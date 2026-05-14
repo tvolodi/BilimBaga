@@ -67,7 +67,7 @@ Exposes a complete REST API for creating, reading, updating, and managing the li
         "version": 2,
         "locale_coverage": ["kk", "ru"],
         "stem_preview": "Қандай хаттама...",
-        "tags": ["uuid-tag1"],
+        "tags": ["network-security"], // tag names (not IDs) — resolved by backend JOIN
         "created_by": "uuid-user",
         "created_at": "2026-05-14T10:00:00Z",
         "updated_at": "2026-05-14T10:00:00Z"

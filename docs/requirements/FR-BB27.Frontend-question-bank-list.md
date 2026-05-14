@@ -33,7 +33,7 @@ A filterable, sortable, paginated data table providing an overview of the entire
 | Frontend | New page `QuestionBankPage` (`src/pages/admin/questions/QuestionBankPage.tsx`); components: `FilterBar`, `QuestionTable`, `BulkActionBar`, `ImportModal`, `VersionHistorySlideover`, `Pagination` |
 | Router | New route `/admin/questions` registered in `App.tsx` under AdminLayout |
 | i18n | New key namespace `questionBank.*` in `src/locales/{kk,ru,en}.json` |
-| Backend | Extended under FR-BB23 via Code Fixer: added `?search=`, `?sort=`, `?order=` query params; `GET /api/v1/questions` list item now includes `category_name` (JOIN), `created_by_name` (JOIN), `stem_preview` (default locale stem text), and `tags` (tag name array) — separate `tag_ids`/`tag_names` fields replaced by a single `tags` string array |
+| Backend | Extended under FR-BB23 via Code Fixer: added `?search=`, `?sort=`, `?order=` query params; `GET /api/v1/questions` list item now includes `category_name` (JOIN), `created_by_name` (JOIN), `stem_preview` (default locale stem text), and `tags` (tag name array) — separate `tag_ids`/`tag_names` fields replaced by a single `tags` string array. Also pluralised `?status`→`?statuses`, `?difficulty`→`?difficulties`, `?tag_id`→`?tag_ids` (all accept comma-separated multi-values; backward-compat aliases retained). |
 | Database | No changes |
 
 ## Technical Specification
@@ -116,7 +116,7 @@ interface QuestionListItem {
   type: 'single' | 'multiple' | 'truefalse' | 'shorttext' | 'likert';
   difficulty: 'easy' | 'medium' | 'hard';
   status: 'draft' | 'review' | 'active' | 'archived';
-  category_id: string | null;  // UUID v4
+  category_id: string;         // UUID v4
   category_name: string;       // resolved by backend JOIN
   default_locale: string;
   version: number;
@@ -232,8 +232,9 @@ interface ImportWarningRow {
 ```
 
 ## Notes
-- Multi-value filter params are serialized as comma-separated strings in the URL (e.g., ?statuses=active,review). The backend `GET /api/v1/questions` accepts these comma-separated values and ANDs them with other filters. See FR-BB23 implementation note.
+- Multi-value filter params are serialized as comma-separated strings in the URL (e.g., ?statuses=active,review). The backend `GET /api/v1/questions` accepts these comma-separated values and ANDs them with other filters. See URL Parameter Shape section above.
 - The `tag_ids` filter sends **UUID v4 values** (not tag names) as a comma-separated string: `?tag_ids=uuid1,uuid2`. The backend resolves which questions are associated with those tag IDs via the `question_tags` join table. The `tags` field returned in the list item contains resolved tag **names** (strings) — this is display-only and is not used for filtering.
+- AC-4 bulk-selected export requires FR-BB25 AC-6 to support an optional `?ids=` query parameter (comma-separated UUIDs). When `?ids=` is present, it overrides filter params and exports only those question IDs. See FR-BB25 for the endpoint specification.
 - All filter state should be managed in the URL (using React Router `useSearchParams`) rather than component state, so filtered views are bookmarkable and shareable.
 - React Query key for the list should include the full filter/sort/page object so each unique combination is cached separately: `['questions', filterParams]`.
 - Bulk archive operations should be dispatched as `Promise.allSettled()` — not sequentially — to maximise parallelism; each resolved/rejected result updates the corresponding row in the cache.

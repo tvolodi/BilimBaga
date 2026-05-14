@@ -12,7 +12,7 @@
 |----|------|-------|--------|
 | FR-BB11 | Project-scaffold | Project Scaffold | Draft |
 | FR-BB12 | Database-bootstrap | Database Bootstrap | Implemented |
-| FR-BB13 | Tenant-configuration | Tenant Configuration | Draft |
+| FR-BB13 | Tenant-configuration | Tenant Configuration | Implemented |
 | FR-BB14 | Authentication | Authentication | Draft |
 | FR-BB15 | JWT-middleware | JWT Middleware | Draft |
 | FR-BB16 | RBAC | Role-Based Access Control | Draft |

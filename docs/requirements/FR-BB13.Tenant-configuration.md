@@ -6,11 +6,21 @@
 | ID | FR-BB13 |
 | Phase | 1 — Foundation |
 | Priority | 1 |
-| Status | Draft |
+| Status | Revised |
 | Depends On | FR-BB12 |
 
 ## Description
 Provides a runtime-configurable branding and localisation store for the platform. A single `tenant_config` table holds key/value pairs (JSONB values) covering application name, logo, colours, and locale settings. The Go service loads and caches this configuration at startup so that every request has access to branding data without a round-trip to the database. Super admins may update configuration at runtime via a protected API endpoint; public endpoints expose the subset of data needed by the frontend before authentication.
+
+## Scope
+
+| Layer | Items |
+|-------|-------|
+| Database | `tenant_config` table; `migrations/002_tenant_config.up.sql`, `migrations/002_tenant_config.down.sql` |
+| API endpoints | `GET /api/v1/tenant/config`, `PUT /api/v1/tenant/config`, `GET /api/v1/tenant/logo` |
+| Backend packages | `internal/tenant/handler.go`, `internal/tenant/service.go`, `internal/tenant/repository.go` |
+| Frontend | `src/api/useTenantConfig.ts`, `src/components/TenantLogo.tsx` |
+| i18n | `src/locales/kk.json`, `src/locales/ru.json`, `src/locales/en.json` — key `common.logo_placeholder` |
 
 ## Acceptance Criteria
 - [ ] AC-1: Migration creates the `tenant_config` table with `key TEXT PRIMARY KEY`, `value JSONB NOT NULL`, and `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` columns.
@@ -21,7 +31,8 @@ Provides a runtime-configurable branding and localisation store for the platform
 - [ ] AC-6: `PUT /api/v1/tenant/config` accepts a partial update object; only provided keys are modified; missing keys retain their existing values.
 - [ ] AC-7: `PUT /api/v1/tenant/config` is accessible only to users with the `super_admin` role; any other role receives `403 Forbidden`.
 - [ ] AC-8: After a successful `PUT /api/v1/tenant/config`, the in-memory cache is invalidated and refreshed so subsequent `GET` requests return the new values without a service restart.
-- [ ] AC-9: All config update events are written to `audit_log` with `action = "tenant_config.update"` and a metadata payload listing the changed keys.
+
+> **NOTE**: Audit logging for tenant config updates will be wired in FR-BB19.
 
 ## Technical Specification
 
@@ -106,10 +117,75 @@ DROP TABLE IF EXISTS tenant_config;
 // On no logo configured — 204 No Content
 ```
 
+### Go Architecture
+
+**Package**: `internal/tenant`
+
+**Files**:
+- `repository.go` — direct database access only
+- `service.go` — business logic and cache
+- `handler.go` — HTTP layer, thin
+
+**Constructor chain** (wired in `internal/router/router.go`):
+```
+NewRepository(*sqlx.DB) → NewService(Repository) → NewHandler(Service)
+```
+
+#### Repository interface
+
+```go
+type Repository interface {
+    GetAll(ctx context.Context) (map[string]json.RawMessage, error)
+    Upsert(ctx context.Context, key string, value json.RawMessage) error
+}
+```
+
+`GetAll` reads all rows from `tenant_config` and returns them as a keyed map.  
+`Upsert` performs an `INSERT … ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`.
+
+#### Service responsibilities
+
+- Holds a `sync.RWMutex`-protected in-memory cache (`map[string]json.RawMessage`).
+- `LoadCache(ctx context.Context) error` — called once at startup; populates cache from repository.
+- `InvalidateAndRefresh(ctx context.Context) error` — called after a successful `PUT`; clears cache and reloads from repository under write lock.
+- Validates on `PUT`: `available_locales` must be a superset of `default_locale`; returns `400 Bad Request` with `code: "INVALID_LOCALE"` if violated.
+- Decodes logo base64 data URI (`data:<mime>;base64,<data>`) to extract MIME type and raw bytes; enforces 1 MB decoded size limit.
+
+#### Handler responsibilities
+
+- Parse and validate request body → delegate to service → serialize and return JSON response.
+- No business logic in handler.
+- `GET /api/v1/tenant/config` and `GET /api/v1/tenant/logo` are registered without JWT middleware.
+- `PUT /api/v1/tenant/config` is wrapped with JWT + RBAC middleware requiring `super_admin` role.
+
 ### Frontend Components
-- `useTenantConfig()` — React Query hook that fetches `GET /api/v1/tenant/config` and caches it for the session lifetime; consumed before rendering `<App />`.
+
+- `useTenantConfig()` — `src/api/useTenantConfig.ts`; React Query hook with query key `['tenant', 'config']`; fetches `GET /api/v1/tenant/config`; `staleTime: Infinity` so it is fetched once per session and consumed before rendering `<App />`.
 - CSS custom properties (`--color-primary`, `--color-accent`) injected into `:root` from the config response so Tailwind's `primary` and `accent` colour tokens resolve to tenant values.
-- `<TenantLogo />` — renders `<img src="/api/v1/tenant/logo" />` with a fallback text placeholder if the server returns 204.
+- `<TenantLogo />` — `src/components/TenantLogo.tsx`; renders `<img src="/api/v1/tenant/logo" />`; when the server returns `204 No Content` renders a text fallback using i18n key `common.logo_placeholder`. The key must be added to `src/locales/kk.json`, `src/locales/ru.json`, and `src/locales/en.json`.
+
+## Out of Scope
+
+- Logo upload via multipart/form-data — Phase 1 stores logo as base64 JSONB only.
+- Per-schema multi-tenant configuration — Phase 6 concern.
+- Per-user theme overrides — not planned.
+
+## Test Strategy
+
+### Backend (Go)
+- **Unit tests** (`internal/tenant/service_test.go`):
+  - Cache invalidation: verify `InvalidateAndRefresh` returns updated values without a restart.
+  - Locale validation: verify `PUT` with `default_locale` not in `available_locales` returns `400`.
+  - Logo size limit: verify payload > 1 MB is rejected with `413`.
+- **Integration tests** (`internal/tenant/handler_test.go`) using `net/http/httptest`:
+  - `GET /api/v1/tenant/config` returns 200 with all five public keys.
+  - `PUT /api/v1/tenant/config` with `super_admin` token updates keys and refreshes cache.
+  - `PUT /api/v1/tenant/config` with non-admin token returns 403.
+  - `GET /api/v1/tenant/logo` returns 204 when logo is `null`.
+
+### Frontend
+- `useTenantConfig()` hook test with MSW mock returning the standard config shape — assert returned data matches.
+- `<TenantLogo />` component test: when `/api/v1/tenant/logo` returns 204, assert the i18n fallback text (`common.logo_placeholder`) is rendered.
 
 ## Notes
 - The `logo` value in the database is stored as a base64-encoded string prefixed with its MIME type (e.g. `data:image/png;base64,...`). The `/logo` endpoint decodes the prefix, sets the appropriate `Content-Type`, and streams the decoded bytes.

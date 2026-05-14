@@ -14,6 +14,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 	"github.com/bilimbaga/bilimbaga/internal/router"
+	"github.com/bilimbaga/bilimbaga/internal/tenant"
 )
 
 func main() {
@@ -45,7 +46,22 @@ func main() {
 	}
 	log.Println("database migrations applied")
 
-	r := router.New()
+	// Wire up tenant configuration.
+	tenantRepo := tenant.NewRepository(db)
+	tenantSvc := tenant.NewService(tenantRepo)
+	tenantHandler := tenant.NewHandler(tenantSvc)
+
+	// Populate the tenant config cache before accepting requests.
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := tenantSvc.LoadCache(startupCtx); err != nil {
+		cancelStartup()
+		fmt.Fprintf(os.Stderr, "startup error: load tenant config cache: %v\n", err)
+		os.Exit(1)
+	}
+	cancelStartup()
+	log.Println("tenant config cache loaded")
+
+	r := router.New(tenantHandler)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,
@@ -78,4 +94,3 @@ func main() {
 
 	log.Println("server stopped")
 }
-

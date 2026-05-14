@@ -22,13 +22,17 @@
 | FR-BB110 | Frontend-auth-screens | Frontend: Auth Screens | Implemented |
 | FR-BB111 | Frontend-admin-shell | Frontend: Admin Shell | Implemented |
 | FR-BB112 | Frontend-branding-settings | Frontend: Branding Settings | Implemented |
+| FR-BB113 | Frontend-department-management | Frontend: Department Management | Draft |
+| FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Draft |
 | FR-BB21 | Categories-and-tags | Categories and Tags | Draft |
-| FR-BB22 | Question-model | Question Model | Draft |
-| FR-BB23 | Question-CRUD-API | Question CRUD API | Draft |
-| FR-BB24 | Translation-API | Translation API | Draft |
+| FR-BB22 | Question-model | Question Model | Implemented |
+| FR-BB23 | Question-CRUD-API | Question CRUD API | Implemented |
+| FR-BB24 | Translation-API | Translation API | Implemented |
 | FR-BB25 | Bulk-import-export | Bulk Import / Export | Draft |
 | FR-BB26 | Frontend-question-editor | Frontend: Question Editor | Draft |
 | FR-BB27 | Frontend-question-bank-list | Frontend: Question Bank List | Draft |
+| FR-BB28 | Frontend-categories-management | Frontend: Categories Management | Draft |
+| FR-BB29 | Frontend-tags-management | Frontend: Tags Management | Draft |
 | FR-BB31 | Exam-configuration-model | Exam Configuration Model | Draft |
 | FR-BB32 | Exam-configuration-API | Exam Configuration API | Draft |
 | FR-BB33 | Exam-assignment | Exam Assignment | Draft |

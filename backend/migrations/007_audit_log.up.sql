@@ -1,3 +1,7 @@
+-- Migration 007 supersedes the audit_log created in 004_auth.
+-- Drop the old single-tenant schema and replace with the multi-tenant version.
+DROP TABLE IF EXISTS audit_log;
+
 CREATE TABLE audit_log (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id   TEXT        NOT NULL,

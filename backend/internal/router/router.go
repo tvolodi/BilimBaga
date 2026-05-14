@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/health"
+	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -10,7 +11,8 @@ import (
 
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, jwtSecret string) *chi.Mux {
+// rbacCache is the in-memory permission cache loaded at startup.
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -35,9 +37,9 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, jwtSecret str
 			r.Use(auth.Authenticate(jwtSecret))
 			r.Post("/auth/change-password", authHandler.ChangePassword)
 
-			// Tenant configuration — protected endpoint.
-			// TODO: add super_admin RBAC guard once FR-BB16 is implemented.
-			r.Put("/tenant/config", tenantHandler.UpdateConfig)
+			// Tenant configuration — requires super_admin.
+			r.With(rbac.RequirePermission(rbacCache, "tenant", "manage")).
+				Put("/tenant/config", tenantHandler.UpdateConfig)
 
 			// All subsequent authenticated routes are registered here.
 		})

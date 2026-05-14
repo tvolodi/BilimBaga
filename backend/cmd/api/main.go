@@ -14,6 +14,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
+	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 )
@@ -74,7 +75,15 @@ func main() {
 	}, authRepo)
 	authHandler := auth.NewHandler(authSvc)
 
-	r := router.New(tenantHandler, authHandler, cfg.JWTSecret)
+	// Load the RBAC permission cache.
+	rbacCache := rbac.NewCache()
+	if err := rbacCache.Load(db); err != nil {
+		fmt.Fprintf(os.Stderr, "startup error: load rbac cache: %v\n", err)
+		os.Exit(1)
+	}
+	log.Println("rbac permission cache loaded")
+
+	r := router.New(tenantHandler, authHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

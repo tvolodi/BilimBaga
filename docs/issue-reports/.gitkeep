@@ -1,0 +1,8 @@
+# Issue Reports & Inner Reports
+
+Agent-generated reports written during pipeline runs.
+
+| File pattern | Contents |
+|-------------|----------|
+| `{run-id}-investigation.md` | Issue Resolution investigation summary |
+| `{run-id}-INNER-REPORT.md` | Release Finalizer inner report |

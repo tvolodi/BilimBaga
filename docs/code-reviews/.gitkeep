@@ -1,0 +1,7 @@
+# Code Reviews
+
+Code review outputs written by the Code Reviewer agent.
+
+Each file is a handoff: `docs/handoffs/{run-id}/step-04-code-reviewer.json`
+
+Summaries may also be placed here as `{run-id}-code-review.md`.

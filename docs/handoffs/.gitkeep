@@ -1,0 +1,9 @@
+# Handoffs
+
+Inter-agent JSON payloads written during pipeline runs.
+
+Each pipeline run creates a subdirectory: `docs/handoffs/{run-id}/`
+
+Files are named: `step-{NN}-{agent-slug}.json`
+
+These files are machine-readable handoffs — do not edit manually.

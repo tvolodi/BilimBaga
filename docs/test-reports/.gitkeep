@@ -1,0 +1,9 @@
+# Test Reports
+
+Test run summaries written by the Test Run & Error Resolution agent.
+
+| File pattern | Contents |
+|-------------|----------|
+| `{run-id}-backend.txt` | Raw Go test output |
+| `{run-id}-frontend.txt` | Raw frontend test output |
+| `{run-id}-summary.json` | Structured summary with pass/fail counts and AC coverage |

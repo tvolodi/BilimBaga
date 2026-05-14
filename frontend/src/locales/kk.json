@@ -4,5 +4,89 @@
   "en": "English",
   "common": {
     "logo_placeholder": "Логотип"
+  },
+  "users": {
+    "title": "Пайдаланушылар",
+    "columns": {
+      "name": "Толық аты",
+      "email": "Email",
+      "department": "Бөлім",
+      "role": "Рөл",
+      "status": "Күй",
+      "created_at": "Жасалған"
+    },
+    "actions": {
+      "create": "Пайдаланушы қосу",
+      "edit": "Өңдеу",
+      "deactivate": "Өшіру",
+      "reset_password": "Құпия сөзді қайта орнату",
+      "import": "CSV импорт"
+    },
+    "status": {
+      "active": "Белсенді",
+      "inactive": "Белсенді емес"
+    },
+    "form": {
+      "email_label": "Email",
+      "email_placeholder": "user@example.com",
+      "full_name_label": "Толық аты",
+      "full_name_placeholder": "Толық атын енгізіңіз",
+      "department_label": "Бөлім",
+      "department_placeholder": "Бөлімді таңдаңыз",
+      "role_label": "Рөл",
+      "role_placeholder": "Рөлді таңдаңыз"
+    },
+    "create_drawer": {
+      "title": "Пайдаланушы қосу",
+      "submit": "Қосу",
+      "temp_password_label": "Уақытша құпия сөз",
+      "temp_password_note": "Бұл құпия сөзді сақтаңыз — ол қайтадан көрсетілмейді."
+    },
+    "edit_drawer": {
+      "title": "Пайдаланушыны өңдеу",
+      "submit": "Сақтау"
+    },
+    "deactivate_dialog": {
+      "title": "Пайдаланушыны өшіру",
+      "message": "{{name}} пайдаланушысын өшіргіңіз келе ме?",
+      "confirm": "Өшіру",
+      "cancel": "Болдырмау"
+    },
+    "reset_password_modal": {
+      "title": "Құпия сөз қайта орнатылды",
+      "message": "Жаңа уақытша құпия сөз жасалды.",
+      "temp_password_label": "Уақытша құпия сөз",
+      "note": "Бұл құпия сөзді сақтаңыз — ол қайтадан көрсетілмейді.",
+      "close": "Жабу"
+    },
+    "import_modal": {
+      "title": "Пайдаланушыларды импорттау",
+      "upload_label": "CSV файлын жүктеу",
+      "upload_hint": "CSV бағандары: email, full_name, department_name, role_name (макс. 500 жол)",
+      "preview_button": "Алдын ала қарау",
+      "commit_button": "Жарамды жолдарды импорттау",
+      "valid_count": "{{count}} жарамды жол",
+      "error_count": "{{count}} қателі жол",
+      "close": "Жабу"
+    },
+    "filters": {
+      "department": "Бөлім бойынша сүзу",
+      "role": "Рөл бойынша сүзу",
+      "status": "Күй бойынша сүзу",
+      "all": "Барлығы"
+    },
+    "messages": {
+      "create_success": "Пайдаланушы сәтті қосылды.",
+      "update_success": "Пайдаланушы жаңартылды.",
+      "deactivate_success": "Пайдаланушы өшірілді.",
+      "reset_success": "Құпия сөз қайта орнатылды.",
+      "import_success": "Импорт аяқталды.",
+      "error_generic": "Қате орын алды. Қайталап көріңіз."
+    },
+    "pagination": {
+      "previous": "Алдыңғы",
+      "next": "Келесі",
+      "page_info": "{{page}} / {{total}} бет"
+    }
   }
 }

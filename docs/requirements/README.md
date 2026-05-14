@@ -15,9 +15,9 @@
 | FR-BB13 | Tenant-configuration | Tenant Configuration | Implemented |
 | FR-BB14 | Authentication | Authentication | Implemented |
 | FR-BB15 | JWT-middleware | JWT Middleware | Implemented |
-| FR-BB16 | RBAC | Role-Based Access Control | Draft |
-| FR-BB17 | Department-management | Department Management | Draft |
-| FR-BB18 | User-management-API | User Management API | Draft |
+| FR-BB16 | RBAC | Role-Based Access Control | Implemented |
+| FR-BB17 | Department-management | Department Management | Implemented |
+| FR-BB18 | User-management-API | User Management API | Implemented |
 | FR-BB19 | Audit-log | Audit Log | Draft |
 | FR-BB110 | Frontend-auth-screens | Frontend: Auth Screens | Draft |
 | FR-BB111 | Frontend-admin-shell | Frontend: Admin Shell | Draft |

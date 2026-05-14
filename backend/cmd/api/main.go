@@ -18,6 +18,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
+	"github.com/bilimbaga/bilimbaga/internal/users"
 )
 
 func main() {
@@ -89,7 +90,12 @@ func main() {
 	deptSvc := departments.NewService(deptRepo)
 	deptHandler := departments.NewHandler(deptSvc)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, cfg.JWTSecret, rbacCache)
+	// Wire up user management.
+	usersRepo := users.NewRepository(db)
+	usersSvc := users.NewService(usersRepo)
+	usersHandler := users.NewHandler(usersSvc)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

@@ -4,5 +4,89 @@
   "en": "English",
   "common": {
     "logo_placeholder": "Логотип"
+  },
+  "users": {
+    "title": "Пользователи",
+    "columns": {
+      "name": "Полное имя",
+      "email": "Email",
+      "department": "Отдел",
+      "role": "Роль",
+      "status": "Статус",
+      "created_at": "Создан"
+    },
+    "actions": {
+      "create": "Создать пользователя",
+      "edit": "Редактировать",
+      "deactivate": "Деактивировать",
+      "reset_password": "Сбросить пароль",
+      "import": "Импорт CSV"
+    },
+    "status": {
+      "active": "Активен",
+      "inactive": "Неактивен"
+    },
+    "form": {
+      "email_label": "Email",
+      "email_placeholder": "user@example.com",
+      "full_name_label": "Полное имя",
+      "full_name_placeholder": "Введите полное имя",
+      "department_label": "Отдел",
+      "department_placeholder": "Выберите отдел",
+      "role_label": "Роль",
+      "role_placeholder": "Выберите роль"
+    },
+    "create_drawer": {
+      "title": "Создать пользователя",
+      "submit": "Создать",
+      "temp_password_label": "Временный пароль",
+      "temp_password_note": "Сохраните этот пароль — он больше не будет показан."
+    },
+    "edit_drawer": {
+      "title": "Редактировать пользователя",
+      "submit": "Сохранить изменения"
+    },
+    "deactivate_dialog": {
+      "title": "Деактивировать пользователя",
+      "message": "Вы уверены, что хотите деактивировать {{name}}?",
+      "confirm": "Деактивировать",
+      "cancel": "Отмена"
+    },
+    "reset_password_modal": {
+      "title": "Пароль сброшен",
+      "message": "Был сгенерирован новый временный пароль.",
+      "temp_password_label": "Временный пароль",
+      "note": "Сохраните этот пароль — он больше не будет показан.",
+      "close": "Закрыть"
+    },
+    "import_modal": {
+      "title": "Импорт пользователей",
+      "upload_label": "Загрузить CSV файл",
+      "upload_hint": "Столбцы CSV: email, full_name, department_name, role_name (макс. 500 строк)",
+      "preview_button": "Предпросмотр",
+      "commit_button": "Импортировать валидные строки",
+      "valid_count": "{{count}} валидных строк",
+      "error_count": "{{count}} строк с ошибками",
+      "close": "Закрыть"
+    },
+    "filters": {
+      "department": "Фильтр по отделу",
+      "role": "Фильтр по роли",
+      "status": "Фильтр по статусу",
+      "all": "Все"
+    },
+    "messages": {
+      "create_success": "Пользователь успешно создан.",
+      "update_success": "Пользователь обновлён.",
+      "deactivate_success": "Пользователь деактивирован.",
+      "reset_success": "Пароль сброшен.",
+      "import_success": "Импорт завершён.",
+      "error_generic": "Произошла ошибка. Попробуйте ещё раз."
+    },
+    "pagination": {
+      "previous": "Назад",
+      "next": "Вперёд",
+      "page_info": "Страница {{page}} из {{total}}"
+    }
   }
 }

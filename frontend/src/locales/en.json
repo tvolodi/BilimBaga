@@ -4,5 +4,89 @@
   "en": "English",
   "common": {
     "logo_placeholder": "Logo"
+  },
+  "users": {
+    "title": "Users",
+    "columns": {
+      "name": "Full Name",
+      "email": "Email",
+      "department": "Department",
+      "role": "Role",
+      "status": "Status",
+      "created_at": "Created"
+    },
+    "actions": {
+      "create": "Create User",
+      "edit": "Edit",
+      "deactivate": "Deactivate",
+      "reset_password": "Reset Password",
+      "import": "Import CSV"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "form": {
+      "email_label": "Email",
+      "email_placeholder": "user@example.com",
+      "full_name_label": "Full Name",
+      "full_name_placeholder": "Enter full name",
+      "department_label": "Department",
+      "department_placeholder": "Select department",
+      "role_label": "Role",
+      "role_placeholder": "Select role"
+    },
+    "create_drawer": {
+      "title": "Create User",
+      "submit": "Create",
+      "temp_password_label": "Temporary Password",
+      "temp_password_note": "Save this password — it will not be shown again."
+    },
+    "edit_drawer": {
+      "title": "Edit User",
+      "submit": "Save Changes"
+    },
+    "deactivate_dialog": {
+      "title": "Deactivate User",
+      "message": "Are you sure you want to deactivate {{name}}? They will no longer be able to log in.",
+      "confirm": "Deactivate",
+      "cancel": "Cancel"
+    },
+    "reset_password_modal": {
+      "title": "Password Reset",
+      "message": "A new temporary password has been generated.",
+      "temp_password_label": "Temporary Password",
+      "note": "Save this password — it will not be shown again.",
+      "close": "Close"
+    },
+    "import_modal": {
+      "title": "Import Users",
+      "upload_label": "Upload CSV File",
+      "upload_hint": "CSV columns: email, full_name, department_name, role_name (max 500 rows)",
+      "preview_button": "Preview",
+      "commit_button": "Import Valid Rows",
+      "valid_count": "{{count}} valid row(s)",
+      "error_count": "{{count}} row(s) with errors",
+      "close": "Close"
+    },
+    "filters": {
+      "department": "Filter by department",
+      "role": "Filter by role",
+      "status": "Filter by status",
+      "all": "All"
+    },
+    "messages": {
+      "create_success": "User created successfully.",
+      "update_success": "User updated successfully.",
+      "deactivate_success": "User deactivated.",
+      "reset_success": "Password reset.",
+      "import_success": "Import completed.",
+      "error_generic": "An error occurred. Please try again."
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "page_info": "Page {{page}} of {{total}}"
+    }
   }
 }

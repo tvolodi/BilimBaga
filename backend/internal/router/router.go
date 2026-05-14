@@ -6,6 +6,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/health"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
+	"github.com/bilimbaga/bilimbaga/internal/users"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -13,7 +14,7 @@ import (
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -51,6 +52,25 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Put("/departments/{id}", deptHandler.Update)
 			r.With(rbac.RequirePermission(rbacCache, "departments", "manage")).
 				Delete("/departments/{id}", deptHandler.Delete)
+
+			// User management.
+			// GetMe is available to every authenticated user — no extra permission required.
+			r.Get("/users/me", usersHandler.GetMe)
+			// Import is a static sub-path; must be registered before /{id} routes.
+			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
+				Post("/users/import", usersHandler.ImportUsers)
+			r.With(rbac.RequirePermission(rbacCache, "users", "read")).
+				Get("/users", usersHandler.ListUsers)
+			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
+				Post("/users", usersHandler.CreateUser)
+			// Per-user routes — GET self-access is enforced inside the handler.
+			r.Get("/users/{id}", usersHandler.GetUser)
+			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
+				Put("/users/{id}", usersHandler.UpdateUser)
+			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
+				Post("/users/{id}/deactivate", usersHandler.DeactivateUser)
+			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
+				Post("/users/{id}/reset-password", usersHandler.ResetPassword)
 		})
 	})
 

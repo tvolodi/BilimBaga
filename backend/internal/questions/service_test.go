@@ -220,6 +220,40 @@ func (m *mockRepository) TagExists(ctx context.Context, tagID string) (bool, err
 	return true, nil
 }
 
+// ── FR-BB25 mock stubs ────────────────────────────────────────────────────────
+
+func (m *mockRepository) ResolveCategoryPath(_ context.Context, path string) (string, error) {
+	return "cat-id-" + path, nil
+}
+
+func (m *mockRepository) FindSimilarStems(_ context.Context, _ []string, _ string) (map[string]StemSimilarityResult, error) {
+	return map[string]StemSimilarityResult{}, nil
+}
+
+func (m *mockRepository) ImportBatch(_ context.Context, rows []ImportRow, _ string) ([]string, error) {
+	ids := make([]string, len(rows))
+	for i := range rows {
+		ids[i] = fmt.Sprintf("imported-q-%d", i+1)
+	}
+	return ids, nil
+}
+
+func (m *mockRepository) StreamExport(_ context.Context, _ ExportFilter, _ func(*ExportRow) error) error {
+	return nil
+}
+
+func (m *mockRepository) TagNameToID(_ context.Context, name string) (string, error) {
+	return "tag-id-" + name, nil
+}
+
+func (m *mockRepository) TagIDByName(_ context.Context, names []string) (map[string]string, error) {
+	result := make(map[string]string, len(names))
+	for _, n := range names {
+		result[n] = "tag-id-" + n
+	}
+	return result, nil
+}
+
 // --- Tests ---
 
 func TestCreateQuestion_DefaultsVersionAndStatus(t *testing.T) {

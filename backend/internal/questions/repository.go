@@ -42,6 +42,14 @@ type Repository interface {
 	DeleteByID(ctx context.Context, id string) error
 	GetVersionChain(ctx context.Context, id string) ([]*VersionEntry, error)
 	TagExists(ctx context.Context, tagID string) (bool, error)
+
+	// FR-BB25 additions.
+	ResolveCategoryPath(ctx context.Context, path string) (string, error)
+	FindSimilarStems(ctx context.Context, stems []string, locale string) (map[string]StemSimilarityResult, error)
+	ImportBatch(ctx context.Context, rows []ImportRow, createdBy string) ([]string, error)
+	StreamExport(ctx context.Context, filter ExportFilter, fn func(*ExportRow) error) error
+	TagNameToID(ctx context.Context, name string) (string, error)
+	TagIDByName(ctx context.Context, names []string) (map[string]string, error)
 }
 
 type postgresRepository struct {

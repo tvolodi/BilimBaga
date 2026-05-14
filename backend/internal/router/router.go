@@ -103,6 +103,11 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Delete("/tags/{id}", tagsHandler.Delete)
 
 			// Questions — all endpoints require questions:read or questions:write.
+			// Import and export are static sub-paths; registered before /{id} routes.
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Post("/questions/import", questionsHandler.Import)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "read")).
+				Get("/questions/export", questionsHandler.Export)
 			r.With(rbac.RequirePermission(rbacCache, "questions", "read")).
 				Get("/questions", questionsHandler.List)
 			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).

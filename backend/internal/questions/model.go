@@ -190,3 +190,81 @@ type UpdateQuestionInput struct {
 	AnswerOptions []AnswerOptionInput
 	TagIDs        []string
 }
+
+// ── FR-BB25: Bulk Import / Export ────────────────────────────────────────────
+
+// ImportRow is a single parsed row from a CSV or JSON import file.
+type ImportRow struct {
+	// RowNumber is the 1-based row index in the source file (for error reporting).
+	RowNumber     int
+	Type          string
+	Difficulty    string
+	CategoryPath  string
+	DefaultLocale string
+	Translations  map[string]TranslationInput
+	AnswerOptions []AnswerOptionInput
+	Tags          []string
+}
+
+// ImportRowError describes validation errors for a single import row.
+type ImportRowError struct {
+	Row    int      `json:"row"`
+	Errors []string `json:"errors"`
+}
+
+// SimilarityMatch describes a near-duplicate found during import duplicate detection.
+type SimilarityMatch struct {
+	QuestionID  string  `json:"question_id"`
+	Score       float64 `json:"score"`
+	StemPreview string  `json:"stem_preview"`
+}
+
+// ImportRowWarning describes a similarity warning for a single import row.
+type ImportRowWarning struct {
+	Row             int             `json:"row"`
+	SimilarityMatch SimilarityMatch `json:"similarity_match"`
+}
+
+// DryRunReport is the response body for a dry-run import.
+type DryRunReport struct {
+	DryRun      bool               `json:"dry_run"`
+	ValidCount  int                `json:"valid_count"`
+	ErrorRows   []ImportRowError   `json:"error_rows"`
+	WarningRows []ImportRowWarning `json:"warning_rows"`
+}
+
+// CommitResult is the response body for a successful committed import.
+type CommitResult struct {
+	DryRun        bool     `json:"dry_run"`
+	ImportedCount int      `json:"imported_count"`
+	QuestionIDs   []string `json:"question_ids"`
+}
+
+// ExportRow is a single question formatted for export (JSON array element or CSV row).
+type ExportRow struct {
+	Type          string                       `json:"type"`
+	Difficulty    string                       `json:"difficulty"`
+	CategoryPath  string                       `json:"category_path"`
+	DefaultLocale string                       `json:"default_locale"`
+	Translations  map[string]TranslationDetail `json:"translations"`
+	AnswerOptions []AnswerOptionDetail         `json:"answer_options"`
+	Tags          []string                     `json:"tags"`
+}
+
+// ExportFilter mirrors QuestionFilter plus an optional explicit ID list.
+type ExportFilter struct {
+	IDs          []string // when non-empty, only export these question IDs (max 100)
+	CategoryID   *string
+	TagIDs       []string
+	Difficulties []string
+	Type         *string
+	Statuses     []string
+	Locale       *string
+}
+
+// StemSimilarityResult is returned by the trigram batch search in the repository.
+type StemSimilarityResult struct {
+	QuestionID string
+	Score      float64
+	Stem       string
+}

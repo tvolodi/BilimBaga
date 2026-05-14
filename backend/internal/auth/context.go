@@ -5,7 +5,7 @@ import "context"
 type contextKey int
 
 const (
-	ctxUserID       contextKey = iota
+	ctxUserID contextKey = iota
 	ctxRole
 	ctxDepartmentID
 	ctxTenantID

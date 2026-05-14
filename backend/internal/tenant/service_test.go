@@ -79,8 +79,8 @@ func TestGetPublicConfig(t *testing.T) {
 // TestUpdateConfig_LocaleConstraint verifies that default_locale must be in available_locales.
 func TestUpdateConfig_LocaleConstraint(t *testing.T) {
 	tests := []struct {
-		name       string
-		updates    map[string]json.RawMessage
+		name        string
+		updates     map[string]json.RawMessage
 		wantErrCode string
 	}{
 		{

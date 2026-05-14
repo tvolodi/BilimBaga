@@ -50,11 +50,11 @@ func TestAuthenticate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		authHeader     string
-		wantStatus     int
-		wantCode       string // empty means no error envelope check
-		checkCtx       func(t *testing.T, r *http.Request)
+		name       string
+		authHeader string
+		wantStatus int
+		wantCode   string // empty means no error envelope check
+		checkCtx   func(t *testing.T, r *http.Request)
 	}{
 		{
 			name:       "AC-1: missing Authorization header → 401 MISSING_TOKEN",

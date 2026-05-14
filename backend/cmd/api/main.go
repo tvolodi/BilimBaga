@@ -14,6 +14,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
+	"github.com/bilimbaga/bilimbaga/internal/departments"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
@@ -83,7 +84,12 @@ func main() {
 	}
 	log.Println("rbac permission cache loaded")
 
-	r := router.New(tenantHandler, authHandler, cfg.JWTSecret, rbacCache)
+	// Wire up department management.
+	deptRepo := departments.NewRepository(db)
+	deptSvc := departments.NewService(deptRepo)
+	deptHandler := departments.NewHandler(deptSvc)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

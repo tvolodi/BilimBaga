@@ -15,7 +15,7 @@ type Config struct {
 	Name            string
 	User            string
 	Password        string
-	SSLMode         string        // defaults to "disable"; set via DB_SSLMODE
+	SSLMode         string // defaults to "disable"; set via DB_SSLMODE
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxIdleTime time.Duration

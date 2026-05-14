@@ -12,15 +12,15 @@ func TestCacheHas(t *testing.T) {
 			"users:read": true, "users:manage": true,
 			"questions:read": true, "questions:write": true,
 			"exams:read": true, "exams:write": true, "exams:assign": true,
-			"reports:read":  true,
-			"portal:read":   true, "portal:submit": true,
+			"reports:read": true,
+			"portal:read":  true, "portal:submit": true,
 			"tenant:manage": true, "audit:read": true,
 		},
 		"department_admin": {
 			"users:read": true, "users:manage": true,
 			"questions:read": true,
 			"exams:read":     true, "exams:assign": true,
-			"reports:read":   true,
+			"reports:read": true,
 		},
 		"examiner": {
 			"questions:read": true, "questions:write": true,

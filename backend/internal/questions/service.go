@@ -38,6 +38,10 @@ type Service interface {
 	TransitionStatus(ctx context.Context, id, newStatus string) (*Question, error)
 	DeleteQuestion(ctx context.Context, id string) error
 	ListVersions(ctx context.Context, id string) ([]*VersionEntry, error)
+
+	// FR-BB25 additions.
+	ValidateAndImport(ctx context.Context, rows []ImportRow, dryRun bool, createdBy string) (*DryRunReport, *CommitResult, error)
+	StreamExport(ctx context.Context, filter ExportFilter, fn func(*ExportRow) error) error
 }
 
 type service struct {

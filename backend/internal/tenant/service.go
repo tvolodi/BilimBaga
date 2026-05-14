@@ -37,6 +37,11 @@ type Service interface {
 	GetPublicConfig() map[string]json.RawMessage
 	GetLogoData() ([]byte, string, error)
 	UpdateConfig(ctx context.Context, updates map[string]json.RawMessage) ([]string, error)
+
+	// GetDefaultLocale returns the configured default_locale, or empty string if unset.
+	GetDefaultLocale() string
+	// GetAvailableLocales returns the configured available_locales list, or nil if unset.
+	GetAvailableLocales() []string
 }
 
 type service struct {
@@ -166,6 +171,36 @@ func (s *service) UpdateConfig(ctx context.Context, updates map[string]json.RawM
 	}
 
 	return updatedKeys, nil
+}
+
+// GetDefaultLocale returns the configured default_locale, or empty string if unset.
+func (s *service) GetDefaultLocale() string {
+	s.mu.RLock()
+	raw, ok := s.cache["default_locale"]
+	s.mu.RUnlock()
+	if !ok {
+		return ""
+	}
+	var v string
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return ""
+	}
+	return v
+}
+
+// GetAvailableLocales returns the configured available_locales list, or nil if unset.
+func (s *service) GetAvailableLocales() []string {
+	s.mu.RLock()
+	raw, ok := s.cache["available_locales"]
+	s.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	var v []string
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil
+	}
+	return v
 }
 
 // validateLocaleConstraint enforces that default_locale ∈ available_locales.

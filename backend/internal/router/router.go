@@ -18,7 +18,7 @@ import (
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -121,6 +121,14 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Post("/questions/{id}/tags", questionsHandler.AddTag)
 			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
 				Delete("/questions/{id}/tags/{tagId}", questionsHandler.RemoveTag)
+
+			// Question translations (FR-BB24).
+			r.With(rbac.RequirePermission(rbacCache, "questions", "read")).
+				Get("/questions/{id}/translations", translationsHandler.List)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Put("/questions/{id}/translations/{locale}", translationsHandler.Upsert)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Delete("/questions/{id}/translations/{locale}", translationsHandler.Delete)
 		})
 	})
 

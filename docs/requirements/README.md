@@ -27,7 +27,7 @@
 | FR-BB21 | Categories-and-tags | Categories and Tags | Draft |
 | FR-BB22 | Question-model | Question Model | Implemented |
 | FR-BB23 | Question-CRUD-API | Question CRUD API | Implemented |
-| FR-BB24 | Translation-API | Translation API | Draft |
+| FR-BB24 | Translation-API | Translation API | Implemented |
 | FR-BB25 | Bulk-import-export | Bulk Import / Export | Draft |
 | FR-BB26 | Frontend-question-editor | Frontend: Question Editor | Draft |
 | FR-BB27 | Frontend-question-bank-list | Frontend: Question Bank List | Draft |

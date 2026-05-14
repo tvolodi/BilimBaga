@@ -122,7 +122,12 @@ func main() {
 	questionsSvc := questions.NewService(questionsRepo)
 	questionsHandler := questions.NewHandler(questionsSvc, auditWriter)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, cfg.JWTSecret, rbacCache)
+	// Wire up question translations (FR-BB24).
+	translationsRepo := questions.NewTranslationRepository(db)
+	translationsSvc := questions.NewTranslationService(translationsRepo, tenantSvc)
+	translationsHandler := questions.NewTranslationHandler(translationsSvc, auditWriter)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

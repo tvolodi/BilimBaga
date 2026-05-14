@@ -6,23 +6,23 @@
 | ID | FR-BB24 |
 | Phase | 2 — Content Management |
 | Priority | 2 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB23 |
 
 ## Description
 Provides dedicated endpoints for managing per-locale translations of question stems, explanations, and answer option texts independently of the core question structure. A single upsert endpoint replaces all text for a locale atomically, enabling translators to work locale-by-locale without touching the structural metadata. The API enforces that the default locale translation cannot be deleted and that only locales declared in the tenant's configuration are accepted.
 
 ## Acceptance Criteria
-- [ ] AC-1: `GET /api/v1/questions/:id/translations` returns a map of all locale codes to their translation objects (stem, explanation, answer option texts); locales with no translation are absent from the map; the response includes a `locale_coverage` summary listing present and missing locales relative to the tenant's `available_locales`.
-- [ ] AC-2: `PUT /api/v1/questions/:id/translations/:locale` performs an atomic upsert: it creates or replaces `question_translations` and all `answer_translations` for the given locale in a single transaction; partial updates (e.g., providing only some option translations) return `422` with an error listing the missing option IDs.
-- [ ] AC-3: `PUT /api/v1/questions/:id/translations/:locale` rejects a locale that is not present in the tenant's `available_locales` configuration with `422` and error code `ERR_UNSUPPORTED_LOCALE`.
-- [ ] AC-4: `DELETE /api/v1/questions/:id/translations/:locale` removes the `question_translations` row and all associated `answer_translations` for that locale; if the locale equals `default_locale`, it returns `409` with error code `ERR_CANNOT_DELETE_DEFAULT_LOCALE`.
-- [ ] AC-5: The `locale_coverage` computed field returned by `GET /api/v1/questions` (FR-BB23) and `GET /api/v1/questions/:id` is consistent with the translation rows — any discrepancy caused by a direct DB manipulation must be detectable by an integration test.
-- [ ] AC-6: All translation write operations (PUT, DELETE) require role `examiner` or above; read operations require any authenticated user.
-- [ ] AC-7: An audit log entry is written for every PUT and DELETE, capturing `entity_type = 'question_translation'`, `entity_id` (question ID + locale), and the before/after text diff.
-- [ ] AC-8: `PUT /api/v1/questions/:id/translations/:locale` returns the full updated translation object in the response body, not just a success acknowledgement.
-- [ ] AC-9: Attempting to write a translation for a non-existent question ID returns `404` with error code `ERR_QUESTION_NOT_FOUND`.
-- [ ] AC-10: The upsert is idempotent — submitting the same translation payload twice produces no error and does not increment any version counter or trigger additional audit entries beyond the second write.
+- [x] AC-1: `GET /api/v1/questions/:id/translations` returns a map of all locale codes to their translation objects (stem, explanation, answer option texts); locales with no translation are absent from the map; the response includes a `locale_coverage` summary listing present and missing locales relative to the tenant's `available_locales`.
+- [x] AC-2: `PUT /api/v1/questions/:id/translations/:locale` performs an atomic upsert: it creates or replaces `question_translations` and all `answer_translations` for the given locale in a single transaction; partial updates (e.g., providing only some option translations) return `422` with an error listing the missing option IDs.
+- [x] AC-3: `PUT /api/v1/questions/:id/translations/:locale` rejects a locale that is not present in the tenant's `available_locales` configuration with `422` and error code `ERR_UNSUPPORTED_LOCALE`.
+- [x] AC-4: `DELETE /api/v1/questions/:id/translations/:locale` removes the `question_translations` row and all associated `answer_translations` for that locale; if the locale equals `default_locale`, it returns `409` with error code `ERR_CANNOT_DELETE_DEFAULT_LOCALE`.
+- [x] AC-5: The `locale_coverage` computed field returned by `GET /api/v1/questions` (FR-BB23) and `GET /api/v1/questions/:id` is consistent with the translation rows — any discrepancy caused by a direct DB manipulation must be detectable by an integration test.
+- [x] AC-6: All translation write operations (PUT, DELETE) require role `examiner` or above; read operations require any authenticated user.
+- [x] AC-7: An audit log entry is written for every PUT and DELETE, capturing `entity_type = 'question_translation'`, `entity_id` (question ID + locale), and the before/after text diff.
+- [x] AC-8: `PUT /api/v1/questions/:id/translations/:locale` returns the full updated translation object in the response body, not just a success acknowledgement.
+- [x] AC-9: Attempting to write a translation for a non-existent question ID returns `404` with error code `ERR_QUESTION_NOT_FOUND`.
+- [x] AC-10: The upsert is idempotent — submitting the same translation payload twice produces no error and does not increment any version counter or trigger additional audit entries beyond the second write.
 
 ## Technical Specification
 

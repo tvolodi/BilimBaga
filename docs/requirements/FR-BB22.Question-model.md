@@ -6,8 +6,17 @@
 | ID | FR-BB22 |
 | Phase | 2 — Content Management |
 | Priority | 1 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB21 |
+
+## Scope
+
+| Layer | Items |
+|-------|-------|
+| Database | 5 new tables: `questions`, `question_translations`, `answer_options`, `answer_translations`, `question_tags` |
+| Go package | `internal/questions` — repository and model types for these tables are owned here |
+| Frontend | N/A for this FR |
+| i18n keys | N/A for this FR |
 
 ## Description
 Defines the core data model for the multilingual question bank. A question record stores type, difficulty, status, and authorship metadata; all user-visible text lives in separate translation rows keyed by locale. Answer options are similarly split into a structure table and a translation table. Versioning is achieved by chaining questions via `parent_id` so every edit to an active question produces a new version while the old one is archived automatically.
@@ -15,7 +24,7 @@ Defines the core data model for the multilingual question bank. A question recor
 ## Acceptance Criteria
 - [ ] AC-1: The `questions` table exists with all specified columns; `type` is constrained to `('single','multiple','truefalse','likert','shorttext')`; `difficulty` is constrained to `('easy','medium','hard')`; `status` is constrained to `('draft','review','active','archived')`; the database rejects out-of-range enum values.
 - [ ] AC-2: The `question_translations` table enforces a composite PK on `(question_id, locale)` and a FK to `questions(id) ON DELETE CASCADE`; inserting a translation for a non-existent question is rejected by the DB.
-- [ ] AC-3: The `answer_options` table enforces a FK to `questions(id) ON DELETE CASCADE`; `sort_order` defaults to the insertion sequence; `likert_weight` and `likert_polarity` are NULL for non-Likert question types and are validated at the application layer.
+- [ ] AC-3: The `answer_options` table enforces a FK to `questions(id) ON DELETE CASCADE`; `sort_order` defaults to 0 (the DB column default); the caller is responsible for setting explicit `sort_order` values when display order matters; `likert_weight` and `likert_polarity` are NULL for non-Likert question types and are validated at the application layer.
 - [ ] AC-4: The `answer_translations` table enforces a composite PK on `(option_id, locale)` and a FK to `answer_options(id) ON DELETE CASCADE`.
 - [ ] AC-5: The `question_tags` join table enforces a composite PK on `(question_id, tag_id)`, FKs to both parent tables with `ON DELETE CASCADE`, preventing orphan associations.
 - [ ] AC-6: When a new version of an active question is created, `parent_id` on the new row references the previous question's `id`; the previous question's `status` is set to `archived` atomically in the same transaction; only one question per parent chain may have `status = 'active'` at any time.
@@ -105,6 +114,23 @@ CREATE TRIGGER question_translations_updated_at
     BEFORE UPDATE ON question_translations
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ```
+
+## Go Domain Package
+
+Go domain package: `internal/questions` — repository and model types for these tables are owned here. No other package may import question repository types directly; access goes through the `questions` service interface.
+
+## Out of Scope
+
+- REST API endpoints for question CRUD (FR-BB23)
+- Translation upsert API (FR-BB24)
+- RBAC permission rows for questions (covered separately)
+- Bulk import/export of question banks (FR-BB25)
+
+## Test Strategy
+
+1. **Migration integration test**: verify all five tables (`questions`, `question_translations`, `answer_options`, `answer_translations`, `question_tags`) are created and foreign key constraints are enforced (e.g., inserting a child row with a non-existent parent UUID is rejected).
+2. **DB constraint tests**: verify that inserting invalid `type`, `difficulty`, or `status` values is rejected by the database CHECK constraints.
+3. **Versioning transaction unit test** (AC-6): verify that creating a new version atomically sets `parent_id`, sets the previous question's `status` to `'archived'`, and that no two rows with the same parent chain have `status = 'active'`.
 
 ## Notes
 - The split between `questions` + `answer_options` (structure) and their `_translations` counterparts means grading logic never needs to parse locale-specific text — it only reads `is_correct` and `likert_weight` from the structure tables.

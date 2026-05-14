@@ -14,11 +14,14 @@ import (
 
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
+	"github.com/bilimbaga/bilimbaga/internal/categories"
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
+	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
+	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 	"github.com/bilimbaga/bilimbaga/internal/users"
 )
@@ -105,7 +108,20 @@ func main() {
 	auditSvc := audit.NewService(db)
 	auditHandler := audit.NewHandler(auditSvc, auditWriter)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, cfg.JWTSecret, rbacCache)
+	// Wire up categories and tags (FR-BB21).
+	categoriesRepo := categories.NewRepository(db)
+	categoriesSvc := categories.NewService(categoriesRepo)
+	categoriesHandler := categories.NewHandler(categoriesSvc, auditWriter)
+
+	tagsRepo := tags.NewRepository(db)
+	tagsSvc := tags.NewService(tagsRepo)
+	tagsHandler := tags.NewHandler(tagsSvc, auditWriter)
+
+	// Wire up questions (FR-BB22 — no HTTP handlers yet; routes come in FR-BB23).
+	questionsRepo := questions.NewRepository(db)
+	_ = questions.NewService(questionsRepo)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

@@ -6,17 +6,35 @@
 | ID | FR-BB110 |
 | Phase | 1 — Foundation |
 | Priority | 2 |
-| Status | Draft |
+| Status | Revised-2 |
 | Depends On | FR-BB14, FR-BB13 |
 
 ## Description
 Delivers the login screen and forced-password-change screen — the two entry points that every user passes through before reaching any protected area of the application. Tenant branding (logo, colours) is fetched before render and applied via CSS custom properties so the screens feel native to the organisation. All strings are externalised to i18n locale files and the language selector on the login page allows switching before authentication.
 
+## Scope
+
+| Layer    | Artifact |
+|----------|----------|
+| Frontend | `src/pages/auth/LoginPage.tsx`, `src/pages/auth/ChangePasswordPage.tsx`, `src/api/auth.ts`, `src/components/auth/LoginForm.tsx`, `src/components/auth/ChangePasswordForm.tsx`, `src/components/auth/LanguageSelector.tsx`, `src/components/TenantLogo.tsx` (extend), `src/locales/kk.json`, `src/locales/ru.json`, `src/locales/en.json` |
+| Backend  | No changes — using existing endpoints from FR-BB14 |
+| Database | No changes |
+| i18n     | `auth.*` key namespace added to `kk.json`, `ru.json`, `en.json` |
+
+## Out of Scope
+
+- Registration / self-sign-up flow
+- Multi-factor authentication (MFA)
+- Social / SSO login (OAuth2, SAML)
+- Account unlock self-service
+- Password-strength policy enforcement UI
+- Password reset via email link
+
 ## Acceptance Criteria
 - [ ] AC-1: The login page displays the tenant logo (from `GET /api/v1/tenant/logo`) at the top; if no logo is configured (204 response), a text fallback using `app_name` is shown.
 - [ ] AC-2: The login page contains an email field, a password field (masked), a language selector, and a "Sign in" button; all labels and placeholder text come from the active i18n locale file.
 - [ ] AC-3: On successful login, the access token is stored in React Query's client state (not `localStorage`); the user is redirected to `/admin` (admin roles) or `/portal` (employee role).
-- [ ] AC-4: When the server returns `force_password_change: true`, the user is immediately redirected to `/auth/change-password` before any other page loads.
+- [ ] AC-4: When the server returns `force_password_change: true`, the user is immediately redirected to `/change-password` before any other page loads.
 - [ ] AC-5: The forced-password-change screen requires the user to enter their current password and a new password (with confirmation); on success the user is redirected to the appropriate landing page.
 - [ ] AC-6: The error state `INVALID_CREDENTIALS` displays an inline error message without clearing the email field.
 - [ ] AC-7: The error state `ACCOUNT_LOCKED` displays the lock message and the `locked_until` timestamp in the user's locale and time zone.
@@ -38,50 +56,33 @@ src/
       ChangePasswordPage.tsx
   api/
     auth.ts            # React Query mutations: useLogin, useChangePassword, useLogout
-    tenant.ts          # React Query query: useTenantConfig
   components/
     auth/
       LoginForm.tsx
       ChangePasswordForm.tsx
       LanguageSelector.tsx
-      TenantLogo.tsx
   locales/
     kk.json            # Kazakh strings
     ru.json            # Russian strings
     en.json            # English strings
 ```
 
-#### `useTenantConfig` hook (`src/api/tenant.ts`)
+> **Note — existing hook**: `useTenantConfig()` already exists at `src/api/useTenantConfig.ts` (queryKey `['tenant','config']`, `staleTime: Infinity`). Import from there — do **not** create `src/api/tenant.ts`.
 
-```typescript
-import { useQuery } from '@tanstack/react-query';
-
-interface TenantConfig {
-  app_name: string;
-  primary_color: string;
-  accent_color: string;
-  default_locale: string;
-  available_locales: string[];
-}
-
-export function useTenantConfig() {
-  return useQuery<TenantConfig>({
-    queryKey: ['tenant', 'config'],
-    queryFn: async () => {
-      const res = await fetch('/api/v1/tenant/config');
-      if (!res.ok) throw new Error('Failed to load tenant config');
-      const json = await res.json();
-      return json.data;
-    },
-    staleTime: Infinity,  // config is stable for the session
-  });
-}
-```
+> **Note — existing component**: `src/components/TenantLogo.tsx` already exists. Extend it to accept an optional `appName?: string` prop; when the logo `<img>` fails to load, display `appName` as the text fallback instead of the generic i18n placeholder. Do **not** create `src/components/auth/TenantLogo.tsx`; import `TenantLogo` from `../../components/TenantLogo` in `LoginPage.tsx`.
 
 #### `useLogin` mutation (`src/api/auth.ts`)
 
 ```typescript
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+interface ApiError {
+  code: string;
+  message: string;
+  details?: Record<string, string>;
+}
+
+// Note: If a shared `ApiError` type already exists in `src/api/types.ts`, import from there instead of redefining.
 
 interface LoginPayload {
   email: string;
@@ -126,18 +127,16 @@ export function useLogin() {
 #### `LoginPage.tsx` — key behaviour
 
 ```typescript
+// Key imports:
+// import { useTenantConfig } from '../../api/useTenantConfig';
+// import { TenantLogo } from '../../components/TenantLogo';
+
+// CSS brand colours are already applied globally by TenantProvider in App.tsx — no local useEffect needed.
 export function LoginPage() {
   const { data: config, isLoading: configLoading } = useTenantConfig();
   const login = useLogin();
   const navigate = useNavigate();
   const { t } = useTranslation();
-
-  // Apply brand colours before render
-  useEffect(() => {
-    if (!config) return;
-    document.documentElement.style.setProperty('--color-primary', config.primary_color);
-    document.documentElement.style.setProperty('--color-accent', config.accent_color);
-  }, [config]);
 
   if (configLoading) return <FullPageSpinner />;
 
@@ -145,7 +144,7 @@ export function LoginPage() {
     try {
       const result = await login.mutateAsync(values);
       if (result.user.force_password_change) {
-        navigate('/auth/change-password');
+        navigate('/change-password');
       } else if (result.user.role === 'employee') {
         navigate('/portal');
       } else {
@@ -206,13 +205,24 @@ export function LoginPage() {
 ```typescript
 // In App.tsx / router setup
 <Routes>
-  <Route path="/auth/login"           element={<LoginPage />} />
-  <Route path="/auth/change-password" element={<RequireAuth><ChangePasswordPage /></RequireAuth>} />
-  <Route path="/admin/*"              element={<RequireRole roles={['super_admin','department_admin','examiner']}><AdminShell /></RequireRole>} />
-  <Route path="/portal/*"             element={<RequireRole roles={['employee']}><EmployeePortal /></RequireRole>} />
-  <Route path="/"                     element={<Navigate to="/auth/login" replace />} />
+  <Route path="/login"           element={<LoginPage />} />
+  <Route path="/change-password" element={<RequireAuth><ChangePasswordPage /></RequireAuth>} />
+  <Route path="/admin/*"         element={<RequireRole roles={['super_admin','department_admin','examiner']}><AdminShell /></RequireRole>} />
+  <Route path="/portal/*"        element={<RequireRole roles={['employee']}><EmployeePortal /></RequireRole>} />
+  <Route path="/"                element={<Navigate to="/login" replace />} />
 </Routes>
 ```
+
+## Test Strategy
+
+| Test type | Scope | Tool |
+|-----------|-------|------|
+| Unit | `useLogin` mutation (success, INVALID_CREDENTIALS, ACCOUNT_LOCKED, network error) | Vitest + MSW |
+| Unit | `useTenantConfig` query (success, 204 logo fallback, network error degraded UI) | Vitest + MSW |
+| Component | `LoginForm` renders error variants inline, does not clear email on INVALID_CREDENTIALS | React Testing Library |
+| Component | `LanguageSelector` persists choice to localStorage; applies i18n change immediately | React Testing Library |
+| Component | `ChangePasswordForm` shows mismatch error client-side | React Testing Library |
+| e2e | Full login → redirect flow (admin role → /admin; employee role → /portal; force_password_change → /change-password) | Playwright |
 
 ## Notes
 - The access token must never be written to `localStorage` or `sessionStorage` to mitigate XSS token theft. Store it only in React Query's in-memory client state; use the httpOnly refresh cookie for persistence across tab refreshes.

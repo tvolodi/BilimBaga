@@ -88,5 +88,31 @@
       "next": "Next",
       "page_info": "Page {{page}} of {{total}}"
     }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in to {{appName}}",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "passwordLabel": "Password",
+      "submitButton": "Sign in",
+      "errors": {
+        "INVALID_CREDENTIALS": "Incorrect email or password.",
+        "ACCOUNT_LOCKED": "Account locked until {{until}}. Contact your administrator.",
+        "network": "Service unavailable. Please try again later."
+      }
+    },
+    "changePassword": {
+      "title": "Set your new password",
+      "currentPasswordLabel": "Current password",
+      "newPasswordLabel": "New password",
+      "confirmPasswordLabel": "Confirm new password",
+      "submitButton": "Change password",
+      "errors": {
+        "INVALID_CREDENTIALS": "Current password is incorrect.",
+        "VALIDATION_ERROR": "New password does not meet requirements.",
+        "mismatch": "Passwords do not match."
+      }
+    }
   }
 }

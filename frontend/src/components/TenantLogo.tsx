@@ -1,6 +1,10 @@
 import { useTranslation } from 'react-i18next'
 
-export function TenantLogo() {
+interface TenantLogoProps {
+  appName?: string
+}
+
+export function TenantLogo({ appName }: TenantLogoProps) {
   const { t } = useTranslation()
 
   function handleError(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -12,14 +16,19 @@ export function TenantLogo() {
     }
   }
 
+  const fallbackText = appName ?? t('common.logo_placeholder')
+
   return (
-    <>
+    <div className="flex justify-center">
       <img
         src="/api/v1/tenant/logo"
-        alt={t('common.logo_placeholder')}
+        alt={fallbackText}
+        className="h-12 object-contain"
         onError={handleError}
       />
-      <span style={{ display: 'none' }}>{t('common.logo_placeholder')}</span>
-    </>
+      <span style={{ display: 'none' }} className="text-lg font-bold">
+        {fallbackText}
+      </span>
+    </div>
   )
 }

@@ -19,7 +19,7 @@
 | FR-BB17 | Department-management | Department Management | Implemented |
 | FR-BB18 | User-management-API | User Management API | Implemented |
 | FR-BB19 | Audit-log | Audit Log | Implemented |
-| FR-BB110 | Frontend-auth-screens | Frontend: Auth Screens | Draft |
+| FR-BB110 | Frontend-auth-screens | Frontend: Auth Screens | Implemented |
 | FR-BB111 | Frontend-admin-shell | Frontend: Admin Shell | Draft |
 | FR-BB112 | Frontend-branding-settings | Frontend: Branding Settings | Draft |
 | FR-BB21 | Categories-and-tags | Categories and Tags | Draft |

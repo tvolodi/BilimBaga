@@ -88,5 +88,31 @@
       "next": "Келесі",
       "page_info": "{{page}} / {{total}} бет"
     }
+  },
+  "auth": {
+    "login": {
+      "title": "{{appName}} жүйесіне кіру",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "passwordLabel": "Құпия сөз",
+      "submitButton": "Кіру",
+      "errors": {
+        "INVALID_CREDENTIALS": "Email немесе құпия сөз қате.",
+        "ACCOUNT_LOCKED": "Аккаунт {{until}} дейін бұғатталған. Әкімшіге хабарласыңыз.",
+        "network": "Қызмет қолжетімсіз. Кейінірек қайталаңыз."
+      }
+    },
+    "changePassword": {
+      "title": "Жаңа құпия сөз орнату",
+      "currentPasswordLabel": "Ағымдағы құпия сөз",
+      "newPasswordLabel": "Жаңа құпия сөз",
+      "confirmPasswordLabel": "Жаңа құпия сөзді растаңыз",
+      "submitButton": "Құпия сөзді өзгерту",
+      "errors": {
+        "INVALID_CREDENTIALS": "Ағымдағы құпия сөз қате.",
+        "VALIDATION_ERROR": "Жаңа құпия сөз талаптарға сай емес.",
+        "mismatch": "Құпия сөздер сәйкес емес."
+      }
+    }
   }
 }

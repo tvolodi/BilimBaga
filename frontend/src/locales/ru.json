@@ -88,5 +88,31 @@
       "next": "Вперёд",
       "page_info": "Страница {{page}} из {{total}}"
     }
+  },
+  "auth": {
+    "login": {
+      "title": "Вход в {{appName}}",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "passwordLabel": "Пароль",
+      "submitButton": "Войти",
+      "errors": {
+        "INVALID_CREDENTIALS": "Неверный email или пароль.",
+        "ACCOUNT_LOCKED": "Аккаунт заблокирован до {{until}}. Обратитесь к администратору.",
+        "network": "Сервис недоступен. Попробуйте позже."
+      }
+    },
+    "changePassword": {
+      "title": "Установите новый пароль",
+      "currentPasswordLabel": "Текущий пароль",
+      "newPasswordLabel": "Новый пароль",
+      "confirmPasswordLabel": "Подтвердите новый пароль",
+      "submitButton": "Изменить пароль",
+      "errors": {
+        "INVALID_CREDENTIALS": "Текущий пароль неверен.",
+        "VALIDATION_ERROR": "Новый пароль не соответствует требованиям.",
+        "mismatch": "Пароли не совпадают."
+      }
+    }
   }
 }

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
 	"github.com/bilimbaga/bilimbaga/internal/health"
@@ -14,7 +15,7 @@ import (
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -71,6 +72,12 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Post("/users/{id}/deactivate", usersHandler.DeactivateUser)
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/{id}/reset-password", usersHandler.ResetPassword)
+
+			// Audit log.
+			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).
+				Get("/audit", auditHandler.List)
+			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).
+				Get("/audit/export", auditHandler.Export)
 		})
 	})
 

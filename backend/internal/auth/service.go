@@ -56,10 +56,6 @@ func (s *service) Login(ctx context.Context, req *LoginRequest, ipAddr string) (
 				[]byte("$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
 				[]byte(req.Password),
 			)
-			s.writeAudit(ctx, nil, "LOGIN_FAILURE", ipAddr, map[string]any{
-				"email":  req.Email,
-				"reason": "user_not_found",
-			})
 			return nil, nil, &ServiceError{
 				Code:       "INVALID_CREDENTIALS",
 				Message:    "invalid email or password",
@@ -71,11 +67,6 @@ func (s *service) Login(ctx context.Context, req *LoginRequest, ipAddr string) (
 
 	// AC-5: check lockout before verifying the password.
 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now().UTC()) {
-		s.writeAudit(ctx, &user.ID, "LOGIN_FAILURE", ipAddr, map[string]any{
-			"email":        req.Email,
-			"reason":       "account_locked",
-			"locked_until": user.LockedUntil.Format(time.RFC3339),
-		})
 		return nil, nil, &ServiceError{
 			Code:       "ACCOUNT_LOCKED",
 			Message:    fmt.Sprintf("account locked, try again after %s", user.LockedUntil.Format(time.RFC3339)),
@@ -91,11 +82,6 @@ func (s *service) Login(ctx context.Context, req *LoginRequest, ipAddr string) (
 			lockUntil := time.Now().UTC().Add(30 * time.Minute)
 			_ = s.repo.LockAccount(ctx, user.ID, lockUntil)
 			_ = s.repo.UpdateFailedAttempts(ctx, user.ID, newAttempts)
-			s.writeAudit(ctx, &user.ID, "LOGIN_FAILURE", ipAddr, map[string]any{
-				"email":        req.Email,
-				"reason":       "invalid_password_account_now_locked",
-				"locked_until": lockUntil.Format(time.RFC3339),
-			})
 			return nil, nil, &ServiceError{
 				Code:       "ACCOUNT_LOCKED",
 				Message:    fmt.Sprintf("account locked, try again after %s", lockUntil.Format(time.RFC3339)),
@@ -103,11 +89,6 @@ func (s *service) Login(ctx context.Context, req *LoginRequest, ipAddr string) (
 			}
 		}
 		_ = s.repo.UpdateFailedAttempts(ctx, user.ID, newAttempts)
-		s.writeAudit(ctx, &user.ID, "LOGIN_FAILURE", ipAddr, map[string]any{
-			"email":    req.Email,
-			"reason":   "invalid_password",
-			"attempts": newAttempts,
-		})
 		return nil, nil, &ServiceError{
 			Code:       "INVALID_CREDENTIALS",
 			Message:    "invalid email or password",
@@ -127,8 +108,6 @@ func (s *service) Login(ctx context.Context, req *LoginRequest, ipAddr string) (
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth.service.Login: issue refresh cookie: %w", err)
 	}
-
-	s.writeAudit(ctx, &user.ID, "LOGIN_SUCCESS", ipAddr, map[string]any{"email": req.Email})
 
 	return &LoginResponse{
 		AccessToken: accessToken,
@@ -164,7 +143,6 @@ func (s *service) Refresh(ctx context.Context, rawToken, ipAddr string) (*Refres
 	// AC-11: detect reuse of a revoked token.
 	if record.RevokedAt != nil {
 		_ = s.repo.RevokeAllUserRefreshTokens(ctx, record.UserID)
-		s.writeAudit(ctx, &record.UserID, "REFRESH_TOKEN_REUSE_DETECTED", ipAddr, nil)
 		return nil, nil, &ServiceError{
 			Code:       "INVALID_REFRESH_TOKEN",
 			Message:    "refresh token is invalid or expired",
@@ -200,8 +178,6 @@ func (s *service) Refresh(ctx context.Context, rawToken, ipAddr string) (*Refres
 		return nil, nil, fmt.Errorf("auth.service.Refresh: issue refresh cookie: %w", err)
 	}
 
-	s.writeAudit(ctx, &user.ID, "REFRESH_SUCCESS", ipAddr, nil)
-
 	return &RefreshResponse{
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
@@ -229,7 +205,6 @@ func (s *service) Logout(ctx context.Context, rawToken, ipAddr string) (*http.Co
 
 	if record.RevokedAt == nil {
 		_ = s.repo.RevokeRefreshToken(ctx, record.ID)
-		s.writeAudit(ctx, &record.UserID, "LOGOUT", ipAddr, nil)
 	}
 
 	return clearCookie, nil
@@ -253,9 +228,6 @@ func (s *service) ChangePassword(ctx context.Context, userID string, req *Change
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-		s.writeAudit(ctx, &userID, "PASSWORD_CHANGE_FAILURE", ipAddr, map[string]any{
-			"reason": "invalid_current_password",
-		})
 		return &ServiceError{
 			Code:       "INVALID_CREDENTIALS",
 			Message:    "current password is incorrect",
@@ -273,7 +245,6 @@ func (s *service) ChangePassword(ctx context.Context, userID string, req *Change
 		return fmt.Errorf("auth.service.ChangePassword: update password: %w", err)
 	}
 
-	s.writeAudit(ctx, &userID, "PASSWORD_CHANGE_SUCCESS", ipAddr, nil)
 	return nil
 }
 
@@ -361,16 +332,6 @@ func (s *service) clearRefreshCookie() *http.Cookie {
 		Secure:   s.cfg.CookieSecure,
 		SameSite: http.SameSiteStrictMode,
 	}
-}
-
-// writeAudit writes an audit log entry, ignoring errors so auth operations are never blocked.
-func (s *service) writeAudit(ctx context.Context, userID *string, action, ipAddr string, metadata map[string]any) {
-	_ = s.repo.WriteAuditLog(ctx, &AuditEntry{
-		UserID:    userID,
-		Action:    action,
-		IPAddress: ipAddr,
-		Metadata:  metadata,
-	})
 }
 
 // hashToken returns the hex-encoded SHA-256 hash of a token string.

@@ -7,10 +7,11 @@ Your main goal is to diminish the amount of manual work for the user. If possibl
 
 Before concluding ANY response, run this self-check:
 - Did I leave a shell command for the user to run? → Run it myself.
-- Did I write a migration file but not apply it? → Apply it myself.
+- Did I write a migration file but not apply it? → Apply it myself with `make migrate`.
 - Did I say "you can..." or "you need to..."? → Do it myself instead.
 - Did I skip a step with "requires live server"? → Start the server, do the step, stop it.
 - Did I ask a question whose answer I can find in the codebase? → Look it up myself.
+- Does my final summary contain ANY command the user must run? → Remove it and run the command myself.
 
 **Forbidden output patterns** (if any appear in a response, the response is wrong):
 - "You can run..."
@@ -18,8 +19,12 @@ Before concluding ANY response, run this self-check:
 - "To complete this, run..."
 - "Restart the server and..."
 - "Apply the migration by..."
+- "Run make migrate..."
+- "Run the migration..."
 - "Once you do X, then Y will work"
 - "This should work after you..."
+- "Don't forget to..."
+- "Remember to..."
 
 **The only valid reason to ask the user** is when there are two or more genuinely equivalent options and the choice depends on a business/personal preference the agent cannot infer from context.
 

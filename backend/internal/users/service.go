@@ -140,12 +140,6 @@ func (s *service) CreateUser(ctx context.Context, req CreateRequest, callerRole,
 		return nil, fmt.Errorf("users.CreateUser: %w", err)
 	}
 
-	uid := callerUserID
-	_ = s.repo.WriteAuditLog(ctx, &uid, "user.create", ip, map[string]any{
-		"target_user_id": u.ID,
-		"email":          u.Email,
-	})
-
 	return &CreateResponse{User: *u, TemporaryPassword: tmpPwd}, nil
 }
 
@@ -180,10 +174,6 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 		return nil, fmt.Errorf("users.UpdateUser: %w", err)
 	}
 
-	uid := callerUserID
-	_ = s.repo.WriteAuditLog(ctx, &uid, "user.update", ip, map[string]any{
-		"target_user_id": id,
-	})
 	return u, nil
 }
 
@@ -206,10 +196,6 @@ func (s *service) DeactivateUser(ctx context.Context, id, callerRole, callerDept
 	}
 	_ = s.repo.RevokeAllTokens(ctx, id)
 
-	uid := callerUserID
-	_ = s.repo.WriteAuditLog(ctx, &uid, "user.deactivate", ip, map[string]any{
-		"target_user_id": id,
-	})
 	return nil
 }
 
@@ -241,10 +227,6 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 		return nil, fmt.Errorf("users.ResetPassword: %w", err)
 	}
 
-	uid := callerUserID
-	_ = s.repo.WriteAuditLog(ctx, &uid, "user.password_reset", ip, map[string]any{
-		"target_user_id": id,
-	})
 	return &ResetPasswordResponse{TemporaryPassword: tmpPwd}, nil
 }
 
@@ -359,10 +341,7 @@ func (s *service) commitImportRow(ctx context.Context, row CSVRow, callerUserID,
 		return fmt.Errorf("create user: %w", err)
 	}
 
-	_ = s.repo.WriteAuditLog(ctx, &callerUserID, "user.import", ip, map[string]any{
-		"target_user_id": u.ID,
-		"email":          u.Email,
-	})
+	_ = u // suppress unused warning
 	return nil
 }
 

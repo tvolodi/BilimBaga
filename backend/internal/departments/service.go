@@ -87,15 +87,6 @@ func (s *service) Create(ctx context.Context, req CreateRequest, userID, ipAddre
 		return nil, fmt.Errorf("departments.Create: %w", err)
 	}
 
-	var uidPtr *string
-	if userID != "" {
-		uidPtr = &userID
-	}
-	_ = s.repo.WriteAuditLog(ctx, uidPtr, "department.create", ipAddress, map[string]any{
-		"department_id": created.ID,
-		"name":          created.Name,
-	})
-
 	return &DepartmentNode{
 		ID:        created.ID,
 		Name:      created.Name,
@@ -112,15 +103,6 @@ func (s *service) Update(ctx context.Context, id string, req UpdateRequest, user
 	if err != nil {
 		return nil, fmt.Errorf("departments.Update: %w", err)
 	}
-
-	var uidPtr *string
-	if userID != "" {
-		uidPtr = &userID
-	}
-	_ = s.repo.WriteAuditLog(ctx, uidPtr, "department.update", ipAddress, map[string]any{
-		"department_id": updated.ID,
-		"name":          updated.Name,
-	})
 
 	return &DepartmentNode{
 		ID:        updated.ID,
@@ -157,14 +139,6 @@ func (s *service) Delete(ctx context.Context, id, userID, ipAddress string) erro
 	if err := s.repo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("departments.Delete: %w", err)
 	}
-
-	var uidPtr *string
-	if userID != "" {
-		uidPtr = &userID
-	}
-	_ = s.repo.WriteAuditLog(ctx, uidPtr, "department.delete", ipAddress, map[string]any{
-		"department_id": id,
-	})
 
 	return nil
 }

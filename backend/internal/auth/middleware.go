@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -50,9 +51,9 @@ func Authenticate(jwtSecret string) func(http.Handler) http.Handler {
 			deptID, _ := claims["department_id"].(string) // optional; defaults to ""
 
 			ctx := r.Context()
-			ctx = context.WithValue(ctx, ctxUserID, userID)
-			ctx = context.WithValue(ctx, ctxRole, role)
-			ctx = context.WithValue(ctx, ctxDepartmentID, deptID)
+			ctx = context.WithValue(ctx, ctxkeys.CtxUserID, userID)
+			ctx = context.WithValue(ctx, ctxkeys.CtxRole, role)
+			ctx = context.WithValue(ctx, ctxkeys.CtxDepartmentID, deptID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

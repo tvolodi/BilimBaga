@@ -83,7 +83,7 @@ func TestListTree_Returns200(t *testing.T) {
 			return []*DepartmentNode{sampleNode()}, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/departments", nil)
 	w := httptest.NewRecorder()
@@ -101,7 +101,7 @@ func TestListTree_ServiceError_Returns500(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/departments", nil)
 	w := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestCreate_Returns201(t *testing.T) {
 			return sampleNode(), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"name":"Engineering"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/departments", strings.NewReader(body))
@@ -135,7 +135,7 @@ func TestCreate_Returns201(t *testing.T) {
 }
 
 func TestCreate_EmptyName_Returns400(t *testing.T) {
-	h := NewHandler(&mockService{})
+	h := NewHandler(&mockService{}, nil)
 
 	body := `{"name":""}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/departments", strings.NewReader(body))
@@ -154,7 +154,7 @@ func TestCreate_ParentNotFound_Returns404(t *testing.T) {
 			return nil, ErrNotFound
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"name":"Child","parent_id":"missing"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/departments", strings.NewReader(body))
@@ -173,7 +173,7 @@ func TestCreate_DuplicateName_Returns409(t *testing.T) {
 			return nil, ErrDuplicateName
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"name":"Duplicate"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/departments", strings.NewReader(body))
@@ -194,7 +194,7 @@ func TestUpdate_Returns200(t *testing.T) {
 			return sampleNode(), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"name":"New Name"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/departments/dept-1", strings.NewReader(body))
@@ -209,7 +209,7 @@ func TestUpdate_Returns200(t *testing.T) {
 }
 
 func TestUpdate_EmptyName_Returns400(t *testing.T) {
-	h := NewHandler(&mockService{})
+	h := NewHandler(&mockService{}, nil)
 
 	body := `{"name":""}`
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/departments/dept-1", strings.NewReader(body))
@@ -226,7 +226,7 @@ func TestUpdate_NotFound_Returns404(t *testing.T) {
 			return nil, ErrNotFound
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"name":"X"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/departments/missing", strings.NewReader(body))
@@ -246,7 +246,7 @@ func TestDelete_Returns204(t *testing.T) {
 	svc := &mockService{
 		deleteFn: func(_ context.Context, _, _, _ string) error { return nil },
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/departments/dept-1", nil)
 	req = withChiParam(req, "id", "dept-1")
@@ -260,7 +260,7 @@ func TestDelete_NotFound_Returns404(t *testing.T) {
 	svc := &mockService{
 		deleteFn: func(_ context.Context, _, _, _ string) error { return ErrNotFound },
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/departments/missing", nil)
 	req = withChiParam(req, "id", "missing")
@@ -277,7 +277,7 @@ func TestDelete_HasChildren_Returns409(t *testing.T) {
 	svc := &mockService{
 		deleteFn: func(_ context.Context, _, _, _ string) error { return ErrDepartmentHasChildren },
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/departments/dept-1", nil)
 	req = withChiParam(req, "id", "dept-1")
@@ -294,7 +294,7 @@ func TestDelete_HasUsers_Returns409(t *testing.T) {
 	svc := &mockService{
 		deleteFn: func(_ context.Context, _, _, _ string) error { return ErrDepartmentNotEmpty },
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/departments/dept-1", nil)
 	req = withChiParam(req, "id", "dept-1")

@@ -18,7 +18,7 @@ func newTestHandler(t *testing.T) *Handler {
 	repo := newMockRepository(defaultSeedData())
 	svc := NewService(repo)
 	require.NoError(t, svc.LoadCache(context.Background()))
-	return NewHandler(svc)
+	return NewHandler(svc, nil)
 }
 
 // decodeResponse unmarshals the JSON response body into the standard envelope.

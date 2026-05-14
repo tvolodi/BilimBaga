@@ -1,0 +1,46 @@
+{
+  "run_id": "FR-BB16",
+  "changes_applied": [
+    {
+      "type": "migration",
+      "description": "Applied all pending migrations 001–005 to a fresh bilimbaga-db instance. Migration 005_rbac.up.sql created the permissions and role_permissions tables, renamed the hr_admin role to examiner, and seeded the full RBAC permission matrix."
+    },
+    {
+      "type": "env",
+      "description": "Created .env from .env.example so Docker Compose could resolve DB_NAME, DB_USER, DB_PASSWORD variables. The .env file uses placeholder values from .env.example (password: changeme) suitable for local development only."
+    }
+  ],
+  "migration_files": [
+    "backend/migrations/001_init.up.sql",
+    "backend/migrations/002_tenant_config.up.sql",
+    "backend/migrations/003_roles_departments.up.sql",
+    "backend/migrations/004_auth.up.sql",
+    "backend/migrations/005_rbac.up.sql"
+  ],
+  "env_vars_added": [
+    {
+      "name": "DB_PASSWORD",
+      "description": "Currently set to placeholder 'changeme' from .env.example. Must be changed to a strong secret for any non-local environment.",
+      "user_action_required": true
+    },
+    {
+      "name": "JWT_SECRET",
+      "description": "Currently set to placeholder 'replace-with-at-least-32-random-chars'. Must be replaced with a securely generated value.",
+      "user_action_required": true
+    }
+  ],
+  "files_changed": [
+    ".env"
+  ],
+  "verification_status": "ok",
+  "verification_details": {
+    "tables_present": ["audit_log", "departments", "permissions", "refresh_tokens", "role_permissions", "roles", "tenant_config", "users"],
+    "roles": ["department_admin", "employee", "examiner", "super_admin"],
+    "hr_admin_renamed_to_examiner": true,
+    "permissions_table_created": true,
+    "role_permissions_table_created": true,
+    "permissions_seeded": 12,
+    "role_permissions_seeded": true
+  },
+  "user_instructions": "For local development the defaults in .env are sufficient. Before any staging/production deployment, replace DB_PASSWORD and JWT_SECRET in .env with strong, randomly generated values — never commit the .env file."
+}

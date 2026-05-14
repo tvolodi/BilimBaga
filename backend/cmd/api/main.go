@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
@@ -50,10 +52,14 @@ func main() {
 	}
 	log.Println("database migrations applied")
 
+	// Set up structured logger and audit writer.
+	logger := slog.Default()
+	auditWriter := audit.NewWriter(db, logger)
+
 	// Wire up tenant configuration.
 	tenantRepo := tenant.NewRepository(db)
 	tenantSvc := tenant.NewService(tenantRepo)
-	tenantHandler := tenant.NewHandler(tenantSvc)
+	tenantHandler := tenant.NewHandler(tenantSvc, auditWriter)
 
 	// Populate the tenant config cache before accepting requests.
 	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 10*time.Second)
@@ -75,7 +81,7 @@ func main() {
 		CookieDomain:      cfg.CookieDomain,
 		CookieSecure:      cfg.CookieSecure,
 	}, authRepo)
-	authHandler := auth.NewHandler(authSvc)
+	authHandler := auth.NewHandler(authSvc, auditWriter)
 
 	// Load the RBAC permission cache.
 	rbacCache := rbac.NewCache()
@@ -88,14 +94,18 @@ func main() {
 	// Wire up department management.
 	deptRepo := departments.NewRepository(db)
 	deptSvc := departments.NewService(deptRepo)
-	deptHandler := departments.NewHandler(deptSvc)
+	deptHandler := departments.NewHandler(deptSvc, auditWriter)
 
 	// Wire up user management.
 	usersRepo := users.NewRepository(db)
 	usersSvc := users.NewService(usersRepo)
-	usersHandler := users.NewHandler(usersSvc)
+	usersHandler := users.NewHandler(usersSvc, auditWriter)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, cfg.JWTSecret, rbacCache)
+	// Wire up audit log.
+	auditSvc := audit.NewService(db)
+	auditHandler := audit.NewHandler(auditSvc, auditWriter)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

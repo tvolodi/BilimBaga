@@ -1,0 +1,33 @@
+﻿{
+  "run_id": "FR-BB13",
+  "pipeline": "A",
+  "commit_hash": "ab1de0b",
+  "commit_message": "feat(tenant): implement FR-BB13 tenant configuration API and UI",
+  "files_committed": [
+    "backend/migrations/002_tenant_config.up.sql",
+    "backend/migrations/002_tenant_config.down.sql",
+    "backend/internal/tenant/repository.go",
+    "backend/internal/tenant/service.go",
+    "backend/internal/tenant/handler.go",
+    "backend/internal/tenant/service_test.go",
+    "backend/internal/tenant/handler_test.go",
+    "backend/internal/router/router.go",
+    "backend/cmd/api/main.go",
+    "backend/go.mod",
+    "backend/go.sum",
+    "frontend/src/api/useTenantConfig.ts",
+    "frontend/src/api/useTenantConfig.test.tsx",
+    "frontend/src/components/TenantLogo.tsx",
+    "frontend/src/components/TenantProvider.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/en.json",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "docs/requirements/FR-BB13.Tenant-configuration.md",
+    "docs/requirements/README.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB13-INNER-REPORT.md",
+  "status": "success"
+}

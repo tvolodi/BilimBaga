@@ -1,0 +1,54 @@
+{
+  "run_id": "FR-BB12",
+  "step": "01-requirement-development",
+  "mode": "revision",
+  "requirement_id": "FR-BB12",
+  "requirement_file": "docs/requirements/FR-BB12.Database-bootstrap.md",
+  "status": "revised",
+  "changes_applied": [
+    {
+      "severity": "Critical",
+      "finding": "AC-2 naming convention self-contradictory (single file vs separate up/down files)",
+      "fix": "Updated AC-2 to name initial files as 001_init.up.sql and 001_init.down.sql; updated Technical Specification section headers accordingly."
+    },
+    {
+      "severity": "High",
+      "finding": "Startup code sketch has Go naming collision (local var 'db' shadows 'db' package)",
+      "fix": "Added explicit import alias 'dbpkg' and renamed local variable to 'database' in the main.go sketch."
+    },
+    {
+      "severity": "High",
+      "finding": "Embedded binary claim (//go:embed) incompatible with file:// source driver",
+      "fix": "Removed //go:embed claim from Notes; clarified that migrations/ directory must be present on the OS filesystem at runtime. Added DB_SSLMODE to env vars list in Notes."
+    },
+    {
+      "severity": "High",
+      "finding": "sslmode=disable hardcoded in DSN",
+      "fix": "Added SSLMode string field to db.Config; updated DSN format string to use cfg.SSLMode; added AC-10 for DB_SSLMODE env var with default 'disable'."
+    },
+    {
+      "severity": "Medium",
+      "finding": "No AC for dirty-flag abort behavior",
+      "fix": "Added AC-9 covering dirty flag detection and non-zero exit."
+    },
+    {
+      "severity": "Medium",
+      "finding": "Missing Out of Scope section",
+      "fix": "Added Out of Scope section listing: schema tables beyond placeholder, data seeding, multi-tenant isolation, DB backup configuration."
+    },
+    {
+      "severity": "Medium",
+      "finding": "Missing Test Strategy section",
+      "fix": "Added Test Strategy section with four test scenarios: integration test (RunMigrations), dirty-flag abort integration test, unit test for DB_SSLMODE config, and make migrate smoke test."
+    },
+    {
+      "severity": "Cleanup",
+      "finding": "Orphaned Notes bullet about dirty flag left after Notes section replacement",
+      "fix": "Removed the orphaned bullet (now superseded by AC-9)."
+    }
+  ],
+  "new_acs_added": ["AC-9", "AC-10"],
+  "sections_added": ["Out of Scope", "Test Strategy"],
+  "fr_number_unchanged": true,
+  "timestamp": "2026-05-14T00:00:00Z"
+}

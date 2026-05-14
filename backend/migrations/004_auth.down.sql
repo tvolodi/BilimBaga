@@ -1,0 +1,4 @@
+-- Migration: 004_auth.down.sql
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS users;

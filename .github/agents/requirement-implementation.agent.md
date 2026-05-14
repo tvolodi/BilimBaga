@@ -54,8 +54,13 @@ handoffs:
 1. Determine the next migration number by listing `backend/migrations/`.
 2. Write a new numbered SQL migration file: `backend/migrations/{NNN}_{slug}.sql`.
 3. **Never edit existing migration files.**
-4. Apply the migration: `docker exec bilimbaga-db psql -U postgres -d bilimbaga -f /migrations/{NNN}_{slug}.sql` or via `make migrate`.
-5. Verify applied: check schema matches the requirement's DDL spec.
+4. **Apply the migration NOW — do not leave this for the user**:
+   ```bash
+   make migrate
+   ```
+   If `make migrate` is unavailable, use: `docker exec bilimbaga-db psql -U postgres -d bilimbaga -f /migrations/{NNN}_{slug}.sql`
+5. Verify the migration applied: check that the expected tables/columns exist (`\d {table_name}`).
+6. If the migration fails, fix the SQL and re-apply before continuing to Phase 3.
 
 ### Phase 3 — Go Backend
 
@@ -131,6 +136,11 @@ Wait for its report. If it reports failures it could not resolve, determine if a
 2. Update `docs/architecture-guide.md` if new tables or endpoints were added.
 
 ### Phase 10 — Release
+
+**⛔ Zero Manual Work self-check before delegating:**
+- Did I apply every migration file I created? → If not, run `make migrate` now.
+- Does my final summary contain ANY command the user must run? → Remove it and do it myself.
+- Are all tests passing? → If not, fix them before proceeding.
 
 Delegate to `06-release-finalizer` with:
 - Run ID

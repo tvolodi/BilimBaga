@@ -20,7 +20,6 @@ type mockRepo struct {
 	hasUsersFn func(ctx context.Context, id string) (bool, error)
 	hasChildFn func(ctx context.Context, id string) (bool, error)
 	deleteFn   func(ctx context.Context, id string) error
-	auditLog   []string
 }
 
 func (m *mockRepo) GetAll(_ context.Context) ([]Department, error) {
@@ -79,11 +78,6 @@ func (m *mockRepo) Delete(ctx context.Context, id string) error {
 	if m.deleteFn != nil {
 		return m.deleteFn(ctx, id)
 	}
-	return nil
-}
-
-func (m *mockRepo) WriteAuditLog(_ context.Context, _ *string, action, _ string, _ map[string]any) error {
-	m.auditLog = append(m.auditLog, action)
 	return nil
 }
 
@@ -159,7 +153,6 @@ func TestCreate_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Engineering", node.Name)
 	assert.Empty(t, node.Children)
-	assert.Contains(t, repo.auditLog, "department.create")
 }
 
 func TestCreate_WithParent_ParentNotFound(t *testing.T) {
@@ -199,7 +192,7 @@ func TestUpdate_Success(t *testing.T) {
 	node, err := svc.Update(context.Background(), "d1", UpdateRequest{Name: "New Name"}, "user-1", "127.0.0.1")
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", node.Name)
-	assert.Contains(t, repo.auditLog, "department.update")
+
 }
 
 func TestUpdate_NotFound(t *testing.T) {
@@ -235,7 +228,7 @@ func TestDelete_Success(t *testing.T) {
 
 	err := svc.Delete(context.Background(), "d1", "user-1", "127.0.0.1")
 	require.NoError(t, err)
-	assert.Contains(t, repo.auditLog, "department.delete")
+
 }
 
 func TestDelete_NotFound(t *testing.T) {

@@ -10,18 +10,20 @@ import (
 	"strings"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/go-chi/chi/v5"
 )
 
 // Handler handles HTTP requests for the users domain.
 type Handler struct {
-	svc Service
+	svc    Service
+	writer *audit.Writer
 }
 
-// NewHandler creates a new Handler backed by the given Service.
-func NewHandler(svc Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler creates a new Handler backed by the given Service and audit Writer.
+func NewHandler(svc Service, writer *audit.Writer) *Handler {
+	return &Handler{svc: svc, writer: writer}
 }
 
 // ListUsers handles GET /api/v1/users.
@@ -114,6 +116,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.writer.Write(r.Context(), r, "user.create", "user", &resp.User.ID, map[string]any{"email": resp.User.Email})
 	api.WriteJSON(w, http.StatusCreated, map[string]any{"data": resp, "error": nil})
 }
 
@@ -145,6 +148,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.writer.Write(r.Context(), r, "user.update", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": u, "error": nil})
 }
 
@@ -166,6 +170,7 @@ func (h *Handler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.writer.Write(r.Context(), r, "user.deactivate", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "error": nil})
 }
 
@@ -188,6 +193,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.writer.Write(r.Context(), r, "user.password_reset", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
 }
 

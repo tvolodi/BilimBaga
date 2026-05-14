@@ -6,8 +6,16 @@
 | ID | FR-BB14 |
 | Phase | 1 — Foundation |
 | Priority | 1 |
-| Status | Draft |
-| Depends On | FR-BB12 |
+| Status | Ready |
+| Depends On | FR-BB12, FR-BB16, FR-BB17, FR-BB19 |
+
+## Scope
+
+| Layer | Artifact |
+|-------|----------|
+| Migration | `migrations/007_auth.up.sql`, `migrations/007_auth.down.sql` |
+| Backend | `internal/auth/` (handler, service, repository) |
+| Router | `internal/router/` (auth routes) |
 
 ## Description
 Implements the full authentication lifecycle: credential validation, JWT access token issuance, httpOnly refresh-cookie rotation, logout, and forced password change. Account lockout after repeated failures protects against brute-force attacks. All authentication events — successful logins, failures, logouts, and password changes — are recorded in the `audit_log` for compliance and forensics.
@@ -23,13 +31,15 @@ Implements the full authentication lifecycle: credential validation, JWT access 
 - [ ] AC-8: `POST /api/v1/auth/change-password` requires the caller to supply their current password, validates it, hashes the new password with bcrypt cost 12, stores it, and sets `force_password_change = false`.
 - [ ] AC-9: Passwords are hashed with bcrypt at cost 12; plaintext passwords are never logged, stored, or returned in any API response.
 - [ ] AC-10: Every authentication event (login success, login failure, refresh, logout, password change) writes a row to `audit_log` with the actor's `user_id` (or the email if no user is resolved), the IP address from `X-Forwarded-For` / `RemoteAddr`, and relevant metadata.
+- [ ] AC-11: `POST /api/v1/auth/refresh` with a previously-revoked refresh token immediately revokes ALL of that user's active refresh tokens and returns `401 Unauthorized` with `INVALID_REFRESH_TOKEN`.
+- [ ] AC-12: `POST /api/v1/auth/change-password` with `new_password` shorter than 8 characters returns `422 Unprocessable Entity` with `VALIDATION_ERROR`.
 
 ## Technical Specification
 
 ### Database Schema
 
 ```sql
--- Migration: 003_auth.up.sql
+-- Migration: 007_auth.up.sql
 
 CREATE TABLE users (
     id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,7 +75,7 @@ CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 ```
 
 ```sql
--- Migration: 003_auth.down.sql
+-- Migration: 007_auth.down.sql
 DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS users;
 ```
@@ -186,10 +196,33 @@ DROP TABLE IF EXISTS users;
 }
 ```
 
+## Out of Scope
+
+- OAuth / SSO providers (deferred to a future phase)
+- Multi-factor authentication (MFA / 2FA)
+- Admin unlock UI (deferred to FR-BB18)
+- Email-based password reset / forgot-password flow
+- Session management beyond JWT (e.g. server-side session store)
+
+## Test Strategy
+
+- **Unit tests** — `internal/auth/` service layer:
+  - Login happy path and credential failure
+  - Account lockout counter increment and lock threshold
+  - Refresh token rotation (new record inserted, old record revoked)
+  - Token-reuse revocation (revoked token presented → all tokens for user revoked)
+  - Password change (correct current password, wrong current password, too-short new password)
+- **Integration tests** — all four endpoints exercised against a test database:
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/refresh`
+  - `POST /api/v1/auth/logout`
+  - `POST /api/v1/auth/change-password`
+- **Table-driven edge-case tests**: locked account, expired refresh token, revoked refresh token, reused refresh token.
+
 ## Notes
 - The refresh token stored in the cookie is a cryptographically random 32-byte value (base64url-encoded). Only its SHA-256 hash is stored in `refresh_tokens.token_hash` — the raw token is never persisted.
-- On refresh token rotation, the old token is revoked (not deleted) to enable detection of token-reuse attacks: if a revoked token is presented, all of that user's refresh tokens are revoked immediately.
+- On refresh token rotation, the old token is revoked (not deleted) to enable detection of token-reuse attacks: if a revoked token is presented, all of that user's refresh tokens are revoked immediately (see AC-11).
 - `failed_attempts` is reset to 0 on successful login.
 - Admin unlock (FR-BB18) sets `locked_until = NULL` and `failed_attempts = 0`.
-- New password minimum requirements: ≥ 8 characters. Stricter policy (uppercase, digit, special char) is configurable via tenant config in a future phase.
-- The `departments` table is created by FR-BB17 but referenced here; migration ordering must ensure `departments` exists before `users`. In practice, insert a placeholder migration for the `departments` table in the `003_auth.up.sql` file or ensure FR-BB17 migration (004) runs first and the FK is added as an ALTER in that file.
+- New password minimum requirements: ≥ 8 characters (see AC-12). Stricter policy (uppercase, digit, special char) is configurable via tenant config in a future phase.
+- Migration `007_auth.up.sql` runs after FR-BB16 (`roles`) and FR-BB17 (`departments`), so both FK targets are guaranteed to exist.

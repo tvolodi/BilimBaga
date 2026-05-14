@@ -1,0 +1,26 @@
+﻿{
+  "run_id": "FR-BB17",
+  "pipeline": "A",
+  "commit_hash": "91a078b",
+  "commit_message": "feat(departments): implement FR-BB17 department management API",
+  "files_committed": [
+    "backend/migrations/006_departments.up.sql",
+    "backend/migrations/006_departments.down.sql",
+    "backend/internal/departments/types.go",
+    "backend/internal/departments/repository.go",
+    "backend/internal/departments/service.go",
+    "backend/internal/departments/handler.go",
+    "backend/internal/departments/service_test.go",
+    "backend/internal/departments/handler_test.go",
+    "backend/internal/router/router.go",
+    "backend/cmd/api/main.go",
+    "backend/internal/auth/context.go",
+    "backend/internal/auth/middleware_test.go",
+    "backend/internal/db/db.go",
+    "backend/internal/rbac/cache_test.go",
+    "backend/internal/tenant/service_test.go",
+    "docs/requirements/FR-BB17.Department-management.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB17-INNER-REPORT.md",
+  "status": "success"
+}

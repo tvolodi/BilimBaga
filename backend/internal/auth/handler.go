@@ -6,16 +6,19 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/bilimbaga/bilimbaga/internal/audit"
 )
 
 // Handler handles HTTP requests for the auth domain.
 type Handler struct {
-	svc Service
+	svc    Service
+	writer *audit.Writer
 }
 
-// NewHandler creates a new Handler backed by the given Service.
-func NewHandler(svc Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler creates a new Handler backed by the given Service and audit Writer.
+func NewHandler(svc Service, writer *audit.Writer) *Handler {
+	return &Handler{svc: svc, writer: writer}
 }
 
 // apiResponse is the standard JSON envelope for all API responses.
@@ -73,10 +76,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	resp, cookie, err := h.svc.Login(r.Context(), &req, clientIP(r))
 	if err != nil {
+		h.writer.Write(r.Context(), r, "auth.login.failure", "user", nil, map[string]any{"email": req.Email})
 		handleServiceError(w, err)
 		return
 	}
 
+	h.writer.Write(r.Context(), r, "auth.login.success", "user", &resp.User.ID, map[string]any{"email": req.Email})
 	http.SetCookie(w, cookie)
 	writeJSON(w, http.StatusOK, resp, nil)
 }
@@ -118,6 +123,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.writer.Write(r.Context(), r, "auth.logout", "", nil, nil)
 	http.SetCookie(w, clearCookie)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "logged out"}, nil)
 }
@@ -164,5 +170,6 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.writer.Write(r.Context(), r, "auth.password_change", "user", &userID, nil)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password changed"}, nil)
 }

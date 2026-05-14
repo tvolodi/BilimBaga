@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -13,14 +12,6 @@ import (
 
 // ErrNotFound is returned by repository methods when a record does not exist.
 var ErrNotFound = errors.New("not found")
-
-// AuditEntry holds the data to be written to the audit_log table.
-type AuditEntry struct {
-	UserID    *string
-	Action    string
-	IPAddress string
-	Metadata  map[string]any
-}
 
 // Repository is the data-access interface for the auth domain.
 type Repository interface {
@@ -34,7 +25,6 @@ type Repository interface {
 	RevokeRefreshToken(ctx context.Context, tokenID string) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
 	UpdatePassword(ctx context.Context, userID, passwordHash string) error
-	WriteAuditLog(ctx context.Context, entry *AuditEntry) error
 }
 
 type pgRepository struct {
@@ -170,21 +160,4 @@ func (r *pgRepository) UpdatePassword(ctx context.Context, userID, passwordHash 
 	return nil
 }
 
-// WriteAuditLog inserts an audit log entry. Metadata is marshalled to JSONB.
-func (r *pgRepository) WriteAuditLog(ctx context.Context, entry *AuditEntry) error {
-	var metaJSON []byte
-	if entry.Metadata != nil {
-		var err error
-		metaJSON, err = json.Marshal(entry.Metadata)
-		if err != nil {
-			return fmt.Errorf("auth.WriteAuditLog: marshal metadata: %w", err)
-		}
-	}
-	const q = `
-		INSERT INTO audit_log (user_id, action, ip_address, metadata)
-		VALUES ($1, $2, $3, $4)`
-	if _, err := r.db.ExecContext(ctx, q, entry.UserID, entry.Action, entry.IPAddress, metaJSON); err != nil {
-		return fmt.Errorf("auth.WriteAuditLog: %w", err)
-	}
-	return nil
-}
+

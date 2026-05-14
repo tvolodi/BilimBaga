@@ -1,0 +1,48 @@
+{
+  "run_id": "FR-BB14",
+  "pipeline": "A",
+  "step": "03-requirement-implementation",
+  "status": "COMPLETE",
+  "summary": "Implement FR-BB14 Authentication — login, refresh, logout, change-password endpoints with JWT, bcrypt, httpOnly cookies, account lockout, and audit logging",
+  "inner_report_path": "docs/issue-reports/FR-BB14-INNER-REPORT.md",
+  "files_changed": [
+    "backend/migrations/003_roles_departments.up.sql",
+    "backend/migrations/003_roles_departments.down.sql",
+    "backend/migrations/004_auth.up.sql",
+    "backend/migrations/004_auth.down.sql",
+    "backend/internal/auth/model.go",
+    "backend/internal/auth/repository.go",
+    "backend/internal/auth/service.go",
+    "backend/internal/auth/handler.go",
+    "backend/internal/auth/handler_test.go",
+    "backend/internal/router/router.go",
+    "backend/cmd/api/main.go",
+    "backend/go.mod",
+    "backend/go.sum",
+    "docs/requirements/README.md",
+    "docs/issue-reports/FR-BB14-INNER-REPORT.md"
+  ],
+  "test_results": {
+    "total_tests": 23,
+    "passed": 23,
+    "failed": 0,
+    "regressions": 0,
+    "packages": [
+      "github.com/bilimbaga/bilimbaga/internal/auth"
+    ]
+  },
+  "acceptance_criteria": {
+    "AC-1": "PASS",
+    "AC-2": "PASS",
+    "AC-3": "PASS",
+    "AC-4": "PASS",
+    "AC-5": "PASS",
+    "AC-6": "PASS",
+    "AC-7": "PASS",
+    "AC-8": "PASS",
+    "AC-9": "PASS",
+    "AC-10": "PASS",
+    "AC-11": "PASS",
+    "AC-12": "PASS"
+  }
+}

@@ -21,7 +21,6 @@ type mockRepo struct {
 	createFn   func(ctx context.Context, email, fullName, hash string, deptID *string, roleID string) (*User, error)
 	deactivate map[string]bool
 	revoked    []string
-	auditLog   []string
 	tokens     map[string]string // id → hash
 }
 
@@ -166,11 +165,6 @@ func (m *mockRepo) GetRoleNameByID(_ context.Context, roleID string) (string, er
 	return name, nil
 }
 
-func (m *mockRepo) WriteAuditLog(_ context.Context, _ *string, action, _ string, _ map[string]any) error {
-	m.auditLog = append(m.auditLog, action)
-	return nil
-}
-
 // helpers
 func strPtr(s string) *string { return &s }
 
@@ -258,7 +252,7 @@ func TestCreateUser_TempPassword(t *testing.T) {
 	assert.Len(t, resp.TemporaryPassword, 10)
 	assert.True(t, resp.ForcePasswordChange)
 	assert.Equal(t, "new@example.com", resp.Email)
-	assert.Contains(t, repo.auditLog, "user.create")
+
 }
 
 func TestCreateUser_DuplicateEmail(t *testing.T) {
@@ -319,7 +313,7 @@ func TestDeactivateUser_TokenRevocation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "inactive", repo.users["u1"].Status)
 	assert.Contains(t, repo.revoked, "u1")
-	assert.Contains(t, repo.auditLog, "user.deactivate")
+
 }
 
 func TestDeactivateUser_DeptAdminWrongDept(t *testing.T) {
@@ -346,7 +340,7 @@ func TestResetPassword(t *testing.T) {
 	assert.NotEmpty(t, resp.TemporaryPassword)
 	assert.Len(t, resp.TemporaryPassword, 10)
 	assert.True(t, repo.users["u1"].ForcePasswordChange)
-	assert.Contains(t, repo.auditLog, "user.password_reset")
+
 }
 
 func TestImportUsers_Preview(t *testing.T) {

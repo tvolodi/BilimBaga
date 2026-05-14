@@ -6,18 +6,20 @@ import (
 	"net/http"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/go-chi/chi/v5"
 )
 
 // Handler handles HTTP requests for the departments domain.
 type Handler struct {
-	svc Service
+	svc    Service
+	writer *audit.Writer
 }
 
-// NewHandler creates a new Handler backed by the given Service.
-func NewHandler(svc Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler creates a new Handler backed by the given Service and audit Writer.
+func NewHandler(svc Service, writer *audit.Writer) *Handler {
+	return &Handler{svc: svc, writer: writer}
 }
 
 // ListTree handles GET /api/v1/departments.
@@ -60,6 +62,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.writer.Write(r.Context(), r, "department.create", "department", &dept.ID, map[string]any{"name": dept.Name})
 	api.WriteJSON(w, http.StatusCreated, map[string]any{"data": dept, "error": nil})
 }
 
@@ -94,6 +97,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.writer.Write(r.Context(), r, "department.update", "department", &dept.ID, map[string]any{"name": dept.Name})
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": dept, "error": nil})
 }
 
@@ -120,5 +124,6 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.writer.Write(r.Context(), r, "department.delete", "department", &id, nil)
 	w.WriteHeader(http.StatusNoContent)
 }

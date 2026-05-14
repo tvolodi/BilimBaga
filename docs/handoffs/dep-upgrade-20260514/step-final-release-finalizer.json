@@ -1,0 +1,19 @@
+﻿{
+  "run_id": "dep-upgrade-20260514",
+  "pipeline": "Infra",
+  "commit_hash": "6294bf1a14e6e82db23394f055fa9f1cd58581b8",
+  "commit_message": "chore(deps): upgrade all frameworks to current stable (May 2026)",
+  "files_committed": [
+    "backend/go.mod",
+    "backend/go.sum",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "frontend/tailwind.config.js",
+    "frontend/postcss.config.js",
+    "frontend/vite.config.ts",
+    "frontend/src/index.css",
+    "frontend/src/components/ui/button.tsx"
+  ],
+  "inner_report_path": "docs/issue-reports/dep-upgrade-20260514-INNER-REPORT.md",
+  "status": "success"
+}

@@ -3,7 +3,6 @@ package users
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -23,7 +22,6 @@ type Repository interface {
 	GetDepartmentIDByName(ctx context.Context, name string) (string, error)
 	GetRoleIDByName(ctx context.Context, name string) (string, error)
 	GetRoleNameByID(ctx context.Context, roleID string) (string, error)
-	WriteAuditLog(ctx context.Context, userID *string, action, ipAddress string, metadata map[string]any) error
 }
 
 type pgRepository struct {
@@ -228,19 +226,6 @@ func (r *pgRepository) GetRoleNameByID(ctx context.Context, roleID string) (stri
 		return "", fmt.Errorf("users.GetRoleNameByID: %w", err)
 	}
 	return name, nil
-}
-
-// WriteAuditLog appends an entry to the audit_log table.
-func (r *pgRepository) WriteAuditLog(ctx context.Context, userID *string, action, ipAddress string, metadata map[string]any) error {
-	raw, err := json.Marshal(metadata)
-	if err != nil {
-		return fmt.Errorf("users.WriteAuditLog: marshal metadata: %w", err)
-	}
-	const q = `INSERT INTO audit_log (user_id, action, ip_address, metadata) VALUES ($1, $2, $3, $4)`
-	if _, err := r.db.ExecContext(ctx, q, userID, action, ipAddress, raw); err != nil {
-		return fmt.Errorf("users.WriteAuditLog: %w", err)
-	}
-	return nil
 }
 
 // isUniqueViolation returns true when err is a PostgreSQL unique-constraint error.

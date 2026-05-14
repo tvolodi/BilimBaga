@@ -1,0 +1,29 @@
+﻿{
+  "run_id": "FR-BB15",
+  "pipeline": "A",
+  "commit_hash": "b3e6029",
+  "commit_message": "feat(auth): implement JWT middleware (FR-BB15)",
+  "files_committed": [
+    "backend/cmd/api/main.go",
+    "backend/go.mod",
+    "backend/go.sum",
+    "backend/internal/api/response.go",
+    "backend/internal/auth/context.go",
+    "backend/internal/auth/handler.go",
+    "backend/internal/auth/handler_test.go",
+    "backend/internal/auth/middleware.go",
+    "backend/internal/auth/middleware_test.go",
+    "backend/internal/auth/model.go",
+    "backend/internal/auth/repository.go",
+    "backend/internal/auth/service.go",
+    "backend/internal/auth/tenant.go",
+    "backend/internal/auth/tenant_test.go",
+    "backend/internal/config/config.go",
+    "backend/internal/router/router.go",
+    "docs/issue-reports/FR-BB15-INNER-REPORT.md",
+    "docs/requirements/FR-BB15.JWT-middleware.md",
+    "docs/requirements/README.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB15-INNER-REPORT.md",
+  "status": "success"
+}

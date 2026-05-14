@@ -89,7 +89,7 @@ func TestLogin_ValidCredentials_Returns200WithTokenAndCookie(t *testing.T) {
 			}, refreshCookie("raw-refresh-token"), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"email":"alice@example.com","password":"Secret123!"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
@@ -121,7 +121,7 @@ func TestLogin_InvalidCredentials_Returns401(t *testing.T) {
 			return nil, nil, &ServiceError{Code: "INVALID_CREDENTIALS", Message: "invalid email or password", HTTPStatus: http.StatusUnauthorized}
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"email":"alice@example.com","password":"wrong"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
@@ -141,7 +141,7 @@ func TestLogin_LockedAccount_Returns423(t *testing.T) {
 			return nil, nil, &ServiceError{Code: "ACCOUNT_LOCKED", Message: "account locked", HTTPStatus: http.StatusLocked}
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"email":"alice@example.com","password":"Secret123!"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
@@ -156,7 +156,7 @@ func TestLogin_LockedAccount_Returns423(t *testing.T) {
 }
 
 func TestLogin_MalformedBody_Returns400(t *testing.T) {
-	h := NewHandler(&mockService{})
+	h := NewHandler(&mockService{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader("not-json"))
 	w := httptest.NewRecorder()
@@ -175,7 +175,7 @@ func TestRefresh_ValidCookie_Returns200WithNewToken(t *testing.T) {
 				refreshCookie("new-refresh-token"), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)
 	req.AddCookie(refreshCookie("old-refresh-token"))
@@ -193,7 +193,7 @@ func TestRefresh_ValidCookie_Returns200WithNewToken(t *testing.T) {
 }
 
 func TestRefresh_NoCookie_Returns401(t *testing.T) {
-	h := NewHandler(&mockService{})
+	h := NewHandler(&mockService{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)
 	w := httptest.NewRecorder()
@@ -212,7 +212,7 @@ func TestRefresh_RevokedToken_Returns401(t *testing.T) {
 			return nil, nil, &ServiceError{Code: "INVALID_REFRESH_TOKEN", Message: "refresh token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)
 	req.AddCookie(refreshCookie("revoked-token"))
@@ -234,7 +234,7 @@ func TestLogout_WithCookie_Returns200AndClearsCookie(t *testing.T) {
 			return &http.Cookie{Name: "refresh_token", Value: "", MaxAge: -1, Path: "/api/v1/auth"}, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
 	req.AddCookie(refreshCookie("some-token"))
@@ -259,7 +259,7 @@ func TestLogout_WithoutCookie_Returns200(t *testing.T) {
 			return &http.Cookie{Name: "refresh_token", Value: "", MaxAge: -1, Path: "/api/v1/auth"}, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
 	w := httptest.NewRecorder()
@@ -281,7 +281,7 @@ func TestChangePassword_Valid_Returns200(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"current_password":"OldPass123!","new_password":"NewPass456!"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/change-password", strings.NewReader(body))
@@ -308,7 +308,7 @@ func TestChangePassword_ShortNewPassword_Returns422(t *testing.T) {
 			return &ServiceError{Code: "VALIDATION_ERROR", Message: "new password must be at least 8 characters", HTTPStatus: http.StatusUnprocessableEntity}
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"current_password":"OldPass123!","new_password":"short"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/change-password", strings.NewReader(body))
@@ -332,7 +332,7 @@ func TestChangePassword_WrongCurrentPassword_Returns400(t *testing.T) {
 			return &ServiceError{Code: "INVALID_CREDENTIALS", Message: "current password is incorrect", HTTPStatus: http.StatusBadRequest}
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"current_password":"WrongPass!","new_password":"NewPass456!"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/change-password", strings.NewReader(body))
@@ -348,7 +348,7 @@ func TestChangePassword_WrongCurrentPassword_Returns400(t *testing.T) {
 }
 
 func TestChangePassword_NoAuthHeader_Returns401(t *testing.T) {
-	h := NewHandler(&mockService{})
+	h := NewHandler(&mockService{}, nil)
 
 	body := `{"current_password":"OldPass123!","new_password":"NewPass456!"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/change-password", strings.NewReader(body))
@@ -368,7 +368,7 @@ func TestChangePassword_InvalidToken_Returns401(t *testing.T) {
 			return nil, &ServiceError{Code: "UNAUTHORIZED", Message: "invalid token", HTTPStatus: http.StatusUnauthorized}
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	body := `{"current_password":"OldPass123!","new_password":"NewPass456!"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/change-password", strings.NewReader(body))
@@ -422,7 +422,6 @@ func TestService_Login_LockedAccount_Returns423BeforePasswordCheck(t *testing.T)
 				LockedUntil:  &lockTime,
 			}, nil
 		},
-		writeAuditLogFn: func(_ context.Context, _ *AuditEntry) error { return nil },
 	}
 
 	svc := NewService(ServiceConfig{
@@ -463,7 +462,6 @@ func TestService_Login_FifthFailureLocks(t *testing.T) {
 			storedAttempts = attempts
 			return nil
 		},
-		writeAuditLogFn: func(_ context.Context, _ *AuditEntry) error { return nil },
 	}
 
 	svc := NewService(ServiceConfig{
@@ -555,7 +553,6 @@ type mockRepository struct {
 	revokeRefreshTokenFn    func(ctx context.Context, tokenID string) error
 	revokeAllUserTokensFn   func(ctx context.Context, userID string) error
 	updatePasswordFn        func(ctx context.Context, userID, passwordHash string) error
-	writeAuditLogFn         func(ctx context.Context, entry *AuditEntry) error
 }
 
 func (m *mockRepository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
@@ -624,13 +621,6 @@ func (m *mockRepository) RevokeAllUserRefreshTokens(ctx context.Context, userID 
 func (m *mockRepository) UpdatePassword(ctx context.Context, userID, passwordHash string) error {
 	if m.updatePasswordFn != nil {
 		return m.updatePasswordFn(ctx, userID, passwordHash)
-	}
-	return nil
-}
-
-func (m *mockRepository) WriteAuditLog(ctx context.Context, entry *AuditEntry) error {
-	if m.writeAuditLogFn != nil {
-		return m.writeAuditLogFn(ctx, entry)
 	}
 	return nil
 }

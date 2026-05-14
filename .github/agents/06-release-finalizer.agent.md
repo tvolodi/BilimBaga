@@ -26,11 +26,12 @@ handoffs: []
 ## Workflow
 
 1. **Verify tests passed** (Pipeline A and B only): read the test report from `docs/test-reports/{run-id}-summary.json`. If any suite has failures, abort and escalate to Orchestrator.
-2. **Git status review**: run `git status` — review what will be staged.
-3. **Git commit**: stage and commit relevant files.
-4. **Generate inner report**: create `docs/issue-reports/{run-id}-INNER-REPORT.md`.
-5. **Write handoff file**: `docs/handoffs/{run-id}/step-final-release-finalizer.json`.
-6. **Print final summary** to the user.
+2. **Apply pending migrations**: if any `backend/migrations/` files are in `files_changed`, run `make migrate` now. Do NOT skip this step and do NOT leave it for the user. Verify the migration applied by checking the output. If it fails, stop and escalate to Orchestrator.
+3. **Git status review**: run `git status` — review what will be staged.
+4. **Git commit**: stage and commit relevant files.
+5. **Generate inner report**: create `docs/issue-reports/{run-id}-INNER-REPORT.md`.
+6. **Write handoff file**: `docs/handoffs/{run-id}/step-final-release-finalizer.json`.
+7. **Print final summary** to the user.
 
 ---
 
@@ -148,7 +149,9 @@ Write `docs/handoffs/{run-id}/step-final-release-finalizer.json`:
 }
 ```
 
-Then print the final user-facing summary:
+Then print the final user-facing summary.
+
+**⛔ Zero Manual Work rule**: the summary must NEVER contain a command or instruction for the user to run. No `make migrate`, no `docker exec`, no `npm install`, no `git pull`. If something still needs to be done, do it yourself before printing the summary — or escalate to the Orchestrator if it is blocked.
 
 ```
 ✅ Pipeline {A/B/C/Infra} complete.
@@ -158,6 +161,7 @@ Commit: {hash} — {commit message}
 
 Files changed: {N}
 Tests: {N backend} + {N frontend} passing
+Migration applied: {migration file name, or "none"}
 
 {one sentence summary of what was delivered}
 ```

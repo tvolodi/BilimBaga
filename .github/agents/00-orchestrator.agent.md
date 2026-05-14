@@ -130,6 +130,17 @@ context:
 
 ---
 
+## ⛔ Zero Manual Work — Final Summary Rule
+
+Before printing ANY summary to the user, run this self-check:
+- Does the summary contain `make migrate`, `docker exec`, `npm install`, `git pull`, or any other shell command? → Remove it. Route back to the appropriate subagent to complete the step.
+- Does the summary say "you need to...", "don't forget to...", or "remember to..."? → Remove it. Do it via a subagent or skip if already done.
+- Was a migration file created but not applied? → Route to Infrastructure Configuration agent to apply it before summarizing.
+
+**The user must never receive a task, command, or instruction to run. If something is incomplete, finish it — do not delegate it to the user.**
+
+---
+
 ## Escalation
 
 Escalate to the user ONLY when:

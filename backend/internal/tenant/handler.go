@@ -4,16 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/bilimbaga/bilimbaga/internal/audit"
 )
 
 // Handler handles HTTP requests for tenant configuration.
 type Handler struct {
-	svc Service
+	svc    Service
+	writer *audit.Writer
 }
 
-// NewHandler creates a new Handler backed by the given Service.
-func NewHandler(svc Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler creates a new Handler backed by the given Service and audit Writer.
+func NewHandler(svc Service, writer *audit.Writer) *Handler {
+	return &Handler{svc: svc, writer: writer}
 }
 
 type apiResponse struct {
@@ -65,6 +68,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.writer.Write(r.Context(), r, "tenant_config.update", "", nil, map[string]any{"updated_keys": updatedKeys})
 	writeJSON(w, http.StatusOK, map[string]any{"updated": updatedKeys}, nil)
 }
 

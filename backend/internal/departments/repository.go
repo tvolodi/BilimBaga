@@ -3,7 +3,6 @@ package departments
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -20,7 +19,6 @@ type Repository interface {
 	HasUsers(ctx context.Context, id string) (bool, error)
 	HasChildren(ctx context.Context, id string) (bool, error)
 	Delete(ctx context.Context, id string) error
-	WriteAuditLog(ctx context.Context, userID *string, action, ipAddress string, metadata map[string]any) error
 }
 
 type pgRepository struct {
@@ -115,23 +113,6 @@ func (r *pgRepository) Delete(ctx context.Context, id string) error {
 	const q = `DELETE FROM departments WHERE id = $1`
 	if _, err := r.db.ExecContext(ctx, q, id); err != nil {
 		return fmt.Errorf("departments.Delete: %w", err)
-	}
-	return nil
-}
-
-// WriteAuditLog inserts an entry into the audit_log table.
-func (r *pgRepository) WriteAuditLog(ctx context.Context, userID *string, action, ipAddress string, metadata map[string]any) error {
-	var metaJSON []byte
-	if metadata != nil {
-		var err error
-		metaJSON, err = json.Marshal(metadata)
-		if err != nil {
-			return fmt.Errorf("departments.WriteAuditLog: marshal metadata: %w", err)
-		}
-	}
-	const q = `INSERT INTO audit_log (user_id, action, ip_address, metadata) VALUES ($1, $2, $3, $4)`
-	if _, err := r.db.ExecContext(ctx, q, userID, action, ipAddress, metaJSON); err != nil {
-		return fmt.Errorf("departments.WriteAuditLog: %w", err)
 	}
 	return nil
 }

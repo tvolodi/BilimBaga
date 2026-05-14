@@ -9,14 +9,15 @@ import (
 // Config holds all application configuration loaded once at startup.
 type Config struct {
 	// Database
-	DBHost                string
-	DBPort                string
-	DBName                string
-	DBUser                string
-	DBPassword            string
-	DBMaxOpenConns        int
-	DBMaxIdleConns        int
-	DBConnMaxIdleSeconds  int
+	DBHost               string
+	DBPort               string
+	DBName               string
+	DBUser               string
+	DBPassword           string
+	DBSSLMode            string
+	DBMaxOpenConns       int
+	DBMaxIdleConns       int
+	DBConnMaxIdleSeconds int
 
 	// API
 	APIPort    string
@@ -42,6 +43,7 @@ func Load() (*Config, error) {
 		DBName:     getEnv("DB_NAME", "bilimbaga"),
 		DBUser:     getEnv("DB_USER", "bilimbaga"),
 		DBPassword: getEnv("DB_PASSWORD", ""),
+		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 		APIPort:    getEnv("API_PORT", "8080"),
 		APIBaseURL: getEnv("API_BASE_URL", "http://localhost:8080"),
 		JWTSecret:  getEnv("JWT_SECRET", ""),

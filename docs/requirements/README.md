@@ -11,7 +11,7 @@
 | ID | Slug | Title | Status |
 |----|------|-------|--------|
 | FR-BB11 | Project-scaffold | Project Scaffold | Draft |
-| FR-BB12 | Database-bootstrap | Database Bootstrap | Draft |
+| FR-BB12 | Database-bootstrap | Database Bootstrap | Implemented |
 | FR-BB13 | Tenant-configuration | Tenant Configuration | Draft |
 | FR-BB14 | Authentication | Authentication | Draft |
 | FR-BB15 | JWT-middleware | JWT Middleware | Draft |

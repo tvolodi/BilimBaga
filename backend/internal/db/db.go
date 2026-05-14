@@ -4,27 +4,39 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bilimbaga/bilimbaga/internal/config"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
-// Connect opens a sqlx connection pool using the provided config and verifies
-// the connection with a ping.
-func Connect(cfg *config.Config) (*sqlx.DB, error) {
+// Config holds all parameters needed to open and tune the PostgreSQL connection pool.
+type Config struct {
+	Host            string
+	Port            string
+	Name            string
+	User            string
+	Password        string
+	SSLMode         string        // defaults to "disable"; set via DB_SSLMODE
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxIdleTime time.Duration
+}
+
+// New opens a sqlx connection pool using the provided Config, applies pool
+// settings, and verifies the connection with a Ping.
+func New(cfg Config) (*sqlx.DB, error) {
 	dsn := fmt.Sprintf(
-		"host=%s port=%s dbname=%s user=%s password=%s sslmode=disable",
-		cfg.DBHost, cfg.DBPort, cfg.DBName, cfg.DBUser, cfg.DBPassword,
+		"host=%s port=%s dbname=%s user=%s password=%s sslmode=%s",
+		cfg.Host, cfg.Port, cfg.Name, cfg.User, cfg.Password, cfg.SSLMode,
 	)
 
-	pool, err := sqlx.Connect("postgres", dsn)
+	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("db: connect: %w", err)
+		return nil, fmt.Errorf("db.New connect: %w", err)
 	}
 
-	pool.SetMaxOpenConns(cfg.DBMaxOpenConns)
-	pool.SetMaxIdleConns(cfg.DBMaxIdleConns)
-	pool.SetConnMaxIdleTime(time.Duration(cfg.DBConnMaxIdleSeconds) * time.Second)
+	db.SetMaxOpenConns(cfg.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
-	return pool, nil
+	return db, nil
 }

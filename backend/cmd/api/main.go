@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/config"
+	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 )
 
@@ -21,6 +22,28 @@ func main() {
 		fmt.Fprintf(os.Stderr, "startup error: %v\n", err)
 		os.Exit(1)
 	}
+
+	db, err := dbpkg.New(dbpkg.Config{
+		Host:            cfg.DBHost,
+		Port:            cfg.DBPort,
+		Name:            cfg.DBName,
+		User:            cfg.DBUser,
+		Password:        cfg.DBPassword,
+		SSLMode:         cfg.DBSSLMode,
+		MaxOpenConns:    cfg.DBMaxOpenConns,
+		MaxIdleConns:    cfg.DBMaxIdleConns,
+		ConnMaxIdleTime: time.Duration(cfg.DBConnMaxIdleSeconds) * time.Second,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "startup error: open database: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := dbpkg.RunMigrations(db, "migrations"); err != nil {
+		fmt.Fprintf(os.Stderr, "startup error: run migrations: %v\n", err)
+		os.Exit(1)
+	}
+	log.Println("database migrations applied")
 
 	r := router.New()
 
@@ -55,3 +78,4 @@ func main() {
 
 	log.Println("server stopped")
 }
+

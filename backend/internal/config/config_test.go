@@ -66,3 +66,29 @@ func TestLoad_InvalidIntEnv(t *testing.T) {
 		t.Fatal("expected error for invalid DB_MAX_OPEN_CONNS, got nil")
 	}
 }
+
+func TestLoad_DBSSLModeDefault(t *testing.T) {
+	t.Setenv("JWT_SECRET", "a-secret-that-is-at-least-32-chars!!")
+	os.Unsetenv("DB_SSLMODE")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.DBSSLMode != "disable" {
+		t.Errorf("expected DBSSLMode=disable, got %q", cfg.DBSSLMode)
+	}
+}
+
+func TestLoad_DBSSLModeFromEnv(t *testing.T) {
+	t.Setenv("JWT_SECRET", "a-secret-that-is-at-least-32-chars!!")
+	t.Setenv("DB_SSLMODE", "require")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.DBSSLMode != "require" {
+		t.Errorf("expected DBSSLMode=require, got %q", cfg.DBSSLMode)
+	}
+}

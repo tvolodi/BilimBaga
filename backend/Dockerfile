@@ -12,8 +12,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api
 # ── Stage 2: final ────────────────────────────────────────────────────────────
 FROM scratch
 
-COPY --from=builder /api /api
+WORKDIR /app
+COPY --from=builder /api /app/api
+COPY --from=builder /app/migrations /app/migrations
 
 EXPOSE 8080
 
-ENTRYPOINT ["/api"]
+ENTRYPOINT ["/app/api"]

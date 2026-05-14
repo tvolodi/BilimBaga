@@ -130,6 +130,114 @@
       "previewButton": "Пример кнопки"
     }
   },
+  "questionBank": {
+    "title": "Банк вопросов",
+    "newQuestion": "Новый вопрос",
+    "importButton": "Импорт",
+    "filter": {
+      "category": "Категория",
+      "tag": "Тег",
+      "difficulty": "Сложность",
+      "type": "Тип",
+      "status": "Статус",
+      "localeMissing": "Перевод отсутствует",
+      "search": "Поиск вопросов…",
+      "clearAll": "Сбросить фильтры",
+      "allCategories": "Все категории",
+      "allTypes": "Все типы",
+      "allLocales": "Все языки",
+      "locale": "Фильтр по языку"
+    },
+    "column": {
+      "stem": "Вопрос",
+      "type": "Тип",
+      "difficulty": "Сложность",
+      "category": "Категория",
+      "status": "Статус",
+      "coverage": "Охват",
+      "createdBy": "Создал",
+      "updatedAt": "Обновлено"
+    },
+    "bulk": {
+      "selected": "{{count}} вопросов выбрано",
+      "exportCsv": "Экспорт CSV",
+      "exportJson": "Экспорт JSON",
+      "archive": "В архив",
+      "archivePartialResult": "{{success}} архивировано, {{failed}} не удалось",
+      "exportProgress": "Экспорт {{n}} вопросов",
+      "exportLimit": "Выбрано более 100 — экспорт выполнится по текущим фильтрам"
+    },
+    "empty": {
+      "title": "Нет вопросов",
+      "description": "Вопросы не найдены по текущим фильтрам"
+    },
+    "import": {
+      "title": "Импорт вопросов",
+      "validCount": "Валидных строк: {{count}}",
+      "errors": "Ошибки",
+      "warnings": "Предупреждения",
+      "confirm": "Подтвердить импорт",
+      "dropzone": "Перетащите файл сюда или нажмите для выбора",
+      "cancel": "Отмена",
+      "progress": "Обработка {{n}} / {{total}}"
+    },
+    "versions": {
+      "title": "История версий"
+    },
+    "actions": {
+      "edit": "Редактировать",
+      "archive": "В архив",
+      "viewVersions": "История версий",
+      "delete": "Удалить"
+    },
+    "pagination": {
+      "previous": "Назад",
+      "next": "Вперёд",
+      "pageOf": "Страница {{page}} из {{total}}",
+      "pageSize": "Строк на странице"
+    },
+    "sort": {
+      "asc": "По возрастанию",
+      "desc": "По убыванию"
+    },
+    "status": {
+      "draft": "Черновик",
+      "review": "На проверке",
+      "active": "Активен",
+      "archived": "В архиве"
+    },
+    "type": {
+      "single": "Один ответ",
+      "multiple": "Несколько ответов",
+      "truefalse": "Верно/Неверно",
+      "shorttext": "Краткий ответ",
+      "likert": "Шкала Ликерта"
+    },
+    "difficulty": {
+      "easy": "Лёгкий",
+      "medium": "Средний",
+      "hard": "Сложный"
+    },
+    "error": {
+      "loadFailed": "Ошибка загрузки",
+      "statusTransitionFailed": "Ошибка смены статуса",
+      "deleteFailed": "Ошибка удаления",
+      "exportFailed": "Ошибка экспорта"
+    },
+    "skeleton": {
+      "loading": "Загрузка..."
+    },
+    "localeCoverage": {
+      "present": "{{locale}} доступен",
+      "missing": "{{locale}} отсутствует"
+    },
+    "confirmDelete": {
+      "title": "Удалить вопрос",
+      "description": "Это действие нельзя отменить.",
+      "confirm": "Удалить",
+      "cancel": "Отмена"
+    }
+  },
   "auth": {
     "login": {
       "title": "Вход в {{appName}}",
@@ -154,6 +262,94 @@
         "VALIDATION_ERROR": "Новый пароль не соответствует требованиям.",
         "mismatch": "Пароли не совпадают."
       }
+    }
+  },
+  "questionEditor": {
+    "title": {
+      "new": "Новый вопрос",
+      "edit": "Редактировать вопрос"
+    },
+    "locale": {
+      "coverage": {
+        "complete": "Перевод завершён",
+        "missing": "Перевод отсутствует"
+      }
+    },
+    "type": {
+      "single": "Один верный ответ",
+      "multiple": "Несколько верных ответов",
+      "truefalse": "Верно / Неверно",
+      "likert": "Шкала Ликерта",
+      "shorttext": "Краткий ответ"
+    },
+    "difficulty": {
+      "easy": "Лёгкий",
+      "medium": "Средний",
+      "hard": "Сложный"
+    },
+    "status": {
+      "draft": "Черновик",
+      "review": "На проверке",
+      "active": "Активен",
+      "archived": "В архиве",
+      "transitionSuccess": "Статус успешно обновлён."
+    },
+    "action": {
+      "saveDraft": "Сохранить черновик",
+      "save": "Сохранить",
+      "submitForReview": "Отправить на проверку",
+      "approve": "Одобрить",
+      "archive": "В архив"
+    },
+    "autosave": {
+      "saving": "Сохранение…",
+      "saved": "Сохранено"
+    },
+    "section": {
+      "metadata": "Метаданные",
+      "translation": "Содержимое",
+      "answerOptions": "Варианты ответов"
+    },
+    "field": {
+      "type": "Тип вопроса",
+      "difficulty": "Сложность",
+      "category": "Категория",
+      "tags": "Теги",
+      "stem": "Текст вопроса",
+      "stemPlaceholder": "Введите текст вопроса…",
+      "explanation": "Пояснение",
+      "explanationPlaceholder": "Необязательное пояснение, показываемое после ответа…"
+    },
+    "category": {
+      "placeholder": "Выберите категорию"
+    },
+    "tags": {
+      "placeholder": "Добавить теги…",
+      "createNew": "Создать тег \"{{name}}\""
+    },
+    "explanation": {
+      "add": "Добавить пояснение",
+      "hide": "Скрыть"
+    },
+    "addOption": "Добавить вариант ответа",
+    "option": {
+      "placeholder": "Текст варианта…",
+      "markCorrect": "Отметить как верный",
+      "likertWeight": "Вес",
+      "likertPolarity": "Полярность",
+      "selectPolarity": "Выберите полярность",
+      "positive": "Положительная",
+      "negative": "Отрицательная"
+    },
+    "preview": {
+      "title": "Предпросмотр",
+      "stemEmpty": "Текст вопроса появится здесь…",
+      "optionEmpty": "(пусто)",
+      "shortTextPlaceholder": "Произвольный ответ…"
+    },
+    "error": {
+      "saveFailed": "Не удалось сохранить. Попробуйте ещё раз.",
+      "statusTransitionFailed": "Не удалось изменить статус."
     }
   }
 }

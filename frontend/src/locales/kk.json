@@ -130,6 +130,114 @@
       "previewButton": "Үлгі түймесі"
     }
   },
+  "questionBank": {
+    "title": "Сұрақ банкі",
+    "newQuestion": "Жаңа сұрақ",
+    "importButton": "Импорт",
+    "filter": {
+      "category": "Санат",
+      "tag": "Тег",
+      "difficulty": "Қиындық",
+      "type": "Түрі",
+      "status": "Мәртебесі",
+      "localeMissing": "Аудармасы жоқ",
+      "search": "Сұрақтарды іздеу…",
+      "clearAll": "Сүзгілерді тазалау",
+      "allCategories": "Барлық санаттар",
+      "allTypes": "Барлық түрлер",
+      "allLocales": "Барлық тілдер",
+      "locale": "Тіл бойынша сүзу"
+    },
+    "column": {
+      "stem": "Сұрақ",
+      "type": "Түрі",
+      "difficulty": "Қиындық",
+      "category": "Санат",
+      "status": "Мәртебесі",
+      "coverage": "Аударма",
+      "createdBy": "Жасаған",
+      "updatedAt": "Жаңартылған"
+    },
+    "bulk": {
+      "selected": "{{count}} сұрақ таңдалды",
+      "exportCsv": "CSV-ге экспорт",
+      "exportJson": "JSON-ге экспорт",
+      "archive": "Мұрағаттау",
+      "archivePartialResult": "{{success}} мұрағатталды, {{failed}} сәтсіз",
+      "exportProgress": "{{n}} сұрақ экспортталуда",
+      "exportLimit": "100-ден астам таңдалды — ағымдағы сүзгілермен экспорт жасалады"
+    },
+    "empty": {
+      "title": "Сұрақтар жоқ",
+      "description": "Сүзгілерге сәйкес сұрақтар табылмады"
+    },
+    "import": {
+      "title": "Сұрақтарды импорттау",
+      "validCount": "Жарамды жолдар: {{count}}",
+      "errors": "Қателер",
+      "warnings": "Ескертулер",
+      "confirm": "Импорттауды растау",
+      "dropzone": "Файлды осында жіберіңіз немесе таңдаңыз",
+      "cancel": "Болдырмау",
+      "progress": "{{n}} / {{total}} өңделуде"
+    },
+    "versions": {
+      "title": "Нұсқалар тарихы"
+    },
+    "actions": {
+      "edit": "Өңдеу",
+      "archive": "Мұрағаттау",
+      "viewVersions": "Нұсқаларды көру",
+      "delete": "Жою"
+    },
+    "pagination": {
+      "previous": "Алдыңғы",
+      "next": "Келесі",
+      "pageOf": "{{page}} / {{total}} бет",
+      "pageSize": "Беттегі жолдар"
+    },
+    "sort": {
+      "asc": "Өсу бойынша",
+      "desc": "Кему бойынша"
+    },
+    "status": {
+      "draft": "Жоба",
+      "review": "Тексеру",
+      "active": "Белсенді",
+      "archived": "Мұрағатта"
+    },
+    "type": {
+      "single": "Бір жауапты",
+      "multiple": "Көп жауапты",
+      "truefalse": "Дұрыс/Бұрыс",
+      "shorttext": "Қысқа жауап",
+      "likert": "Ликерт шкаласы"
+    },
+    "difficulty": {
+      "easy": "Жеңіл",
+      "medium": "Орта",
+      "hard": "Қиын"
+    },
+    "error": {
+      "loadFailed": "Жүктеу қатесі",
+      "statusTransitionFailed": "Мәртебені өзгерту қатесі",
+      "deleteFailed": "Жою қатесі",
+      "exportFailed": "Экспорт қатесі"
+    },
+    "skeleton": {
+      "loading": "Жүктелуде..."
+    },
+    "localeCoverage": {
+      "present": "{{locale}} тілінде бар",
+      "missing": "{{locale}} тілінде жоқ"
+    },
+    "confirmDelete": {
+      "title": "Сұрақты жою",
+      "description": "Бұл әрекетті кері қайтару мүмкін емес.",
+      "confirm": "Жою",
+      "cancel": "Болдырмау"
+    }
+  },
   "auth": {
     "login": {
       "title": "{{appName}} жүйесіне кіру",
@@ -154,6 +262,94 @@
         "VALIDATION_ERROR": "Жаңа құпия сөз талаптарға сай емес.",
         "mismatch": "Құпия сөздер сәйкес емес."
       }
+    }
+  },
+  "questionEditor": {
+    "title": {
+      "new": "Жаңа сұрақ",
+      "edit": "Сұрақты өңдеу"
+    },
+    "locale": {
+      "coverage": {
+        "complete": "Аударма толық",
+        "missing": "Аударма жоқ"
+      }
+    },
+    "type": {
+      "single": "Бір дұрыс жауап",
+      "multiple": "Бірнеше дұрыс жауап",
+      "truefalse": "Рас / Жалған",
+      "likert": "Лайкерт шкаласы",
+      "shorttext": "Қысқа жауап"
+    },
+    "difficulty": {
+      "easy": "Оңай",
+      "medium": "Орташа",
+      "hard": "Қиын"
+    },
+    "status": {
+      "draft": "Жоба",
+      "review": "Тексерілуде",
+      "active": "Белсенді",
+      "archived": "Мұрағатталған",
+      "transitionSuccess": "Мәртебе сәтті жаңартылды."
+    },
+    "action": {
+      "saveDraft": "Жобаны сақтау",
+      "save": "Сақтау",
+      "submitForReview": "Тексеруге жіберу",
+      "approve": "Бекіту",
+      "archive": "Мұрағаттау"
+    },
+    "autosave": {
+      "saving": "Сақталуда…",
+      "saved": "Сақталды"
+    },
+    "section": {
+      "metadata": "Мета деректер",
+      "translation": "Мазмұн",
+      "answerOptions": "Жауап нұсқалары"
+    },
+    "field": {
+      "type": "Сұрақ түрі",
+      "difficulty": "Қиындық",
+      "category": "Санат",
+      "tags": "Тегтер",
+      "stem": "Сұрақ мәтіні",
+      "stemPlaceholder": "Сұрақ мәтінін енгізіңіз…",
+      "explanation": "Түсіндірме",
+      "explanationPlaceholder": "Жауап берілгеннен кейін көрсетілетін түсіндірме (міндетті емес)…"
+    },
+    "category": {
+      "placeholder": "Санатты таңдаңыз"
+    },
+    "tags": {
+      "placeholder": "Тегтер қосу…",
+      "createNew": "\"{{name}}\" тегін жасау"
+    },
+    "explanation": {
+      "add": "Түсіндірме қосу",
+      "hide": "Жасыру"
+    },
+    "addOption": "Жауап нұсқасын қосу",
+    "option": {
+      "placeholder": "Нұсқа мәтіні…",
+      "markCorrect": "Дұрыс деп белгілеу",
+      "likertWeight": "Салмақ",
+      "likertPolarity": "Бағыттылық",
+      "selectPolarity": "Бағыттылықты таңдаңыз",
+      "positive": "Оң",
+      "negative": "Теріс"
+    },
+    "preview": {
+      "title": "Алдын ала қарау",
+      "stemEmpty": "Сұрақ мәтіні осында пайда болады…",
+      "optionEmpty": "(бос)",
+      "shortTextPlaceholder": "Еркін жауап…"
+    },
+    "error": {
+      "saveFailed": "Сақтау кезінде қате орын алды. Қайталап көріңіз.",
+      "statusTransitionFailed": "Мәртебені өзгерту мүмкін болмады."
     }
   }
 }

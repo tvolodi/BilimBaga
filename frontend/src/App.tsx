@@ -11,6 +11,8 @@ import { EmployeePortal } from '@/pages/EmployeePortal'
 import { UsersListPage } from '@/pages/admin/users/UsersListPage'
 import { DepartmentsPage } from '@/pages/admin/departments/DepartmentsPage'
 import { BrandingSettingsPage } from '@/pages/admin/settings/BrandingSettingsPage'
+import { QuestionBankPage } from '@/pages/admin/questions/QuestionBankPage'
+import { QuestionEditorPage } from '@/pages/admin/questions/QuestionEditorPage'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
 
@@ -42,6 +44,30 @@ function AppRoutes() {
         <Route index element={<Navigate to="users" replace />} />
         <Route path="users" element={<UsersListPage />} />
         <Route path="departments" element={<DepartmentsPage />} />
+        <Route
+          path="questions"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <QuestionBankPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="questions/new"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <QuestionEditorPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="questions/:id/edit"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <QuestionEditorPage />
+            </RequireRole>
+          }
+        />
         <Route
           path="settings/branding"
           element={

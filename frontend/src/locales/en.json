@@ -130,6 +130,114 @@
       "previewButton": "Sample Button"
     }
   },
+  "questionBank": {
+    "title": "Question Bank",
+    "newQuestion": "New Question",
+    "importButton": "Import",
+    "filter": {
+      "category": "Category",
+      "tag": "Tag",
+      "difficulty": "Difficulty",
+      "type": "Type",
+      "status": "Status",
+      "localeMissing": "Missing translation",
+      "search": "Search questions…",
+      "clearAll": "Clear filters",
+      "allCategories": "All categories",
+      "allTypes": "All types",
+      "allLocales": "All locales",
+      "locale": "Filter by locale"
+    },
+    "column": {
+      "stem": "Question",
+      "type": "Type",
+      "difficulty": "Difficulty",
+      "category": "Category",
+      "status": "Status",
+      "coverage": "Coverage",
+      "createdBy": "Created By",
+      "updatedAt": "Updated"
+    },
+    "bulk": {
+      "selected": "{{count}} questions selected",
+      "exportCsv": "Export CSV",
+      "exportJson": "Export JSON",
+      "archive": "Archive",
+      "archivePartialResult": "{{success}} archived, {{failed}} failed",
+      "exportProgress": "Exporting {{n}} questions",
+      "exportLimit": "More than 100 selected — exporting with current filters"
+    },
+    "empty": {
+      "title": "No questions",
+      "description": "No questions match your current filters"
+    },
+    "import": {
+      "title": "Import Questions",
+      "validCount": "Valid rows: {{count}}",
+      "errors": "Errors",
+      "warnings": "Warnings",
+      "confirm": "Confirm Import",
+      "dropzone": "Drop file here or click to select",
+      "cancel": "Cancel",
+      "progress": "Processing {{n}} / {{total}}"
+    },
+    "versions": {
+      "title": "Version History"
+    },
+    "actions": {
+      "edit": "Edit",
+      "archive": "Archive",
+      "viewVersions": "View Versions",
+      "delete": "Delete"
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{total}}",
+      "pageSize": "Rows per page"
+    },
+    "sort": {
+      "asc": "Ascending",
+      "desc": "Descending"
+    },
+    "status": {
+      "draft": "Draft",
+      "review": "Review",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "type": {
+      "single": "Single Choice",
+      "multiple": "Multiple Choice",
+      "truefalse": "True/False",
+      "shorttext": "Short Text",
+      "likert": "Likert Scale"
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "error": {
+      "loadFailed": "Load failed",
+      "statusTransitionFailed": "Status transition failed",
+      "deleteFailed": "Delete failed",
+      "exportFailed": "Export failed"
+    },
+    "skeleton": {
+      "loading": "Loading..."
+    },
+    "localeCoverage": {
+      "present": "{{locale}} available",
+      "missing": "{{locale}} missing"
+    },
+    "confirmDelete": {
+      "title": "Delete Question",
+      "description": "This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    }
+  },
   "auth": {
     "login": {
       "title": "Sign in to {{appName}}",
@@ -154,6 +262,94 @@
         "VALIDATION_ERROR": "New password does not meet requirements.",
         "mismatch": "Passwords do not match."
       }
+    }
+  },
+  "questionEditor": {
+    "title": {
+      "new": "New Question",
+      "edit": "Edit Question"
+    },
+    "locale": {
+      "coverage": {
+        "complete": "Translation complete",
+        "missing": "Translation missing"
+      }
+    },
+    "type": {
+      "single": "Single Choice",
+      "multiple": "Multiple Choice",
+      "truefalse": "True / False",
+      "likert": "Likert Scale",
+      "shorttext": "Short Text"
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "status": {
+      "draft": "Draft",
+      "review": "In Review",
+      "active": "Active",
+      "archived": "Archived",
+      "transitionSuccess": "Status updated successfully."
+    },
+    "action": {
+      "saveDraft": "Save Draft",
+      "save": "Save",
+      "submitForReview": "Submit for Review",
+      "approve": "Approve",
+      "archive": "Archive"
+    },
+    "autosave": {
+      "saving": "Saving…",
+      "saved": "Saved"
+    },
+    "section": {
+      "metadata": "Metadata",
+      "translation": "Content",
+      "answerOptions": "Answer Options"
+    },
+    "field": {
+      "type": "Question Type",
+      "difficulty": "Difficulty",
+      "category": "Category",
+      "tags": "Tags",
+      "stem": "Question Stem",
+      "stemPlaceholder": "Enter the question text…",
+      "explanation": "Explanation",
+      "explanationPlaceholder": "Optional explanation shown after the question is answered…"
+    },
+    "category": {
+      "placeholder": "Select a category"
+    },
+    "tags": {
+      "placeholder": "Add tags…",
+      "createNew": "Create tag \"{{name}}\""
+    },
+    "explanation": {
+      "add": "Add explanation",
+      "hide": "Hide"
+    },
+    "addOption": "Add Answer Option",
+    "option": {
+      "placeholder": "Option text…",
+      "markCorrect": "Mark as correct",
+      "likertWeight": "Weight",
+      "likertPolarity": "Polarity",
+      "selectPolarity": "Select polarity",
+      "positive": "Positive",
+      "negative": "Negative"
+    },
+    "preview": {
+      "title": "Preview",
+      "stemEmpty": "Question stem will appear here…",
+      "optionEmpty": "(empty)",
+      "shortTextPlaceholder": "Free-text answer…"
+    },
+    "error": {
+      "saveFailed": "Save failed. Please try again.",
+      "statusTransitionFailed": "Status transition failed."
     }
   }
 }

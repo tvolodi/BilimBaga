@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 	"github.com/bilimbaga/bilimbaga/internal/router"
@@ -61,7 +62,19 @@ func main() {
 	cancelStartup()
 	log.Println("tenant config cache loaded")
 
-	r := router.New(tenantHandler)
+	// Wire up authentication.
+	authRepo := auth.NewRepository(db)
+	authSvc := auth.NewService(auth.ServiceConfig{
+		JWTSecret:         cfg.JWTSecret,
+		JWTAccessTTLMin:   cfg.JWTAccessTTLMinutes,
+		JWTRefreshTTLDays: cfg.JWTRefreshTTLDays,
+		BcryptCost:        cfg.BcryptCost,
+		CookieDomain:      cfg.CookieDomain,
+		CookieSecure:      cfg.CookieSecure,
+	}, authRepo)
+	authHandler := auth.NewHandler(authSvc)
+
+	r := router.New(tenantHandler, authHandler, cfg.JWTSecret)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

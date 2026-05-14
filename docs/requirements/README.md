@@ -13,8 +13,8 @@
 | FR-BB11 | Project-scaffold | Project Scaffold | Draft |
 | FR-BB12 | Database-bootstrap | Database Bootstrap | Implemented |
 | FR-BB13 | Tenant-configuration | Tenant Configuration | Implemented |
-| FR-BB14 | Authentication | Authentication | Draft |
-| FR-BB15 | JWT-middleware | JWT Middleware | Draft |
+| FR-BB14 | Authentication | Authentication | Implemented |
+| FR-BB15 | JWT-middleware | JWT Middleware | Implemented |
 | FR-BB16 | RBAC | Role-Based Access Control | Draft |
 | FR-BB17 | Department-management | Department Management | Draft |
 | FR-BB18 | User-management-API | User Management API | Draft |

@@ -29,24 +29,24 @@ type Config struct {
 	JWTRefreshTTLDays   int
 
 	// Security
-	BcryptCost    int
-	CookieDomain  string
-	CookieSecure  bool
+	BcryptCost   int
+	CookieDomain string
+	CookieSecure bool
 }
 
 // Load reads all required environment variables and returns a validated Config.
 // It returns an error if any required variable is missing or invalid.
 func Load() (*Config, error) {
 	cfg := &Config{
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5432"),
-		DBName:     getEnv("DB_NAME", "bilimbaga"),
-		DBUser:     getEnv("DB_USER", "bilimbaga"),
-		DBPassword: getEnv("DB_PASSWORD", ""),
-		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
-		APIPort:    getEnv("API_PORT", "8080"),
-		APIBaseURL: getEnv("API_BASE_URL", "http://localhost:8080"),
-		JWTSecret:  getEnv("JWT_SECRET", ""),
+		DBHost:       getEnv("DB_HOST", "localhost"),
+		DBPort:       getEnv("DB_PORT", "5432"),
+		DBName:       getEnv("DB_NAME", "bilimbaga"),
+		DBUser:       getEnv("DB_USER", "bilimbaga"),
+		DBPassword:   getEnv("DB_PASSWORD", ""),
+		DBSSLMode:    getEnv("DB_SSLMODE", "disable"),
+		APIPort:      getEnv("API_PORT", "8080"),
+		APIBaseURL:   getEnv("API_BASE_URL", "http://localhost:8080"),
+		JWTSecret:    getEnv("JWT_SECRET", ""),
 		CookieDomain: getEnv("COOKIE_DOMAIN", "localhost"),
 	}
 

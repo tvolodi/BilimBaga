@@ -1,0 +1,31 @@
+{
+  "run_id": "FR-BB23",
+  "findings_fixed": [
+    {
+      "severity": "High",
+      "file": "backend/internal/questions/model.go",
+      "finding": "QuestionFilter used single-value *string fields (TagID, Difficulty, Status) preventing multi-value filtering",
+      "fix_applied": "Changed TagID *string → TagIDs []string, Difficulty *string → Difficulties []string, Status *string → Statuses []string"
+    },
+    {
+      "severity": "High",
+      "file": "backend/internal/questions/handler.go",
+      "finding": "List handler only parsed single-value query params (tag_id, difficulty, status); no support for comma-separated multi-value params",
+      "fix_applied": "Added splitCommaSeparated helper; handler now parses tag_ids/difficulties/statuses (comma-separated) with backward-compat aliases tag_id/difficulty/status falling through to single-element slices"
+    },
+    {
+      "severity": "High",
+      "file": "backend/internal/questions/repository.go",
+      "finding": "ListFiltered SQL used single-value IS NULL checks ($n::text IS NULL OR col = $n) — incompatible with multi-value array filtering",
+      "fix_applied": "Replaced single-value params for tag, difficulty, status with pq.Array([]string) args; SQL updated to use array_length($n::text[], 1) IS NULL OR col = ANY($n::text[]) pattern; tag filter uses tag_id::text = ANY($n::text[]). Positional args $1–$9 preserved; category_id, type, locale, locale_missing remain single-value unchanged."
+    }
+  ],
+  "findings_deferred": [],
+  "files_changed": [
+    "backend/internal/questions/model.go",
+    "backend/internal/questions/handler.go",
+    "backend/internal/questions/repository.go"
+  ],
+  "compile_verified": true,
+  "tests_verified": "go test ./internal/questions/... → ok (0.723s)"
+}

@@ -11,10 +11,11 @@ import (
 // --- Mock Repository ---
 
 type mockRepository struct {
-	questions    map[string]*Question
-	createFn     func(ctx context.Context, q *Question) error
-	createVerFn  func(ctx context.Context, newQ *Question, previousID string) error
-	createOptFn  func(ctx context.Context, opt *AnswerOption) error
+	questions   map[string]*Question
+	createFn    func(ctx context.Context, q *Question) error
+	createVerFn func(ctx context.Context, newQ *Question, previousID string) error
+	createOptFn func(ctx context.Context, opt *AnswerOption) error
+	tagExistsFn func(ctx context.Context, tagID string) (bool, error)
 }
 
 func newMockRepo() *mockRepository {
@@ -84,7 +85,10 @@ func (m *mockRepository) CreateTranslation(_ context.Context, t *QuestionTransla
 }
 
 func (m *mockRepository) GetTranslation(_ context.Context, questionID, locale string) (*QuestionTranslation, error) {
-	return nil, errors.New("not implemented in mock")
+	if _, ok := m.questions[questionID]; ok {
+		return &QuestionTranslation{QuestionID: questionID, Locale: locale, Stem: "mock stem"}, nil
+	}
+	return nil, ErrNotFound
 }
 
 func (m *mockRepository) CreateAnswerOption(ctx context.Context, opt *AnswerOption) error {
@@ -114,6 +118,106 @@ func (m *mockRepository) RemoveTag(_ context.Context, questionID, tagID string) 
 
 func (m *mockRepository) GetTags(_ context.Context, questionID string) ([]string, error) {
 	return nil, nil
+}
+
+// ── FR-BB23 mock stubs ────────────────────────────────────────────────────────
+
+func (m *mockRepository) CreateFull(_ context.Context, input CreateQuestionFullInput) (*QuestionDetail, error) {
+	id := fmt.Sprintf("q-%d", len(m.questions)+1)
+	detail := &QuestionDetail{
+		ID:            id,
+		Type:          input.Type,
+		Difficulty:    input.Difficulty,
+		Status:        "draft",
+		CategoryID:    input.CategoryID,
+		DefaultLocale: input.DefaultLocale,
+		Version:       1,
+		Translations:  map[string]TranslationDetail{},
+		AnswerOptions: []AnswerOptionDetail{},
+		Tags:          input.TagIDs,
+	}
+	return detail, nil
+}
+
+func (m *mockRepository) ListFiltered(_ context.Context, _ QuestionFilter) ([]*QuestionListItem, int, error) {
+	return nil, 0, nil
+}
+
+func (m *mockRepository) GetWithDetails(_ context.Context, id string) (*QuestionDetail, error) {
+	q, ok := m.questions[id]
+	if !ok {
+		return nil, ErrQuestionNotFound
+	}
+	return &QuestionDetail{
+		ID:            q.ID,
+		Type:          q.Type,
+		Difficulty:    q.Difficulty,
+		Status:        q.Status,
+		CategoryID:    q.CategoryID,
+		DefaultLocale: q.DefaultLocale,
+		Version:       q.Version,
+		ParentID:      q.ParentID,
+		Translations:  map[string]TranslationDetail{},
+		AnswerOptions: []AnswerOptionDetail{},
+		Tags:          []string{},
+	}, nil
+}
+
+func (m *mockRepository) UpdateInPlace(_ context.Context, id string, input UpdateQuestionInput) (*Question, error) {
+	q, ok := m.questions[id]
+	if !ok {
+		return nil, ErrQuestionNotFound
+	}
+	q.CategoryID = input.CategoryID
+	q.Difficulty = input.Difficulty
+	m.questions[id] = q
+	return q, nil
+}
+
+func (m *mockRepository) CreateVersionFull(_ context.Context, previousID string, input UpdateQuestionInput) (*Question, error) {
+	prev, ok := m.questions[previousID]
+	if !ok {
+		return nil, ErrQuestionNotFound
+	}
+	prev.Status = "archived"
+	m.questions[previousID] = prev
+
+	newQ := &Question{
+		ID:            fmt.Sprintf("q-%d", len(m.questions)+1),
+		CategoryID:    input.CategoryID,
+		Difficulty:    input.Difficulty,
+		Type:          prev.Type,
+		DefaultLocale: prev.DefaultLocale,
+		Status:        "draft",
+		CreatedBy:     input.UpdatedBy,
+		Version:       prev.Version + 1,
+		ParentID:      &previousID,
+	}
+	m.questions[newQ.ID] = newQ
+	return newQ, nil
+}
+
+func (m *mockRepository) DeleteByID(_ context.Context, id string) error {
+	if _, ok := m.questions[id]; !ok {
+		return ErrQuestionNotFound
+	}
+	delete(m.questions, id)
+	return nil
+}
+
+func (m *mockRepository) GetVersionChain(_ context.Context, id string) ([]*VersionEntry, error) {
+	q, ok := m.questions[id]
+	if !ok {
+		return nil, nil
+	}
+	return []*VersionEntry{{ID: q.ID, Version: q.Version, Status: q.Status}}, nil
+}
+
+func (m *mockRepository) TagExists(ctx context.Context, tagID string) (bool, error) {
+	if m.tagExistsFn != nil {
+		return m.tagExistsFn(ctx, tagID)
+	}
+	return true, nil
 }
 
 // --- Tests ---
@@ -236,5 +340,232 @@ func TestAddAnswerOption_PassesSortOrderThrough(t *testing.T) {
 	}
 	if !opt.IsCorrect {
 		t.Errorf("expected is_correct=true")
+	}
+}
+
+// ── FR-BB23 service tests ─────────────────────────────────────────────────────
+
+func TestTransitionStatus_ValidTransitions(t *testing.T) {
+	cases := []struct {
+		from string
+		to   string
+	}{
+		{"draft", "review"},
+		{"review", "active"},
+		{"active", "archived"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.from+"->"+tc.to, func(t *testing.T) {
+			repo := newMockRepo()
+			svc := NewService(repo)
+
+			q := &Question{
+				ID:            "q-1",
+				CategoryID:    "cat-1",
+				Difficulty:    "easy",
+				Type:          "single",
+				DefaultLocale: "kk",
+				Status:        tc.from,
+				CreatedBy:     "user-1",
+				Version:       1,
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+			}
+			repo.questions["q-1"] = q
+
+			updated, err := svc.TransitionStatus(context.Background(), "q-1", tc.to)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if updated.Status != tc.to {
+				t.Errorf("expected status=%s, got %s", tc.to, updated.Status)
+			}
+		})
+	}
+}
+
+func TestTransitionStatus_InvalidTransitions(t *testing.T) {
+	invalidCases := []struct {
+		from string
+		to   string
+	}{
+		{"draft", "active"},
+		{"draft", "archived"},
+		{"review", "draft"},
+		{"active", "draft"},
+		{"archived", "active"},
+		{"archived", "draft"},
+	}
+	for _, tc := range invalidCases {
+		t.Run(tc.from+"->"+tc.to, func(t *testing.T) {
+			repo := newMockRepo()
+			svc := NewService(repo)
+
+			q := &Question{
+				ID:            "q-1",
+				Status:        tc.from,
+				DefaultLocale: "kk",
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+			}
+			repo.questions["q-1"] = q
+
+			_, err := svc.TransitionStatus(context.Background(), "q-1", tc.to)
+			if err == nil {
+				t.Fatalf("expected error for transition %s->%s, got nil", tc.from, tc.to)
+			}
+			if !errors.Is(err, ErrInvalidTransition) {
+				t.Errorf("expected ErrInvalidTransition, got %v", err)
+			}
+		})
+	}
+}
+
+func TestDeleteQuestion_DraftSucceeds(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	q := &Question{
+		ID:        "q-1",
+		Status:    "draft",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	repo.questions["q-1"] = q
+
+	if err := svc.DeleteQuestion(context.Background(), "q-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := repo.questions["q-1"]; ok {
+		t.Error("expected question to be removed from store")
+	}
+}
+
+func TestDeleteQuestion_NonDraftFails(t *testing.T) {
+	for _, status := range []string{"review", "active", "archived"} {
+		t.Run(status, func(t *testing.T) {
+			repo := newMockRepo()
+			svc := NewService(repo)
+
+			q := &Question{ID: "q-1", Status: status, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+			repo.questions["q-1"] = q
+
+			err := svc.DeleteQuestion(context.Background(), "q-1")
+			if err == nil {
+				t.Fatalf("expected error for status %s, got nil", status)
+			}
+			if !errors.Is(err, ErrNotDraft) {
+				t.Errorf("expected ErrNotDraft, got %v", err)
+			}
+		})
+	}
+}
+
+func TestUpdateQuestion_ActiveCreatesNewVersion(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	q := &Question{
+		ID:            "q-active",
+		CategoryID:    "cat-1",
+		Difficulty:    "medium",
+		Type:          "single",
+		DefaultLocale: "kk",
+		Status:        "active",
+		CreatedBy:     "user-1",
+		Version:       1,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	repo.questions["q-active"] = q
+
+	newQ, err := svc.UpdateQuestion(context.Background(), "q-active", UpdateQuestionInput{
+		CategoryID: "cat-1",
+		Difficulty: "hard",
+		UpdatedBy:  "user-2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if newQ.Version != 2 {
+		t.Errorf("expected version=2, got %d", newQ.Version)
+	}
+	if newQ.Status != "draft" {
+		t.Errorf("expected status=draft, got %s", newQ.Status)
+	}
+	if newQ.ParentID == nil || *newQ.ParentID != "q-active" {
+		t.Errorf("expected parent_id=q-active")
+	}
+	// Previous should be archived.
+	if repo.questions["q-active"].Status != "archived" {
+		t.Errorf("expected previous question to be archived")
+	}
+}
+
+func TestUpdateQuestion_DraftUpdatesInPlace(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	q := &Question{
+		ID:            "q-draft",
+		CategoryID:    "cat-1",
+		Difficulty:    "easy",
+		Type:          "single",
+		DefaultLocale: "kk",
+		Status:        "draft",
+		CreatedBy:     "user-1",
+		Version:       1,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	repo.questions["q-draft"] = q
+
+	updated, err := svc.UpdateQuestion(context.Background(), "q-draft", UpdateQuestionInput{
+		CategoryID: "cat-1",
+		Difficulty: "hard",
+		UpdatedBy:  "user-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated.ID != "q-draft" {
+		t.Errorf("expected same ID for in-place update, got %s", updated.ID)
+	}
+	if updated.Difficulty != "hard" {
+		t.Errorf("expected difficulty=hard, got %s", updated.Difficulty)
+	}
+}
+
+func TestListVersions_ReturnsChain(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	q := &Question{
+		ID:        "q-1",
+		Status:    "active",
+		Version:   1,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	repo.questions["q-1"] = q
+
+	versions, err := svc.ListVersions(context.Background(), "q-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(versions) == 0 {
+		t.Error("expected at least one version entry")
+	}
+}
+
+func TestTagQuestion_NonExistentTagReturnsErrTagNotFound(t *testing.T) {
+	repo := newMockRepo()
+	// Override TagExists to return false.
+	repo.tagExistsFn = func(_ context.Context, _ string) (bool, error) { return false, nil }
+	svc := NewService(repo)
+
+	err := svc.TagQuestion(context.Background(), "q-1", "nonexistent-tag")
+	if !errors.Is(err, ErrTagNotFound) {
+		t.Errorf("expected ErrTagNotFound, got %v", err)
 	}
 }

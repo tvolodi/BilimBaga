@@ -117,11 +117,12 @@ func main() {
 	tagsSvc := tags.NewService(tagsRepo)
 	tagsHandler := tags.NewHandler(tagsSvc, auditWriter)
 
-	// Wire up questions (FR-BB22 — no HTTP handlers yet; routes come in FR-BB23).
+	// Wire up questions (FR-BB22/FR-BB23).
 	questionsRepo := questions.NewRepository(db)
-	_ = questions.NewService(questionsRepo)
+	questionsSvc := questions.NewService(questionsRepo)
+	questionsHandler := questions.NewHandler(questionsSvc, auditWriter)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, cfg.JWTSecret, rbacCache)
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

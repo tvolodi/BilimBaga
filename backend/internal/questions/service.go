@@ -28,6 +28,16 @@ type Service interface {
 
 	TagQuestion(ctx context.Context, questionID, tagID string) error
 	UntagQuestion(ctx context.Context, questionID, tagID string) error
+	GetQuestionTags(ctx context.Context, questionID string) ([]string, error)
+
+	// FR-BB23 additions.
+	CreateQuestionFull(ctx context.Context, input CreateQuestionFullInput) (*QuestionDetail, error)
+	ListFiltered(ctx context.Context, filter QuestionFilter) ([]*QuestionListItem, int, error)
+	GetQuestionWithDetails(ctx context.Context, id string) (*QuestionDetail, error)
+	UpdateQuestion(ctx context.Context, id string, input UpdateQuestionInput) (*Question, error)
+	TransitionStatus(ctx context.Context, id, newStatus string) (*Question, error)
+	DeleteQuestion(ctx context.Context, id string) error
+	ListVersions(ctx context.Context, id string) ([]*VersionEntry, error)
 }
 
 type service struct {
@@ -145,6 +155,13 @@ func (s *service) AddAnswerTranslation(ctx context.Context, optionID string, loc
 }
 
 func (s *service) TagQuestion(ctx context.Context, questionID, tagID string) error {
+	exists, err := s.repo.TagExists(ctx, tagID)
+	if err != nil {
+		return fmt.Errorf("questions: TagQuestion: %w", err)
+	}
+	if !exists {
+		return ErrTagNotFound
+	}
 	if err := s.repo.AddTag(ctx, questionID, tagID); err != nil {
 		return fmt.Errorf("questions: TagQuestion: %w", err)
 	}
@@ -156,4 +173,124 @@ func (s *service) UntagQuestion(ctx context.Context, questionID, tagID string) e
 		return fmt.Errorf("questions: UntagQuestion: %w", err)
 	}
 	return nil
+}
+
+func (s *service) GetQuestionTags(ctx context.Context, questionID string) ([]string, error) {
+	tags, err := s.repo.GetTags(ctx, questionID)
+	if err != nil {
+		return nil, fmt.Errorf("questions: GetQuestionTags: %w", err)
+	}
+	return tags, nil
+}
+
+// ── FR-BB23 additions ────────────────────────────────────────────────────────
+
+func (s *service) CreateQuestionFull(ctx context.Context, input CreateQuestionFullInput) (*QuestionDetail, error) {
+	detail, err := s.repo.CreateFull(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("questions: CreateQuestionFull: %w", err)
+	}
+	return detail, nil
+}
+
+func (s *service) ListFiltered(ctx context.Context, filter QuestionFilter) ([]*QuestionListItem, int, error) {
+	items, total, err := s.repo.ListFiltered(ctx, filter)
+	if err != nil {
+		return nil, 0, fmt.Errorf("questions: ListFiltered: %w", err)
+	}
+	return items, total, nil
+}
+
+func (s *service) GetQuestionWithDetails(ctx context.Context, id string) (*QuestionDetail, error) {
+	detail, err := s.repo.GetWithDetails(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("questions: GetQuestionWithDetails: %w", err)
+	}
+	return detail, nil
+}
+
+// UpdateQuestion updates a question in place (draft/review) or creates a new version (active).
+func (s *service) UpdateQuestion(ctx context.Context, id string, input UpdateQuestionInput) (*Question, error) {
+	q, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("questions: UpdateQuestion: %w", err)
+	}
+	switch q.Status {
+	case "active":
+		newQ, err := s.repo.CreateVersionFull(ctx, id, input)
+		if err != nil {
+			return nil, fmt.Errorf("questions: UpdateQuestion: create version: %w", err)
+		}
+		return newQ, nil
+	case "draft", "review":
+		updated, err := s.repo.UpdateInPlace(ctx, id, input)
+		if err != nil {
+			return nil, fmt.Errorf("questions: UpdateQuestion: update in place: %w", err)
+		}
+		return updated, nil
+	default:
+		return nil, fmt.Errorf("questions: UpdateQuestion: %w: question is %s", ErrInvalidInput, q.Status)
+	}
+}
+
+// validTransitions defines the allowed status state machine.
+var validTransitions = map[string]string{
+	"draft":  "review",
+	"review": "active",
+	"active": "archived",
+}
+
+// TransitionStatus enforces the status state machine and updates the question.
+func (s *service) TransitionStatus(ctx context.Context, id, newStatus string) (*Question, error) {
+	q, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("questions: TransitionStatus: %w", err)
+	}
+
+	allowed, ok := validTransitions[q.Status]
+	if !ok || allowed != newStatus {
+		return nil, fmt.Errorf("%w: cannot transition from %q to %q", ErrInvalidTransition, q.Status, newStatus)
+	}
+
+	// For review and active, the default locale stem must be non-empty.
+	if newStatus == "review" || newStatus == "active" {
+		t, err := s.repo.GetTranslation(ctx, id, q.DefaultLocale)
+		if err != nil || t.Stem == "" {
+			return nil, ErrStemRequired
+		}
+	}
+
+	q.Status = newStatus
+	if err := s.repo.Update(ctx, q); err != nil {
+		return nil, fmt.Errorf("questions: TransitionStatus: update: %w", err)
+	}
+	return q, nil
+}
+
+// DeleteQuestion hard-deletes a question only if it is in draft status.
+func (s *service) DeleteQuestion(ctx context.Context, id string) error {
+	q, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("questions: DeleteQuestion: %w", err)
+	}
+	if q.Status != "draft" {
+		return ErrNotDraft
+	}
+	if err := s.repo.DeleteByID(ctx, id); err != nil {
+		return fmt.Errorf("questions: DeleteQuestion: %w", err)
+	}
+	return nil
+}
+
+// ListVersions returns the full version chain for any question in the chain.
+func (s *service) ListVersions(ctx context.Context, id string) ([]*VersionEntry, error) {
+	// Verify the question exists first.
+	if _, err := s.repo.GetByID(ctx, id); err != nil {
+		return nil, fmt.Errorf("questions: ListVersions: %w", err)
+	}
+	versions, err := s.repo.GetVersionChain(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("questions: ListVersions: %w", err)
+	}
+	return versions, nil
 }

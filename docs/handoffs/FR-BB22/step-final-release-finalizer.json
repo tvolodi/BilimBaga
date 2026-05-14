@@ -1,0 +1,18 @@
+﻿{
+  "run_id": "FR-BB22",
+  "pipeline": "A",
+  "commit_hash": "ab6f8c4",
+  "commit_message": "feat(questions): implement FR-BB22 question model — DB migration 009 + repository + service + unit tests",
+  "files_committed": [
+    "backend/migrations/009_questions.up.sql",
+    "backend/migrations/009_questions.down.sql",
+    "backend/internal/questions/model.go",
+    "backend/internal/questions/repository.go",
+    "backend/internal/questions/service.go",
+    "backend/internal/questions/service_test.go",
+    "backend/cmd/api/main.go",
+    "docs/requirements/FR-BB22.Question-model.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB22-INNER-REPORT.md",
+  "status": "success"
+}

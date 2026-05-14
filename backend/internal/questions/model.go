@@ -7,10 +7,14 @@ import (
 
 // Sentinel errors for the questions domain.
 var (
-	ErrNotFound         = errors.New("not found")
-	ErrQuestionNotFound = errors.New("question not found")
-	ErrForbidden        = errors.New("forbidden")
-	ErrInvalidInput     = errors.New("invalid input")
+	ErrNotFound          = errors.New("not found")
+	ErrQuestionNotFound  = errors.New("question not found")
+	ErrForbidden         = errors.New("forbidden")
+	ErrInvalidInput      = errors.New("invalid input")
+	ErrInvalidTransition = errors.New("invalid status transition")
+	ErrNotDraft          = errors.New("question is not in draft status")
+	ErrStemRequired      = errors.New("default locale stem is required for this transition")
+	ErrTagNotFound       = errors.New("tag not found")
 )
 
 // Question is the core metadata row — no user-visible text.
@@ -59,4 +63,130 @@ type AnswerTranslation struct {
 type QuestionTag struct {
 	QuestionID string `db:"question_id"`
 	TagID      string `db:"tag_id"`
+}
+
+// QuestionFilter holds all filter parameters for the paginated question list.
+type QuestionFilter struct {
+	CategoryID    *string
+	TagIDs        []string // multi-value: question must have ANY of these tag IDs
+	Difficulties  []string // multi-value: question difficulty must be ANY of these
+	Type          *string
+	Statuses      []string // multi-value: question status must be ANY of these
+	Locale        *string  // filter: only questions that have a translation for this locale
+	LocaleMissing *string  // filter: only questions that do NOT have a translation for this locale
+	Search        string   // full-text search against the default-locale stem
+	Sort          string   // one of: created_at, updated_at, difficulty
+	Order         string   // asc or desc
+	Page          int
+	PerPage       int
+}
+
+// QuestionListItem is the summary row returned in the paginated list endpoint.
+type QuestionListItem struct {
+	ID             string    `json:"id"`
+	Type           string    `json:"type"`
+	Difficulty     string    `json:"difficulty"`
+	Status         string    `json:"status"`
+	CategoryID     string    `json:"category_id"`
+	CategoryName   string    `json:"category_name,omitempty"`
+	DefaultLocale  string    `json:"default_locale"`
+	Version        int       `json:"version"`
+	LocaleCoverage []string  `json:"locale_coverage"`
+	StemPreview    string    `json:"stem_preview"`
+	Tags           []string  `json:"tags"`
+	CreatedBy      string    `json:"created_by"`
+	CreatedByName  string    `json:"created_by_name,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// TranslationDetail holds locale-specific text for the detail response.
+type TranslationDetail struct {
+	Stem        string  `json:"stem"`
+	Explanation *string `json:"explanation"`
+}
+
+// AnswerTranslationDetail holds the translation text for a single locale in the detail response.
+type AnswerTranslationDetail struct {
+	Text string `json:"text"`
+}
+
+// AnswerOptionDetail holds full answer option data including translations.
+type AnswerOptionDetail struct {
+	ID             string                             `json:"id"`
+	SortOrder      int                                `json:"sort_order"`
+	IsCorrect      bool                               `json:"is_correct"`
+	LikertWeight   *float64                           `json:"likert_weight"`
+	LikertPolarity *string                            `json:"likert_polarity"`
+	Translations   map[string]AnswerTranslationDetail `json:"translations"`
+}
+
+// QuestionDetail is the full question including translations, options, and tags.
+type QuestionDetail struct {
+	ID             string                       `json:"id"`
+	Type           string                       `json:"type"`
+	Difficulty     string                       `json:"difficulty"`
+	Status         string                       `json:"status"`
+	CategoryID     string                       `json:"category_id"`
+	DefaultLocale  string                       `json:"default_locale"`
+	Version        int                          `json:"version"`
+	ParentID       *string                      `json:"parent_id"`
+	LocaleCoverage []string                     `json:"locale_coverage"`
+	Translations   map[string]TranslationDetail `json:"translations"`
+	AnswerOptions  []AnswerOptionDetail         `json:"answer_options"`
+	Tags           []string                     `json:"tags"`
+	CreatedBy      string                       `json:"created_by"`
+	CreatedAt      time.Time                    `json:"created_at"`
+	UpdatedAt      time.Time                    `json:"updated_at"`
+}
+
+// VersionEntry is a single entry in a question's version history chain.
+type VersionEntry struct {
+	ID        string    `json:"id"         db:"id"`
+	Version   int       `json:"version"    db:"version"`
+	Status    string    `json:"status"     db:"status"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	CreatedBy string    `json:"created_by" db:"created_by"`
+}
+
+// AnswerTranslationInput is the locale-specific text for an answer option in create/update requests.
+type AnswerTranslationInput struct {
+	Text string `json:"text"`
+}
+
+// AnswerOptionInput holds input data for a single answer option in create/update requests.
+type AnswerOptionInput struct {
+	SortOrder      int                               `json:"sort_order"`
+	IsCorrect      bool                              `json:"is_correct"`
+	LikertWeight   *float64                          `json:"likert_weight"`
+	LikertPolarity *string                           `json:"likert_polarity"`
+	Translations   map[string]AnswerTranslationInput `json:"translations"`
+}
+
+// TranslationInput holds locale-specific stem and explanation for create/update requests.
+type TranslationInput struct {
+	Stem        string  `json:"stem"`
+	Explanation *string `json:"explanation"`
+}
+
+// CreateQuestionFullInput bundles all fields needed to create a question and its sub-objects atomically.
+type CreateQuestionFullInput struct {
+	CategoryID    string
+	Difficulty    string
+	Type          string
+	DefaultLocale string
+	CreatedBy     string
+	Translations  map[string]TranslationInput
+	AnswerOptions []AnswerOptionInput
+	TagIDs        []string
+}
+
+// UpdateQuestionInput bundles all updateable fields for a question (in-place update or auto-versioning).
+type UpdateQuestionInput struct {
+	CategoryID    string
+	Difficulty    string
+	UpdatedBy     string
+	Translations  map[string]TranslationInput
+	AnswerOptions []AnswerOptionInput
+	TagIDs        []string
 }

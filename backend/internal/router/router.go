@@ -3,9 +3,12 @@ package router
 import (
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
+	"github.com/bilimbaga/bilimbaga/internal/categories"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
 	"github.com/bilimbaga/bilimbaga/internal/health"
+	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
+	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 	"github.com/bilimbaga/bilimbaga/internal/users"
 	"github.com/go-chi/chi/v5"
@@ -15,7 +18,7 @@ import (
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -78,6 +81,46 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Get("/audit", auditHandler.List)
 			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).
 				Get("/audit/export", auditHandler.Export)
+
+			// Categories — tree is readable by any authenticated user;
+			// mutations require categories:manage (examiner+ and super_admin).
+			r.Get("/categories", categoriesHandler.ListTree)
+			r.With(rbac.RequirePermission(rbacCache, "categories", "manage")).
+				Post("/categories", categoriesHandler.Create)
+			r.With(rbac.RequirePermission(rbacCache, "categories", "manage")).
+				Put("/categories/{id}", categoriesHandler.Update)
+			r.With(rbac.RequirePermission(rbacCache, "categories", "manage")).
+				Delete("/categories/{id}", categoriesHandler.Delete)
+
+			// Tags — read and write require explicit permissions.
+			r.With(rbac.RequirePermission(rbacCache, "tags", "read")).
+				Get("/tags", tagsHandler.List)
+			r.With(rbac.RequirePermission(rbacCache, "tags", "manage")).
+				Post("/tags", tagsHandler.Create)
+			r.With(rbac.RequirePermission(rbacCache, "tags", "manage")).
+				Put("/tags/{id}", tagsHandler.Update)
+			r.With(rbac.RequirePermission(rbacCache, "tags", "manage")).
+				Delete("/tags/{id}", tagsHandler.Delete)
+
+			// Questions — all endpoints require questions:read or questions:write.
+			r.With(rbac.RequirePermission(rbacCache, "questions", "read")).
+				Get("/questions", questionsHandler.List)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Post("/questions", questionsHandler.Create)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "read")).
+				Get("/questions/{id}", questionsHandler.Get)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Put("/questions/{id}", questionsHandler.Update)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Post("/questions/{id}/status", questionsHandler.TransitionStatus)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Delete("/questions/{id}", questionsHandler.Delete)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "read")).
+				Get("/questions/{id}/versions", questionsHandler.ListVersions)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Post("/questions/{id}/tags", questionsHandler.AddTag)
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Delete("/questions/{id}/tags/{tagId}", questionsHandler.RemoveTag)
 		})
 	})
 

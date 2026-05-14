@@ -6,9 +6,10 @@ import { RequireAuth } from '@/components/RequireAuth'
 import { RequireRole } from '@/components/RequireRole'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
-import { AdminShell } from '@/pages/AdminShell'
+import { AdminLayout } from '@/layouts/AdminLayout'
 import { EmployeePortal } from '@/pages/EmployeePortal'
-import { UsersListPage } from '@/pages/users/UsersListPage'
+import { UsersListPage } from '@/pages/admin/users/UsersListPage'
+import { DepartmentsPage } from '@/pages/admin/departments/DepartmentsPage'
 import { useRefreshToken } from '@/api/auth'
 
 const queryClient = new QueryClient()
@@ -29,26 +30,22 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/admin/*"
+        path="/admin"
         element={
           <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-            <AdminShell />
+            <AdminLayout />
           </RequireRole>
         }
-      />
+      >
+        <Route index element={<Navigate to="users" replace />} />
+        <Route path="users" element={<UsersListPage />} />
+        <Route path="departments" element={<DepartmentsPage />} />
+      </Route>
       <Route
         path="/portal/*"
         element={
           <RequireRole roles={['employee']}>
             <EmployeePortal />
-          </RequireRole>
-        }
-      />
-      <Route
-        path="/users"
-        element={
-          <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-            <UsersListPage />
           </RequireRole>
         }
       />

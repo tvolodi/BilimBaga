@@ -3,7 +3,17 @@
   "ru": "Русский",
   "en": "English",
   "common": {
-    "logo_placeholder": "Логотип"
+    "logo_placeholder": "Логотип",
+    "coming_soon": "Скоро"
+  },
+  "nav": {
+    "dashboard": "Главная",
+    "users": "Пользователи",
+    "departments": "Отделы",
+    "questions": "Вопросы",
+    "exams": "Экзамены",
+    "reports": "Отчёты",
+    "settings": "Настройки"
   },
   "users": {
     "title": "Пользователи",
@@ -13,14 +23,21 @@
       "department": "Отдел",
       "role": "Роль",
       "status": "Статус",
-      "created_at": "Создан"
+      "created_at": "Создан",
+      "actions": "Действия"
+    },
+    "roles": {
+      "super_admin": "Супер-Администратор",
+      "department_admin": "Администратор отдела",
+      "examiner": "Экзаменатор",
+      "employee": "Сотрудник"
     },
     "actions": {
-      "create": "Создать пользователя",
+      "create": "Новый пользователь",
       "edit": "Редактировать",
       "deactivate": "Деактивировать",
       "reset_password": "Сбросить пароль",
-      "import": "Импорт CSV"
+      "import": "Массовый импорт"
     },
     "status": {
       "active": "Активен",

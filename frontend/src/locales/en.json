@@ -3,7 +3,17 @@
   "ru": "Russian",
   "en": "English",
   "common": {
-    "logo_placeholder": "Logo"
+    "logo_placeholder": "Logo",
+    "coming_soon": "Coming soon"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "departments": "Departments",
+    "questions": "Questions",
+    "exams": "Exams",
+    "reports": "Reports",
+    "settings": "Settings"
   },
   "users": {
     "title": "Users",
@@ -13,14 +23,21 @@
       "department": "Department",
       "role": "Role",
       "status": "Status",
-      "created_at": "Created"
+      "created_at": "Created",
+      "actions": "Actions"
+    },
+    "roles": {
+      "super_admin": "Super Admin",
+      "department_admin": "Dept. Admin",
+      "examiner": "Examiner",
+      "employee": "Employee"
     },
     "actions": {
-      "create": "Create User",
+      "create": "New User",
       "edit": "Edit",
       "deactivate": "Deactivate",
       "reset_password": "Reset Password",
-      "import": "Import CSV"
+      "import": "Bulk Import"
     },
     "status": {
       "active": "Active",

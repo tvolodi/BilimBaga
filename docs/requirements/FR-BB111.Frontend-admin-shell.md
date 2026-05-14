@@ -6,7 +6,7 @@
 | ID | FR-BB111 |
 | Phase | 1 — Foundation |
 | Priority | 3 |
-| Status | Draft |
+| Status | Validated |
 | Depends On | FR-BB110, FR-BB17, FR-BB18 |
 
 ## Description
@@ -14,10 +14,10 @@ Provides the persistent chrome — sidebar navigation, top bar, and breadcrumbs 
 
 ## Acceptance Criteria
 - [ ] AC-1: The admin layout renders a collapsible sidebar with navigation links: Dashboard, Users, Departments, Questions, Exams, Reports, Settings; active link is visually highlighted.
-- [ ] AC-2: The top bar displays the authenticated user's `full_name`, a role badge (coloured by role), and a logout button that calls `POST /api/v1/auth/logout` and redirects to `/auth/login`.
+- [ ] AC-2: The top bar displays the authenticated user's `full_name`, a role badge (coloured by role), and a logout button that calls `POST /api/v1/auth/logout` and redirects to `/login`.
 - [ ] AC-3: A `<Breadcrumb />` component reflects the current route hierarchy (e.g. "Admin › Users › Edit").
-- [ ] AC-4: Any navigation to `/admin/*` without a valid access token immediately redirects to `/auth/login`; the originally requested URL is stored so the user is redirected back after login.
-- [ ] AC-5: Any navigation to `/admin/*` by a user with `role = 'employee'` immediately redirects to `/portal`.
+- [ ] AC-4: Any navigation to `/admin/*` without a valid access token immediately redirects to `/login`; the originally requested URL is stored so the user is redirected back after login.
+- [ ] AC-5: Any navigation to `/admin/*` by a user with `role_name = 'employee'` immediately redirects to `/portal`.
 - [ ] AC-6: The Users list page (`/admin/users`) renders a table with columns: Full Name, Email, Department, Role, Status, Actions; supports client-side column sorting.
 - [ ] AC-7: The Users list page includes filter controls for Department (select), Role (select), and Status (toggle); applying filters calls the API with the corresponding query parameters.
 - [ ] AC-8: A "New User" button opens the User Create Drawer; on successful save the users list query is invalidated so the new user appears without a full page reload.
@@ -61,15 +61,18 @@ src/
 #### `AdminLayout.tsx` — structure
 
 ```typescript
+// Dependency: npm install usehooks-ts
+import { useLocalStorage } from 'usehooks-ts';
+
 export function AdminLayout() {
-  const { data: user } = useCurrentUser();   // GET /api/v1/users/me
+  const { data: user } = useMe();            // GET /api/v1/users/me
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useLocalStorage('sidebar-collapsed', false);
 
   if (!user) {
-    return <Navigate to="/auth/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  if (user.role === 'employee') {
+  if (user.role_name === 'employee') {
     return <Navigate to="/portal" replace />;
   }
 
@@ -113,13 +116,13 @@ export function UsersListPage() {
 
   return (
     <div>
-      <PageHeader title={t('users.listTitle')}>
-        <Button onClick={openImportModal}>{t('users.import')}</Button>
-        <Button onClick={openCreateDrawer}>{t('users.create')}</Button>
+      <PageHeader title={t('users.title')}>
+        <Button onClick={openImportModal}>{t('users.actions.import')}</Button>
+        <Button onClick={openCreateDrawer}>{t('users.actions.create')}</Button>
       </PageHeader>
       <UserFiltersBar filters={filters} onChange={setFilters} />
       <DataTable columns={columns} data={data?.items ?? []} isLoading={isLoading} />
-      <Pagination page={page} total={data?.pagination.total ?? 0} pageSize={20} onChange={setPage} />
+      <Pagination page={page} total={data?.meta.total ?? 0} pageSize={20} onChange={setPage} />
     </div>
   );
 }
@@ -144,8 +147,50 @@ export function useUsers(params: UserListParams) {
 }
 ```
 
-#### i18n keys required (excerpt `en.json`)
+#### `useDepartments` hook (`src/api/departments.ts`)
 
+```typescript
+// Department type
+export interface Department {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  children?: Department[];
+}
+
+// Hook — backend returns a tree from GET /api/v1/departments
+export function useDepartments() {
+  return useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const res = await apiFetch('/api/v1/departments');
+      return res.data as Department[];
+    },
+  });
+}
+```
+
+#### i18n keys
+
+**Existing keys** (already in `en/kk/ru.json` from FR-BB18 — use as-is, do NOT re-declare):
+
+| Key | `en` value |
+|-----|------------|
+| `users.title` | "Users" |
+| `users.columns.name` | "Full Name" |
+
+**Updated existing keys** (present in locale files from FR-BB18 but MUST be updated to new values):
+
+> **Implementation note**: Update `users.actions.create` and `users.actions.import` in `en.json`, `kk.json`, and `ru.json` to the new values listed below.
+
+| Key | `en` value | `kk` value | `ru` value |
+|-----|------------|------------|------------|
+| `users.actions.create` | "New User" | "Жаңа Пайдаланушы" | "Новый пользователь" |
+| `users.actions.import` | "Bulk Import" | "Топтық жүктеу" | "Массовый импорт" |
+
+**New keys to add** (append to each locale file; do NOT duplicate existing keys):
+
+`en.json` additions:
 ```json
 {
   "nav": {
@@ -158,15 +203,7 @@ export function useUsers(params: UserListParams) {
     "settings":    "Settings"
   },
   "users": {
-    "listTitle":   "Users",
-    "create":      "New User",
-    "import":      "Bulk Import",
     "columns": {
-      "fullName":   "Full Name",
-      "email":      "Email",
-      "department": "Department",
-      "role":       "Role",
-      "status":     "Status",
       "actions":    "Actions"
     },
     "roles": {
@@ -174,18 +211,70 @@ export function useUsers(params: UserListParams) {
       "department_admin":  "Dept. Admin",
       "examiner":          "Examiner",
       "employee":          "Employee"
+    }
+  }
+}
+```
+
+`kk.json` additions:
+```json
+{
+  "nav": {
+    "dashboard":   "Басты бет",
+    "users":       "Пайдаланушылар",
+    "departments": "Бөлімдер",
+    "questions":   "Сұрақтар",
+    "exams":       "Емтихандар",
+    "reports":     "Есептер",
+    "settings":    "Параметрлер"
+  },
+  "users": {
+    "columns": {
+      "actions": "Әрекеттер"
     },
-    "status": {
-      "active":   "Active",
-      "inactive": "Inactive"
+    "roles": {
+      "super_admin":       "Бас Әкімші",
+      "department_admin":  "Бөлім Әкімшісі",
+      "examiner":          "Емтихан Алушы",
+      "employee":          "Қызметкер"
+    }
+  }
+}
+```
+
+`ru.json` additions:
+```json
+{
+  "nav": {
+    "dashboard":   "Главная",
+    "users":       "Пользователи",
+    "departments": "Отделы",
+    "questions":   "Вопросы",
+    "exams":       "Экзамены",
+    "reports":     "Отчёты",
+    "settings":    "Настройки"
+  },
+  "users": {
+    "columns": {
+      "actions": "Действия"
+    },
+    "roles": {
+      "super_admin":       "Супер-Администратор",
+      "department_admin":  "Администратор отдела",
+      "examiner":          "Экзаменатор",
+      "employee":          "Сотрудник"
     }
   }
 }
 ```
 
 ## Notes
-- `useCurrentUser()` calls `GET /api/v1/users/me` and is cached by React Query; it is the single source of truth for the current user's identity throughout the admin shell.
+- `useMe()` calls `GET /api/v1/users/me` and is cached by React Query; it is the single source of truth for the current user's identity throughout the admin shell. It is already exported from `src/api/users.ts` — do NOT create a `useCurrentUser()` alias.
 - The route guard pattern uses React Router's `<Navigate state={{ from: location }} />` so the post-login redirect works correctly.
 - shadcn/ui `Sheet` component is used for both create and edit drawers to ensure consistent slide-over behaviour and focus management.
 - Role badge colours: `super_admin` = purple, `department_admin` = blue, `examiner` = teal, `employee` = gray — defined as Tailwind `data-role` variant classes, not hardcoded `style` attributes.
 - Navigation items for which the user lacks `read` permission (based on their role) should be hidden from the sidebar to reduce confusion; this is a UX convenience, not a security control (the backend enforces permissions).
+- **Dual auth guard (M-1)**: `RequireRole` in `App.tsx` provides the first layer of protection for `/admin/*` routes. `AdminLayout` provides a second layer only for graceful redirect after login. The implementation must NOT remove `RequireRole` from `App.tsx`; both layers are intentional.
+- **AdminShell.tsx replacement (M-2)**: `src/pages/AdminShell.tsx` (created by FR-BB110) must be REPLACED by `src/layouts/AdminLayout.tsx`. This is not an addition — delete the old file and update the import in `App.tsx` to reference `src/layouts/AdminLayout`.
+- **DepartmentsPage placeholder (L-1)**: `DepartmentsPage.tsx` is a shell placeholder only — it renders a "Coming Soon" empty state with no data fetching. Full implementation is deferred to FR-BB17.
+- **`usehooks-ts` dependency (H-2)**: `useLocalStorage` is sourced from `usehooks-ts`. Run `npm install usehooks-ts` in the `frontend/` directory and import it as `import { useLocalStorage } from 'usehooks-ts'`.

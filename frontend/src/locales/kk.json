@@ -3,7 +3,17 @@
   "ru": "Русский",
   "en": "English",
   "common": {
-    "logo_placeholder": "Логотип"
+    "logo_placeholder": "Логотип",
+    "coming_soon": "Жақында"
+  },
+  "nav": {
+    "dashboard": "Басты бет",
+    "users": "Пайдаланушылар",
+    "departments": "Бөлімдер",
+    "questions": "Сұрақтар",
+    "exams": "Емтихандар",
+    "reports": "Есептер",
+    "settings": "Параметрлер"
   },
   "users": {
     "title": "Пайдаланушылар",
@@ -13,14 +23,21 @@
       "department": "Бөлім",
       "role": "Рөл",
       "status": "Күй",
-      "created_at": "Жасалған"
+      "created_at": "Жасалған",
+      "actions": "Әрекеттер"
+    },
+    "roles": {
+      "super_admin": "Бас Әкімші",
+      "department_admin": "Бөлім Әкімшісі",
+      "examiner": "Емтихан Алушы",
+      "employee": "Қызметкер"
     },
     "actions": {
-      "create": "Пайдаланушы қосу",
+      "create": "Жаңа Пайдаланушы",
       "edit": "Өңдеу",
       "deactivate": "Өшіру",
       "reset_password": "Құпия сөзді қайта орнату",
-      "import": "CSV импорт"
+      "import": "Топтық жүктеу"
     },
     "status": {
       "active": "Белсенді",

@@ -6,7 +6,7 @@
 | ID | FR-BB112 |
 | Phase | 1 — Foundation |
 | Priority | 3 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB13, FR-BB111 |
 
 ## Description

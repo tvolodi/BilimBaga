@@ -10,6 +10,8 @@ import { AdminLayout } from '@/layouts/AdminLayout'
 import { EmployeePortal } from '@/pages/EmployeePortal'
 import { UsersListPage } from '@/pages/admin/users/UsersListPage'
 import { DepartmentsPage } from '@/pages/admin/departments/DepartmentsPage'
+import { BrandingSettingsPage } from '@/pages/admin/settings/BrandingSettingsPage'
+import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
 
 const queryClient = new QueryClient()
@@ -40,6 +42,14 @@ function AppRoutes() {
         <Route index element={<Navigate to="users" replace />} />
         <Route path="users" element={<UsersListPage />} />
         <Route path="departments" element={<DepartmentsPage />} />
+        <Route
+          path="settings/branding"
+          element={
+            <RequireSuperAdmin>
+              <BrandingSettingsPage />
+            </RequireSuperAdmin>
+          }
+        />
       </Route>
       <Route
         path="/portal/*"

@@ -6,7 +6,7 @@
 | ID | FR-BB110 |
 | Phase | 1 — Foundation |
 | Priority | 2 |
-| Status | Revised-2 |
+| Status | Ready |
 | Depends On | FR-BB14, FR-BB13 |
 
 ## Description

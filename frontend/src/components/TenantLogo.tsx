@@ -1,10 +1,13 @@
 import { useTranslation } from 'react-i18next'
+import { cn } from '@/lib/utils'
 
 interface TenantLogoProps {
   appName?: string
+  logoOverride?: string
+  className?: string
 }
 
-export function TenantLogo({ appName }: TenantLogoProps) {
+export function TenantLogo({ appName, logoOverride, className }: TenantLogoProps) {
   const { t } = useTranslation()
 
   function handleError(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -17,13 +20,14 @@ export function TenantLogo({ appName }: TenantLogoProps) {
   }
 
   const fallbackText = appName ?? t('common.logo_placeholder')
+  const src = logoOverride && logoOverride.length > 0 ? logoOverride : '/api/v1/tenant/logo'
 
   return (
     <div className="flex justify-center">
       <img
-        src="/api/v1/tenant/logo"
+        src={src}
         alt={fallbackText}
-        className="h-12 object-contain"
+        className={cn('h-12 object-contain', className)}
         onError={handleError}
       />
       <span style={{ display: 'none' }} className="text-lg font-bold">

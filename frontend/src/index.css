@@ -1,1 +1,205 @@
 @import "tailwindcss";
+
+/* =========================================================================
+   BilimBaga Design System — token layer
+   See docs/design-system/bilimbaga_design_system.md for the spec.
+
+   Layering:
+     1. Brand palette (raw colors — never used directly in components)
+     2. Semantic tokens (--bg-*, --text-*, --border-*, --color-success, …)
+     3. shadcn-compat aliases (--color-primary, --color-muted, …) so
+        existing ui/* components keep working unchanged. TenantProvider
+        overrides --color-primary / --color-accent at runtime; both layers
+        below read through to those vars.
+   ========================================================================= */
+
+@theme {
+  /* ---- 1. Brand palette ---- */
+  --color-navy: #1B3A6B;
+  --color-blue: #2E6DB4;
+  --color-blue-light: #5AA0E0;
+  --color-blue-pale: #D8E8F5;
+  --color-gold: #C8A84B;
+  --color-gold-light: #F0E4B8;
+
+  /* ---- 2. Semantic tokens (light) ---- */
+  --color-bg-page: #F4F6FA;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-raised: #FFFFFF;
+  --color-bg-subtle: #EEF2F8;
+  --color-bg-navy: #1B3A6B;
+
+  --color-text-primary: #1A1F2E;
+  --color-text-secondary: #4A5568;
+  --color-text-muted: #8A94A6;
+  --color-text-on-navy: #FFFFFF;
+  --color-text-on-blue: #FFFFFF;
+  --color-text-link: #2E6DB4;
+
+  --color-border-default: #DDE2ED;
+  --color-border-strong: #B8C4D8;
+  --color-border-focus: #2E6DB4;
+
+  --color-success: #1E7E4E;
+  --color-bg-success: #E8F7EF;
+  --color-warning: #92610A;
+  --color-bg-warning: #FEF3DC;
+  --color-danger: #C0392B;
+  --color-bg-danger: #FDECEA;
+  --color-info: #1B5FA8;
+  --color-bg-info: #E6F1FB;
+
+  /* ---- 3. shadcn-compat aliases ----
+     Existing ui/* components reference these names. They alias onto the
+     semantic tokens above, except for --color-primary / --color-accent
+     which TenantProvider overrides at runtime. */
+  --color-primary: #2E6DB4;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #EEF2F8;
+  --color-secondary-foreground: #1A1F2E;
+  --color-muted: #EEF2F8;
+  --color-muted-foreground: #4A5568;
+  --color-accent: #C8A84B;
+  --color-accent-foreground: #1A1F2E;
+  --color-destructive: #C0392B;
+  --color-destructive-foreground: #FFFFFF;
+  --color-background: #F4F6FA;
+  --color-foreground: #1A1F2E;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1A1F2E;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #1A1F2E;
+  --color-border: #DDE2ED;
+  --color-input: #DDE2ED;
+  --color-ring: #2E6DB4;
+
+  /* ---- Typography ---- */
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --text-display: 2rem;
+  --text-display--line-height: 1.2;
+  --text-display--font-weight: 700;
+
+  --text-h1: 1.5rem;
+  --text-h1--line-height: 1.3;
+  --text-h1--font-weight: 600;
+
+  --text-h2: 1.25rem;
+  --text-h2--line-height: 1.35;
+  --text-h2--font-weight: 600;
+
+  --text-h3: 1rem;
+  --text-h3--line-height: 1.4;
+  --text-h3--font-weight: 600;
+
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.6;
+  --text-body--font-weight: 400;
+
+  --text-body-sm: 0.8125rem;
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--font-weight: 400;
+
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.4;
+  --text-label--font-weight: 500;
+
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1.4;
+  --text-caption--font-weight: 400;
+
+  /* ---- Radius ---- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ---- Shadows ---- */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(46, 109, 180, 0.25);
+
+  /* ---- Layout max-widths ---- */
+  --container-content: 960px;
+  --container-admin: 1200px;
+  --container-question: 720px;
+}
+
+/* Dark-mode token overrides.
+   Apply with class="dark" on <html> (Tailwind v4 supports custom variants
+   via @custom-variant, but plain CSS selector overrides work for tokens). */
+.dark {
+  --color-bg-page: #0F1623;
+  --color-bg-surface: #1A2133;
+  --color-bg-surface-raised: #222D42;
+  --color-bg-subtle: #1E2A3D;
+  --color-bg-navy: #0D1E3A;
+
+  --color-text-primary: #E8ECF4;
+  --color-text-secondary: #9AAABB;
+  --color-text-muted: #5A6A7E;
+  --color-text-on-navy: #E8ECF4;
+  --color-text-link: #5AA0E0;
+
+  --color-border-default: #2A3550;
+  --color-border-strong: #3D4F6E;
+  --color-border-focus: #5AA0E0;
+
+  --color-success: #4ABA7E;
+  --color-bg-success: #0F2E1E;
+  --color-warning: #E0A030;
+  --color-bg-warning: #2A1E08;
+  --color-danger: #E06050;
+  --color-bg-danger: #2A0F0D;
+  --color-info: #5AA0E0;
+  --color-bg-info: #0C1E35;
+
+  --color-primary: #5AA0E0;
+  --color-primary-foreground: #0F1623;
+  --color-secondary: #1E2A3D;
+  --color-secondary-foreground: #E8ECF4;
+  --color-muted: #1E2A3D;
+  --color-muted-foreground: #9AAABB;
+  --color-accent: #C8A84B;
+  --color-accent-foreground: #0F1623;
+  --color-destructive: #E06050;
+  --color-destructive-foreground: #FFFFFF;
+  --color-background: #0F1623;
+  --color-foreground: #E8ECF4;
+  --color-card: #1A2133;
+  --color-card-foreground: #E8ECF4;
+  --color-popover: #1A2133;
+  --color-popover-foreground: #E8ECF4;
+  --color-border: #2A3550;
+  --color-input: #2A3550;
+  --color-ring: #5AA0E0;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--color-bg-page);
+    color: var(--color-text-primary);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

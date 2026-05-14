@@ -25,7 +25,7 @@ const NAV_ITEMS = [
   { key: 'questions', icon: FileQuestion, path: '/admin/questions', labelKey: 'nav.questions', end: false },
   { key: 'exams', icon: ClipboardList, path: '/admin/exams', labelKey: 'nav.exams', end: false },
   { key: 'reports', icon: BarChart2, path: '/admin/reports', labelKey: 'nav.reports', end: false },
-  { key: 'settings', icon: Settings, path: '/admin/settings', labelKey: 'nav.settings', end: false },
+  { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false },
 ]
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {

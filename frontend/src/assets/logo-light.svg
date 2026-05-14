@@ -1,0 +1,17 @@
+<svg width="200" height="56" viewBox="0 0 200 56" xmlns="http://www.w3.org/2000/svg">
+  <title>BilimBaga</title>
+  <polygon points="28,4 48,16 48,40 28,52 8,40 8,16" fill="#1B3A6B"/>
+  <polygon points="28,14 33,22 28,20 23,22" fill="#2E6DB4"/>
+  <polygon points="38,28 30,28 32,23 36,22" fill="#2E6DB4"/>
+  <polygon points="28,42 23,34 28,36 33,34" fill="#2E6DB4"/>
+  <polygon points="18,28 26,28 24,33 20,34" fill="#2E6DB4"/>
+  <circle cx="28" cy="28" r="4.5" fill="#C8A84B"/>
+  <text x="62" y="24"
+    font-family="Inter, Arial, sans-serif"
+    font-weight="700" font-size="22"
+    fill="#1B3A6B" letter-spacing="-0.3">Bilim</text>
+  <text x="62" y="46"
+    font-family="Inter, Arial, sans-serif"
+    font-weight="300" font-size="17"
+    fill="#2E6DB4" letter-spacing="3.5">BAGA</text>
+</svg>

@@ -1,0 +1,31 @@
+﻿{
+  "run_id": "FR-BB111",
+  "pipeline": "A",
+  "commit_hash": "eb1a5dc",
+  "commit_message": "feat(frontend): implement FR-BB111 admin shell — sidebar, topbar, breadcrumb, users list",
+  "files_committed": [
+    "frontend/src/api/departments.ts",
+    "frontend/src/layouts/AdminLayout.tsx",
+    "frontend/src/components/admin/Sidebar.tsx",
+    "frontend/src/components/admin/TopBar.tsx",
+    "frontend/src/components/admin/Breadcrumb.tsx",
+    "frontend/src/components/admin/RoleBadge.tsx",
+    "frontend/src/components/admin/StatusBadge.tsx",
+    "frontend/src/pages/admin/users/UsersListPage.tsx",
+    "frontend/src/pages/admin/users/UserCreateDrawer.tsx",
+    "frontend/src/pages/admin/users/UserEditDrawer.tsx",
+    "frontend/src/pages/admin/users/ImportModal.tsx",
+    "frontend/src/pages/admin/departments/DepartmentsPage.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/pages/AdminShell.tsx",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "docs/requirements/FR-BB111.Frontend-admin-shell.md",
+    "docs/issue-reports/FR-BB111-INNER-REPORT.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB111-INNER-REPORT.md",
+  "status": "success"
+}

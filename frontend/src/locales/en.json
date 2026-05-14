@@ -106,6 +106,30 @@
       "page_info": "Page {{page}} of {{total}}"
     }
   },
+  "settings": {
+    "branding": {
+      "title": "Branding",
+      "appName": "Application Name",
+      "logo": "Logo",
+      "logoHint": "PNG, JPEG, SVG or WebP · max 1 MB",
+      "logoDragDrop": "Drag and drop or click to upload",
+      "logoSizeError": "File is too large. Maximum size is 1 MB.",
+      "logoTypeError": "Unsupported file type. Use PNG, JPEG, SVG or WebP.",
+      "logoReadError": "Could not read file. Please try again.",
+      "primaryColor": "Primary Colour",
+      "accentColor": "Accent Colour",
+      "contrastWarning": "Low contrast — text may be hard to read (ratio: {{ratio}}:1)",
+      "locales": "Available Languages",
+      "defaultLocale": "Default Language",
+      "localeError": "Default language must be in the available languages list.",
+      "save": "Save Changes",
+      "saveSuccess": "Branding updated successfully.",
+      "saveError": "Could not save branding. Please try again.",
+      "preview": "Live Preview",
+      "previewBody": "Preview of the main content area.",
+      "previewButton": "Sample Button"
+    }
+  },
   "auth": {
     "login": {
       "title": "Sign in to {{appName}}",

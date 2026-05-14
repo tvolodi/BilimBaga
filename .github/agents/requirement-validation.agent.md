@@ -44,7 +44,7 @@ Read the handoff file from Step 1: `docs/handoffs/{run-id}/step-01-requirement-d
 | Check | Severity |
 |-------|----------|
 | FR-BBxx number assigned and not duplicate | Critical |
-| Status = "draft" | Low |
+| Status is `draft` or `validated` (not `implemented`) | Low |
 | Phase reference matches roadmap | High |
 | All dependent FR-BBxx IDs listed and exist | High |
 | Summary paragraph present and describes business purpose | Medium |
@@ -127,5 +127,7 @@ Write `docs/handoffs/{run-id}/step-02-requirement-validation.json`:
 
 **PASS**: zero Critical findings, zero High findings.
 **FAIL**: one or more Critical or High findings.
+
+**On PASS**: update the `Status` field in the requirement document from `draft` to `validated` before writing the handoff file.
 
 Medium and Low findings are reported but do not cause a FAIL (the Requirement Development agent should still address them in revision).

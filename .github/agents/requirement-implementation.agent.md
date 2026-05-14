@@ -132,8 +132,9 @@ Wait for its report. If it reports failures it could not resolve, determine if a
 
 ### Phase 9 — Documentation Update
 
-1. Update `docs/requirements/README.md` — change status from `draft` to `implemented`.
-2. Update `docs/architecture-guide.md` if new tables or endpoints were added.
+1. Update `docs/requirements/README.md` — change status from `validated` to `implemented`.
+2. Update the `Status` field in the requirement document itself (`docs/requirements/{slug}.md`) from `validated` to `implemented`.
+3. Update `docs/architecture-guide.md` if new tables or endpoints were added.
 
 ### Phase 10 — Release
 

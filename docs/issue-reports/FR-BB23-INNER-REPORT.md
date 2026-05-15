@@ -124,3 +124,38 @@ backend/cmd/api/main.go                                    (MODIFIED)
 docs/requirements/FR-BB23.Question-CRUD-API.md             (MODIFIED)
 docs/requirements/README.md                                 (MODIFIED)
 ```
+
+---
+
+## Retroactive Validation — 2026-05-15
+
+**Pipeline**: A (retroactive validation)
+**Outcome**: PASS — no code or test changes required
+
+### Summary
+FR-BB23 was originally implemented without passing through the validation pipeline. A retroactive validation run (Pipeline A) was executed on 2026-05-15. Gap analysis confirmed all 11 ACs are fully satisfied by the existing implementation. Code Review returned PASS with zero findings at any severity level. No production code, test, or migration changes were needed.
+
+### Acceptance Criteria Verified
+| AC | Verified By |
+|----|-------------|
+| AC-1 | Code review — handler.go:List, all filter params confirmed |
+| AC-2 | Code review — validateCreateRequest, type-specific rules confirmed |
+| AC-3 | Code review — repository.go:GetWithDetails confirmed |
+| AC-4 | Code review — service.go:UpdateQuestion serializable tx confirmed |
+| AC-5 | Code review — validTransitions map confirmed |
+| AC-6 | Code review — service.go:DeleteQuestion ErrNotDraft confirmed |
+| AC-7 | Code review — repository.go:GetVersionChain recursive CTE confirmed |
+| AC-8 | Code review — ON CONFLICT DO NOTHING idempotency confirmed |
+| AC-9 | Code review — all 6 mutating endpoints write audit_log entries confirmed |
+| AC-10 | Code review — migration 010 idx_question_tags_tag_id confirmed |
+| AC-11 | Code review — rbac.RequirePermission on all endpoints confirmed |
+
+### Test Results (re-run)
+- Backend: all packages passing, 0 failed
+- Frontend: N/A
+
+### Migration Applied
+none
+
+### Known Limitations
+None identified.

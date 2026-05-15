@@ -41,6 +41,16 @@ type Service interface {
 	// GetExamHistory returns paginated session history for a user+exam pair (FR-BB41 AC-6/AC-10).
 	// Returns ErrExamNotFound if the exam does not exist.
 	GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
+
+	// ListGradingQueue returns sessions pending manual grading (FR-BB42 AC-1/AC-2/AC-3).
+	ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
+
+	// GetGradingDetail returns session header and short-text questions for grading (FR-BB42 AC-4).
+	GetGradingDetail(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
+
+	// GradeAnswer validates and persists a manual grade for one short-text answer (FR-BB42 AC-5/AC-6/AC-7/AC-8/AC-10).
+	// Returns ErrInvalidScore if score_pct is not in [0, 100].
+	GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
 }
 
 type service struct {
@@ -731,4 +741,53 @@ func (s *service) GetExamHistory(ctx context.Context, examID, userID string, pag
 			Total:   total,
 		},
 	}, nil
+}
+
+// ListGradingQueue returns sessions pending manual grading (FR-BB42 AC-1/AC-2/AC-3).
+func (s *service) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error) {
+	items, total, err := s.repo.ListGradingQueue(ctx, examID, dateFrom, dateTo, page, perPage)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: ListGradingQueue: %w", err)
+	}
+	return &GradingQueueResponse{
+		Items: items,
+		Meta: GradingQueueMeta{
+			Page:    page,
+			PerPage: perPage,
+			Total:   total,
+		},
+	}, nil
+}
+
+// GetGradingDetail returns session header and short-text questions (FR-BB42 AC-4).
+func (s *service) GetGradingDetail(ctx context.Context, sessionID string) (*GradingDetailResponse, error) {
+	detail, err := s.repo.GetGradingDetail(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetGradingDetail: %w", err)
+	}
+	return detail, nil
+}
+
+// GradeAnswer validates and stores a manual grade for a short-text answer (FR-BB42).
+func (s *service) GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error) {
+	// AC-5: validate score range.
+	if req.ScorePct < 0 || req.ScorePct > 100 {
+		return nil, ErrInvalidScore
+	}
+
+	result, err := s.repo.GradeAnswer(ctx, sessionID, questionID, graderID, tenantID, actorIP, req.ScorePct, req.Feedback)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
+	}
+
+	resp := &GradeAnswerResponse{
+		QuestionID:    questionID,
+		GradingStatus: "graded",
+		ScorePct:      req.ScorePct,
+		SessionStatus: result.sessionStatus,
+		AllGraded:     result.allGraded,
+		FinalScorePct: result.finalScorePct,
+		Passed:        result.passed,
+	}
+	return resp, nil
 }

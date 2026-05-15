@@ -203,6 +203,11 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.Get("/portal/sessions/{id}/result", sessionsHandler.GetSessionResult)
 			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).Get("/admin/sessions/{id}/result", sessionsHandler.GetAdminSessionResult)
 			r.Get("/portal/exams/{id}/history", sessionsHandler.GetExamHistory)
+
+			// Manual grading queue (FR-BB42).
+			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading", sessionsHandler.HandleListGradingQueue)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "write")).Post("/admin/grading/{sessionId}/answers/{questionId}", sessionsHandler.HandleGradeAnswer)
 		})
 	})
 

@@ -27,6 +27,9 @@ type mockSvc struct {
 	getSessionResultFn   func(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error)
 	getAdminResultFn     func(ctx context.Context, sessionID string) (*SessionResultResponse, error)
 	getExamHistoryFn     func(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
+	listGradingQueueFn   func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
+	getGradingDetailFn   func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
+	gradeAnswerFn        func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
 }
 
 func (m *mockSvc) CreateSession(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error) {
@@ -74,6 +77,24 @@ func (m *mockSvc) GetAdminSessionResult(ctx context.Context, sessionID string) (
 func (m *mockSvc) GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error) {
 	if m.getExamHistoryFn != nil {
 		return m.getExamHistoryFn(ctx, examID, userID, page, perPage)
+	}
+	return nil, errors.New("not configured")
+}
+func (m *mockSvc) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error) {
+	if m.listGradingQueueFn != nil {
+		return m.listGradingQueueFn(ctx, examID, dateFrom, dateTo, page, perPage)
+	}
+	return nil, errors.New("not configured")
+}
+func (m *mockSvc) GetGradingDetail(ctx context.Context, sessionID string) (*GradingDetailResponse, error) {
+	if m.getGradingDetailFn != nil {
+		return m.getGradingDetailFn(ctx, sessionID)
+	}
+	return nil, errors.New("not configured")
+}
+func (m *mockSvc) GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error) {
+	if m.gradeAnswerFn != nil {
+		return m.gradeAnswerFn(ctx, sessionID, questionID, graderID, tenantID, actorIP, req)
 	}
 	return nil, errors.New("not configured")
 }
@@ -1054,4 +1075,97 @@ func TestGetExamHistory_Handler_404_ExamNotFound(t *testing.T) {
 	body := decodeBody(t, w.Body.Bytes())
 	errObj, _ := body["error"].(map[string]any)
 	assert.Equal(t, "EXAM_NOT_FOUND", errObj["code"])
+}
+
+// ── FR-BB42: Manual Grading Queue handler tests ───────────────────────────────
+
+func TestHandleListGradingQueue_200(t *testing.T) {
+	now := time.Now().UTC()
+	svc := &mockSvc{
+		listGradingQueueFn: func(_ context.Context, _ *string, _, _ *time.Time, _, _ int) (*GradingQueueResponse, error) {
+			return &GradingQueueResponse{
+				Items: []GradingQueueItem{
+					{SessionID: "s1", EmployeeName: "Alice", ExamID: "e1", ExamTitle: "Quiz", SubmittedAt: &now, PendingQuestionCount: 2},
+				},
+				Meta: GradingQueueMeta{Page: 1, PerPage: 20, Total: 1},
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/grading", nil)
+	req = req.WithContext(context.WithValue(req.Context(), ctxkeys.CtxTenantID, "tenant-1"))
+	w := httptest.NewRecorder()
+	h.HandleListGradingQueue(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	data, _ := body["data"].(map[string]any)
+	require.NotNil(t, data)
+	items, _ := data["items"].([]any)
+	assert.Len(t, items, 1)
+}
+
+func TestHandleGradeAnswer_422_InvalidScore(t *testing.T) {
+	svc := &mockSvc{
+		gradeAnswerFn: func(_ context.Context, _, _, _, _, _ string, _ GradeAnswerRequest) (*GradeAnswerResponse, error) {
+			return nil, ErrInvalidScore
+		},
+	}
+	h := NewHandler(svc)
+
+	bodyStr := `{"score_pct": 150, "feedback": ""}`
+	req := httptest.NewRequest(http.MethodPost, "/admin/grading/s1/answers/q1", strings.NewReader(bodyStr))
+	req.Header.Set("Content-Type", "application/json")
+	ctx422 := context.WithValue(req.Context(), ctxkeys.CtxTenantID, "tenant-1")
+	rctx422 := chi.NewRouteContext()
+	rctx422.URLParams.Add("sessionId", "s1")
+	rctx422.URLParams.Add("questionId", "q1")
+	req = req.WithContext(context.WithValue(ctx422, chi.RouteCtxKey, rctx422))
+
+	w := httptest.NewRecorder()
+	h.HandleGradeAnswer(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "INVALID_SCORE", errObj["code"])
+}
+
+func TestHandleGradeAnswer_200_AllGraded(t *testing.T) {
+	finalScore := 90.0
+	passed := true
+	svc := &mockSvc{
+		gradeAnswerFn: func(_ context.Context, _, _, _, _, _ string, _ GradeAnswerRequest) (*GradeAnswerResponse, error) {
+			return &GradeAnswerResponse{
+				QuestionID:    "q1",
+				GradingStatus: "graded",
+				ScorePct:      90,
+				SessionStatus: "submitted",
+				AllGraded:     true,
+				FinalScorePct: &finalScore,
+				Passed:        &passed,
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+
+	bodyStr := `{"score_pct": 90, "feedback": "Excellent"}`
+	req := httptest.NewRequest(http.MethodPost, "/admin/grading/s1/answers/q1", strings.NewReader(bodyStr))
+	req.Header.Set("Content-Type", "application/json")
+	ctx200 := context.WithValue(req.Context(), ctxkeys.CtxTenantID, "tenant-1")
+	rctx200 := chi.NewRouteContext()
+	rctx200.URLParams.Add("sessionId", "s1")
+	rctx200.URLParams.Add("questionId", "q1")
+	req = req.WithContext(context.WithValue(ctx200, chi.RouteCtxKey, rctx200))
+
+	w := httptest.NewRecorder()
+	h.HandleGradeAnswer(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	data, _ := body["data"].(map[string]any)
+	require.NotNil(t, data)
+	assert.Equal(t, true, data["all_graded"])
+	assert.Equal(t, "submitted", data["session_status"])
 }

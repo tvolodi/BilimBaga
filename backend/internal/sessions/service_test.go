@@ -40,6 +40,9 @@ type mockRepo struct {
 	getCorrectAnswerTextsFn   func(ctx context.Context, questionIDs []string, locale string) (map[string][]string, error)
 	getExamHistoryFn          func(ctx context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error)
 	getExamTitleByIDFn        func(ctx context.Context, examID string) (string, error)
+	listGradingQueueFn        func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error)
+	getGradingDetailFn        func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
+	gradeAnswerFn             func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error)
 }
 
 func (m *mockRepo) IsAssigned(ctx context.Context, examID, userID, deptID string) (bool, error) {
@@ -245,6 +248,24 @@ func (m *mockRepo) GetExamTitleByID(ctx context.Context, examID string) (string,
 		return m.getExamTitleByIDFn(ctx, examID)
 	}
 	return "Exam", nil
+}
+func (m *mockRepo) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error) {
+	if m.listGradingQueueFn != nil {
+		return m.listGradingQueueFn(ctx, examID, dateFrom, dateTo, page, perPage)
+	}
+	return []GradingQueueItem{}, 0, nil
+}
+func (m *mockRepo) GetGradingDetail(ctx context.Context, sessionID string) (*GradingDetailResponse, error) {
+	if m.getGradingDetailFn != nil {
+		return m.getGradingDetailFn(ctx, sessionID)
+	}
+	return nil, ErrSessionNotFound
+}
+func (m *mockRepo) GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error) {
+	if m.gradeAnswerFn != nil {
+		return m.gradeAnswerFn(ctx, sessionID, questionID, graderID, tenantID, actorIP, scorePct, feedback)
+	}
+	return &gradeAnswerResult{sessionStatus: "grading_pending"}, nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1434,4 +1455,145 @@ func TestGetExamHistory_PaginationMeta(t *testing.T) {
 	assert.Equal(t, 1, resp.Meta.PerPage)
 	assert.Equal(t, 5, resp.Meta.Total)
 	assert.Equal(t, "exam-1", resp.ExamID)
+}
+
+// ── FR-BB42: Manual Grading Queue service tests ───────────────────────────────
+
+func TestListGradingQueue_ReturnsPaginatedItems(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &mockRepo{
+		listGradingQueueFn: func(_ context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error) {
+			return []GradingQueueItem{
+				{SessionID: "s1", EmployeeName: "Alice", ExamID: "e1", ExamTitle: "Test Exam", SubmittedAt: &now, PendingQuestionCount: 2},
+			}, 1, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.ListGradingQueue(context.Background(), nil, nil, nil, 1, 20)
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	assert.Equal(t, "s1", resp.Items[0].SessionID)
+	assert.Equal(t, 1, resp.Meta.Total)
+	assert.Equal(t, 1, resp.Meta.Page)
+	assert.Equal(t, 20, resp.Meta.PerPage)
+}
+
+func TestListGradingQueue_EmptyResult(t *testing.T) {
+	repo := &mockRepo{
+		listGradingQueueFn: func(_ context.Context, _ *string, _, _ *time.Time, _, _ int) ([]GradingQueueItem, int, error) {
+			return []GradingQueueItem{}, 0, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.ListGradingQueue(context.Background(), nil, nil, nil, 1, 20)
+	require.NoError(t, err)
+	assert.Empty(t, resp.Items)
+	assert.Equal(t, 0, resp.Meta.Total)
+}
+
+func TestListGradingQueue_RepoError(t *testing.T) {
+	repo := &mockRepo{
+		listGradingQueueFn: func(_ context.Context, _ *string, _, _ *time.Time, _, _ int) ([]GradingQueueItem, int, error) {
+			return nil, 0, errors.New("db error")
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.ListGradingQueue(context.Background(), nil, nil, nil, 1, 20)
+	require.Error(t, err)
+}
+
+func TestGetGradingDetail_ReturnsDetail(t *testing.T) {
+	now := time.Now().UTC()
+	expected := &GradingDetailResponse{
+		SessionID:    "s1",
+		EmployeeName: "Alice",
+		ExamTitle:    "Quiz 1",
+		SubmittedAt:  &now,
+		Questions: []GradingQuestionItem{
+			{QuestionID: "q1", Stem: "Write about Go.", TextAnswer: "Go is great.", GradingStatus: "pending_manual"},
+		},
+	}
+	repo := &mockRepo{
+		getGradingDetailFn: func(_ context.Context, sessionID string) (*GradingDetailResponse, error) {
+			return expected, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetGradingDetail(context.Background(), "s1")
+	require.NoError(t, err)
+	assert.Equal(t, "s1", resp.SessionID)
+	assert.Len(t, resp.Questions, 1)
+}
+
+func TestGetGradingDetail_NotFound(t *testing.T) {
+	repo := &mockRepo{
+		getGradingDetailFn: func(_ context.Context, sessionID string) (*GradingDetailResponse, error) {
+			return nil, ErrSessionNotFound
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetGradingDetail(context.Background(), "nonexistent")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrSessionNotFound)
+}
+
+func TestGradeAnswer_InvalidScoreAbove100(t *testing.T) {
+	svc := NewService(&mockRepo{})
+	_, err := svc.GradeAnswer(context.Background(), "s1", "q1", "grader", "tenant", "127.0.0.1", GradeAnswerRequest{ScorePct: 101})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidScore)
+}
+
+func TestGradeAnswer_InvalidScoreNegative(t *testing.T) {
+	svc := NewService(&mockRepo{})
+	_, err := svc.GradeAnswer(context.Background(), "s1", "q1", "grader", "tenant", "127.0.0.1", GradeAnswerRequest{ScorePct: -1})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidScore)
+}
+
+func TestGradeAnswer_Success_MorePending(t *testing.T) {
+	repo := &mockRepo{
+		gradeAnswerFn: func(_ context.Context, _, _, _, _, _ string, _ float64, _ string) (*gradeAnswerResult, error) {
+			return &gradeAnswerResult{allGraded: false, sessionStatus: "grading_pending"}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GradeAnswer(context.Background(), "s1", "q1", "g1", "t1", "ip", GradeAnswerRequest{ScorePct: 75, Feedback: "Good"})
+	require.NoError(t, err)
+	assert.Equal(t, "graded", resp.GradingStatus)
+	assert.Equal(t, 75.0, resp.ScorePct)
+	assert.False(t, resp.AllGraded)
+	assert.Equal(t, "grading_pending", resp.SessionStatus)
+	assert.Nil(t, resp.FinalScorePct)
+	assert.Nil(t, resp.Passed)
+}
+
+func TestGradeAnswer_Success_AllGraded(t *testing.T) {
+	finalScore := 88.5
+	passed := true
+	repo := &mockRepo{
+		gradeAnswerFn: func(_ context.Context, _, _, _, _, _ string, _ float64, _ string) (*gradeAnswerResult, error) {
+			return &gradeAnswerResult{allGraded: true, finalScorePct: &finalScore, passed: &passed, sessionStatus: "submitted"}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GradeAnswer(context.Background(), "s1", "q1", "g1", "t1", "ip", GradeAnswerRequest{ScorePct: 88.5, Feedback: ""})
+	require.NoError(t, err)
+	assert.True(t, resp.AllGraded)
+	assert.Equal(t, "submitted", resp.SessionStatus)
+	require.NotNil(t, resp.FinalScorePct)
+	assert.Equal(t, finalScore, *resp.FinalScorePct)
+	require.NotNil(t, resp.Passed)
+	assert.True(t, *resp.Passed)
+}
+
+func TestGradeAnswer_RepoError(t *testing.T) {
+	repo := &mockRepo{
+		gradeAnswerFn: func(_ context.Context, _, _, _, _, _ string, _ float64, _ string) (*gradeAnswerResult, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GradeAnswer(context.Background(), "s1", "q1", "g1", "t1", "ip", GradeAnswerRequest{ScorePct: 50})
+	require.Error(t, err)
 }

@@ -32,6 +32,9 @@ var (
 	// FR-BB41 errors.
 	ErrSessionInProgress = errors.New("session result not available while in progress")
 	ErrExamNotFound      = errors.New("exam not found")
+
+	// FR-BB42 errors.
+	ErrInvalidScore = errors.New("score_pct must be between 0 and 100")
 )
 
 // Session is the persisted exam session row.
@@ -266,4 +269,65 @@ type ExamHistoryResponse struct {
 	ExamTitle string           `json:"exam_title"`
 	Sessions  []HistorySession `json:"sessions"`
 	Meta      ExamHistoryMeta  `json:"meta"`
+}
+
+// ── FR-BB42: Manual Grading Queue ────────────────────────────────────────────
+
+// GradingQueueItem is one pending session in the manual grading queue (FR-BB42).
+type GradingQueueItem struct {
+	SessionID            string     `json:"session_id" db:"session_id"`
+	EmployeeName         string     `json:"employee_name" db:"employee_name"`
+	ExamID               string     `json:"exam_id" db:"exam_id"`
+	ExamTitle            string     `json:"exam_title" db:"exam_title"`
+	SubmittedAt          *time.Time `json:"submitted_at" db:"submitted_at"`
+	PendingQuestionCount int64      `json:"pending_question_count" db:"pending_question_count"`
+}
+
+// GradingQueueMeta holds pagination metadata for the grading queue (FR-BB42).
+type GradingQueueMeta struct {
+	Page    int `json:"page"`
+	PerPage int `json:"per_page"`
+	Total   int `json:"total"`
+}
+
+// GradingQueueResponse is the response for GET /admin/grading (FR-BB42).
+type GradingQueueResponse struct {
+	Items []GradingQueueItem `json:"items"`
+	Meta  GradingQueueMeta   `json:"meta"`
+}
+
+// GradingQuestionItem is one short-text question in the grading detail view (FR-BB42).
+type GradingQuestionItem struct {
+	QuestionID      string   `json:"question_id" db:"question_id"`
+	Stem            string   `json:"stem" db:"stem"`
+	TextAnswer      string   `json:"text_answer" db:"text_answer"`
+	GradingStatus   string   `json:"grading_status" db:"grading_status"`
+	CurrentScorePct *float64 `json:"current_score_pct" db:"current_score_pct"`
+	ManualFeedback  *string  `json:"manual_feedback" db:"manual_feedback"`
+}
+
+// GradingDetailResponse is the response for GET /admin/grading/:sessionId (FR-BB42).
+type GradingDetailResponse struct {
+	SessionID    string                `json:"session_id"`
+	EmployeeName string                `json:"employee_name"`
+	ExamTitle    string                `json:"exam_title"`
+	SubmittedAt  *time.Time            `json:"submitted_at"`
+	Questions    []GradingQuestionItem `json:"questions"`
+}
+
+// GradeAnswerRequest is the request body for POST /admin/grading/:sessionId/answers/:questionId.
+type GradeAnswerRequest struct {
+	ScorePct float64 `json:"score_pct"`
+	Feedback string  `json:"feedback"`
+}
+
+// GradeAnswerResponse is the response for a grade submission (FR-BB42).
+type GradeAnswerResponse struct {
+	QuestionID    string   `json:"question_id"`
+	GradingStatus string   `json:"grading_status"`
+	ScorePct      float64  `json:"score_pct"`
+	SessionStatus string   `json:"session_status"`
+	AllGraded     bool     `json:"all_graded"`
+	FinalScorePct *float64 `json:"final_score_pct,omitempty"`
+	Passed        *bool    `json:"passed,omitempty"`
 }

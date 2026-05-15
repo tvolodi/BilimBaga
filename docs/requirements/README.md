@@ -48,7 +48,7 @@
 | FR-BB313 | Frontend-employee-portal | Frontend: Employee Portal | implemented |
 | FR-BB314 | Frontend-exam-taking-screen | Frontend: Exam Taking Screen | Draft |
 | FR-BB41 | Result-retrieval-API | Result Retrieval API | Implemented |
-| FR-BB42 | Manual-grading-queue | Manual Grading Queue | Draft |
+| FR-BB42 | Manual-grading-queue | Manual Grading Queue | implemented |
 | FR-BB43 | Certificate-generation | Certificate Generation | Draft |
 | FR-BB44 | PDF-generation | PDF Generation | Draft |
 | FR-BB45 | Frontend-result-screen | Frontend: Result Screen | Draft |

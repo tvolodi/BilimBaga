@@ -112,6 +112,20 @@ type Repository interface {
 	// GetExamTitleByID returns the title for the given exam ID (FR-BB41).
 	// Returns ErrExamNotFound if the exam does not exist.
 	GetExamTitleByID(ctx context.Context, examID string) (string, error)
+
+	// ListGradingQueue returns sessions with status='grading_pending', optionally filtered (FR-BB42 AC-1/AC-2/AC-3).
+	// examID, dateFrom, dateTo are all optional (nil = no filter).
+	// Returns the items, total count, and any error.
+	ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error)
+
+	// GetGradingDetail returns session header and all short-text questions for manual grading (FR-BB42 AC-4).
+	// Returns ErrSessionNotFound if the session does not exist.
+	GetGradingDetail(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
+
+	// GradeAnswer scores one short-text answer inside a transaction (FR-BB42 AC-7/AC-10).
+	// If this is the last pending answer, recalculates session score and transitions to 'submitted'.
+	// Writes audit log entry inside the same transaction.
+	GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error)
 }
 
 // questionDetail is the stem+type data fetched for question display.
@@ -1100,4 +1114,236 @@ func (r *postgresRepository) GetExamTitleByID(ctx context.Context, examID string
 		return "", fmt.Errorf("sessions: GetExamTitleByID: %w", err)
 	}
 	return title, nil
+}
+
+// gradeAnswerResult is the internal result returned by GradeAnswer.
+type gradeAnswerResult struct {
+	allGraded     bool
+	finalScorePct *float64
+	passed        *bool
+	sessionStatus string
+}
+
+// ListGradingQueue returns sessions with status='grading_pending' (FR-BB42 AC-1/AC-2/AC-3).
+func (r *postgresRepository) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error) {
+	// Build the base WHERE conditions shared by both count and rows queries.
+	// $1=examID, $2=dateFrom, $3=dateTo.
+	const baseWhere = `
+WHERE es.status = 'grading_pending'
+  AND ($1::UUID IS NULL OR e.id = $1)
+  AND ($2::DATE IS NULL OR es.submitted_at::DATE >= $2)
+  AND ($3::DATE IS NULL OR es.submitted_at::DATE <= $3)`
+
+	const countQ = `
+SELECT COUNT(DISTINCT es.id)
+FROM exam_sessions es
+JOIN users u  ON u.id  = es.user_id
+JOIN exams e  ON e.id  = es.exam_id
+JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere
+
+	var total int
+	if err := r.db.GetContext(ctx, &total, countQ, examID, dateFrom, dateTo); err != nil {
+		return nil, 0, fmt.Errorf("sessions: ListGradingQueue: count: %w", err)
+	}
+
+	const rowsQ = `
+SELECT
+  es.id                                                                AS session_id,
+  u.full_name                                                          AS employee_name,
+  e.id                                                                 AS exam_id,
+  e.title                                                              AS exam_title,
+  es.submitted_at,
+  COUNT(sqs.question_id) FILTER (WHERE sqs.grading_status = 'pending_manual') AS pending_question_count
+FROM exam_sessions es
+JOIN users u  ON u.id  = es.user_id
+JOIN exams e  ON e.id  = es.exam_id
+JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere + `
+GROUP BY es.id, u.full_name, e.id, e.title, es.submitted_at
+ORDER BY es.submitted_at ASC
+LIMIT $4 OFFSET $5`
+
+	offset := (page - 1) * perPage
+	rows, err := r.db.QueryxContext(ctx, rowsQ, examID, dateFrom, dateTo, perPage, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("sessions: ListGradingQueue: query: %w", err)
+	}
+	defer rows.Close()
+
+	items := []GradingQueueItem{} // non-nil so JSON serialises as [] not null
+	for rows.Next() {
+		var item GradingQueueItem
+		if err := rows.StructScan(&item); err != nil {
+			return nil, 0, fmt.Errorf("sessions: ListGradingQueue: scan: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, total, rows.Err()
+}
+
+// GetGradingDetail returns session header and short-text questions for grading (FR-BB42 AC-4).
+func (r *postgresRepository) GetGradingDetail(ctx context.Context, sessionID string) (*GradingDetailResponse, error) {
+	// Fetch session header.
+	const headerQ = `
+SELECT es.id         AS session_id,
+       u.full_name   AS employee_name,
+       e.title       AS exam_title,
+       es.submitted_at
+FROM exam_sessions es
+JOIN users u ON u.id = es.user_id
+JOIN exams e ON e.id = es.exam_id
+WHERE es.id = $1`
+
+	type headerRow struct {
+		SessionID    string     `db:"session_id"`
+		EmployeeName string     `db:"employee_name"`
+		ExamTitle    string     `db:"exam_title"`
+		SubmittedAt  *time.Time `db:"submitted_at"`
+	}
+	var hdr headerRow
+	if err := r.db.GetContext(ctx, &hdr, headerQ, sessionID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("sessions: GetGradingDetail: header: %w", err)
+	}
+
+	// Fetch short-text questions for this session (both pending and already graded).
+	const questionsQ = `
+SELECT
+  sqs.question_id,
+  COALESCE(qt.stem, '')          AS stem,
+  COALESCE(sa.text_answer, '')   AS text_answer,
+  sqs.grading_status::text       AS grading_status,
+  CASE WHEN sqs.grading_status != 'pending_manual'
+       THEN ROUND(sqs.score / NULLIF(sqs.max_score, 0) * 100, 2)
+       ELSE NULL
+  END                            AS current_score_pct,
+  sqs.manual_feedback
+FROM session_question_scores sqs
+JOIN questions q
+    ON q.id = sqs.question_id
+LEFT JOIN question_translations qt
+    ON qt.question_id = q.id AND qt.locale = q.default_locale
+LEFT JOIN session_answers sa
+    ON sa.session_id = sqs.session_id AND sa.question_id = sqs.question_id
+WHERE sqs.session_id = $1
+  AND q.type = 'shorttext'
+ORDER BY sqs.question_id`
+
+	rows, err := r.db.QueryxContext(ctx, questionsQ, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetGradingDetail: questions: %w", err)
+	}
+	defer rows.Close()
+
+	questions := []GradingQuestionItem{} // non-nil
+	for rows.Next() {
+		var item GradingQuestionItem
+		if err := rows.StructScan(&item); err != nil {
+			return nil, fmt.Errorf("sessions: GetGradingDetail: scan: %w", err)
+		}
+		questions = append(questions, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("sessions: GetGradingDetail: iterate: %w", err)
+	}
+
+	return &GradingDetailResponse{
+		SessionID:    hdr.SessionID,
+		EmployeeName: hdr.EmployeeName,
+		ExamTitle:    hdr.ExamTitle,
+		SubmittedAt:  hdr.SubmittedAt,
+		Questions:    questions,
+	}, nil
+}
+
+// GradeAnswer scores one short-text answer inside a transaction (FR-BB42 AC-7/AC-10).
+func (r *postgresRepository) GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	// 1. Fetch max_score.
+	var maxScore float64
+	const maxQ = `SELECT max_score FROM session_question_scores WHERE session_id = $1 AND question_id = $2`
+	if err := tx.QueryRowContext(ctx, maxQ, sessionID, questionID).Scan(&maxScore); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("sessions: GradeAnswer: fetch max_score: %w", err)
+	}
+
+	// 2. Compute raw score.
+	score := scorePct / 100.0 * maxScore
+
+	// 3. Update the score row (AC-10: persist graded_by, graded_at, manual_feedback).
+	const updateQ = `
+UPDATE session_question_scores
+SET score           = $3,
+    grading_status  = 'graded',
+    manual_feedback = $4,
+    graded_by       = $5,
+    graded_at       = NOW()
+WHERE session_id = $1 AND question_id = $2`
+	if _, err := tx.ExecContext(ctx, updateQ, sessionID, questionID, score, feedback, graderID); err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: update score: %w", err)
+	}
+
+	// 4. Check whether all answers are now graded.
+	var pendingCount int
+	const pendingQ = `SELECT COUNT(*) FROM session_question_scores WHERE session_id = $1 AND grading_status = 'pending_manual'`
+	if err := tx.QueryRowContext(ctx, pendingQ, sessionID).Scan(&pendingCount); err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: count pending: %w", err)
+	}
+	allGraded := pendingCount == 0
+
+	res := &gradeAnswerResult{
+		allGraded:     allGraded,
+		sessionStatus: "grading_pending",
+	}
+
+	// 5. If all graded, recalculate final score and transition session (AC-6/AC-7).
+	if allGraded {
+		// Recalculate aggregate score_pct.
+		var finalScorePct float64
+		const finalQ = `SELECT ROUND(SUM(score) / NULLIF(SUM(max_score), 0) * 100, 2) FROM session_question_scores WHERE session_id = $1`
+		if err := tx.QueryRowContext(ctx, finalQ, sessionID).Scan(&finalScorePct); err != nil {
+			return nil, fmt.Errorf("sessions: GradeAnswer: recalculate final score: %w", err)
+		}
+
+		// Fetch passing_score_pct from the exam.
+		var passingScorePct float64
+		const passingQ = `SELECT e.passing_score_pct FROM exams e JOIN exam_sessions es ON es.exam_id = e.id WHERE es.id = $1`
+		if err := tx.QueryRowContext(ctx, passingQ, sessionID).Scan(&passingScorePct); err != nil {
+			return nil, fmt.Errorf("sessions: GradeAnswer: fetch passing score: %w", err)
+		}
+
+		passed := finalScorePct >= passingScorePct
+
+		// Transition session to 'submitted'.
+		const transitionQ = `UPDATE exam_sessions SET score_pct = $2, passed = $3, status = 'submitted' WHERE id = $1`
+		if _, err := tx.ExecContext(ctx, transitionQ, sessionID, finalScorePct, passed); err != nil {
+			return nil, fmt.Errorf("sessions: GradeAnswer: transition session: %w", err)
+		}
+
+		res.finalScorePct = &finalScorePct
+		res.passed = &passed
+		res.sessionStatus = "submitted"
+	}
+
+	// 6. Write audit log entry (AC-8).
+	const auditQ = `
+INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
+VALUES ($1, $2, 'answer.grade', 'session_answer', $3, $4,
+        jsonb_build_object('grader_id', $2, 'session_id', $5, 'score_pct', $6))`
+	if _, err := tx.ExecContext(ctx, auditQ, tenantID, graderID, questionID, actorIP, sessionID, scorePct); err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: audit: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: commit: %w", err)
+	}
+	return res, nil
 }

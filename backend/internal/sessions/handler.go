@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
@@ -279,4 +280,90 @@ func parsePagination(r *http.Request) (page, perPage int) {
 		perPage = 100
 	}
 	return page, perPage
+}
+
+// HandleListGradingQueue handles GET /api/v1/admin/grading (FR-BB42 AC-1/AC-2/AC-3).
+func (h *Handler) HandleListGradingQueue(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	var examID *string
+	if v := q.Get("exam_id"); v != "" {
+		examID = &v
+	}
+
+	var dateFrom, dateTo *time.Time
+	if v := q.Get("date_from"); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err != nil {
+			api.WriteError(w, http.StatusBadRequest, "INVALID_DATE", "date_from must be YYYY-MM-DD")
+			return
+		}
+		dateFrom = &t
+	}
+	if v := q.Get("date_to"); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err != nil {
+			api.WriteError(w, http.StatusBadRequest, "INVALID_DATE", "date_to must be YYYY-MM-DD")
+			return
+		}
+		dateTo = &t
+	}
+
+	page, perPage := parsePagination(r)
+
+	resp, err := h.svc.ListGradingQueue(r.Context(), examID, dateFrom, dateTo, page, perPage)
+	if err != nil {
+		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to list grading queue")
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// HandleGetGradingDetail handles GET /api/v1/admin/grading/:sessionId (FR-BB42 AC-4).
+func (h *Handler) HandleGetGradingDetail(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionId")
+
+	resp, err := h.svc.GetGradingDetail(r.Context(), sessionID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrSessionNotFound):
+			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to get grading detail")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// HandleGradeAnswer handles POST /api/v1/admin/grading/:sessionId/answers/:questionId (FR-BB42 AC-5/AC-6/AC-7/AC-8/AC-10).
+func (h *Handler) HandleGradeAnswer(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionId")
+	questionID := chi.URLParam(r, "questionId")
+	graderID := auth.UserIDFromCtx(r.Context())
+	tenantID := ctxkeys.TenantIDFromCtx(r.Context())
+	actorIP := r.RemoteAddr
+
+	var req GradeAnswerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "request body is not valid JSON")
+		return
+	}
+
+	resp, err := h.svc.GradeAnswer(r.Context(), sessionID, questionID, graderID, tenantID, actorIP, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidScore):
+			api.WriteError(w, http.StatusUnprocessableEntity, "INVALID_SCORE", "score_pct must be between 0 and 100")
+		case errors.Is(err, ErrSessionNotFound):
+			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to grade answer")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
 }

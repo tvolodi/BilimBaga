@@ -6,8 +6,17 @@
 | ID | FR-BB42 |
 | Phase | 4 — Results & Certificates |
 | Priority | 1 |
-| Status | Draft |
-| Depends On | FR-BB39 |
+| Status | implemented |
+| Depends On | FR-BB39, FR-BB311 |
+
+## Scope
+
+| Layer | Scope |
+|-------|-------|
+| Backend — sessions package | New handler/service/repository methods |
+| Database | Migration 018: ALTER TABLE session_question_scores; seed grading permissions |
+| Tests | Unit tests for score validation, transaction logic, re-grade path |
+| Frontend | Out of scope (FR-4.7) |
 
 ## Description
 Provides the backend API for reviewing and scoring short-text answers that require human judgment. Examiners can list sessions awaiting manual grading, open a session to see individual answers, and submit a numeric score (0–100%) with optional textual feedback per answer. Once every pending answer in a session is graded, the system recalculates the final score and transitions the session to `submitted`.
@@ -15,13 +24,13 @@ Provides the backend API for reviewing and scoring short-text answers that requi
 ## Acceptance Criteria
 - [ ] AC-1: `GET /admin/grading` returns only sessions with `status = 'grading_pending'`; sessions in any other state are excluded.
 - [ ] AC-2: The grading queue supports filtering by `exam_id`, `date_from`, and `date_to` (all optional); date filters apply to `submitted_at`.
-- [ ] AC-3: `GET /admin/grading` is paginated with `page` and `per_page` (default 20, max 100) and returns `total_count`.
+- [ ] AC-3: `GET /admin/grading` is paginated with `page` and `per_page` (default 20, max 100) and returns pagination metadata including `meta.total`.
 - [ ] AC-4: `GET /admin/grading/:sessionId` returns only questions of type `short_text` that have `grading_status = 'pending_manual'`; already-graded short-text questions are included with their current `score_pct`.
 - [ ] AC-5: `POST /admin/grading/:sessionId/answers/:questionId` returns HTTP 422 with `code: INVALID_SCORE` if `score_pct` is not in the range [0, 100].
 - [ ] AC-6: After a grade is submitted, if all `session_question_scores` rows for the session have `grading_status != 'pending_manual'`, the system recalculates `exam_sessions.score_pct` using the grading engine logic and transitions `status` to `submitted`.
 - [ ] AC-7: Final score recalculation and status transition after last-question grading execute inside a single database transaction.
 - [ ] AC-8: Each grade submission writes an audit log entry: `action = 'answer.grade'`, `entity_type = 'session_answer'`, `entity_id = question_id`, metadata includes `grader_id`, `session_id`, `score_pct`.
-- [ ] AC-9: All three grading endpoints require `role IN (examiner, hr_admin, super_admin)`; employees receive HTTP 403.
+- [ ] AC-9: `GET /admin/grading`, `GET /admin/grading/:sessionId`, and `POST /admin/grading/:sessionId/answers/:questionId` require the `grading:read` or `grading:write` permission respectively. Roles `examiner`, `department_admin`, and `super_admin` hold these permissions. Employees receive HTTP 403.
 - [ ] AC-10: `graded_by`, `graded_at`, and `manual_feedback` are persisted on `session_question_scores` for every scored short-text answer.
 
 ## Technical Specification
@@ -50,7 +59,7 @@ ALTER TABLE session_question_scores
 ```json
 {
   "data": {
-    "sessions": [
+    "items": [
       {
         "session_id": "uuid-session",
         "employee_name": "Aibek Seitkali",
@@ -60,9 +69,11 @@ ALTER TABLE session_question_scores
         "pending_question_count": 3
       }
     ],
-    "total_count": 12,
-    "page": 1,
-    "per_page": 20
+    "meta": {
+      "page": 1,
+      "per_page": 20,
+      "total": 12
+    }
   },
   "error": null
 }
@@ -155,25 +166,37 @@ SELECT
   e.id AS exam_id,
   e.title AS exam_title,
   es.submitted_at,
-  COUNT(sqs.id) FILTER (WHERE sqs.grading_status = 'pending_manual') AS pending_question_count
+  COUNT(sqs.question_id) FILTER (WHERE sqs.grading_status = 'pending_manual') AS pending_question_count
 FROM exam_sessions es
 JOIN users u ON u.id = es.user_id
 JOIN exams e ON e.id = es.exam_id
 JOIN session_question_scores sqs ON sqs.session_id = es.id
 WHERE es.status = 'grading_pending'
-  AND es.tenant_id = $1
-  AND ($2::UUID IS NULL OR e.id = $2)
-  AND ($3::DATE IS NULL OR es.submitted_at::DATE >= $3)
-  AND ($4::DATE IS NULL OR es.submitted_at::DATE <= $4)
+  AND ($1::UUID IS NULL OR e.id = $1)
+  AND ($2::DATE IS NULL OR es.submitted_at::DATE >= $2)
+  AND ($3::DATE IS NULL OR es.submitted_at::DATE <= $3)
 GROUP BY es.id, u.full_name, e.id, e.title, es.submitted_at
 ORDER BY es.submitted_at ASC
-LIMIT $5 OFFSET $6;
+LIMIT $4 OFFSET $5;
 
 -- Check if all answers graded after scoring one
 SELECT COUNT(*) = 0 AS all_graded
 FROM session_question_scores
 WHERE session_id = $1 AND grading_status = 'pending_manual';
 ```
+
+### RBAC Permissions
+
+New permissions to seed in migration 018:
+- `grading:read` — granted to: `examiner`, `department_admin`, `super_admin`
+- `grading:write` — granted to: `examiner`, `department_admin`, `super_admin`
+
+Middleware usage:
+- `GET /admin/grading` — guarded by `rbac.RequirePermission(cache, "grading", "read")`
+- `GET /admin/grading/:sessionId` — guarded by `rbac.RequirePermission(cache, "grading", "read")`
+- `POST /admin/grading/:sessionId/answers/:questionId` — guarded by `rbac.RequirePermission(cache, "grading", "write")`
+
+Migration 018 seeds these into the `permissions` and `role_permissions` tables.
 
 ### Final Score Recalculation
 
@@ -186,6 +209,25 @@ passed    = score_pct >= exam.passing_score_pct
 
 Both `exam_sessions.score_pct`, `exam_sessions.passed`, and `exam_sessions.status = 'submitted'` are updated in a single transaction.
 
+### Stem Locale Source
+
+The `stem` field in `GET /admin/grading/:sessionId` responses is sourced from `question_translations` using `q.default_locale` from the `questions` table, consistent with existing question detail endpoints.
+
 ## Notes
 - The `score` stored in `session_question_scores` for a short-text answer is `score_pct / 100 * max_score` to keep the aggregate formula consistent with auto-graded questions.
 - Examiners may re-grade an already-graded short-text answer; subsequent submissions overwrite `score`, `manual_feedback`, `graded_by`, and `graded_at`, and retrigger the aggregate recalculation.
+
+## Out of Scope
+
+- **Frontend grading UI**: The examiner-facing grading screen (roadmap section 4.7) is out of scope for this requirement.
+- **Certificate auto-generation**: Automatic certificate issuance upon session completion (FR-BB43) is out of scope for this requirement.
+
+## Test Strategy
+
+- **Unit tests**:
+  - Score range validation: assert HTTP 422 / `INVALID_SCORE` when `score_pct < 0` or `score_pct > 100`.
+  - Transaction atomicity: mock DB failure mid-transaction; assert session status does not transition and score is not persisted.
+  - Re-grade path: submit a second grade for the same `questionId`; assert `score`, `manual_feedback`, `graded_by`, and `graded_at` are overwritten, not duplicated.
+  - Audit log write: assert `action = 'answer.grade'` entry is written with correct `grader_id`, `session_id`, and `score_pct`.
+- **Integration tests**:
+  - Full `POST` flow that triggers session auto-transition: grade all pending short-text answers for a session and assert `exam_sessions.status` transitions to `submitted` and `score_pct` is recalculated correctly.

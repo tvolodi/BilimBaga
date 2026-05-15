@@ -1099,6 +1099,100 @@ func TestGetExamHistory_Handler_404_ExamNotFound(t *testing.T) {
 	assert.Equal(t, "EXAM_NOT_FOUND", errObj["code"])
 }
 
+// AC-6: history returns sessions in ascending started_at order (success path).
+func TestGetExamHistory_Handler_200_Success(t *testing.T) {
+	now := time.Now().UTC()
+	score := 80.0
+	svc := &mockSvc{
+		getExamHistoryFn: func(_ context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error) {
+			assert.Equal(t, "exam-1", examID)
+			assert.Equal(t, "user-1", userID)
+			return &ExamHistoryResponse{
+				ExamID:    "exam-1",
+				ExamTitle: "Test Exam",
+				Sessions: []HistorySession{
+					{SessionID: "s1", StartedAt: now, SubmittedAt: &now, ScorePct: &score, Passed: true, Status: "submitted"},
+				},
+				Meta: ExamHistoryMeta{Page: 1, PerPage: 20, Total: 1},
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetExamHistory(w, historyRequest("exam-1"))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	assert.Nil(t, body["error"])
+	data, ok := body["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "exam-1", data["exam_id"])
+	meta, ok := data["meta"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1), meta["page"])
+	assert.Equal(t, float64(20), meta["per_page"])
+	assert.Equal(t, float64(1), meta["total"])
+}
+
+// AC-10: per_page=200 is clamped to 100; page/per_page/total in meta are correct.
+func TestGetExamHistory_Handler_200_PerPageClamped(t *testing.T) {
+	var capturedPerPage int
+	svc := &mockSvc{
+		getExamHistoryFn: func(_ context.Context, _, _ string, page, perPage int) (*ExamHistoryResponse, error) {
+			capturedPerPage = perPage
+			return &ExamHistoryResponse{
+				ExamID:    "exam-1",
+				ExamTitle: "Test Exam",
+				Sessions:  []HistorySession{},
+				Meta:      ExamHistoryMeta{Page: page, PerPage: perPage, Total: 0},
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/portal/exams/exam-1/history?page=1&per_page=200", nil)
+	req = withChiParam(req, "id", "exam-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+	h.GetExamHistory(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	// per_page=200 must be clamped to 100 before reaching service.
+	assert.Equal(t, 100, capturedPerPage)
+	body := decodeBody(t, w.Body.Bytes())
+	data, ok := body["data"].(map[string]any)
+	require.True(t, ok)
+	meta, ok := data["meta"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(100), meta["per_page"])
+}
+
+// AC-10: page defaults to 1, per_page defaults to 20 when not supplied.
+func TestGetExamHistory_Handler_200_DefaultPagination(t *testing.T) {
+	var capturedPage, capturedPerPage int
+	svc := &mockSvc{
+		getExamHistoryFn: func(_ context.Context, _, _ string, page, perPage int) (*ExamHistoryResponse, error) {
+			capturedPage = page
+			capturedPerPage = perPage
+			return &ExamHistoryResponse{
+				ExamID:    "exam-1",
+				ExamTitle: "Test Exam",
+				Sessions:  []HistorySession{},
+				Meta:      ExamHistoryMeta{Page: page, PerPage: perPage, Total: 0},
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/portal/exams/exam-1/history", nil)
+	req = withChiParam(req, "id", "exam-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+	h.GetExamHistory(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, 1, capturedPage)
+	assert.Equal(t, 20, capturedPerPage)
+}
+
 // ── FR-BB42: Manual Grading Queue handler tests ───────────────────────────────
 
 func TestHandleListGradingQueue_200(t *testing.T) {

@@ -1082,7 +1082,7 @@ SELECT id AS session_id, started_at, submitted_at, score_pct,
        COALESCE(passed, false) AS passed, status
 FROM exam_sessions
 WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted')
-ORDER BY started_at DESC
+ORDER BY started_at ASC
 LIMIT $3 OFFSET $4`
 
 	offset := (page - 1) * perPage

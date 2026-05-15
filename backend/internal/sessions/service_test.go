@@ -216,7 +216,7 @@ func (m *mockRepo) GetAdminSessionResult(ctx context.Context, sessionID string) 
 	return &sessionResultRow{
 		SessionID: sessionID, ExamID: "exam-1", ExamTitle: "Exam", UserID: "user-1",
 		Status: "submitted", ScorePct: &score, Passed: true,
-		ShowAnswersMode: "after_submission", AttemptNumber: 1, SubmittedAt: &now,
+		ShowAnswersMode: "after_completion", AttemptNumber: 1, SubmittedAt: &now,
 	}, nil
 }
 func (m *mockRepo) GetSectionScores(ctx context.Context, sessionID string) ([]SectionScore, error) {
@@ -1318,8 +1318,8 @@ func TestGetSessionResult_ShowAnswersNever_NoBreakdown(t *testing.T) {
 	assert.Equal(t, "never", resp.ShowAnswersMode)
 }
 
-// AC-4: show_answers='after_submission' — PerQuestionBreakdown must be present.
-func TestGetSessionResult_ShowAnswersAfterSubmission_HasBreakdown(t *testing.T) {
+// AC-4: show_answers='after_completion' — PerQuestionBreakdown must be present with all required fields.
+func TestGetSessionResult_ShowAnswersAfterCompletion_HasBreakdown(t *testing.T) {
 	score := 90.0
 	now := time.Now().UTC()
 	explanation := "Because B"
@@ -1328,7 +1328,7 @@ func TestGetSessionResult_ShowAnswersAfterSubmission_HasBreakdown(t *testing.T) 
 			return &sessionResultRow{
 				SessionID: "sess-1", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
 				Status: "submitted", ScorePct: &score, Passed: true,
-				ShowAnswersMode: "after_submission", AttemptNumber: 1, SubmittedAt: &now,
+				ShowAnswersMode: "after_completion", AttemptNumber: 1, SubmittedAt: &now,
 			}, nil
 		},
 		getQuestionBreakdownFn: func(_ context.Context, _, _ string) ([]questionBreakdownRow, error) {
@@ -1456,6 +1456,182 @@ func TestGetExamHistory_PaginationMeta(t *testing.T) {
 	assert.Equal(t, 1, resp.Meta.PerPage)
 	assert.Equal(t, 5, resp.Meta.Total)
 	assert.Equal(t, "exam-1", resp.ExamID)
+}
+
+// AC-6: history repo returns sessions in ascending started_at order.
+func TestGetExamHistory_AscendingStartedAt(t *testing.T) {
+	t1 := time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
+	score1, score2 := 60.0, 84.5
+	repo := &mockRepo{
+		getExamHistoryFn: func(_ context.Context, _, _ string, _, _ int) ([]historyRow, int, error) {
+			// Simulate repo returning rows in ASC started_at order (as required by AC-6).
+			return []historyRow{
+				{SessionID: "s1", StartedAt: t1, SubmittedAt: &t1, ScorePct: &score1, Passed: false, Status: "submitted"},
+				{SessionID: "s2", StartedAt: t2, SubmittedAt: &t2, ScorePct: &score2, Passed: true, Status: "submitted"},
+			}, 2, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetExamHistory(context.Background(), "exam-1", "user-1", 1, 20)
+	require.NoError(t, err)
+	require.Len(t, resp.Sessions, 2)
+	// Verify ascending order: first session started before second.
+	assert.True(t, resp.Sessions[0].StartedAt.Before(resp.Sessions[1].StartedAt),
+		"history sessions must be in ascending started_at order")
+	assert.Equal(t, "s1", resp.Sessions[0].SessionID)
+	assert.Equal(t, "s2", resp.Sessions[1].SessionID)
+}
+
+// AC-7: per_section_scores is non-empty when sections exist, empty array when not.
+func TestGetSessionResult_PerSectionScores_WithSections(t *testing.T) {
+	score := 75.0
+	now := time.Now().UTC()
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-1", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
+				Status: "submitted", ScorePct: &score, Passed: true,
+				ShowAnswersMode: "never", AttemptNumber: 1, SubmittedAt: &now,
+			}, nil
+		},
+		getSectionScoresFn: func(_ context.Context, _ string) ([]SectionScore, error) {
+			return []SectionScore{
+				{SectionID: "sect-1", Title: "Theory", ScorePct: 90.0},
+				{SectionID: "sect-2", Title: "Practical", ScorePct: 78.0},
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	assert.Len(t, resp.PerSectionScores, 2, "per_section_scores must be non-empty when sections exist")
+	assert.Equal(t, "sect-1", resp.PerSectionScores[0].SectionID)
+}
+
+func TestGetSessionResult_PerSectionScores_NoSections(t *testing.T) {
+	score := 75.0
+	now := time.Now().UTC()
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-1", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
+				Status: "submitted", ScorePct: &score, Passed: true,
+				ShowAnswersMode: "never", AttemptNumber: 1, SubmittedAt: &now,
+			}, nil
+		},
+		getSectionScoresFn: func(_ context.Context, _ string) ([]SectionScore, error) {
+			return []SectionScore{}, nil // empty because no sections exist for this exam
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	// Empty array (not nil) is serialised as [] by JSON — verify it's a non-nil empty slice.
+	assert.NotNil(t, resp.PerSectionScores, "per_section_scores must be an empty array, not null")
+	assert.Len(t, resp.PerSectionScores, 0)
+}
+
+// AC-8: time_taken_seconds is non-nil for a submitted session; nil when submitted_at is null.
+func TestGetSessionResult_TimeTakenSeconds_Computed(t *testing.T) {
+	score := 80.0
+	timeTaken := 1423
+	now := time.Now().UTC()
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID:        "sess-1",
+				ExamID:           "exam-1",
+				ExamTitle:        "T",
+				UserID:           "user-1",
+				Status:           "submitted",
+				ScorePct:         &score,
+				Passed:           true,
+				ShowAnswersMode:  "never",
+				AttemptNumber:    1,
+				SubmittedAt:      &now,
+				TimeTakenSeconds: &timeTaken,
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	require.NotNil(t, resp.TimeTakenSeconds, "time_taken_seconds must be non-nil for submitted session")
+	assert.Equal(t, 1423, *resp.TimeTakenSeconds)
+}
+
+func TestGetSessionResult_TimeTakenSeconds_NullWhenNotSubmitted(t *testing.T) {
+	score := 80.0
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID:        "sess-1",
+				ExamID:           "exam-1",
+				ExamTitle:        "T",
+				UserID:           "user-1",
+				Status:           "submitted",
+				ScorePct:         &score,
+				Passed:           true,
+				ShowAnswersMode:  "never",
+				AttemptNumber:    1,
+				SubmittedAt:      nil, // null submitted_at → null time_taken_seconds
+				TimeTakenSeconds: nil,
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	assert.Nil(t, resp.TimeTakenSeconds, "time_taken_seconds must be null when submitted_at is null")
+}
+
+// AC-11: admin endpoint returns ErrSessionInProgress for in-progress sessions.
+func TestGetAdminSessionResult_InProgress(t *testing.T) {
+	repo := &mockRepo{
+		getAdminSessionResultFn: func(_ context.Context, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-1", UserID: "user-1", Status: "in_progress",
+				ShowAnswersMode: "never",
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetAdminSessionResult(context.Background(), "sess-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrSessionInProgress)
+}
+
+// AC-4: after_all_attempts mode also shows breakdown.
+func TestGetSessionResult_ShowAnswersAfterAllAttempts_HasBreakdown(t *testing.T) {
+	score := 90.0
+	now := time.Now().UTC()
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-1", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
+				Status: "submitted", ScorePct: &score, Passed: true,
+				ShowAnswersMode: "after_all_attempts", AttemptNumber: 1, SubmittedAt: &now,
+			}, nil
+		},
+		getQuestionBreakdownFn: func(_ context.Context, _, _ string) ([]questionBreakdownRow, error) {
+			return []questionBreakdownRow{
+				{QuestionID: "q-1", QuestionType: "single_choice", Stem: "Stem?", PointsEarned: 1, MaxPoints: 1},
+			}, nil
+		},
+		getCorrectAnswerTextsFn: func(_ context.Context, _ []string, _ string) (map[string][]string, error) {
+			return map[string][]string{"q-1": {"Correct"}}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	require.NotNil(t, resp.PerQuestionBreakdown)
+	require.Len(t, *resp.PerQuestionBreakdown, 1)
+	bd := (*resp.PerQuestionBreakdown)[0]
+	assert.Equal(t, "q-1", bd.QuestionID)
+	assert.NotNil(t, bd.EmployeeAnswer)
+	assert.NotNil(t, bd.CorrectAnswer)
 }
 
 // ── FR-BB42: Manual Grading Queue service tests ───────────────────────────────

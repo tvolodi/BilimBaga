@@ -15,6 +15,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/categories"
+	"github.com/bilimbaga/bilimbaga/internal/certificates"
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
@@ -153,7 +154,12 @@ func main() {
 	// Start FR-BB310 auto-submit background job.
 	go sessions.AutoSubmitJob(appCtx, db, logger, gradingEngine)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, cfg.JWTSecret, rbacCache)
+	// Wire up certificates (FR-BB43).
+	certsRepo := certificates.NewRepository(db)
+	certsSvc := certificates.NewService(certsRepo, tenantSvc)
+	certHandler := certificates.NewHandler(certsSvc, cfg.APIBaseURL)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, certHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

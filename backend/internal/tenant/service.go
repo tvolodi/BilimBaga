@@ -35,6 +35,9 @@ type Service interface {
 	LoadCache(ctx context.Context) error
 	InvalidateAndRefresh(ctx context.Context) error
 	GetPublicConfig() map[string]json.RawMessage
+	// GetAllConfig returns the full raw configuration cache (all keys, including non-public ones).
+	// Used by the certificates package to capture a branding snapshot at issuance time.
+	GetAllConfig() map[string]json.RawMessage
 	GetLogoData() ([]byte, string, error)
 	UpdateConfig(ctx context.Context, updates map[string]json.RawMessage) ([]string, error)
 
@@ -90,6 +93,18 @@ func (s *service) GetPublicConfig() map[string]json.RawMessage {
 		if v, ok := s.cache[k]; ok {
 			result[k] = v
 		}
+	}
+	return result
+}
+
+// GetAllConfig returns the full raw configuration cache including non-public keys.
+// The returned map is a shallow copy — callers must not modify it.
+func (s *service) GetAllConfig() map[string]json.RawMessage {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make(map[string]json.RawMessage, len(s.cache))
+	for k, v := range s.cache {
+		result[k] = v
 	}
 	return result
 }

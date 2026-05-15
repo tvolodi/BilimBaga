@@ -6,8 +6,17 @@
 | ID | FR-BB43 |
 | Phase | 4 — Results & Certificates |
 | Priority | 1 |
-| Status | Draft |
-| Depends On | FR-BB41 |
+| Status | Implemented |
+| Depends On | FR-BB41, FR-BB44 |
+
+## Scope
+
+| Layer | Items |
+|-------|-------|
+| Database | New `certificates` table (migration `019_certificates.up.sql`) |
+| Backend | `internal/certificates/` package — handler, service, repository; router wiring in `internal/router/` |
+| Frontend | N/A — certificate download is a direct browser link; no dedicated SPA page |
+| i18n | N/A — all user-visible strings are on the backend PDF template |
 
 ## Description
 Manages the lifecycle of completion certificates. When an employee passes an exam with `certificate_enabled = true`, they can request a PDF certificate via an authenticated endpoint. The first request lazily creates a `certificates` record (capturing a snapshot of tenant branding and result data) and streams a generated PDF. A public verification endpoint allows anyone to confirm certificate authenticity using the unique verification code embedded in the QR code.
@@ -19,8 +28,8 @@ Manages the lifecycle of completion certificates. When an employee passes an exa
 - [ ] AC-4: `GET /portal/sessions/:id/certificate` returns HTTP 422 with `code: SESSION_NOT_SUBMITTED` if session status is not `submitted`.
 - [ ] AC-5: On the first certificate request, a row is inserted into `certificates` with a `verification_code` (UUID v4), capturing `employee_name`, `exam_title`, `score_pct`, and `template_snapshot` (company branding) at that instant; subsequent requests reuse the existing record but regenerate the PDF bytes on the fly.
 - [ ] AC-6: The response sets `Content-Type: application/pdf` and `Content-Disposition: attachment; filename="certificate-{verification_code}.pdf"`.
-- [ ] AC-7: `GET /verify/:code` is a public endpoint requiring no authentication; it returns HTTP 200 with `{ valid: true, ... }` for a valid code and HTTP 404 with `{ valid: false }` for an unknown code.
-- [ ] AC-8: `GET /admin/sessions/:id/certificate` returns the certificate for any session, not restricted to the caller's own sessions; requires `role IN (examiner, hr_admin, super_admin)`.
+- [ ] AC-7: `GET /verify/:code` is a public endpoint requiring no authentication; it returns HTTP 200 with `{ "data": { "valid": true, ... }, "error": null }` for a valid code and HTTP 200 with `{ "data": { "valid": false }, "error": null }` for an unknown code. The endpoint never returns HTTP 404.
+- [ ] AC-8: `GET /admin/sessions/:id/certificate` returns the certificate for any session, not restricted to the caller's own sessions; requires `rbac.RequirePermission(cache, "exams", "read")` (covers `super_admin`, `department_admin`, and `examiner`).
 - [ ] AC-9: `template_snapshot` captures `company_name`, `logo_base64`, `primary_color`, `signatory_name`, and `signatory_title` from tenant config at the time of first issuance; later branding changes do not alter existing certificates.
 - [ ] AC-10: Certificate creation is idempotent: concurrent requests for the same session use an `ON CONFLICT (session_id) DO NOTHING` upsert so only one record is ever created.
 
@@ -41,8 +50,8 @@ CREATE TABLE certificates (
   template_snapshot JSONB       NOT NULL
 );
 
-CREATE INDEX idx_certificates_verification_code ON certificates(verification_code);
 CREATE INDEX idx_certificates_tenant_id ON certificates(tenant_id);
+-- Note: no explicit index on verification_code — the UNIQUE constraint creates an implicit B-tree index.
 ```
 
 ### API Endpoints
@@ -77,7 +86,7 @@ Content-Disposition: attachment; filename="certificate-550e8400-e29b-41d4-a716-4
 }
 ```
 
-**GET /api/v1/verify/:code — Response (404, invalid)**
+**GET /api/v1/verify/:code — Response (200, invalid)**
 ```json
 {
   "data": { "valid": false },
@@ -98,6 +107,14 @@ Content-Disposition: attachment; filename="certificate-550e8400-e29b-41d4-a716-4
 {
   "data": null,
   "error": { "code": "SESSION_NOT_PASSED", "message": "Certificate is only issued for passed sessions" }
+}
+```
+
+**Error — Session not submitted (422)**
+```json
+{
+  "data": null,
+  "error": { "code": "SESSION_NOT_SUBMITTED", "message": "Certificate can only be issued for submitted sessions" }
 }
 ```
 
@@ -149,6 +166,30 @@ func (s *CertificateService) GetOrCreate(ctx context.Context, sessionID uuid.UUI
     return cert, err
 }
 ```
+
+### PDF Generation
+
+The handler calls `GeneratePDF(cert *Certificate, tenantCfg *TenantConfig, verifyBaseURL string) ([]byte, error)` from `internal/certificates/pdf.go` (provided by FR-BB44). The PDF is not stored; it is regenerated on every request from the `certificates` record.
+
+### Go Implementation Notes
+
+- Package: `internal/certificates/` — handler, service (`CertificateService`), repository (`CertificateRepository`).
+- Admin endpoint protected by `rbac.RequirePermission(cache, "exams", "read")` middleware.
+- Router wiring in `internal/router/` mounts portal and admin routes under their respective groups.
+
+## Out of Scope
+
+- PDF binary storage as database blobs.
+- Email delivery of certificates.
+- Certificate revocation or invalidation.
+- Multi-page or custom per-tenant PDF templates (beyond the single `template_snapshot` branding).
+
+## Test Strategy
+
+- **Unit**: `CertificateService.GetOrCreate` with a mock repository — cover ownership violation (403), not-certifiable exam (422), non-passed session (422), non-submitted session (422), first-time creation path, and idempotent second-call path.
+- **Handler tests**: each HTTP error path returns the correct status code and error body; 200 path sets correct `Content-Type` and `Content-Disposition` headers.
+- **Idempotency test**: two concurrent calls for the same session result in exactly one `certificates` row.
+- **Verify endpoint tests**: `GET /verify/:code` with a valid code returns `200 { valid: true, ... }`; with an unknown code returns `200 { valid: false }`.
 
 ## Notes
 - No PDF binary is stored in the database; PDFs are regenerated on every request from `certificates` record data. This avoids large binary blobs in PostgreSQL while keeping the source of truth consistent.

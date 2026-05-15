@@ -34,16 +34,16 @@
 | FR-BB28 | Frontend-categories-management | Frontend: Categories Management | Draft |
 | FR-BB29 | Frontend-tags-management | Frontend: Tags Management | Draft |
 | FR-BB31 | Exam-configuration-model | Exam Configuration Model | Draft |
-| FR-BB32 | Exam-configuration-API | Exam Configuration API | Draft |
-| FR-BB33 | Exam-assignment | Exam Assignment | Draft |
-| FR-BB34 | Employee-exam-portal-API | Employee Exam Portal API | Draft |
-| FR-BB35 | Session-creation | Session Creation | Draft |
-| FR-BB36 | Session-tables | Session Tables | Draft |
-| FR-BB37 | Answer-saving | Answer Saving | Draft |
-| FR-BB38 | Tab-switch-events | Tab Switch Events | Draft |
-| FR-BB39 | Session-submission | Session Submission | Draft |
-| FR-BB310 | Auto-submit-background-job | Auto-Submit Background Job | Draft |
-| FR-BB311 | Grading-engine | Grading Engine | Draft |
+| FR-BB32 | Exam-configuration-API | Exam Configuration API | Implemented |
+| FR-BB33 | Exam-assignment | Exam Assignment | Implemented |
+| FR-BB34 | Employee-exam-portal-API | Employee Exam Portal API | Implemented |
+| FR-BB35 | Session-creation | Session Creation | Implemented |
+| FR-BB36 | Session-tables | Session Tables | Implemented |
+| FR-BB37 | Answer-saving | Answer Saving | Implemented |
+| FR-BB38 | Tab-switch-events | Tab Switch Events | Implemented |
+| FR-BB39 | Session-submission | Session Submission | implemented |
+| FR-BB310 | Auto-submit-background-job | Auto-Submit Background Job | implemented |
+| FR-BB311 | Grading-engine | Grading Engine | Implemented |
 | FR-BB312 | Frontend-exam-configuration-UI | Frontend: Exam Configuration UI | Draft |
 | FR-BB313 | Frontend-employee-portal | Frontend: Employee Portal | Draft |
 | FR-BB314 | Frontend-exam-taking-screen | Frontend: Exam Taking Screen | Draft |

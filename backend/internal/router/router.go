@@ -5,9 +5,12 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/categories"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
+	"github.com/bilimbaga/bilimbaga/internal/exams"
 	"github.com/bilimbaga/bilimbaga/internal/health"
+	"github.com/bilimbaga/bilimbaga/internal/portal"
 	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
+	"github.com/bilimbaga/bilimbaga/internal/sessions"
 	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 	"github.com/bilimbaga/bilimbaga/internal/users"
@@ -18,7 +21,7 @@ import (
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -134,6 +137,67 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Put("/questions/{id}/translations/{locale}", translationsHandler.Upsert)
 			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
 				Delete("/questions/{id}/translations/{locale}", translationsHandler.Delete)
+
+			// Exams (FR-BB31).
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).
+				Get("/exams", examsHandler.List)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Post("/exams", examsHandler.Create)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).
+				Get("/exams/{id}", examsHandler.Get)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Put("/exams/{id}", examsHandler.Update)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Post("/exams/{id}/publish", examsHandler.Publish)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Post("/exams/{id}/archive", examsHandler.Archive)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Post("/exams/{id}/status", examsHandler.TransitionStatus)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Delete("/exams/{id}", examsHandler.Delete)
+
+			// Exam sections.
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Post("/exams/{id}/sections", examsHandler.CreateSection)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Put("/exams/{id}/sections/{sectionId}", examsHandler.UpdateSection)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Delete("/exams/{id}/sections/{sectionId}", examsHandler.DeleteSection)
+
+			// Exam question rules.
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Post("/exams/{id}/rules", examsHandler.CreateRule)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Put("/exams/{id}/rules/{ruleId}", examsHandler.UpdateRule)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Delete("/exams/{id}/rules/{ruleId}", examsHandler.DeleteRule)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Put("/exams/{id}/rules/{ruleId}/questions", examsHandler.SetManualQuestions)
+
+			// Exam assignments (FR-BB33).
+			r.With(rbac.RequirePermission(rbacCache, "exams", "assign")).
+				Post("/exams/{id}/assign", examsHandler.Assign)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "assign")).
+				Delete("/exams/{id}/assign/{assignmentId}", examsHandler.Unassign)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).
+				Get("/exams/{id}/assignments", examsHandler.ListAssignments)
+
+			// Employee exam portal (FR-BB34) — any authenticated user.
+			r.Get("/portal/exams", portalHandler.ListMyExams)
+			r.Get("/portal/exams/{id}", portalHandler.GetMyExam)
+
+			// Session creation (FR-BB35) — any authenticated user.
+			r.Post("/portal/exams/{id}/sessions", sessionsHandler.CreateSession)
+
+			// Answer saving and session resume (FR-BB37) — any authenticated user.
+			r.Get("/portal/sessions/{id}", sessionsHandler.GetSessionState)
+			r.Put("/portal/sessions/{id}/answers/{questionId}", sessionsHandler.SaveAnswer)
+
+			// Tab-switch event reporting (FR-BB38) — any authenticated user.
+			r.Post("/portal/sessions/{id}/events", sessionsHandler.ReportEvent)
+
+			// Session submission (FR-BB39) — any authenticated user.
+			r.Post("/portal/sessions/{id}/submit", sessionsHandler.SubmitSession)
 		})
 	})
 

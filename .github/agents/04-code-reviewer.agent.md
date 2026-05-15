@@ -95,6 +95,8 @@ Read the previous agent's handoff file first:
 | High | Route guards applied — unauthenticated users redirected to login; wrong-role users redirected appropriately |
 | High | New routes registered in the router configuration |
 | High | TypeScript types defined for all API response shapes — no `any` on API data |
+| High | E2e tests exist in `frontend/e2e/{domain}/` for every new or changed user-facing flow — if absent, FAIL unless handoff documents a no-UI reason |
+| Medium | E2e tests cover the golden path AND at least one error/edge case per flow |
 | Medium | shadcn/ui components used for interactive primitives (buttons, inputs, dialogs, tables) |
 | Medium | Loading, error, and empty states handled and visible in every data-dependent component |
 | Medium | No dead code or console.log left in production components |

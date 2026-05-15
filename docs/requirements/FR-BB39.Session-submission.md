@@ -6,7 +6,7 @@
 | ID | FR-BB39 |
 | Phase | 3 — Exam Engine |
 | Priority | 1 |
-| Status | Draft |
+| Status | implemented |
 | Depends On | FR-BB37 |
 
 ## Description

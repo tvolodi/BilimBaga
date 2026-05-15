@@ -1,0 +1,25 @@
+﻿{
+  "run_id": "FR-BB23-FR-BB26-FR-BB27-CONTENT-MANAGEMENT",
+  "pipeline": "A",
+  "commit_hash": "d5c2dda",
+  "commit_message": "feat(frontend): implement FR-BB26 question editor + FR-BB27 question bank list UI",
+  "files_committed": [
+    "frontend/src/api/questions.ts",
+    "frontend/src/pages/admin/questions/QuestionBankPage.tsx",
+    "frontend/src/pages/admin/questions/QuestionEditorPage.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "docs/requirements/FR-BB25.Bulk-import-export.md",
+    "docs/requirements/FR-BB26.Frontend-question-editor.md",
+    "docs/requirements/FR-BB27.Frontend-question-bank-list.md",
+    "docs/issue-reports/FR-BB26-INNER-REPORT.md",
+    "docs/issue-reports/FR-BB27-INNER-REPORT.md",
+    "docs/issue-reports/FR-BB23-FR-BB26-FR-BB27-CONTENT-MANAGEMENT-INNER-REPORT.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB23-FR-BB26-FR-BB27-CONTENT-MANAGEMENT-INNER-REPORT.md",
+  "status": "success"
+}

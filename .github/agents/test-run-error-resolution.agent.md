@@ -49,7 +49,21 @@ cd frontend && npm test -- --run 2>&1 | tee docs/test-reports/{run-id}-frontend.
 
 Parse output for failures.
 
-### Step 3 — Diagnose Failures
+### Step 3 — Run E2E Tests
+
+```bash
+cd frontend && npx playwright test 2>&1 | tee docs/test-reports/{run-id}-e2e.txt
+```
+
+- If Playwright is not yet installed: `cd frontend && npx playwright install --with-deps` then retry.
+- E2e tests require the backend and frontend dev servers to be running. Start them first:
+  - `cd backend && go run ./cmd/api &`
+  - `cd frontend && npm run dev &`
+  - Wait for both to be ready before running Playwright.
+- Parse output: list all PASS/FAIL test titles and capture failure messages.
+- Skip this step only if no `frontend/e2e/` directory exists AND the handoff explicitly states the change has no user-facing surface.
+
+### Step 5 — Diagnose Failures
 
 For each failing test:
 1. Read the test file.
@@ -58,7 +72,7 @@ For each failing test:
    - **Test code** (wrong assertion, stale fixture, incorrect mock) → fix the test
    - **Production code** (bug introduced by the implementation) → fix the production code
 
-### Step 4 — Fix Failures
+### Step 6 — Fix Failures
 
 **If fixing test code**:
 - Correct assertions to match actual contract behavior.
@@ -69,19 +83,20 @@ For each failing test:
 - Apply minimal targeted fix.
 - Verify the fix does not break other tests by re-running the full suite.
 
-### Step 5 — Verify All Pass
+### Step 7 — Verify All Pass
 
-Re-run both test suites after all fixes:
+Re-run all test suites after all fixes:
 ```bash
 cd backend && go test ./...
 cd frontend && npm test -- --run
+cd frontend && npx playwright test
 ```
 
 Confirm zero failures before writing the handoff file.
 
-### Step 6 — Verify AC Coverage
+### Step 8 — Verify AC Coverage
 
-Check that each acceptance criterion from the requirement doc has at least one passing test. Flag any uncovered AC as a HIGH finding.
+Check that each acceptance criterion from the requirement doc has at least one passing test (unit, integration, component, or e2e). Flag any uncovered AC as a HIGH finding.
 
 ---
 
@@ -105,6 +120,8 @@ Write `docs/test-reports/{run-id}-summary.json`:
   "run_id": "...",
   "backend_result": "PASS" | "FAIL",
   "frontend_result": "PASS" | "FAIL",
+  "e2e_result": "PASS" | "FAIL" | "SKIPPED",
+  "e2e_skipped_reason": "...",
   "total_tests": 0,
   "passed": 0,
   "failed": 0,

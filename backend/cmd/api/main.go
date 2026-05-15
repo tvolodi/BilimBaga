@@ -18,15 +18,22 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
+	"github.com/bilimbaga/bilimbaga/internal/exams"
+	"github.com/bilimbaga/bilimbaga/internal/portal"
 	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
+	"github.com/bilimbaga/bilimbaga/internal/sessions"
 	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 	"github.com/bilimbaga/bilimbaga/internal/users"
 )
 
 func main() {
+	// appCtx is cancelled on SIGINT/SIGTERM; used by background jobs for clean shutdown.
+	appCtx, stopApp := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopApp()
+
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "startup error: %v\n", err)
@@ -127,7 +134,26 @@ func main() {
 	translationsSvc := questions.NewTranslationService(translationsRepo, tenantSvc)
 	translationsHandler := questions.NewTranslationHandler(translationsSvc, auditWriter)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, cfg.JWTSecret, rbacCache)
+	// Wire up exams (FR-BB31).
+	examsRepo := exams.NewRepository(db)
+	examsSvc := exams.NewService(examsRepo)
+	examsHandler := exams.NewHandler(examsSvc, auditWriter)
+
+	// Wire up employee exam portal (FR-BB34).
+	portalRepo := portal.NewRepository(db)
+	portalSvc := portal.NewService(portalRepo)
+	portalHandler := portal.NewHandler(portalSvc)
+
+	// Wire up session creation (FR-BB35).
+	gradingEngine := sessions.NewGradingEngine()
+	sessionsRepo := sessions.NewRepository(db, gradingEngine)
+	sessionsSvc := sessions.NewService(sessionsRepo)
+	sessionsHandler := sessions.NewHandler(sessionsSvc)
+
+	// Start FR-BB310 auto-submit background job.
+	go sessions.AutoSubmitJob(appCtx, db, logger, gradingEngine)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,
@@ -137,10 +163,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Graceful shutdown on SIGINT / SIGTERM.
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		log.Printf("API listening on :%s", cfg.APIPort)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -148,13 +170,15 @@ func main() {
 		}
 	}()
 
-	<-quit
+	// Wait for SIGINT / SIGTERM (appCtx is cancelled by signal.NotifyContext).
+	<-appCtx.Done()
+	stopApp()
 	log.Println("shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("forced shutdown: %v", err)
 	}
 

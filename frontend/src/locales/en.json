@@ -4,16 +4,22 @@
   "en": "English",
   "common": {
     "logo_placeholder": "Logo",
-    "coming_soon": "Coming soon"
+    "coming_soon": "Coming soon",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loading": "Loading…",
+    "loadError": "Failed to load. Please try again."
   },
   "nav": {
     "dashboard": "Dashboard",
     "users": "Users",
     "departments": "Departments",
     "questions": "Questions",
+    "categories": "Categories",
     "exams": "Exams",
     "reports": "Reports",
-    "settings": "Settings"
+    "settings": "Settings",
+    "tags": "Tags"
   },
   "users": {
     "title": "Users",
@@ -237,6 +243,71 @@
       "confirm": "Delete",
       "cancel": "Cancel"
     }
+  },
+  "categories": {
+    "title": "Categories",
+    "actions": {
+      "new": "New Category",
+      "addChild": "Add child",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "form": {
+      "name": "Name",
+      "parent": "Parent category",
+      "parentTopLevel": "(Top level)",
+      "track": "Track",
+      "trackHelp": "Optional grouping label (e.g. \"compliance\", \"safety\")",
+      "sortOrder": "Sort order"
+    },
+    "deleteConfirm": {
+      "title": "Delete category",
+      "description": "This cannot be undone."
+    },
+    "errors": {
+      "inUse": "Cannot delete: {{count}} question(s) still use this category",
+      "cycle": "Cannot set this parent — it would create a cycle",
+      "parentNotFound": "Selected parent no longer exists",
+      "invalidName": "Name is required (max 100 characters)"
+    },
+    "messages": {
+      "deleteSuccess": "Category deleted."
+    },
+    "empty": "No categories yet. Click \"New Category\" to start."
+  },
+  "tags": {
+    "title": "Tags",
+    "columns": {
+      "name": "Name",
+      "usage": "Usage",
+      "createdAt": "Created",
+      "actions": "Actions"
+    },
+    "actions": {
+      "new": "New Tag",
+      "rename": "Rename",
+      "delete": "Delete"
+    },
+    "form": {
+      "name": "Tag name",
+      "nameHelp": "Lowercase, max 64 characters"
+    },
+    "search": "Search tags",
+    "renameModal": {
+      "title": "Rename tag",
+      "description": "All questions using this tag will keep the link."
+    },
+    "deleteConfirm": {
+      "title": "Delete tag",
+      "description": "This cannot be undone."
+    },
+    "errors": {
+      "duplicate": "A tag with this name already exists",
+      "inUse": "Cannot delete: {{count}} question(s) still use this tag",
+      "invalidName": "Name is required (max 64 characters)",
+      "notFound": "Tag no longer exists"
+    },
+    "empty": "No tags yet. Click \"New Tag\" to start."
   },
   "auth": {
     "login": {

@@ -1,3 +1,4 @@
+import { Component, type ReactNode, type ErrorInfo } from 'react'
 import { useMatches, Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 
@@ -5,7 +6,7 @@ interface BreadcrumbHandle {
   breadcrumb?: string
 }
 
-export function Breadcrumb() {
+function BreadcrumbContent() {
   const matches = useMatches()
 
   const crumbs = matches
@@ -32,5 +33,33 @@ export function Breadcrumb() {
         </span>
       ))}
     </nav>
+  )
+}
+
+class BreadcrumbBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(_err: Error) {
+    return { hasError: true }
+  }
+
+  componentDidCatch(_err: Error, _info: ErrorInfo) {
+    // useMatches throws when not in a data router — this is expected with BrowserRouter
+  }
+
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
+}
+
+export function Breadcrumb() {
+  return (
+    <BreadcrumbBoundary>
+      <BreadcrumbContent />
+    </BreadcrumbBoundary>
   )
 }

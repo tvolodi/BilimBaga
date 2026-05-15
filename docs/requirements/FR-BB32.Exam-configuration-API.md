@@ -6,7 +6,7 @@
 | ID | FR-BB32 |
 | Phase | 3 — Exam Engine |
 | Priority | 1 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB31 |
 
 ## Description

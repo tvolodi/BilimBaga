@@ -13,6 +13,8 @@ import { DepartmentsPage } from '@/pages/admin/departments/DepartmentsPage'
 import { BrandingSettingsPage } from '@/pages/admin/settings/BrandingSettingsPage'
 import { QuestionBankPage } from '@/pages/admin/questions/QuestionBankPage'
 import { QuestionEditorPage } from '@/pages/admin/questions/QuestionEditorPage'
+import { CategoriesPage } from '@/pages/admin/categories/CategoriesPage'
+import { TagsPage } from '@/pages/admin/tags/TagsPage'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
 
@@ -65,6 +67,22 @@ function AppRoutes() {
           element={
             <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
               <QuestionEditorPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="categories"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <CategoriesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="tags"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <TagsPage />
             </RequireRole>
           }
         />

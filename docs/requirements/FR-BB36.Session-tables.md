@@ -6,23 +6,23 @@
 | ID | FR-BB36 |
 | Phase | 3 — Exam Engine |
 | Priority | 1 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB35 |
 
 ## Description
 Defines the database schema for all session-related tables: the core `exam_sessions` record, the `session_questions` snapshot of question assignment, `session_answers` for per-question responses, and `tab_switch_events` for anti-cheat tracking. These tables serve as the persistence layer for FR-BB35 (creation), FR-BB37 (answers), FR-BB38 (events), FR-BB39 (submission), and FR-BB311 (grading).
 
 ## Acceptance Criteria
-- [ ] AC-1: `exam_sessions` table exists with all specified columns; `status` ENUM accepts only `'in_progress'`, `'submitted'`, `'auto_submitted'`, `'grading_pending'`.
-- [ ] AC-2: `session_questions` has composite PK `(session_id, question_id)`; FK to `exam_sessions.id` ON DELETE CASCADE and to `questions.id` ON DELETE RESTRICT (questions must not be hard-deleted while sessions reference them).
-- [ ] AC-3: `session_answers` upsert on `(session_id, question_id)` works correctly; the table has a unique index on `(session_id, question_id)`.
-- [ ] AC-4: `tab_switch_events` records are insertable while the session is `in_progress`; `session_id` FK has ON DELETE CASCADE.
-- [ ] AC-5: `session_answers.selected_option_ids` is stored as JSONB; an empty array `[]` is valid for unanswered states.
-- [ ] AC-6: `exam_sessions.seed` is a `BIGINT NOT NULL`; it stores the unix nanosecond timestamp used as PRNG seed.
-- [ ] AC-7: `session_questions.question_version_id` references a version snapshot of the question at time of session creation (FK to `question_versions.id` if that table exists, or nullable UUID if versioning is added in a later phase).
-- [ ] AC-8: All index definitions are included in the migration for: `session_answers(session_id)`, `exam_sessions(user_id, exam_id, status)`, `tab_switch_events(session_id)`, `exam_sessions(expires_at, status)` (for the auto-submit background job query).
-- [ ] AC-9: Migration is numbered sequentially after FR-BB35's migration; no existing migration files are modified.
-- [ ] AC-10: `session_answers.time_spent_seconds` is NOT NULL with default 0; values must be non-negative (CHECK constraint).
+- [x] AC-1: `exam_sessions` table exists with all specified columns; `status` ENUM accepts only `'in_progress'`, `'submitted'`, `'auto_submitted'`, `'grading_pending'`.
+- [x] AC-2: `session_questions` has composite PK `(session_id, question_id)`; FK to `exam_sessions.id` ON DELETE CASCADE and to `questions.id` ON DELETE RESTRICT (questions must not be hard-deleted while sessions reference them).
+- [x] AC-3: `session_answers` upsert on `(session_id, question_id)` works correctly; the table has a unique index on `(session_id, question_id)`.
+- [x] AC-4: `tab_switch_events` records are insertable while the session is `in_progress`; `session_id` FK has ON DELETE CASCADE.
+- [x] AC-5: `session_answers.selected_option_ids` is stored as JSONB; an empty array `[]` is valid for unanswered states.
+- [x] AC-6: `exam_sessions.seed` is a `BIGINT NOT NULL`; it stores the unix nanosecond timestamp used as PRNG seed.
+- [x] AC-7: `session_questions.question_version_id` references a version snapshot of the question at time of session creation (FK to `question_versions.id` if that table exists, or nullable UUID if versioning is added in a later phase).
+- [x] AC-8: All index definitions are included in the migration for: `session_answers(session_id)`, `exam_sessions(user_id, exam_id, status)`, `tab_switch_events(session_id)`, `exam_sessions(expires_at, status)` (for the auto-submit background job query).
+- [x] AC-9: Migration is numbered sequentially after FR-BB35's migration; no existing migration files are modified.
+- [x] AC-10: `session_answers.time_spent_seconds` is NOT NULL with default 0; values must be non-negative (CHECK constraint).
 
 ## Technical Specification
 

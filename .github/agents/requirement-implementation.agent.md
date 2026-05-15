@@ -110,6 +110,12 @@ handoffs:
 4. Write frontend component tests for all new or changed React components.
 5. Do not test live external services or the live database — use test doubles / mocks.
 6. Ensure each acceptance criterion maps to at least one test.
+7. **Write e2e tests** for every user-facing flow added or changed by this requirement:
+   - Place tests in `frontend/e2e/{domain}/` using Playwright (`*.spec.ts`).
+   - Cover the golden path end-to-end: authenticate, navigate to the feature, perform the primary action, assert the resulting UI state.
+   - Cover at least one error/edge case per flow (e.g. invalid input, forbidden role, empty state).
+   - E2e tests are **mandatory** for any feature that touches the UI; skip only for purely backend/internal changes with no user-facing surface, and document the reason in the handoff file.
+   - Run e2e tests with: `cd frontend && npx playwright test`. Fix all failures before proceeding.
 
 ### Phase 7 — Code Review
 
@@ -141,7 +147,8 @@ Wait for its report. If it reports failures it could not resolve, determine if a
 **⛔ Zero Manual Work self-check before delegating:**
 - Did I apply every migration file I created? → If not, run `make migrate` now.
 - Does my final summary contain ANY command the user must run? → Remove it and do it myself.
-- Are all tests passing? → If not, fix them before proceeding.
+- Are all tests passing (unit, integration, component, e2e)? → If not, fix them before proceeding.
+- Did I write e2e tests for every new/changed UI flow? → If not, write them now.
 
 Delegate to `06-release-finalizer` with:
 - Run ID

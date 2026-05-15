@@ -28,6 +28,8 @@ interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
 function DialogContent({ className, children, ...props }: DialogContentProps) {
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       className={cn(
         'bg-background rounded-lg shadow-lg p-6 w-full max-w-md mx-4',
         className,

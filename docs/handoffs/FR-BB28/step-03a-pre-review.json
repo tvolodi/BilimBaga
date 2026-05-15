@@ -1,0 +1,27 @@
+{
+  "run_id": "FR-BB28",
+  "pipeline": "A",
+  "step": "pre-code-review",
+  "requirement_doc": "docs/requirements/FR-BB28.Frontend-categories-management.md",
+  "changed_files": [
+    "frontend/src/api/categories.ts",
+    "frontend/src/pages/admin/categories/CategoriesPage.tsx",
+    "frontend/src/pages/admin/categories/CategoryEditModal.tsx",
+    "frontend/src/pages/admin/categories/CategoryDeleteConfirm.tsx",
+    "frontend/src/components/admin/categories/CategoryTree.tsx",
+    "frontend/src/components/admin/categories/CategoryTreeNode.tsx",
+    "frontend/src/components/admin/categories/CategoryTree.test.tsx",
+    "frontend/src/pages/admin/categories/CategoriesPage.test.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/components/admin/Sidebar.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json"
+  ],
+  "test_results": {
+    "status": "all_passing",
+    "files": 17,
+    "tests": 77,
+    "new_tests": 8
+  }
+}

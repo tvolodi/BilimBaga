@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -759,5 +760,184 @@ func TestTransitionStatus_RequiresStemForActive(t *testing.T) {
 	}
 	if !errors.Is(err, ErrStemRequired) {
 		t.Errorf("AC-8: expected ErrStemRequired, got %v", err)
+	}
+}
+
+// ── AC-2: Type-specific validation unit tests ────────────────────────────────
+
+// TestValidateCreateRequest covers all question types defined in AC-2.
+func TestValidateCreateRequest_TypeSpecific(t *testing.T) {
+	fp := func(v float64) *float64 { return &v }
+
+	cases := []struct {
+		name        string
+		req         createQuestionReq
+		expectError bool
+		fieldHint   string // optional: must be present in one of the field errors
+	}{
+		// single: needs ≥2 options
+		{
+			name: "single_too_few_options",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "single",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{{SortOrder: 1, IsCorrect: true}},
+			},
+			expectError: true,
+			fieldHint:   "answer_options",
+		},
+		// single: exactly 2 options is valid
+		{
+			name: "single_two_options_valid",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "single",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{
+					{SortOrder: 1, IsCorrect: true},
+					{SortOrder: 2, IsCorrect: false},
+				},
+			},
+			expectError: false,
+		},
+		// multiple: needs ≥2 options
+		{
+			name: "multiple_too_few_options",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "multiple",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{{SortOrder: 1, IsCorrect: true}},
+			},
+			expectError: true,
+			fieldHint:   "answer_options",
+		},
+		// truefalse: needs ≥2 options
+		{
+			name: "truefalse_too_few_options",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "truefalse",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{{SortOrder: 1, IsCorrect: true}},
+			},
+			expectError: true,
+			fieldHint:   "answer_options",
+		},
+		// truefalse: 2 options valid
+		{
+			name: "truefalse_two_options_valid",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "truefalse",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{
+					{SortOrder: 1, IsCorrect: true},
+					{SortOrder: 2, IsCorrect: false},
+				},
+			},
+			expectError: false,
+		},
+		// likert: needs ≥2 options AND each must have likert_weight
+		{
+			name: "likert_missing_likert_weight",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "likert",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{
+					{SortOrder: 1, LikertWeight: fp(1.0)},
+					{SortOrder: 2}, // missing likert_weight
+				},
+			},
+			expectError: true,
+			fieldHint:   "likert_weight",
+		},
+		// likert: 2 options with weights valid
+		{
+			name: "likert_valid",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "likert",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{
+					{SortOrder: 1, LikertWeight: fp(1.0)},
+					{SortOrder: 2, LikertWeight: fp(2.0)},
+				},
+			},
+			expectError: false,
+		},
+		// shorttext: zero options valid
+		{
+			name: "shorttext_zero_options_valid",
+			req: createQuestionReq{
+				CategoryID:    "cat-1",
+				Difficulty:    "easy",
+				Type:          "shorttext",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
+				AnswerOptions: []answerOptionReq{},
+			},
+			expectError: false,
+		},
+		// missing stem for default_locale
+		{
+			name: "missing_default_locale_stem",
+			req: createQuestionReq{
+				CategoryID: "cat-1", Difficulty: "easy", Type: "shorttext",
+				DefaultLocale: "kk",
+				Translations:  map[string]translationReq{"kk": {Stem: ""}},
+				AnswerOptions: []answerOptionReq{},
+			},
+			expectError: true,
+			fieldHint:   "stem",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateCreateRequest(tc.req)
+			if tc.expectError && len(errs) == 0 {
+				t.Fatalf("expected validation errors, got none")
+			}
+			if !tc.expectError && len(errs) > 0 {
+				t.Fatalf("expected no validation errors, got %v", errs)
+			}
+			if tc.fieldHint != "" {
+				found := false
+				for _, e := range errs {
+					if strings.Contains(e.Field, tc.fieldHint) || strings.Contains(e.Message, tc.fieldHint) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected an error mentioning %q, got %v", tc.fieldHint, errs)
+				}
+			}
+		})
+	}
+}
+
+// ── AC-8: Tag idempotency test ───────────────────────────────────────────────
+
+// TestTagQuestion_IdempotentAdd verifies that tagging the same question twice
+// does not return an error (AddTag uses ON CONFLICT DO NOTHING in the DB layer;
+// the service layer always calls AddTag — idempotency is at the DB level).
+func TestTagQuestion_IdempotentAdd(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	q := &Question{ID: "q-1", Status: "draft", DefaultLocale: "kk", CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	repo.questions["q-1"] = q
+
+	// First add — must succeed.
+	if err := svc.TagQuestion(context.Background(), "q-1", "tag-1"); err != nil {
+		t.Fatalf("first TagQuestion: unexpected error: %v", err)
+	}
+	// Second add (same tag) — must also succeed without error (idempotent).
+	if err := svc.TagQuestion(context.Background(), "q-1", "tag-1"); err != nil {
+		t.Fatalf("second TagQuestion (idempotent): unexpected error: %v", err)
 	}
 }

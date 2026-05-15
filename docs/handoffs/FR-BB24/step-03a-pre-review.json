@@ -1,0 +1,25 @@
+{
+  "run_id": "FR-BB24",
+  "pipeline": "A",
+  "requirement_doc": "docs/requirements/FR-BB24.Translation-API.md",
+  "changed_files": [
+    "backend/internal/questions/translation_handler.go",
+    "backend/internal/questions/translation_service.go",
+    "backend/internal/questions/translation_repository.go",
+    "backend/internal/questions/translation_handler_test.go",
+    "backend/internal/questions/translation_service_test.go",
+    "docs/requirements/FR-BB24.Translation-API.md"
+  ],
+  "acceptance_criteria": [
+    "AC-1: GET /api/v1/questions/:id/translations returns locale map + locale_coverage",
+    "AC-2: PUT performs atomic upsert; 422 for partial options",
+    "AC-3: PUT rejects unsupported locale with 422 ERR_UNSUPPORTED_LOCALE",
+    "AC-4: DELETE removes both tables; 409 ERR_CANNOT_DELETE_DEFAULT_LOCALE if default",
+    "AC-5: locale_coverage consistent with translation rows",
+    "AC-6: PUT/DELETE require questions:write; GET requires questions:read",
+    "AC-7: audit log entry for every PUT and DELETE",
+    "AC-8: PUT returns full updated translation object",
+    "AC-9: non-existent question returns 404 ERR_QUESTION_NOT_FOUND",
+    "AC-10: upsert idempotent"
+  ]
+}

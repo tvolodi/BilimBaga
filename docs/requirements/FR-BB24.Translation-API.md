@@ -138,6 +138,16 @@ _(empty body)_
 }
 ```
 
+### Go Package / Layer
+
+| Concern | Location |
+|---------|----------|
+| Package | `internal/questions` |
+| HTTP handlers | `translation_handler.go` — thin; no SQL, no business logic |
+| Business logic | `translation_service.go` — locale validation, option completeness check, coverage computation, before/after diff for audit |
+| SQL / persistence | `translation_repository.go` — all queries against `question_translations` and `answer_translations`; upsert and delete wrapped in transactions |
+| Wiring | `cmd/api/main.go` — `NewTranslationRepository` → `NewTranslationService` → `NewTranslationHandler`; `tenantSvc` satisfies `TenantLocaleProvider` |
+
 ## Notes
 - The upsert for `answer_translations` should use `INSERT ... ON CONFLICT (option_id, locale) DO UPDATE SET text = EXCLUDED.text` to avoid DELETE + INSERT patterns that would invalidate FK references during the transaction.
 - `available_locales` is stored in the `tenant_config` table (FR-BB13); the translation service reads it once per request (or from a short-lived cache) to validate the `:locale` parameter.

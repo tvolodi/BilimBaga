@@ -46,22 +46,22 @@ type Session struct {
 
 // SessionQuestion is one row in session_questions.
 type SessionQuestion struct {
-	SessionID          string  `db:"session_id"`
-	QuestionID         string  `db:"question_id"`
-	SortOrder          int     `db:"sort_order"`
-	OptionsOrder       []byte  `db:"options_order"` // JSONB: []string of option UUIDs in shuffled order
-	QuestionVersionID  *string `db:"question_version_id"`
+	SessionID         string  `db:"session_id"`
+	QuestionID        string  `db:"question_id"`
+	SortOrder         int     `db:"sort_order"`
+	OptionsOrder      []byte  `db:"options_order"` // JSONB: []string of option UUIDs in shuffled order
+	QuestionVersionID *string `db:"question_version_id"`
 }
 
 // SessionAnswer is one row in session_answers (FR-BB36 AC-3/AC-5/AC-10).
 type SessionAnswer struct {
-	ID                 string  `db:"id"`
-	SessionID          string  `db:"session_id"`
-	QuestionID         string  `db:"question_id"`
-	SelectedOptionIDs  []byte  `db:"selected_option_ids"` // JSONB: []string of selected option UUIDs
-	TextAnswer         *string `db:"text_answer"`
-	SavedAt            string  `db:"saved_at"`
-	TimeSpentSeconds   int     `db:"time_spent_seconds"`
+	ID                string  `db:"id"`
+	SessionID         string  `db:"session_id"`
+	QuestionID        string  `db:"question_id"`
+	SelectedOptionIDs []byte  `db:"selected_option_ids"` // JSONB: []string of selected option UUIDs
+	TextAnswer        *string `db:"text_answer"`
+	SavedAt           string  `db:"saved_at"`
+	TimeSpentSeconds  int     `db:"time_spent_seconds"`
 }
 
 // TabSwitchEvent is one row in tab_switch_events (FR-BB36 AC-4).
@@ -119,11 +119,11 @@ type poolOption struct {
 
 // SessionQuestionResponse is the question object returned in the session response.
 type SessionQuestionResponse struct {
-	ID        string                   `json:"id"`
-	SortOrder int                      `json:"sort_order"`
-	Stem      string                   `json:"stem"`
-	Type      string                   `json:"type"`
-	Options   []SessionOptionResponse  `json:"options"`
+	ID        string                  `json:"id"`
+	SortOrder int                     `json:"sort_order"`
+	Stem      string                  `json:"stem"`
+	Type      string                  `json:"type"`
+	Options   []SessionOptionResponse `json:"options"`
 }
 
 // SessionOptionResponse is the option object returned in the session response (no is_correct).
@@ -166,14 +166,16 @@ type SavedAnswer struct {
 
 // ResumeSessionResponse is the GET /portal/sessions/:id response body.
 type ResumeSessionResponse struct {
-	SessionID        string                       `json:"session_id"`
-	ExamID           string                       `json:"exam_id"`
-	Status           string                       `json:"status"`
-	StartedAt        time.Time                    `json:"started_at"`
-	ExpiresAt        time.Time                    `json:"expires_at"`
-	RemainingSeconds float64                      `json:"remaining_seconds"`
-	Questions        []SessionQuestionResponse    `json:"questions"`
-	Answers          map[string]SavedAnswer       `json:"answers"`
+	SessionID          string                    `json:"session_id"`
+	ExamID             string                    `json:"exam_id"`
+	ExamTitle          string                    `json:"exam_title"`
+	CertificateEnabled bool                      `json:"certificate_enabled"`
+	Status             string                    `json:"status"`
+	StartedAt          time.Time                 `json:"started_at"`
+	ExpiresAt          time.Time                 `json:"expires_at"`
+	RemainingSeconds   float64                   `json:"remaining_seconds"`
+	Questions          []SessionQuestionResponse `json:"questions"`
+	Answers            map[string]SavedAnswer    `json:"answers"`
 }
 
 // ReportEventInput is the request body for POST /portal/sessions/:id/events (FR-BB38).
@@ -194,9 +196,9 @@ type ReportEventResponse struct {
 
 // SubmitSessionResponse is the 200 response body for POST /portal/sessions/:id/submit (FR-BB39).
 type SubmitSessionResponse struct {
-	SessionID   string     `json:"session_id"`
-	Status      string     `json:"status"`
-	SubmittedAt time.Time  `json:"submitted_at"`
-	ScorePct    *float64   `json:"score_pct"`
-	Passed      *bool      `json:"passed"`
+	SessionID   string    `json:"session_id"`
+	Status      string    `json:"status"`
+	SubmittedAt time.Time `json:"submitted_at"`
+	ScorePct    *float64  `json:"score_pct"`
+	Passed      *bool     `json:"passed"`
 }

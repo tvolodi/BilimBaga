@@ -18,6 +18,7 @@ import { TagsPage } from '@/pages/admin/tags/TagsPage'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
 import { ExamWizardCreatePage, ExamWizardEditPage } from '@/pages/ExamWizard'
+import { ExamTakingPage } from '@/pages/ExamTaking'
 
 const queryClient = new QueryClient()
 
@@ -112,6 +113,14 @@ function AppRoutes() {
           }
         />
       </Route>
+      <Route
+        path="/portal/sessions/:sessionId"
+        element={
+          <RequireRole roles={['employee']}>
+            <ExamTakingPage />
+          </RequireRole>
+        }
+      />
       <Route
         path="/portal/*"
         element={

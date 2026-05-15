@@ -94,20 +94,22 @@ type questionDetail struct {
 
 // sessionStateRow holds the raw session fields needed for FR-BB37.
 type sessionStateRow struct {
-	ID        string    `db:"id"`
-	ExamID    string    `db:"exam_id"`
-	UserID    string    `db:"user_id"`
-	Status    string    `db:"status"`
-	StartedAt time.Time `db:"started_at"`
-	ExpiresAt time.Time `db:"expires_at"`
+	ID                 string    `db:"id"`
+	ExamID             string    `db:"exam_id"`
+	UserID             string    `db:"user_id"`
+	Status             string    `db:"status"`
+	StartedAt          time.Time `db:"started_at"`
+	ExpiresAt          time.Time `db:"expires_at"`
+	ExamTitle          string    `db:"exam_title"`
+	CertificateEnabled bool      `db:"certificate_enabled"`
 }
 
 // sessionQuestionRow holds one session_questions row with question type.
 type sessionQuestionRow struct {
-	QuestionID    string  `db:"question_id"`
-	SortOrder     int     `db:"sort_order"`
-	OptionsOrder  []byte  `db:"options_order"`
-	QuestionType  string  `db:"question_type"`
+	QuestionID   string `db:"question_id"`
+	SortOrder    int    `db:"sort_order"`
+	OptionsOrder []byte `db:"options_order"`
+	QuestionType string `db:"question_type"`
 }
 
 // savedAnswerRow holds one session_answers row.
@@ -480,9 +482,11 @@ RETURNING id, started_at, expires_at`
 
 func (r *postgresRepository) GetSessionForUser(ctx context.Context, sessionID, userID string) (*sessionStateRow, error) {
 	const q = `
-SELECT id, exam_id, user_id, status, started_at, expires_at
-FROM exam_sessions
-WHERE id = $1`
+SELECT es.id, es.exam_id, es.user_id, es.status, es.started_at, es.expires_at,
+       e.title AS exam_title, e.certificate_enabled
+FROM exam_sessions es
+JOIN exams e ON e.id = es.exam_id
+WHERE es.id = $1`
 
 	var row sessionStateRow
 	if err := r.db.GetContext(ctx, &row, q, sessionID); err != nil {

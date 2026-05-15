@@ -6,7 +6,7 @@
 | ID | FR-BB314 |
 | Phase | 3 — Exam Engine |
 | Priority | 2 |
-| Status | Draft |
+| Status | implemented |
 | Depends On | FR-BB37, FR-BB38, FR-BB39 |
 
 ## Description

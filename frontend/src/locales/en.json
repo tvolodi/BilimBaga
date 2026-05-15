@@ -493,6 +493,59 @@
       "range": "must be between {{min}} and {{max}}",
       "availableUntilOrder": "Available until must be after available from",
       "assigneeRequired": "Assignee is required"
+    },
+    "taking": {
+      "progress": "{{answered}} / {{total}} answered",
+      "flagButton": "Flag for review",
+      "unflagButton": "Unflagged",
+      "finishButton": "Finish exam",
+      "shortTextPlaceholder": "Type your answer here…",
+      "save": {
+        "saving": "Saving…",
+        "saved": "Saved ✓",
+        "error": "Connection lost ✗"
+      },
+      "navigator": {
+        "title": "Questions",
+        "unanswered": "Unanswered",
+        "answered": "Answered",
+        "flagged": "Flagged"
+      },
+      "review": {
+        "title": "Review before submitting",
+        "unanswered": "Unanswered questions",
+        "flagged": "Flagged for review",
+        "allAnswered": "All questions answered. Ready to submit.",
+        "submitAnyway": "Submit anyway",
+        "goBack": "Go back"
+      },
+      "submit": {
+        "confirm": {
+          "title": "Submit exam",
+          "message": "Once submitted, you cannot change your answers.",
+          "submit": "Submit"
+        }
+      },
+      "result": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "pending": "Your exam is being reviewed by an instructor.",
+        "score": "Score: {{score}}%",
+        "backToPortal": "Back to my exams"
+      },
+      "tabswitch": {
+        "title": "Warning",
+        "warning": "You left the exam window. Further violations may result in automatic submission."
+      },
+      "timer": {
+        "warning": "Less than 20% of your time remaining.",
+        "critical": "Less than 5% of your time remaining."
+      },
+      "timesUp": {
+        "title": "Time's up",
+        "message": "Your time has expired. Submitting exam…",
+        "retrying": "Network error. Retrying…"
+      }
     }
   },
   "portal": {

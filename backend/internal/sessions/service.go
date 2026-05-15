@@ -441,14 +441,16 @@ func (s *service) GetSessionState(ctx context.Context, sessionID, userID string)
 	}
 
 	return &ResumeSessionResponse{
-		SessionID:        sess.ID,
-		ExamID:           sess.ExamID,
-		Status:           sess.Status,
-		StartedAt:        sess.StartedAt,
-		ExpiresAt:        sess.ExpiresAt,
-		RemainingSeconds: remaining,
-		Questions:        questions,
-		Answers:          answers,
+		SessionID:          sess.ID,
+		ExamID:             sess.ExamID,
+		ExamTitle:          sess.ExamTitle,
+		CertificateEnabled: sess.CertificateEnabled,
+		Status:             sess.Status,
+		StartedAt:          sess.StartedAt,
+		ExpiresAt:          sess.ExpiresAt,
+		RemainingSeconds:   remaining,
+		Questions:          questions,
+		Answers:            answers,
 	}, nil
 }
 

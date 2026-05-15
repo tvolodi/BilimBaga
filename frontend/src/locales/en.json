@@ -494,5 +494,42 @@
       "availableUntilOrder": "Available until must be after available from",
       "assigneeRequired": "Assignee is required"
     }
+  },
+  "portal": {
+    "title": "My Exams",
+    "empty": {
+      "title": "No exams assigned",
+      "description": "You have no exams assigned to you right now."
+    },
+    "card": {
+      "status": {
+        "not_started": "Not started",
+        "in_progress": "In progress",
+        "passed": "Passed",
+        "failed": "Failed",
+        "expired": "Expired"
+      },
+      "cta": {
+        "start": "Start exam",
+        "continue": "Continue",
+        "viewResult": "View result"
+      },
+      "timeLimit": "{{minutes}} min",
+      "passingScore": "Pass: {{pct}}%",
+      "attempts": "Attempt {{used}} of {{max}}",
+      "deadline": "Due {{countdown}}",
+      "noDeadline": "No deadline"
+    },
+    "modal": {
+      "title": "Start exam",
+      "timeLimit": "You will have {{minutes}} minutes.",
+      "maxAttempts": "You have {{remaining}} attempt(s) remaining.",
+      "warning": "Once started, do not close or switch tabs — it may be counted against you.",
+      "confirm": "Begin exam",
+      "cancel": "Cancel"
+    },
+    "deadline": {
+      "expired": "Expired"
+    }
   }
 }

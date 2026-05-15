@@ -494,5 +494,42 @@
       "availableUntilOrder": "Дата окончания должна быть позже даты начала",
       "assigneeRequired": "Выберите назначенного"
     }
+  },
+  "portal": {
+    "title": "Мои экзамены",
+    "empty": {
+      "title": "Нет назначенных экзаменов",
+      "description": "Вам пока не назначено ни одного экзамена."
+    },
+    "card": {
+      "status": {
+        "not_started": "Не начат",
+        "in_progress": "В процессе",
+        "passed": "Сдан",
+        "failed": "Не сдан",
+        "expired": "Истёк срок"
+      },
+      "cta": {
+        "start": "Начать экзамен",
+        "continue": "Продолжить",
+        "viewResult": "Посмотреть результат"
+      },
+      "timeLimit": "{{minutes}} мин",
+      "passingScore": "Порог: {{pct}}%",
+      "attempts": "Попытка {{used}} из {{max}}",
+      "deadline": "До {{countdown}}",
+      "noDeadline": "Без срока"
+    },
+    "modal": {
+      "title": "Начать экзамен",
+      "timeLimit": "У вас будет {{minutes}} минут.",
+      "maxAttempts": "Осталось попыток: {{remaining}}.",
+      "warning": "После старта не закрывайте и не переключайте вкладки — это может быть зачтено как нарушение.",
+      "confirm": "Начать экзамен",
+      "cancel": "Отмена"
+    },
+    "deadline": {
+      "expired": "Истёк срок"
+    }
   }
 }

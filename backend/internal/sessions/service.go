@@ -767,7 +767,8 @@ func (s *service) GetMyResults(ctx context.Context, userID string, page, perPage
 }
 
 // ListGradingQueue returns sessions pending manual grading (FR-BB42 AC-1/AC-2/AC-3).
-func (s *service) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error) {	items, total, err := s.repo.ListGradingQueue(ctx, examID, dateFrom, dateTo, page, perPage)
+func (s *service) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error) {
+	items, total, err := s.repo.ListGradingQueue(ctx, examID, dateFrom, dateTo, page, perPage)
 	if err != nil {
 		return nil, fmt.Errorf("sessions: ListGradingQueue: %w", err)
 	}

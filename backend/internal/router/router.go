@@ -11,6 +11,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/portal"
 	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
+	"github.com/bilimbaga/bilimbaga/internal/reports"
 	"github.com/bilimbaga/bilimbaga/internal/sessions"
 	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
@@ -22,7 +23,7 @@ import (
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -210,6 +211,10 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// My Results (FR-BB46) — any authenticated user.
 			r.Get("/portal/results", sessionsHandler.HandleGetMyResults)
+
+			// Dashboard metrics (FR-BB51) — examiner+ only.
+			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+				Get("/admin/dashboard", reportsHandler.GetDashboard)
 
 			// Manual grading queue (FR-BB42).
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading", sessionsHandler.HandleListGradingQueue)

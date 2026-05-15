@@ -6,7 +6,7 @@
 | ID | FR-BB51 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 1 |
-| Status | Draft |
+| Status | Validated |
 | Depends On | FR-BB311, FR-BB33 |
 
 ## Description

@@ -23,6 +23,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/portal"
 	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
+	"github.com/bilimbaga/bilimbaga/internal/reports"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/bilimbaga/bilimbaga/internal/sessions"
 	"github.com/bilimbaga/bilimbaga/internal/tags"
@@ -159,7 +160,12 @@ func main() {
 	certsSvc := certificates.NewService(certsRepo, tenantSvc)
 	certHandler := certificates.NewHandler(certsSvc, cfg.APIBaseURL)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, certHandler, cfg.JWTSecret, rbacCache)
+	// Wire up dashboard metrics (FR-BB51).
+	reportsRepo := reports.NewRepository(db)
+	reportsSvc := reports.NewService(reportsRepo)
+	reportsHandler := reports.NewHandler(reportsSvc)
+
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

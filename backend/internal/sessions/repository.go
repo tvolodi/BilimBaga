@@ -84,6 +84,34 @@ type Repository interface {
 	// Returns ErrSessionForbidden if the session belongs to a different user.
 	// Returns the idempotent result (HTTP 200) if the session is already submitted/grading_pending.
 	SubmitSession(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error)
+
+	// GetSessionResult fetches session result data scoped to the given user (FR-BB41 AC-1, AC-2, AC-8).
+	// Returns ErrSessionNotFound if the session does not exist globally.
+	// Returns ErrSessionForbidden if the session belongs to a different user.
+	GetSessionResult(ctx context.Context, sessionID, userID string) (*sessionResultRow, error)
+
+	// GetAdminSessionResult fetches session result data for any session (FR-BB41 AC-5, AC-9).
+	// Returns ErrSessionNotFound if the session does not exist.
+	GetAdminSessionResult(ctx context.Context, sessionID string) (*sessionResultRow, error)
+
+	// GetSectionScores returns per-section scores for a session (FR-BB41 AC-7).
+	// Returns an empty slice when no section data exists.
+	GetSectionScores(ctx context.Context, sessionID string) ([]SectionScore, error)
+
+	// GetQuestionBreakdown returns per-question score breakdown rows ordered by sort_order (FR-BB41 AC-4).
+	GetQuestionBreakdown(ctx context.Context, sessionID, locale string) ([]questionBreakdownRow, error)
+
+	// GetCorrectAnswerTexts returns correct option texts per question keyed by question ID (FR-BB41 AC-4).
+	// For short_text questions there are no correct options; those question IDs are absent from the map.
+	GetCorrectAnswerTexts(ctx context.Context, questionIDs []string, locale string) (map[string][]string, error)
+
+	// GetExamHistory returns paginated completed sessions for a user+exam (FR-BB41 AC-6, AC-10).
+	// Returns the rows, total count (for pagination), and any error.
+	GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error)
+
+	// GetExamTitleByID returns the title for the given exam ID (FR-BB41).
+	// Returns ErrExamNotFound if the exam does not exist.
+	GetExamTitleByID(ctx context.Context, examID string) (string, error)
 }
 
 // questionDetail is the stem+type data fetched for question display.
@@ -146,11 +174,48 @@ type createSessionInput struct {
 	Questions []resolvedQuestion
 }
 
-// resolvedQuestion is a fully resolved question with its final sort_order and shuffled option IDs.
+// resolvedQuestion is a fully resolved question with its final sort_order, shuffled option IDs,
+// and the rule that produced it (nil for questions outside any rule).
 type resolvedQuestion struct {
 	QuestionID   string
 	SortOrder    int
 	OptionsOrder []string // option UUIDs in shuffled display order
+	RuleID       *string
+}
+
+// sessionResultRow holds the raw result data for a session (FR-BB41).
+type sessionResultRow struct {
+	SessionID        string     `db:"session_id"`
+	ExamID           string     `db:"exam_id"`
+	ExamTitle        string     `db:"exam_title"`
+	ScorePct         *float64   `db:"score_pct"`
+	Passed           bool       `db:"passed"`
+	TimeTakenSeconds *int       `db:"time_taken_seconds"`
+	AttemptNumber    int        `db:"attempt_number"`
+	SubmittedAt      *time.Time `db:"submitted_at"`
+	ShowAnswersMode  string     `db:"show_answers_mode"`
+	Status           string     `db:"status"`
+	UserID           string     `db:"user_id"`
+}
+
+// questionBreakdownRow holds one per-question score breakdown row (FR-BB41).
+type questionBreakdownRow struct {
+	QuestionID   string  `db:"question_id"`
+	QuestionType string  `db:"question_type"`
+	Stem         string  `db:"stem"`
+	PointsEarned float64 `db:"points_earned"`
+	MaxPoints    float64 `db:"max_points"`
+	Explanation  *string `db:"explanation"`
+}
+
+// historyRow holds one session in an exam's history list (FR-BB41).
+type historyRow struct {
+	SessionID   string     `db:"session_id"`
+	StartedAt   time.Time  `db:"started_at"`
+	SubmittedAt *time.Time `db:"submitted_at"`
+	ScorePct    *float64   `db:"score_pct"`
+	Passed      bool       `db:"passed"`
+	Status      string     `db:"status"`
 }
 
 type postgresRepository struct {
@@ -467,8 +532,8 @@ RETURNING id, started_at, expires_at`
 			return "", time.Time{}, time.Time{}, fmt.Errorf("sessions: CreateSession: marshal options: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO session_questions (session_id, question_id, sort_order, options_order) VALUES ($1, $2, $3, $4)`,
-			sr.ID, q.QuestionID, q.SortOrder, optJSON,
+			`INSERT INTO session_questions (session_id, question_id, sort_order, options_order, rule_id) VALUES ($1, $2, $3, $4, $5)`,
+			sr.ID, q.QuestionID, q.SortOrder, optJSON, q.RuleID,
 		); err != nil {
 			return "", time.Time{}, time.Time{}, fmt.Errorf("sessions: CreateSession: insert question: %w", err)
 		}
@@ -791,4 +856,248 @@ RETURNING id, status, submitted_at, score_pct, passed`
 		ScorePct:    &scorePct,
 		Passed:      &passed,
 	}, nil
+}
+
+// sessionResultCTE is the common CTE fragment used by GetSessionResult and
+// GetAdminSessionResult to compute attempt_number correctly.
+// Window functions run AFTER WHERE, so we compute attempt_number across all
+// sessions for the user+exam pair inside a CTE, then filter outside.
+const sessionResultCTE = `
+WITH ranked AS (
+    SELECT
+        es.id                     AS session_id,
+        es.exam_id,
+        e.title                   AS exam_title,
+        e.show_answers_mode,
+        es.user_id,
+        es.status,
+        es.score_pct,
+        COALESCE(es.passed, false) AS passed,
+        EXTRACT(EPOCH FROM (es.submitted_at - es.started_at))::int AS time_taken_seconds,
+        es.submitted_at,
+        ROW_NUMBER() OVER (
+            PARTITION BY es.user_id, es.exam_id
+            ORDER BY es.started_at
+        )                         AS attempt_number
+    FROM exam_sessions es
+    JOIN exams e ON e.id = es.exam_id
+)
+`
+
+// GetSessionResult fetches the result for a session, scoped to the owning user.
+func (r *postgresRepository) GetSessionResult(ctx context.Context, sessionID, userID string) (*sessionResultRow, error) {
+	q := sessionResultCTE + `
+SELECT session_id, exam_id, exam_title, show_answers_mode, user_id, status,
+       score_pct, passed, time_taken_seconds, submitted_at, attempt_number::int
+FROM ranked WHERE session_id = $1`
+
+	var row sessionResultRow
+	if err := r.db.GetContext(ctx, &row, q, sessionID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("sessions: GetSessionResult: %w", err)
+	}
+	// Ownership check done in Go to avoid leaking existence via error type.
+	if row.UserID != userID {
+		return nil, ErrSessionForbidden
+	}
+	return &row, nil
+}
+
+// GetAdminSessionResult fetches the result for any session (admin use).
+func (r *postgresRepository) GetAdminSessionResult(ctx context.Context, sessionID string) (*sessionResultRow, error) {
+	q := sessionResultCTE + `
+SELECT session_id, exam_id, exam_title, show_answers_mode, user_id, status,
+       score_pct, passed, time_taken_seconds, submitted_at, attempt_number::int
+FROM ranked WHERE session_id = $1`
+
+	var row sessionResultRow
+	if err := r.db.GetContext(ctx, &row, q, sessionID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("sessions: GetAdminSessionResult: %w", err)
+	}
+	return &row, nil
+}
+
+// GetSectionScores returns the per-section score aggregations for a session.
+// When no section scores exist it returns an empty (non-nil) slice.
+func (r *postgresRepository) GetSectionScores(ctx context.Context, sessionID string) ([]SectionScore, error) {
+	const q = `
+SELECT
+    sqs.rule_id::text                          AS section_id,
+    COALESCE(eqr.label, '')                    AS title,
+    ROUND(
+        100.0 * SUM(sqs.points_earned) / NULLIF(SUM(sqs.max_points), 0),
+        2
+    )                                          AS score_pct
+FROM session_question_scores sqs
+JOIN session_questions sq ON sq.session_id = sqs.session_id AND sq.question_id = sqs.question_id
+LEFT JOIN exam_question_rules eqr ON eqr.id = sq.rule_id
+WHERE sqs.session_id = $1
+  AND sq.rule_id IS NOT NULL
+GROUP BY sqs.rule_id, eqr.label
+ORDER BY MIN(sq.sort_order)`
+
+	type row struct {
+		SectionID string  `db:"section_id"`
+		Title     string  `db:"title"`
+		ScorePct  float64 `db:"score_pct"`
+	}
+
+	rows, err := r.db.QueryxContext(ctx, q, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetSectionScores: %w", err)
+	}
+	defer rows.Close()
+
+	result := []SectionScore{} // non-nil so JSON serialises as [] not null
+	for rows.Next() {
+		var r row
+		if err := rows.StructScan(&r); err != nil {
+			return nil, fmt.Errorf("sessions: GetSectionScores: scan: %w", err)
+		}
+		result = append(result, SectionScore{
+			SectionID: r.SectionID,
+			Title:     r.Title,
+			ScorePct:  r.ScorePct,
+		})
+	}
+	return result, rows.Err()
+}
+
+// GetQuestionBreakdown returns per-question score rows ordered by sort_order.
+func (r *postgresRepository) GetQuestionBreakdown(ctx context.Context, sessionID, locale string) ([]questionBreakdownRow, error) {
+	const q = `
+SELECT
+    sqs.question_id,
+    q.type                              AS question_type,
+    COALESCE(qt.stem, '')               AS stem,
+    sqs.points_earned,
+    sqs.max_points,
+    qt.explanation
+FROM session_question_scores sqs
+JOIN session_questions sq   ON sq.session_id = sqs.session_id AND sq.question_id = sqs.question_id
+JOIN questions q            ON q.id = sqs.question_id
+LEFT JOIN question_translations qt
+    ON qt.question_id = sqs.question_id
+   AND qt.locale = CASE WHEN $2 = '' THEN q.default_locale ELSE $2 END
+WHERE sqs.session_id = $1
+ORDER BY sq.sort_order`
+
+	rows, err := r.db.QueryxContext(ctx, q, sessionID, locale)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetQuestionBreakdown: %w", err)
+	}
+	defer rows.Close()
+
+	var result []questionBreakdownRow
+	for rows.Next() {
+		var r questionBreakdownRow
+		if err := rows.StructScan(&r); err != nil {
+			return nil, fmt.Errorf("sessions: GetQuestionBreakdown: scan: %w", err)
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// GetCorrectAnswerTexts returns correct option texts for a set of question IDs.
+// The locale falls back to the question's default_locale when empty or not found.
+func (r *postgresRepository) GetCorrectAnswerTexts(ctx context.Context, questionIDs []string, locale string) (map[string][]string, error) {
+	if len(questionIDs) == 0 {
+		return map[string][]string{}, nil
+	}
+
+	placeholders := make([]string, len(questionIDs))
+	args := make([]interface{}, len(questionIDs)+1)
+	args[0] = locale
+	for i, id := range questionIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+2)
+		args[i+1] = id
+	}
+
+	q := fmt.Sprintf(`
+SELECT ao.question_id::text, COALESCE(at.text, '') AS text
+FROM answer_options ao
+JOIN questions q ON q.id = ao.question_id
+LEFT JOIN answer_translations at
+    ON at.option_id = ao.id
+   AND at.locale = CASE WHEN $1 = '' THEN q.default_locale ELSE $1 END
+WHERE ao.is_correct = true
+  AND ao.question_id IN (%s)
+ORDER BY ao.sort_order`, strings.Join(placeholders, ","))
+
+	type row struct {
+		QuestionID string `db:"question_id"`
+		Text       string `db:"text"`
+	}
+
+	rows, err := r.db.QueryxContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetCorrectAnswerTexts: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string][]string)
+	for rows.Next() {
+		var r row
+		if err := rows.StructScan(&r); err != nil {
+			return nil, fmt.Errorf("sessions: GetCorrectAnswerTexts: scan: %w", err)
+		}
+		result[r.QuestionID] = append(result[r.QuestionID], r.Text)
+	}
+	return result, rows.Err()
+}
+
+// GetExamHistory returns paginated sessions for a user+exam pair.
+// Only submitted/auto_submitted sessions are included (AC-6: excludes in_progress).
+func (r *postgresRepository) GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error) {
+	const countQ = `
+SELECT COUNT(*) FROM exam_sessions
+WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted')`
+	var total int
+	if err := r.db.GetContext(ctx, &total, countQ, examID, userID); err != nil {
+		return nil, 0, fmt.Errorf("sessions: GetExamHistory: count: %w", err)
+	}
+
+	const rowsQ = `
+SELECT id AS session_id, started_at, submitted_at, score_pct,
+       COALESCE(passed, false) AS passed, status
+FROM exam_sessions
+WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted')
+ORDER BY started_at DESC
+LIMIT $3 OFFSET $4`
+
+	offset := (page - 1) * perPage
+	rows, err := r.db.QueryxContext(ctx, rowsQ, examID, userID, perPage, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("sessions: GetExamHistory: query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []historyRow
+	for rows.Next() {
+		var row historyRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, 0, fmt.Errorf("sessions: GetExamHistory: scan: %w", err)
+		}
+		result = append(result, row)
+	}
+	return result, total, rows.Err()
+}
+
+// GetExamTitleByID returns the title of an exam or ErrExamNotFound.
+func (r *postgresRepository) GetExamTitleByID(ctx context.Context, examID string) (string, error) {
+	const q = `SELECT title FROM exams WHERE id = $1`
+	var title string
+	if err := r.db.GetContext(ctx, &title, q, examID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrExamNotFound
+		}
+		return "", fmt.Errorf("sessions: GetExamTitleByID: %w", err)
+	}
+	return title, nil
 }

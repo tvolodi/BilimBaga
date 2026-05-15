@@ -1,0 +1,37 @@
+{
+  "run_id": "FR-BB41",
+  "phase": "A",
+  "step": 3,
+  "status": "complete",
+  "requirement_doc": "docs/requirements/FR-BB41.Result-retrieval-API.md",
+  "files_changed": [
+    "backend/migrations/017_session_questions_rule_id.up.sql",
+    "backend/migrations/017_session_questions_rule_id.down.sql",
+    "backend/internal/sessions/model.go",
+    "backend/internal/sessions/repository.go",
+    "backend/internal/sessions/service.go",
+    "backend/internal/sessions/handler.go",
+    "backend/internal/router/router.go",
+    "backend/internal/sessions/service_test.go",
+    "backend/internal/sessions/handler_test.go"
+  ],
+  "new_endpoints": [
+    "GET /api/v1/portal/sessions/:id/result",
+    "GET /api/v1/admin/sessions/:id/result",
+    "GET /api/v1/portal/exams/:id/history"
+  ],
+  "test_results": {
+    "unit_tests": "30/30 PASS (backend/internal/sessions)",
+    "full_suite": "all packages ok",
+    "build": "go build ./... clean",
+    "vet": "go vet ./... clean",
+    "api_startup": "clean - API listening on :8080"
+  },
+  "notes": [
+    "Migration 017 adds nullable rule_id column to session_questions for per-section scoring",
+    "attempt_number computed via CTE with ROW_NUMBER to avoid window-function / WHERE interaction",
+    "PerQuestionBreakdown is *[]QuestionBreakdownItem with omitempty — absent from JSON when show_answers='never'",
+    "Admin endpoint requires RBAC permission exams:read",
+    "parsePagination defaults: page=1, perPage=20, max perPage=100"
+  ]
+}

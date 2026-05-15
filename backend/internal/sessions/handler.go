@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
@@ -190,4 +191,92 @@ func (h *Handler) GetSessionState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// GetSessionResult handles GET /api/v1/portal/sessions/:id/result (FR-BB41).
+func (h *Handler) GetSessionResult(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "id")
+	userID := auth.UserIDFromCtx(r.Context())
+
+	resp, err := h.svc.GetSessionResult(r.Context(), sessionID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrSessionNotFound):
+			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
+		case errors.Is(err, ErrSessionForbidden):
+			api.WriteError(w, http.StatusForbidden, "SESSION_FORBIDDEN",
+				"You do not have access to this session.")
+		case errors.Is(err, ErrSessionInProgress):
+			api.WriteError(w, http.StatusUnprocessableEntity, "SESSION_IN_PROGRESS",
+				"Session result is not available while the session is in progress.")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to get session result")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// GetAdminSessionResult handles GET /api/v1/admin/sessions/:id/result (FR-BB41).
+func (h *Handler) GetAdminSessionResult(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "id")
+
+	resp, err := h.svc.GetAdminSessionResult(r.Context(), sessionID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrSessionNotFound):
+			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
+		case errors.Is(err, ErrSessionInProgress):
+			api.WriteError(w, http.StatusUnprocessableEntity, "SESSION_IN_PROGRESS",
+				"Session result is not available while the session is in progress.")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to get admin session result")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// GetExamHistory handles GET /api/v1/portal/exams/:id/history (FR-BB41).
+func (h *Handler) GetExamHistory(w http.ResponseWriter, r *http.Request) {
+	examID := chi.URLParam(r, "id")
+	userID := auth.UserIDFromCtx(r.Context())
+	page, perPage := parsePagination(r)
+
+	resp, err := h.svc.GetExamHistory(r.Context(), examID, userID, page, perPage)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrExamNotFound):
+			api.WriteError(w, http.StatusNotFound, "EXAM_NOT_FOUND", "Exam not found.")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to get exam history")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// parsePagination parses ?page= and ?per_page= query params with safe defaults.
+// page defaults to 1, per_page defaults to 20 and is capped at 100.
+func parsePagination(r *http.Request) (page, perPage int) {
+	page = 1
+	perPage = 20
+
+	if v := r.URL.Query().Get("page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			page = n
+		}
+	}
+	if v := r.URL.Query().Get("per_page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			perPage = n
+		}
+	}
+	if perPage > 100 {
+		perPage = 100
+	}
+	return page, perPage
 }

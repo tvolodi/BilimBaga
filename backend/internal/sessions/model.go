@@ -28,6 +28,10 @@ var (
 
 	// FR-BB39 errors.
 	ErrSessionAlreadySubmitted = errors.New("session already submitted")
+
+	// FR-BB41 errors.
+	ErrSessionInProgress = errors.New("session result not available while in progress")
+	ErrExamNotFound      = errors.New("exam not found")
 )
 
 // Session is the persisted exam session row.
@@ -201,4 +205,65 @@ type SubmitSessionResponse struct {
 	SubmittedAt time.Time `json:"submitted_at"`
 	ScorePct    *float64  `json:"score_pct"`
 	Passed      *bool     `json:"passed"`
+}
+
+// SectionScore is one entry in the per-section scores list (FR-BB41).
+type SectionScore struct {
+	SectionID string  `json:"section_id"`
+	Title     string  `json:"title"`
+	ScorePct  float64 `json:"score_pct"`
+}
+
+// QuestionBreakdownItem is one item in the per-question breakdown (FR-BB41).
+type QuestionBreakdownItem struct {
+	QuestionID     string   `json:"question_id"`
+	Stem           string   `json:"stem"`
+	EmployeeAnswer []string `json:"employee_answer"`
+	CorrectAnswer  []string `json:"correct_answer"`
+	PointsEarned   float64  `json:"points_earned"`
+	MaxPoints      float64  `json:"max_points"`
+	Explanation    *string  `json:"explanation"`
+}
+
+// SessionResultResponse is the response for GET /portal/sessions/:id/result
+// and GET /admin/sessions/:id/result (FR-BB41).
+// PerQuestionBreakdown uses a pointer so omitempty removes the field entirely
+// (not null) when show_answers = 'never' (AC-3).
+type SessionResultResponse struct {
+	SessionID            string                   `json:"session_id"`
+	ExamID               string                   `json:"exam_id"`
+	ExamTitle            string                   `json:"exam_title"`
+	ScorePct             *float64                 `json:"score_pct"`
+	Passed               bool                     `json:"passed"`
+	TimeTakenSeconds     *int                     `json:"time_taken_seconds"`
+	AttemptNumber        int                      `json:"attempt_number"`
+	SubmittedAt          *time.Time               `json:"submitted_at"`
+	ShowAnswersMode      string                   `json:"show_answers_mode"`
+	PerSectionScores     []SectionScore           `json:"per_section_scores"`
+	PerQuestionBreakdown *[]QuestionBreakdownItem `json:"per_question_breakdown,omitempty"`
+}
+
+// HistorySession is one session in the exam history list (FR-BB41).
+type HistorySession struct {
+	SessionID   string     `json:"session_id"`
+	StartedAt   time.Time  `json:"started_at"`
+	SubmittedAt *time.Time `json:"submitted_at"`
+	ScorePct    *float64   `json:"score_pct"`
+	Passed      bool       `json:"passed"`
+	Status      string     `json:"status"`
+}
+
+// ExamHistoryMeta holds pagination metadata for the exam history response (FR-BB41).
+type ExamHistoryMeta struct {
+	Page    int `json:"page"`
+	PerPage int `json:"per_page"`
+	Total   int `json:"total"`
+}
+
+// ExamHistoryResponse is the response for GET /portal/exams/:id/history (FR-BB41).
+type ExamHistoryResponse struct {
+	ExamID    string           `json:"exam_id"`
+	ExamTitle string           `json:"exam_title"`
+	Sessions  []HistorySession `json:"sessions"`
+	Meta      ExamHistoryMeta  `json:"meta"`
 }

@@ -19,11 +19,14 @@ import (
 // ── Mock service ─────────────────────────────────────────────────────────────
 
 type mockSvc struct {
-	createSessionFn   func(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error)
-	saveAnswerFn      func(ctx context.Context, sessionID, questionID, userID string, input SaveAnswerInput) (*SaveAnswerResponse, error)
-	getSessionStateFn func(ctx context.Context, sessionID, userID string) (*ResumeSessionResponse, error)
-	reportEventFn     func(ctx context.Context, sessionID, userID string, input ReportEventInput) (*ReportEventResponse, error)
-	submitSessionFn   func(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error)
+	createSessionFn      func(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error)
+	saveAnswerFn         func(ctx context.Context, sessionID, questionID, userID string, input SaveAnswerInput) (*SaveAnswerResponse, error)
+	getSessionStateFn    func(ctx context.Context, sessionID, userID string) (*ResumeSessionResponse, error)
+	reportEventFn        func(ctx context.Context, sessionID, userID string, input ReportEventInput) (*ReportEventResponse, error)
+	submitSessionFn      func(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error)
+	getSessionResultFn   func(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error)
+	getAdminResultFn     func(ctx context.Context, sessionID string) (*SessionResultResponse, error)
+	getExamHistoryFn     func(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
 }
 
 func (m *mockSvc) CreateSession(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error) {
@@ -53,6 +56,24 @@ func (m *mockSvc) ReportEvent(ctx context.Context, sessionID, userID string, inp
 func (m *mockSvc) SubmitSession(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error) {
 	if m.submitSessionFn != nil {
 		return m.submitSessionFn(ctx, sessionID, userID, tenantID, actorIP)
+	}
+	return nil, errors.New("not configured")
+}
+func (m *mockSvc) GetSessionResult(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error) {
+	if m.getSessionResultFn != nil {
+		return m.getSessionResultFn(ctx, sessionID, userID)
+	}
+	return nil, errors.New("not configured")
+}
+func (m *mockSvc) GetAdminSessionResult(ctx context.Context, sessionID string) (*SessionResultResponse, error) {
+	if m.getAdminResultFn != nil {
+		return m.getAdminResultFn(ctx, sessionID)
+	}
+	return nil, errors.New("not configured")
+}
+func (m *mockSvc) GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error) {
+	if m.getExamHistoryFn != nil {
+		return m.getExamHistoryFn(ctx, examID, userID, page, perPage)
 	}
 	return nil, errors.New("not configured")
 }

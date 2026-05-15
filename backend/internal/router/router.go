@@ -198,6 +198,11 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Session submission (FR-BB39) — any authenticated user.
 			r.Post("/portal/sessions/{id}/submit", sessionsHandler.SubmitSession)
+
+			// Result retrieval (FR-BB41) — any authenticated user.
+			r.Get("/portal/sessions/{id}/result", sessionsHandler.GetSessionResult)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).Get("/admin/sessions/{id}/result", sessionsHandler.GetAdminSessionResult)
+			r.Get("/portal/exams/{id}/history", sessionsHandler.GetExamHistory)
 		})
 	})
 

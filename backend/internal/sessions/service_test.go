@@ -33,6 +33,13 @@ type mockRepo struct {
 	countTabSwitchEventsFn    func(ctx context.Context, sessionID string) (int, error)
 	autoSubmitSessionFn       func(ctx context.Context, sessionID string) (*autoSubmitResult, error)
 	submitSessionFn           func(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error)
+	getSessionResultFn        func(ctx context.Context, sessionID, userID string) (*sessionResultRow, error)
+	getAdminSessionResultFn   func(ctx context.Context, sessionID string) (*sessionResultRow, error)
+	getSectionScoresFn        func(ctx context.Context, sessionID string) ([]SectionScore, error)
+	getQuestionBreakdownFn    func(ctx context.Context, sessionID, locale string) ([]questionBreakdownRow, error)
+	getCorrectAnswerTextsFn   func(ctx context.Context, questionIDs []string, locale string) (map[string][]string, error)
+	getExamHistoryFn          func(ctx context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error)
+	getExamTitleByIDFn        func(ctx context.Context, examID string) (string, error)
 }
 
 func (m *mockRepo) IsAssigned(ctx context.Context, examID, userID, deptID string) (bool, error) {
@@ -184,6 +191,60 @@ func (m *mockRepo) SubmitSession(ctx context.Context, sessionID, userID, tenantI
 		ScorePct:    &score,
 		Passed:      &passed,
 	}, nil
+}
+func (m *mockRepo) GetSessionResult(ctx context.Context, sessionID, userID string) (*sessionResultRow, error) {
+	if m.getSessionResultFn != nil {
+		return m.getSessionResultFn(ctx, sessionID, userID)
+	}
+	score := 80.0
+	now := time.Now().UTC()
+	return &sessionResultRow{
+		SessionID: sessionID, ExamID: "exam-1", ExamTitle: "Exam", UserID: userID,
+		Status: "submitted", ScorePct: &score, Passed: true,
+		ShowAnswersMode: "never", AttemptNumber: 1, SubmittedAt: &now,
+	}, nil
+}
+func (m *mockRepo) GetAdminSessionResult(ctx context.Context, sessionID string) (*sessionResultRow, error) {
+	if m.getAdminSessionResultFn != nil {
+		return m.getAdminSessionResultFn(ctx, sessionID)
+	}
+	score := 80.0
+	now := time.Now().UTC()
+	return &sessionResultRow{
+		SessionID: sessionID, ExamID: "exam-1", ExamTitle: "Exam", UserID: "user-1",
+		Status: "submitted", ScorePct: &score, Passed: true,
+		ShowAnswersMode: "after_submission", AttemptNumber: 1, SubmittedAt: &now,
+	}, nil
+}
+func (m *mockRepo) GetSectionScores(ctx context.Context, sessionID string) ([]SectionScore, error) {
+	if m.getSectionScoresFn != nil {
+		return m.getSectionScoresFn(ctx, sessionID)
+	}
+	return []SectionScore{}, nil
+}
+func (m *mockRepo) GetQuestionBreakdown(ctx context.Context, sessionID, locale string) ([]questionBreakdownRow, error) {
+	if m.getQuestionBreakdownFn != nil {
+		return m.getQuestionBreakdownFn(ctx, sessionID, locale)
+	}
+	return []questionBreakdownRow{}, nil
+}
+func (m *mockRepo) GetCorrectAnswerTexts(ctx context.Context, questionIDs []string, locale string) (map[string][]string, error) {
+	if m.getCorrectAnswerTextsFn != nil {
+		return m.getCorrectAnswerTextsFn(ctx, questionIDs, locale)
+	}
+	return map[string][]string{}, nil
+}
+func (m *mockRepo) GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error) {
+	if m.getExamHistoryFn != nil {
+		return m.getExamHistoryFn(ctx, examID, userID, page, perPage)
+	}
+	return []historyRow{}, 0, nil
+}
+func (m *mockRepo) GetExamTitleByID(ctx context.Context, examID string) (string, error) {
+	if m.getExamTitleByIDFn != nil {
+		return m.getExamTitleByIDFn(ctx, examID)
+	}
+	return "Exam", nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1182,4 +1243,195 @@ func TestSubmitSession_ResponseShape_GradingPending(t *testing.T) {
 	assert.Equal(t, "grading_pending", resp.Status)
 	assert.Nil(t, resp.ScorePct)
 	assert.Nil(t, resp.Passed)
+}
+
+// ── FR-BB41: GetSessionResult ────────────────────────────────────────────────
+
+// AC-1: ownership — forbidden when session belongs to another user.
+func TestGetSessionResult_Forbidden(t *testing.T) {
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return nil, ErrSessionForbidden
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetSessionResult(context.Background(), "sess-1", "other-user")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrSessionForbidden)
+}
+
+// AC-2: in_progress sessions are rejected with ErrSessionInProgress.
+func TestGetSessionResult_InProgress(t *testing.T) {
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-1", UserID: "user-1", Status: "in_progress",
+				ShowAnswersMode: "never",
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrSessionInProgress)
+}
+
+// AC-3: show_answers='never' — PerQuestionBreakdown must be absent (nil pointer).
+func TestGetSessionResult_ShowAnswersNever_NoBreakdown(t *testing.T) {
+	score := 75.0
+	now := time.Now().UTC()
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-1", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
+				Status: "submitted", ScorePct: &score, Passed: true,
+				ShowAnswersMode: "never", AttemptNumber: 1, SubmittedAt: &now,
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	assert.Nil(t, resp.PerQuestionBreakdown, "breakdown must be absent for show_answers=never")
+	assert.Equal(t, "never", resp.ShowAnswersMode)
+}
+
+// AC-4: show_answers='after_submission' — PerQuestionBreakdown must be present.
+func TestGetSessionResult_ShowAnswersAfterSubmission_HasBreakdown(t *testing.T) {
+	score := 90.0
+	now := time.Now().UTC()
+	explanation := "Because B"
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-1", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
+				Status: "submitted", ScorePct: &score, Passed: true,
+				ShowAnswersMode: "after_submission", AttemptNumber: 1, SubmittedAt: &now,
+			}, nil
+		},
+		getQuestionBreakdownFn: func(_ context.Context, _, _ string) ([]questionBreakdownRow, error) {
+			return []questionBreakdownRow{
+				{QuestionID: "q-1", Stem: "What?", PointsEarned: 5, MaxPoints: 5, Explanation: &explanation},
+			}, nil
+		},
+		getCorrectAnswerTextsFn: func(_ context.Context, _ []string, _ string) (map[string][]string, error) {
+			return map[string][]string{"q-1": {"Answer B"}}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetSessionResult(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	require.NotNil(t, resp.PerQuestionBreakdown)
+	assert.Len(t, *resp.PerQuestionBreakdown, 1)
+	assert.Equal(t, "q-1", (*resp.PerQuestionBreakdown)[0].QuestionID)
+	assert.Equal(t, []string{"Answer B"}, (*resp.PerQuestionBreakdown)[0].CorrectAnswer)
+	assert.Equal(t, &explanation, (*resp.PerQuestionBreakdown)[0].Explanation)
+}
+
+// AC-9: not found.
+func TestGetSessionResult_NotFound(t *testing.T) {
+	repo := &mockRepo{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+			return nil, ErrSessionNotFound
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetSessionResult(context.Background(), "missing", "user-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrSessionNotFound)
+}
+
+// ── FR-BB41: GetAdminSessionResult ───────────────────────────────────────────
+
+// AC-5: admin always receives breakdown regardless of show_answers_mode.
+func TestGetAdminSessionResult_AlwaysBreakdown(t *testing.T) {
+	score := 60.0
+	now := time.Now().UTC()
+	repo := &mockRepo{
+		getAdminSessionResultFn: func(_ context.Context, _ string) (*sessionResultRow, error) {
+			return &sessionResultRow{
+				SessionID: "sess-2", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
+				Status: "submitted", ScorePct: &score, Passed: false,
+				ShowAnswersMode: "never", AttemptNumber: 1, SubmittedAt: &now,
+			}, nil
+		},
+		getQuestionBreakdownFn: func(_ context.Context, _, _ string) ([]questionBreakdownRow, error) {
+			return []questionBreakdownRow{
+				{QuestionID: "q-1", Stem: "X?", PointsEarned: 0, MaxPoints: 5},
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetAdminSessionResult(context.Background(), "sess-2")
+	require.NoError(t, err)
+	require.NotNil(t, resp.PerQuestionBreakdown, "admin always gets breakdown")
+	assert.Len(t, *resp.PerQuestionBreakdown, 1)
+}
+
+// AC-9: not found for admin.
+func TestGetAdminSessionResult_NotFound(t *testing.T) {
+	repo := &mockRepo{
+		getAdminSessionResultFn: func(_ context.Context, _ string) (*sessionResultRow, error) {
+			return nil, ErrSessionNotFound
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetAdminSessionResult(context.Background(), "missing")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrSessionNotFound)
+}
+
+// ── FR-BB41: GetExamHistory ───────────────────────────────────────────────────
+
+// AC-6: in_progress sessions are excluded — repo only returns completed rows.
+func TestGetExamHistory_ExcludesInProgress(t *testing.T) {
+	now := time.Now().UTC()
+	score := 70.0
+	repo := &mockRepo{
+		getExamHistoryFn: func(_ context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error) {
+			// Repo contract: only submitted/auto_submitted rows returned.
+			rows := []historyRow{
+				{SessionID: "s1", StartedAt: now, SubmittedAt: &now, ScorePct: &score, Passed: true, Status: "submitted"},
+			}
+			return rows, 1, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetExamHistory(context.Background(), "exam-1", "user-1", 1, 20)
+	require.NoError(t, err)
+	require.Len(t, resp.Sessions, 1)
+	assert.Equal(t, "submitted", resp.Sessions[0].Status)
+}
+
+// AC-9: exam not found.
+func TestGetExamHistory_ExamNotFound(t *testing.T) {
+	repo := &mockRepo{
+		getExamTitleByIDFn: func(_ context.Context, _ string) (string, error) {
+			return "", ErrExamNotFound
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetExamHistory(context.Background(), "missing-exam", "user-1", 1, 20)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrExamNotFound)
+}
+
+// AC-10: pagination meta is reflected in response.
+func TestGetExamHistory_PaginationMeta(t *testing.T) {
+	now := time.Now().UTC()
+	score := 85.0
+	repo := &mockRepo{
+		getExamHistoryFn: func(_ context.Context, _, _ string, page, perPage int) ([]historyRow, int, error) {
+			return []historyRow{
+				{SessionID: "s1", StartedAt: now, SubmittedAt: &now, ScorePct: &score, Passed: true, Status: "submitted"},
+			}, 5, nil // total = 5 records across all pages
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetExamHistory(context.Background(), "exam-1", "user-1", 2, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 2, resp.Meta.Page)
+	assert.Equal(t, 1, resp.Meta.PerPage)
+	assert.Equal(t, 5, resp.Meta.Total)
+	assert.Equal(t, "exam-1", resp.ExamID)
 }

@@ -28,6 +28,19 @@ type Service interface {
 	// SubmitSession explicitly submits an in_progress session (FR-BB39).
 	// tenantID and actorIP are forwarded for the in-transaction audit log entries.
 	SubmitSession(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error)
+
+	// GetSessionResult returns the result for a completed session, scoped to the owning user (FR-BB41).
+	// Returns ErrSessionInProgress if the session is still in_progress.
+	// Returns ErrSessionForbidden if userID does not own the session.
+	GetSessionResult(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error)
+
+	// GetAdminSessionResult returns the result for any session without user scoping (FR-BB41 AC-5).
+	// Returns ErrSessionInProgress if the session is still in_progress.
+	GetAdminSessionResult(ctx context.Context, sessionID string) (*SessionResultResponse, error)
+
+	// GetExamHistory returns paginated session history for a user+exam pair (FR-BB41 AC-6/AC-10).
+	// Returns ErrExamNotFound if the exam does not exist.
+	GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
 }
 
 type service struct {
@@ -98,6 +111,11 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 	}
 
 	var resolvedIDs []string // question IDs in rule order before shuffle
+	type resolvedWithRuleID struct {
+		id     string
+		ruleID string
+	}
+	var resolvedWithRules []resolvedWithRuleID
 	for _, rule := range rules {
 		var pool []poolQuestion
 		if rule.Mode == "manual" {
@@ -117,17 +135,19 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 		}
 		for _, q := range pool {
 			resolvedIDs = append(resolvedIDs, q.ID)
+			resolvedWithRules = append(resolvedWithRules, resolvedWithRuleID{id: q.ID, ruleID: rule.ID})
 		}
 	}
 
 	// Collect type info alongside IDs so we can build poolQuestion slices for shuffle.
 	type qWithType struct {
-		id  string
-		typ string
+		id     string
+		typ    string
+		ruleID string // rule that produced this question (empty for questions outside any rule)
 	}
 	allQs := make([]qWithType, len(resolvedIDs))
-	for i, id := range resolvedIDs {
-		allQs[i] = qWithType{id: id}
+	for i, rwi := range resolvedWithRules {
+		allQs[i] = qWithType{id: rwi.id, ruleID: rwi.ruleID}
 	}
 
 	// AC-7: apply shuffle_questions.
@@ -150,6 +170,7 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 		questionID   string
 		sortOrder    int
 		optionsOrder []string // final display order
+		ruleID       string
 	}
 
 	resolved := make([]resolvedWithOptions, len(allQs))
@@ -176,6 +197,7 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 			questionID:   q.id,
 			sortOrder:    i,
 			optionsOrder: optIDs,
+			ruleID:       q.ruleID,
 		}
 		allOptionIDs = append(allOptionIDs, optIDs...)
 	}
@@ -189,10 +211,15 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 	expiresAt := current.Add(time.Duration(cfg.TimeLimitMinutes) * time.Minute)
 	rqs := make([]resolvedQuestion, len(resolved))
 	for i, r := range resolved {
+		var ruleID *string
+		if r.ruleID != "" {
+			ruleID = &r.ruleID
+		}
 		rqs[i] = resolvedQuestion{
 			QuestionID:   r.questionID,
 			SortOrder:    r.sortOrder,
 			OptionsOrder: r.optionsOrder,
+			RuleID:       ruleID,
 		}
 	}
 
@@ -537,4 +564,171 @@ func parseTagIDs(raw []byte) ([]string, error) {
 	}
 	var ids []string
 	return ids, json.Unmarshal(raw, &ids)
+}
+
+// buildSessionResult converts a sessionResultRow into a SessionResultResponse,
+// fetching per-section and per-question data as determined by show_answers_mode.
+func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow, alwaysBreakdown bool) (*SessionResultResponse, error) {
+	sections, err := s.repo.GetSectionScores(ctx, row.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: buildSessionResult: section scores: %w", err)
+	}
+
+	resp := &SessionResultResponse{
+		SessionID:        row.SessionID,
+		ExamID:           row.ExamID,
+		ExamTitle:        row.ExamTitle,
+		ScorePct:         row.ScorePct,
+		Passed:           row.Passed,
+		TimeTakenSeconds: row.TimeTakenSeconds,
+		AttemptNumber:    row.AttemptNumber,
+		SubmittedAt:      row.SubmittedAt,
+		ShowAnswersMode:  row.ShowAnswersMode,
+		PerSectionScores: sections,
+	}
+
+	// AC-3: include breakdown when show_answers_mode != 'never', or always for admin (AC-5).
+	includeBreakdown := alwaysBreakdown || row.ShowAnswersMode != "never"
+	if includeBreakdown {
+		bRows, err := s.repo.GetQuestionBreakdown(ctx, row.SessionID, "")
+		if err != nil {
+			return nil, fmt.Errorf("sessions: buildSessionResult: breakdown: %w", err)
+		}
+
+		// Gather question IDs for correct-answer lookup.
+		qIDs := make([]string, len(bRows))
+		for i, b := range bRows {
+			qIDs[i] = b.QuestionID
+		}
+
+		// Fetch employee answers.
+		answerRows, err := s.repo.GetSessionAnswers(ctx, row.SessionID)
+		if err != nil {
+			return nil, fmt.Errorf("sessions: buildSessionResult: answers: %w", err)
+		}
+
+		// Collect all selected option IDs for text resolution.
+		var allOptIDs []string
+		for _, ar := range answerRows {
+			var ids []string
+			if len(ar.SelectedOptionIDs) > 0 {
+				if err := json.Unmarshal(ar.SelectedOptionIDs, &ids); err == nil {
+					allOptIDs = append(allOptIDs, ids...)
+				}
+			}
+		}
+
+		optTexts, err := s.repo.GetOptionTexts(ctx, allOptIDs)
+		if err != nil {
+			return nil, fmt.Errorf("sessions: buildSessionResult: option texts: %w", err)
+		}
+
+		correctMap, err := s.repo.GetCorrectAnswerTexts(ctx, qIDs, "")
+		if err != nil {
+			return nil, fmt.Errorf("sessions: buildSessionResult: correct answers: %w", err)
+		}
+
+		breakdown := make([]QuestionBreakdownItem, len(bRows))
+		for i, b := range bRows {
+			// Build employee answer texts.
+			var empAnswer []string
+			if ar, ok := answerRows[b.QuestionID]; ok {
+				if b.QuestionType == "short_text" {
+					if ar.TextAnswer != nil {
+						empAnswer = []string{*ar.TextAnswer}
+					}
+				} else {
+					var ids []string
+					if len(ar.SelectedOptionIDs) > 0 {
+						_ = json.Unmarshal(ar.SelectedOptionIDs, &ids)
+					}
+					empAnswer = make([]string, len(ids))
+					for j, id := range ids {
+						empAnswer[j] = optTexts[id]
+					}
+				}
+			}
+			if empAnswer == nil {
+				empAnswer = []string{}
+			}
+
+			correct := correctMap[b.QuestionID]
+			if correct == nil {
+				correct = []string{}
+			}
+
+			breakdown[i] = QuestionBreakdownItem{
+				QuestionID:     b.QuestionID,
+				Stem:           b.Stem,
+				EmployeeAnswer: empAnswer,
+				CorrectAnswer:  correct,
+				PointsEarned:   b.PointsEarned,
+				MaxPoints:      b.MaxPoints,
+				Explanation:    b.Explanation,
+			}
+		}
+		resp.PerQuestionBreakdown = &breakdown
+	}
+
+	return resp, nil
+}
+
+func (s *service) GetSessionResult(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error) {
+	row, err := s.repo.GetSessionResult(ctx, sessionID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetSessionResult: %w", err)
+	}
+	// AC-2: reject in_progress sessions.
+	if row.Status == "in_progress" {
+		return nil, ErrSessionInProgress
+	}
+	return s.buildSessionResult(ctx, row, false)
+}
+
+func (s *service) GetAdminSessionResult(ctx context.Context, sessionID string) (*SessionResultResponse, error) {
+	row, err := s.repo.GetAdminSessionResult(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetAdminSessionResult: %w", err)
+	}
+	// AC-2: reject in_progress sessions.
+	if row.Status == "in_progress" {
+		return nil, ErrSessionInProgress
+	}
+	// AC-5: always show breakdown for admin.
+	return s.buildSessionResult(ctx, row, true)
+}
+
+func (s *service) GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error) {
+	title, err := s.repo.GetExamTitleByID(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetExamHistory: %w", err)
+	}
+
+	rows, total, err := s.repo.GetExamHistory(ctx, examID, userID, page, perPage)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetExamHistory: %w", err)
+	}
+
+	sessions := make([]HistorySession, len(rows))
+	for i, r := range rows {
+		sessions[i] = HistorySession{
+			SessionID:   r.SessionID,
+			StartedAt:   r.StartedAt,
+			SubmittedAt: r.SubmittedAt,
+			ScorePct:    r.ScorePct,
+			Passed:      r.Passed,
+			Status:      r.Status,
+		}
+	}
+
+	return &ExamHistoryResponse{
+		ExamID:    examID,
+		ExamTitle: title,
+		Sessions:  sessions,
+		Meta: ExamHistoryMeta{
+			Page:    page,
+			PerPage: perPage,
+			Total:   total,
+		},
+	}, nil
 }

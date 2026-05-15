@@ -21,6 +21,10 @@ export interface PortalExam {
   shuffle_options: boolean
 }
 
+export interface PortalExamDetail extends PortalExam {
+  certificate_enabled: boolean
+}
+
 export interface SessionQuestion {
   id: string
   [key: string]: unknown
@@ -61,6 +65,15 @@ export function usePortalExams() {
     queryKey: ['portal', 'exams'],
     queryFn: () => apiFetch<PortalExam[]>('/api/v1/portal/exams'),
     refetchInterval: 30_000,
+  })
+}
+
+export function usePortalExam(examId: string | undefined) {
+  return useQuery<PortalExamDetail, Error>({
+    queryKey: ['portal', 'exams', examId],
+    queryFn: () => apiFetch<PortalExamDetail>(`/api/v1/portal/exams/${examId}`),
+    staleTime: Infinity,
+    enabled: !!examId,
   })
 }
 

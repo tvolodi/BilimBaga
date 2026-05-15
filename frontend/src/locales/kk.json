@@ -584,5 +584,26 @@
     "deadline": {
       "expired": "Мерзімі өтті"
     }
+  },
+  "result": {
+    "title": "Емтихан нәтижесі",
+    "passed": "Өтті",
+    "failed": "Өтпеді",
+    "pending_grading": "Сіздің жауаптарыңыз тексерілуде. Нәтижелер қолмен тексеруден кейін қолжетімді болады.",
+    "score_label": "Сіздің балыңыз",
+    "time_taken": "Жұмсалған уақыт",
+    "attempt_number": "Талпыныс",
+    "section_scores": "Бөлімдер бойынша балдар",
+    "question_review": "Сұрақтарды қарау",
+    "question_stem": "Сұрақ",
+    "your_answer": "Сіздің жауабыңыз",
+    "correct_answer": "Дұрыс жауап",
+    "points": "Балдар",
+    "explanation": "Түсіндірме",
+    "show_more": "Толығырақ",
+    "show_less": "Жасыру",
+    "download_certificate": "Сертификатты жүктеу",
+    "retake_exam": "Емтиханды қайталау",
+    "back_to_portal": "Порталға оралу"
   }
 }

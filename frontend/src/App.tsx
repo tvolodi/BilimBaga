@@ -19,6 +19,7 @@ import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
 import { ExamWizardCreatePage, ExamWizardEditPage } from '@/pages/ExamWizard'
 import { ExamTakingPage } from '@/pages/ExamTaking'
+import { ResultPage } from '@/pages/ResultPage'
 
 const queryClient = new QueryClient()
 
@@ -113,6 +114,14 @@ function AppRoutes() {
           }
         />
       </Route>
+      <Route
+        path="/portal/sessions/:sessionId/result"
+        element={
+          <RequireRole roles={['employee']}>
+            <ResultPage />
+          </RequireRole>
+        }
+      />
       <Route
         path="/portal/sessions/:sessionId"
         element={

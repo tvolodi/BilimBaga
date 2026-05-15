@@ -584,5 +584,26 @@
     "deadline": {
       "expired": "Expired"
     }
+  },
+  "result": {
+    "title": "Exam Result",
+    "passed": "Passed",
+    "failed": "Failed",
+    "pending_grading": "Your answers are under review. Results will be available after manual grading.",
+    "score_label": "Your Score",
+    "time_taken": "Time Taken",
+    "attempt_number": "Attempt",
+    "section_scores": "Section Scores",
+    "question_review": "Question Review",
+    "question_stem": "Question",
+    "your_answer": "Your Answer",
+    "correct_answer": "Correct Answer",
+    "points": "Points",
+    "explanation": "Explanation",
+    "show_more": "Show more",
+    "show_less": "Show less",
+    "download_certificate": "Download Certificate",
+    "retake_exam": "Retake Exam",
+    "back_to_portal": "Back to Portal"
   }
 }

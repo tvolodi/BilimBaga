@@ -57,6 +57,36 @@ export interface SubmitResult {
   passed: boolean | null
 }
 
+export interface SectionScore {
+  section_id: string
+  title: string
+  score_pct: number
+}
+
+export interface QuestionBreakdownItem {
+  question_id: string
+  stem: string
+  employee_answer: string[]
+  correct_answer: string[]
+  points_earned: number
+  max_points: number
+  explanation: string | null
+}
+
+export interface SessionResult {
+  session_id: string
+  exam_id: string
+  exam_title: string
+  score_pct: number | null
+  passed: boolean
+  time_taken_seconds: number | null
+  attempt_number: number
+  submitted_at: string
+  show_answers_mode: 'never' | 'after_completion' | 'after_all_attempts'
+  per_section_scores: SectionScore[]
+  per_question_breakdown: QuestionBreakdownItem[] | undefined
+}
+
 export interface EventPayload {
   type: 'tab_switch' | 'blur' | 'fullscreen_exit'
 }
@@ -131,5 +161,13 @@ export function useReportEvent(sessionId: string) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }),
+  })
+}
+
+export function useSessionResult(sessionId: string) {
+  return useQuery<SessionResult, Error>({
+    queryKey: ['session-result', sessionId],
+    queryFn: () => apiFetch<SessionResult>(`/api/v1/portal/sessions/${sessionId}/result`),
+    staleTime: Infinity,
   })
 }

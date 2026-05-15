@@ -582,5 +582,26 @@
     "deadline": {
       "expired": "Истёк срок"
     }
+  },
+  "result": {
+    "title": "Результат экзамена",
+    "passed": "Сдан",
+    "failed": "Не сдан",
+    "pending_grading": "Ваши ответы проверяются. Результаты будут доступны после ручной проверки.",
+    "score_label": "Ваш результат",
+    "time_taken": "Затраченное время",
+    "attempt_number": "Попытка",
+    "section_scores": "Результаты по разделам",
+    "question_review": "Разбор вопросов",
+    "question_stem": "Вопрос",
+    "your_answer": "Ваш ответ",
+    "correct_answer": "Правильный ответ",
+    "points": "Баллы",
+    "explanation": "Пояснение",
+    "show_more": "Показать больше",
+    "show_less": "Скрыть",
+    "download_certificate": "Скачать сертификат",
+    "retake_exam": "Пройти экзамен снова",
+    "back_to_portal": "Вернуться на портал"
   }
 }

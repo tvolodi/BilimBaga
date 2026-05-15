@@ -12,12 +12,13 @@ import (
 // --- Mock Repository ---
 
 type mockRepository struct {
-	questions        map[string]*Question
-	createFn         func(ctx context.Context, q *Question) error
-	createVerFn      func(ctx context.Context, newQ *Question, previousID string) error
-	createOptFn      func(ctx context.Context, opt *AnswerOption) error
-	tagExistsFn      func(ctx context.Context, tagID string) (bool, error)
-	GetTranslationFn func(ctx context.Context, questionID, locale string) (*QuestionTranslation, error)
+	questions              map[string]*Question
+	createFn               func(ctx context.Context, q *Question) error
+	createVerFn            func(ctx context.Context, newQ *Question, previousID string) error
+	createOptFn            func(ctx context.Context, opt *AnswerOption) error
+	tagExistsFn            func(ctx context.Context, tagID string) (bool, error)
+	GetTranslationFn       func(ctx context.Context, questionID, locale string) (*QuestionTranslation, error)
+	findSimilarStemsFn     func(ctx context.Context, stems []string, locale string) (map[string]StemSimilarityResult, error)
 }
 
 func newMockRepo() *mockRepository {
@@ -231,7 +232,10 @@ func (m *mockRepository) ResolveCategoryPath(_ context.Context, path string) (st
 	return "cat-id-" + path, nil
 }
 
-func (m *mockRepository) FindSimilarStems(_ context.Context, _ []string, _ string) (map[string]StemSimilarityResult, error) {
+func (m *mockRepository) FindSimilarStems(ctx context.Context, stems []string, locale string) (map[string]StemSimilarityResult, error) {
+	if m.findSimilarStemsFn != nil {
+		return m.findSimilarStemsFn(ctx, stems, locale)
+	}
 	return map[string]StemSimilarityResult{}, nil
 }
 

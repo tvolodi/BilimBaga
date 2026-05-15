@@ -3,13 +3,19 @@ package questions
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
+	"github.com/bilimbaga/bilimbaga/internal/rbac"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -197,3 +203,221 @@ func TestExportHandler_TooManyIDs_Returns400(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+// ── Tests with exact names required by spec ───────────────────────────────────
+
+// TestImportHandler_DryRun_200 is the spec-required alias for TestImportHandler_DryRun_Returns200.
+func TestImportHandler_DryRun_200(t *testing.T) {
+	svc := &mockQService{
+		validateAndImportFn: func(_ context.Context, _ []ImportRow, dryRun bool, _ string) (*DryRunReport, *CommitResult, error) {
+			return &DryRunReport{DryRun: true, ValidCount: 1, ErrorRows: []ImportRowError{}, WarningRows: []ImportRowWarning{}}, nil, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	body, ct := buildQCSVMultipart(t, validCSV, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import?dry_run=true", body)
+	req.Header.Set("Content-Type", ct)
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// TestImportHandler_Commit_201 is the spec-required alias for TestImportHandler_Commit_Returns201.
+func TestImportHandler_Commit_201(t *testing.T) {
+	svc := &mockQService{
+		validateAndImportFn: func(_ context.Context, _ []ImportRow, _ bool, _ string) (*DryRunReport, *CommitResult, error) {
+			return nil, &CommitResult{ImportedCount: 1, QuestionIDs: []string{"q-1"}}, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	body, ct := buildQCSVMultipart(t, validCSV, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+}
+
+// TestImportHandler_BatchTooLarge_413 is the spec-required alias for TestImportHandler_TooManyRows_Returns413.
+func TestImportHandler_BatchTooLarge_413(t *testing.T) {
+	h := NewHandler(&mockQService{}, nil)
+
+	var sb strings.Builder
+	sb.WriteString("type,difficulty,category_path,default_locale,stem,option_1,option_2,correct,tags\n")
+	for i := 0; i < 501; i++ {
+		sb.WriteString("single,easy,Science,kk,What?,A,B,1,\n")
+	}
+	body, ct := buildQCSVMultipart(t, sb.String(), "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	var env struct {
+		Error *struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&env))
+	require.NotNil(t, env.Error)
+	assert.Equal(t, "ERR_BATCH_TOO_LARGE", env.Error.Code)
+}
+
+// TestImportHandler_ValidationFailure_422 verifies that commit mode with invalid
+// rows returns 422 ERR_IMPORT_VALIDATION with error details.
+func TestImportHandler_ValidationFailure_422(t *testing.T) {
+	svc := &mockQService{
+		validateAndImportFn: func(_ context.Context, _ []ImportRow, _ bool, _ string) (*DryRunReport, *CommitResult, error) {
+			return nil, nil, &importValidationError{
+				validCount:  0,
+				errorRows:   []ImportRowError{{Row: 1, Errors: []string{"type: invalid value 'checkbox'"}}},
+				warningRows: []ImportRowWarning{},
+			}
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	body, ct := buildQCSVMultipart(t, validCSV, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	var env struct {
+		Error *struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&env))
+	require.NotNil(t, env.Error)
+	assert.Equal(t, "ERR_IMPORT_VALIDATION", env.Error.Code)
+}
+
+// ── makeImportJWT is a helper that signs a JWT with the given role ──────────
+
+const importTestSecret = "test-import-jwt-secret"
+
+func makeImportJWT(t *testing.T, role string) string {
+	t.Helper()
+	claims := jwt.MapClaims{
+		"sub":  "user-1",
+		"role": role,
+		"exp":  time.Now().Add(15 * time.Minute).Unix(),
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := tok.SignedString([]byte(importTestSecret))
+	require.NoError(t, err)
+	return signed
+}
+
+// TestImportHandler_Unauthorized_401 verifies that requests without a JWT are
+// rejected with 401. The auth middleware runs before the handler in the real
+// router; we simulate that chain here.
+func TestImportHandler_Unauthorized_401(t *testing.T) {
+	cache := rbac.NewCache()
+	cache.LoadFromMap(map[string]rbac.PermissionSet{
+		"examiner": {"questions:write": true},
+	})
+
+	h := NewHandler(&mockQService{}, nil)
+	// Wrap handler with auth.Authenticate + rbac.RequirePermission to test the middleware stack.
+	chain := auth.Authenticate(importTestSecret)(rbac.RequirePermission(cache, "questions", "write")(http.HandlerFunc(h.Import)))
+
+	body, ct := buildQCSVMultipart(t, validCSV, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	// No Authorization header.
+	w := httptest.NewRecorder()
+	chain.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// TestImportHandler_Forbidden_403 verifies that a role without questions:write
+// permission receives 403.
+func TestImportHandler_Forbidden_403(t *testing.T) {
+	cache := rbac.NewCache()
+	cache.LoadFromMap(map[string]rbac.PermissionSet{
+		"examiner": {"questions:write": true},
+		"employee": {},
+	})
+
+	h := NewHandler(&mockQService{}, nil)
+	chain := auth.Authenticate(importTestSecret)(rbac.RequirePermission(cache, "questions", "write")(http.HandlerFunc(h.Import)))
+
+	body, ct := buildQCSVMultipart(t, validCSV, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	req.Header.Set("Authorization", "Bearer "+makeImportJWT(t, "employee"))
+	w := httptest.NewRecorder()
+	chain.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+// TestExportHandler_CSV_200 is the spec-required alias for TestExportHandler_CSV_Returns200.
+func TestExportHandler_CSV_200(t *testing.T) {
+	svc := &mockQService{
+		streamExportFn: func(_ context.Context, _ ExportFilter, fn func(*ExportRow) error) error {
+			return fn(&ExportRow{
+				Type: "single", Difficulty: "easy", CategoryPath: "Science",
+				DefaultLocale: "kk",
+				Translations:  map[string]TranslationDetail{"kk": {Stem: "Q?"}},
+				AnswerOptions: []AnswerOptionDetail{},
+				Tags:          []string{},
+			})
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/questions/export", nil)
+	req.Header.Set("Accept", "text/csv")
+	w := httptest.NewRecorder()
+	h.Export(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Header().Get("Content-Type"), "text/csv")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment")
+}
+
+// TestExportHandler_JSON_200 is the spec-required alias for TestExportHandler_JSON_Returns200.
+func TestExportHandler_JSON_200(t *testing.T) {
+	svc := &mockQService{
+		streamExportFn: func(_ context.Context, _ ExportFilter, fn func(*ExportRow) error) error {
+			return fn(&ExportRow{
+				Type: "single", Difficulty: "easy", CategoryPath: "Science",
+				DefaultLocale: "kk",
+				Translations:  map[string]TranslationDetail{"kk": {Stem: "Q?"}},
+				AnswerOptions: []AnswerOptionDetail{},
+				Tags:          []string{},
+			})
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/questions/export", nil)
+	req.Header.Set("Accept", "application/json")
+	w := httptest.NewRecorder()
+	h.Export(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment")
+	// Verify valid JSON array.
+	var rows []json.RawMessage
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &rows))
+	assert.Len(t, rows, 1)
+}
+
+// ── Compile-time check: errors package must be used ──────────────────────────
+var _ = errors.New

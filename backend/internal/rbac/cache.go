@@ -66,3 +66,11 @@ func (c *Cache) Has(role, resource, action string) bool {
 	defer c.mu.RUnlock()
 	return c.data[role][resource+":"+action]
 }
+
+// LoadFromMap populates the cache directly from the provided map. It is intended
+// for use in tests and integration setups where a live database is not available.
+func (c *Cache) LoadFromMap(data map[string]PermissionSet) {
+	c.mu.Lock()
+	c.data = data
+	c.mu.Unlock()
+}

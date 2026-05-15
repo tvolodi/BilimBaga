@@ -6,7 +6,7 @@
 | ID | FR-BB25 |
 | Phase | 2 — Content Management |
 | Priority | 2 |
-| Status | Ready |
+| Status | Implemented |
 | Depends On | FR-BB23 |
 
 ## Description

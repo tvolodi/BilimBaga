@@ -32,7 +32,7 @@
 | FR-BB26 | Frontend-question-editor | Frontend: Question Editor | Draft |
 | FR-BB27 | Frontend-question-bank-list | Frontend: Question Bank List | Draft |
 | FR-BB28 | Frontend-categories-management | Frontend: Categories Management | implemented |
-| FR-BB29 | Frontend-tags-management | Frontend: Tags Management | Draft |
+| FR-BB29 | Frontend-tags-management | Frontend: Tags Management | implemented |
 | FR-BB31 | Exam-configuration-model | Exam Configuration Model | Draft |
 | FR-BB32 | Exam-configuration-API | Exam Configuration API | Implemented |
 | FR-BB33 | Exam-assignment | Exam Assignment | Implemented |

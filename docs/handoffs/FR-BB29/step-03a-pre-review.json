@@ -1,0 +1,37 @@
+{
+  "run_id": "FR-BB29",
+  "pipeline": "A",
+  "step": "03a-pre-review",
+  "requirement_doc": "docs/requirements/FR-BB29.Frontend-tags-management.md",
+  "changed_files": [
+    "frontend/src/api/tags.ts",
+    "frontend/src/pages/admin/tags/TagsPage.tsx",
+    "frontend/src/pages/admin/tags/TagCreateModal.tsx",
+    "frontend/src/pages/admin/tags/TagRenameModal.tsx",
+    "frontend/src/pages/admin/tags/TagDeleteConfirm.tsx",
+    "frontend/src/pages/admin/tags/TagsPage.test.tsx",
+    "docs/requirements/FR-BB29.Frontend-tags-management.md",
+    "docs/requirements/README.md"
+  ],
+  "test_results": {
+    "total": 83,
+    "passed": 83,
+    "failed": 0,
+    "files": 17
+  },
+  "code_review_result": "PASS",
+  "ac_coverage": {
+    "AC-1": "covered",
+    "AC-2": "covered",
+    "AC-3": "covered",
+    "AC-4": "covered",
+    "AC-5": "covered",
+    "AC-6": "covered",
+    "AC-7": "covered",
+    "AC-8": "covered",
+    "AC-9": "covered",
+    "AC-10": "covered",
+    "AC-11": "covered"
+  },
+  "notes": "All AC covered. TagRenameModal is a separate file (not merged with TagCreateModal) — both serve create and rename flows separately. All i18n keys present in en/kk/ru. Route registered in App.tsx. Sidebar entry present with Hash icon."
+}

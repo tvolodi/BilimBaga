@@ -6,7 +6,7 @@
 | ID | FR-BB29 |
 | Phase | 2 — Content Management |
 | Priority | 2 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB21, FR-BB111 |
 
 ## Description
@@ -19,17 +19,17 @@ Backend endpoints (FR-BB21, extended) are fully implemented:
 - `DELETE /api/v1/tags/:id` — requires `tags:manage` permission, returns `409` if any question references the tag
 
 ## Acceptance Criteria
-- [ ] AC-1: Route `/admin/tags` (nested under `AdminLayout`) renders a sortable table with columns: Name, Usage count, Created at, Actions. Default sort is by name ascending.
-- [ ] AC-2: The Usage count column is sourced from the `usage_count` field on each row of `GET /api/v1/tags`. The column is sortable; clicking the header toggles asc/desc.
-- [ ] AC-3: A search input filters the visible tags client-side by name (case-insensitive substring); debounced 200 ms.
-- [ ] AC-4: A "New Tag" button opens a small modal with a single `name` field (required, max 64 chars — matches `tags.MaxTagNameLength` in the backend); submit calls `POST /api/v1/tags`. Duplicate names produce an inline error mapped from backend `ERR_TAG_DUPLICATE`.
-- [ ] AC-5: Each row's actions menu offers "Rename" and "Delete". Rename opens a modal pre-filled with the current name; submit calls `PUT /api/v1/tags/:id`. Renaming preserves all question links (a confirm sub-text in the modal explains this). Duplicate names produce an inline error.
-- [ ] AC-6: Delete uses a confirm dialog; on `409 Conflict` with `ERR_TAG_IN_USE`, the toast shows the usage count (already visible in the table row) and the row is not removed.
-- [ ] AC-7: The table is paginated client-side (default 50 rows per page; configurable 25/50/100). Backend pagination is **not** added in v1 because tag vocabularies are expected to stay under a few hundred items; this assumption is documented in Notes.
-- [ ] AC-8: The "Rename" and "Delete" menu items are hidden when the current user lacks `tags:manage` (department admins and employees see the list read-only).
-- [ ] AC-9: All user-visible strings come from `src/locales/{en,kk,ru}.json` under the `tags.*` namespace.
-- [ ] AC-10: A sidebar nav entry "Tags" (icon: `Hash`) is added in `Sidebar.tsx`, visible to all admin roles, linking to `/admin/tags`.
-- [ ] AC-11: The `useTags` query is reused by FR-BB27 (Question Bank filters) and FR-BB26 (Question editor tag picker); create / rename / delete mutations all invalidate the `['tags']` query so both consumers refresh.
+- [x] AC-1: Route `/admin/tags` (nested under `AdminLayout`) renders a sortable table with columns: Name, Usage count, Created at, Actions. Default sort is by name ascending.
+- [x] AC-2: The Usage count column is sourced from the `usage_count` field on each row of `GET /api/v1/tags`. The column is sortable; clicking the header toggles asc/desc.
+- [x] AC-3: A search input filters the visible tags client-side by name (case-insensitive substring); debounced 200 ms.
+- [x] AC-4: A "New Tag" button opens a small modal with a single `name` field (required, max 64 chars — matches `tags.MaxTagNameLength` in the backend); submit calls `POST /api/v1/tags`. Duplicate names produce an inline error mapped from backend `ERR_TAG_DUPLICATE`.
+- [x] AC-5: Each row's actions menu offers "Rename" and "Delete". Rename opens a modal pre-filled with the current name; submit calls `PUT /api/v1/tags/:id`. Renaming preserves all question links (a confirm sub-text in the modal explains this). Duplicate names produce an inline error.
+- [x] AC-6: Delete uses a confirm dialog; on `409 Conflict` with `ERR_TAG_IN_USE`, the toast shows the usage count (already visible in the table row) and the row is not removed.
+- [x] AC-7: The table is paginated client-side (default 50 rows per page; configurable 25/50/100). Backend pagination is **not** added in v1 because tag vocabularies are expected to stay under a few hundred items; this assumption is documented in Notes.
+- [x] AC-8: The "Rename" and "Delete" menu items are hidden when the current user lacks `tags:manage` (department admins and employees see the list read-only).
+- [x] AC-9: All user-visible strings come from `src/locales/{en,kk,ru}.json` under the `tags.*` namespace.
+- [x] AC-10: A sidebar nav entry "Tags" (icon: `Hash`) is added in `Sidebar.tsx`, visible to all admin roles, linking to `/admin/tags`.
+- [x] AC-11: The `useTags` query is reused by FR-BB27 (Question Bank filters) and FR-BB26 (Question editor tag picker); create / rename / delete mutations all invalidate the `['tags']` query so both consumers refresh.
 
 ## Technical Specification
 

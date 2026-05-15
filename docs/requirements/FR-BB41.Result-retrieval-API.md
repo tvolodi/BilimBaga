@@ -31,8 +31,9 @@ Provides REST endpoints for retrieving graded exam results. Employees can fetch 
 - [ ] AC-6: `GET /portal/exams/:id/history` returns sessions in ascending `started_at` order; sessions with status `in_progress` are excluded.
 - [ ] AC-7: `per_section_scores` is present and non-empty only when the exam has sections (`exam_sections` rows exist); otherwise the field is an empty array.
 - [ ] AC-8: `time_taken_seconds` is computed as `EXTRACT(EPOCH FROM (submitted_at - started_at))`; returns null if `submitted_at` is null.
-- [ ] AC-9: All three endpoints return HTTP 404 with `code: NOT_FOUND` if the referenced session or exam does not exist within the caller's tenant.
+- [ ] AC-9: The session endpoints (`GET /portal/sessions/:id/result` and `GET /admin/sessions/:id/result`) return HTTP 404 with `code: SESSION_NOT_FOUND` if the session does not exist. The history endpoint (`GET /portal/exams/:id/history`) returns HTTP 404 with `code: EXAM_NOT_FOUND` if the exam does not exist.
 - [ ] AC-10: The history endpoint supports pagination via `page` (default 1) and `per_page` (default 20, max 100) query parameters and includes `meta.total` in the response envelope alongside `meta.page` and `meta.per_page`.
+- [ ] AC-11: `GET /admin/sessions/:id/result` returns HTTP 422 with `code: SESSION_IN_PROGRESS` when the referenced session has status `in_progress`.
 
 ## Technical Specification
 
@@ -92,7 +93,7 @@ Provides REST endpoints for retrieving graded exam results. Employees can fetch 
     "attempt_number": 1,
     "submitted_at": "2026-05-14T10:30:00Z",
     "show_answers_mode": "never",
-    "per_section_scores": []
+    "per_section_scores": []  // empty because this exam fixture has no sections, not because show_answers='never' hides them; per AC-7, section scores are present or absent solely based on whether exam_sections rows exist
   },
   "error": null
 }
@@ -206,6 +207,8 @@ WHERE sqs.session_id = $1
 ORDER BY sq.sort_order;
 ```
 
+> **Note**: The query above is simplified. It must be extended with joins to `session_answers` (for `employee_answer`) and `question_options` (for `correct_answer`) when `show_answers != 'never'` or on the admin endpoint. See service implementation for the full query.
+
 ### Required Migration
 
 ```sql
@@ -252,5 +255,5 @@ Nullable — rows where `rule_id IS NULL` represent questions added outside of a
 - AC-6: Repository integration test seeding two submitted sessions and one in-progress session; assert history query returns only the two submitted sessions in ascending `started_at` order.
 - AC-7: Repository integration test with two fixture exams — one with `exam_sections` rows and one without; assert `per_section_scores` is non-empty for the first and an empty array for the second.
 - AC-8: Repository/SQL test asserting `time_taken_seconds` equals `EXTRACT(EPOCH FROM (submitted_at - started_at))::INT` for a known session; and returns `null` when `submitted_at IS NULL`.
-- AC-9: Handler unit tests for all three endpoints with a non-existent session UUID and a non-existent exam UUID; assert HTTP 404 with `code: NOT_FOUND` in each case.
+- AC-9: Handler unit tests for all three endpoints with a non-existent session UUID or exam UUID; assert HTTP 404 with `code: SESSION_NOT_FOUND` for the two session endpoints (`GET /portal/sessions/:id/result` and `GET /admin/sessions/:id/result`), and HTTP 404 with `code: EXAM_NOT_FOUND` for the history endpoint (`GET /portal/exams/:id/history`).
 - AC-10: Handler integration test issuing requests with `?page=2&per_page=5`; assert correct page of results is returned and response `data.meta` contains `page: 2`, `per_page: 5`, and accurate `total`; also assert `per_page=200` is clamped to 100.

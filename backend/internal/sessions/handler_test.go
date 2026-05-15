@@ -865,3 +865,193 @@ func TestSubmitSession_Handler_500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+// ── FR-BB41: GetSessionResult handler ────────────────────────────────────────
+
+func resultRequest(sessionID string) *http.Request {
+	r := httptest.NewRequest(http.MethodGet, "/portal/sessions/"+sessionID+"/result", nil)
+	r = withChiParam(r, "id", sessionID)
+	r = withUserCtx(r, "user-1", "dept-1")
+	return r
+}
+
+// AC-1: session belongs to another user → 403 SESSION_FORBIDDEN.
+func TestGetSessionResult_Handler_403_Forbidden(t *testing.T) {
+	svc := &mockSvc{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*SessionResultResponse, error) {
+			return nil, ErrSessionForbidden
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetSessionResult(w, resultRequest("sess-1"))
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "SESSION_FORBIDDEN", errObj["code"])
+}
+
+// AC-2: session still in progress → 422 SESSION_IN_PROGRESS.
+func TestGetSessionResult_Handler_422_InProgress(t *testing.T) {
+	svc := &mockSvc{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*SessionResultResponse, error) {
+			return nil, ErrSessionInProgress
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetSessionResult(w, resultRequest("sess-1"))
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "SESSION_IN_PROGRESS", errObj["code"])
+}
+
+// AC-3: show_answers='never' — per_question_breakdown absent entirely from JSON (omitempty).
+func TestGetSessionResult_Handler_200_NeverShowAnswers_BreakdownAbsent(t *testing.T) {
+	score := 80.0
+	svc := &mockSvc{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*SessionResultResponse, error) {
+			return &SessionResultResponse{
+				SessionID:            "sess-1",
+				ExamID:               "exam-1",
+				ExamTitle:            "Test Exam",
+				ScorePct:             &score,
+				Passed:               true,
+				ShowAnswersMode:      "never",
+				PerSectionScores:     []SectionScore{},
+				PerQuestionBreakdown: nil, // nil pointer → omitempty removes the key
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetSessionResult(w, resultRequest("sess-1"))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Unmarshal the "data" sub-object and check the key is absent entirely.
+	var outer struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &outer))
+	_, present := outer.Data["per_question_breakdown"]
+	assert.False(t, present, "per_question_breakdown must be absent when show_answers='never'")
+}
+
+// AC-9: session does not exist → 404 SESSION_NOT_FOUND.
+func TestGetSessionResult_Handler_404_NotFound(t *testing.T) {
+	svc := &mockSvc{
+		getSessionResultFn: func(_ context.Context, _, _ string) (*SessionResultResponse, error) {
+			return nil, ErrSessionNotFound
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetSessionResult(w, resultRequest("missing"))
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "SESSION_NOT_FOUND", errObj["code"])
+}
+
+// ── FR-BB41: GetAdminSessionResult handler ───────────────────────────────────
+
+func adminResultRequest(sessionID string) *http.Request {
+	r := httptest.NewRequest(http.MethodGet, "/admin/sessions/"+sessionID+"/result", nil)
+	r = withChiParam(r, "id", sessionID)
+	return r
+}
+
+// AC-5: admin endpoint succeeds and always returns full breakdown.
+func TestGetAdminSessionResult_Handler_200_FullBreakdown(t *testing.T) {
+	score := 75.0
+	breakdown := []QuestionBreakdownItem{
+		{QuestionID: "q-1", Stem: "What?", EmployeeAnswer: []string{"A"}, CorrectAnswer: []string{"A"}, PointsEarned: 1, MaxPoints: 1},
+	}
+	svc := &mockSvc{
+		getAdminResultFn: func(_ context.Context, _ string) (*SessionResultResponse, error) {
+			return &SessionResultResponse{
+				SessionID:            "sess-1",
+				ExamID:               "exam-1",
+				ExamTitle:            "Admin Exam",
+				ScorePct:             &score,
+				ShowAnswersMode:      "never",
+				PerSectionScores:     []SectionScore{},
+				PerQuestionBreakdown: &breakdown,
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetAdminSessionResult(w, adminResultRequest("sess-1"))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	data, _ := body["data"].(map[string]any)
+	_, hasBd := data["per_question_breakdown"]
+	assert.True(t, hasBd, "admin endpoint must always include per_question_breakdown")
+}
+
+// AC-9 (admin): session does not exist → 404 SESSION_NOT_FOUND.
+func TestGetAdminSessionResult_Handler_404_NotFound(t *testing.T) {
+	svc := &mockSvc{
+		getAdminResultFn: func(_ context.Context, _ string) (*SessionResultResponse, error) {
+			return nil, ErrSessionNotFound
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetAdminSessionResult(w, adminResultRequest("missing"))
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "SESSION_NOT_FOUND", errObj["code"])
+}
+
+// AC-11: admin endpoint with in-progress session → 422 SESSION_IN_PROGRESS.
+func TestGetAdminSessionResult_Handler_422_InProgress(t *testing.T) {
+	svc := &mockSvc{
+		getAdminResultFn: func(_ context.Context, _ string) (*SessionResultResponse, error) {
+			return nil, ErrSessionInProgress
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetAdminSessionResult(w, adminResultRequest("sess-1"))
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "SESSION_IN_PROGRESS", errObj["code"])
+}
+
+// ── FR-BB41: GetExamHistory handler ──────────────────────────────────────────
+
+func historyRequest(examID string) *http.Request {
+	r := httptest.NewRequest(http.MethodGet, "/portal/exams/"+examID+"/history", nil)
+	r = withChiParam(r, "id", examID)
+	r = withUserCtx(r, "user-1", "dept-1")
+	return r
+}
+
+// AC-9 (history): exam does not exist → 404 EXAM_NOT_FOUND.
+func TestGetExamHistory_Handler_404_ExamNotFound(t *testing.T) {
+	svc := &mockSvc{
+		getExamHistoryFn: func(_ context.Context, _, _ string, _, _ int) (*ExamHistoryResponse, error) {
+			return nil, ErrExamNotFound
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.GetExamHistory(w, historyRequest("missing"))
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "EXAM_NOT_FOUND", errObj["code"])
+}

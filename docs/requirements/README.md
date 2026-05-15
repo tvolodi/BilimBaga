@@ -24,7 +24,7 @@
 | FR-BB112 | Frontend-branding-settings | Frontend: Branding Settings | Implemented |
 | FR-BB113 | Frontend-department-management | Frontend: Department Management | Draft |
 | FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Draft |
-| FR-BB21 | Categories-and-tags | Categories and Tags | Draft |
+| FR-BB21 | Categories-and-tags | Categories and Tags | Implemented |
 | FR-BB22 | Question-model | Question Model | Implemented |
 | FR-BB23 | Question-CRUD-API | Question CRUD API | Implemented |
 | FR-BB24 | Translation-API | Translation API | Implemented |

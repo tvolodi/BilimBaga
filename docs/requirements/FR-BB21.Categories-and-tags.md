@@ -6,7 +6,7 @@
 | ID | FR-BB21 |
 | Phase | 2 — Content Management |
 | Priority | 1 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB16 |
 
 ## Description
@@ -22,7 +22,7 @@ Provides the taxonomy layer for the question bank: a hierarchical category tree 
 - [ ] AC-7: `POST /api/v1/tags` creates a tag (name trimmed, lowercased, max 64 chars); returns `409 Conflict` (error code `ERR_TAG_DUPLICATE`) if the name already exists.
 - [ ] AC-8: `PUT /api/v1/tags/:id` renames a tag in place so existing `question_tags` rows continue to reference it; accepts `{ "name": "<new-name>" }`, applies the same trim/lowercase/length rules as create; returns `404 Not Found`, `400` on invalid name, and `409 Conflict` (`ERR_TAG_DUPLICATE`) on collision.
 - [ ] AC-9: `DELETE /api/v1/tags/:id` is rejected with `409 Conflict` (error code `ERR_TAG_IN_USE`) when any question references the tag via the `question_tags` join table.
-- [ ] AC-10: All mutating endpoints emit an audit log entry (table `audit_logs`) with `entity_type`, `entity_id`, `action`, `actor_id`, and `diff` (JSON patch of changed fields). Tag mutations emit `tag.create`, `tag.update`, and `tag.delete` action codes.
+- [ ] AC-10: All mutating endpoints emit an audit log entry (table `audit_log`) with `entity_type`, `entity_id`, `action`, `actor_id`, and `diff` (JSON patch of changed fields). Tag mutations emit `tag.create`, `tag.update`, and `tag.delete` action codes.
 - [ ] AC-11: All user-visible API error messages are keyed (not free-form strings) so the frontend can translate them.
 
 ## Technical Specification
@@ -187,3 +187,5 @@ ON CONFLICT (id) DO NOTHING;
 - `usage_count` on `GET /api/v1/tags` is computed via `LEFT JOIN (SELECT tag_id, COUNT(*) FROM question_tags GROUP BY tag_id)`; the handler probes `to_regclass('public.question_tags')` first and falls back to a constant `0` when the join table has not yet been provisioned (during early-phase deployments before FR-BB22 has run).
 - Rename (`PUT /api/v1/tags/:id`) is preferred over delete-and-recreate because it preserves every `question_tags` link; the frontend (FR-BB29) exposes only Rename, never delete-then-recreate.
 - Cyclic parent detection: before inserting/updating `parent_id`, walk ancestors in application code and reject if the new parent is a descendant of the current node.
+- Pagination exemption — `GET /api/v1/categories`: This endpoint returns the full category tree as a nested structure and is intentionally exempt from the `meta: { page, per_page, total }` pagination envelope. The category tree is a bounded, administrator-maintained vocabulary (expected to remain in the tens-to-hundreds of nodes); returning it in full on every call avoids the complexity of paginating a recursive structure and matches the frontend's requirement (FR-BB26) to receive the complete tree in a single request.
+- Pagination exemption — `GET /api/v1/tags`: This endpoint returns the full flat tag list and is intentionally exempt from the `meta: { page, per_page, total }` pagination envelope. Tags form a small, bounded vocabulary that is loaded once per session for autocomplete inputs; delivering the full list unbounded simplifies client-side filtering without meaningful performance impact.

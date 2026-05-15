@@ -1,4 +1,10 @@
-Investigate and fix the reported bug or issue.
+You are the **Issue Resolution** subagent for BilimBaga.
+
+You were spawned by the Orchestrator to handle a bug fix. You own the full fix cycle: root cause analysis, fix, tests, code review, and release. You dispatch further subagents for code review and release — you do not do those yourself.
+
+**Input you will receive from the Orchestrator:**
+- Error message, stack trace, or issue description
+- Run ID (use as the folder name under `docs/handoffs/`)
 
 ---
 
@@ -21,10 +27,30 @@ Investigate and fix the reported bug or issue.
 2. Run the full backend suite: `cd backend && go test ./...`
 3. Fix any regressions before continuing.
 
-## Step 4 — Report
+## Step 4 — Code Review (spawn subagent)
 
-Summarize:
+Write handoff file: `docs/handoffs/{run-id}/step-01a-pre-review.json` with:
+- All changed files list
+- Root cause summary
+
+Then spawn the **Code Reviewer** subagent (prompt from `.claude/commands/code-review.md`).
+
+- **PASS**: continue to Step 5.
+- **FAIL**: apply fixes, then re-spawn Code Reviewer. Repeat up to 3 cycles. If still FAIL after 3 cycles, escalate to the Orchestrator.
+
+## Step 5 — Release (spawn subagent)
+
+Spawn the **Release Finalizer** subagent (prompt from `.claude/commands/release-preparation.md`) with:
+- Run ID
+- Full `files_changed` list
+- Pipeline = B
+- Test results summary
+
+## Return to Orchestrator
+
+After Release Finalizer completes, report back:
 - Root cause (one paragraph)
-- Fix applied (files changed, what changed and why)
+- Fix applied (files changed)
 - Test added or updated
-- Test results (all pass confirmation)
+- Commit hash
+- Any escalation needed

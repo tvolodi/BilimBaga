@@ -370,3 +370,27 @@ func (h *Handler) HandleGradeAnswer(w http.ResponseWriter, r *http.Request) {
 
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
 }
+
+// HandleGetMyResults handles GET /api/v1/portal/results (FR-BB46).
+func (h *Handler) HandleGetMyResults(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+	page, perPage := parsePagination(r)
+
+	sort := r.URL.Query().Get("sort")
+	dir := r.URL.Query().Get("dir")
+	// Allowlist sort and dir values; fall back to safe defaults.
+	if sort != "date" && sort != "score" {
+		sort = "date"
+	}
+	if dir != "asc" && dir != "desc" {
+		dir = "desc"
+	}
+
+	resp, err := h.svc.GetMyResults(r.Context(), userID, page, perPage, sort, dir)
+	if err != nil {
+		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to get results")
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}

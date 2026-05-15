@@ -1,0 +1,24 @@
+﻿{
+  "run_id": "FR-BB45",
+  "pipeline": "A",
+  "commit_hash": "ba73955",
+  "commit_message": "feat(FR-BB45): implement Frontend Result Screen",
+  "files_committed": [
+    "frontend/src/api/sessions.ts",
+    "frontend/src/api/portal.ts",
+    "frontend/src/components/results/ScoreDial.tsx",
+    "frontend/src/components/results/PassFailBanner.tsx",
+    "frontend/src/components/results/TimeTakenBadge.tsx",
+    "frontend/src/components/results/SectionScores.tsx",
+    "frontend/src/components/results/QuestionBreakdownTable.tsx",
+    "frontend/src/components/results/ResultActions.tsx",
+    "frontend/src/pages/ResultPage.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "docs/requirements/FR-BB45.Frontend-result-screen.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB45-INNER-REPORT.md",
+  "status": "success"
+}

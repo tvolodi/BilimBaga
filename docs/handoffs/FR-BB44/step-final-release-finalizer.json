@@ -1,0 +1,15 @@
+﻿{
+  "run_id": "FR-BB44",
+  "pipeline": "A",
+  "commit_hash": "bddf30ee67b524e0d577f8a6f0cbc63a1451ace2",
+  "commit_message": "feat(FR-BB44): implement PDF certificate generator",
+  "files_committed": [
+    "backend/internal/certificates/pdf.go",
+    "backend/internal/certificates/pdf_test.go",
+    "backend/go.mod",
+    "backend/go.sum",
+    "docs/requirements/FR-BB44.PDF-generation.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB44-INNER-REPORT.md",
+  "status": "success"
+}

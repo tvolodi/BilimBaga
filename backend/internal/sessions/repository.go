@@ -113,6 +113,11 @@ type Repository interface {
 	// Returns ErrExamNotFound if the exam does not exist.
 	GetExamTitleByID(ctx context.Context, examID string) (string, error)
 
+	// GetMyResults returns paginated completed sessions across all exams for a user (FR-BB46).
+	// sort must be one of: 'date' (submitted_at) or 'score' (score_pct).
+	// dir must be 'asc' or 'desc'. Both are allowlisted — never interpolated raw.
+	GetMyResults(ctx context.Context, userID string, page, perPage int, sort, dir string) ([]MyResultsItem, int, error)
+
 	// ListGradingQueue returns sessions with status='grading_pending', optionally filtered (FR-BB42 AC-1/AC-2/AC-3).
 	// examID, dateFrom, dateTo are all optional (nil = no filter).
 	// Returns the items, total count, and any error.
@@ -1114,6 +1119,66 @@ func (r *postgresRepository) GetExamTitleByID(ctx context.Context, examID string
 		return "", fmt.Errorf("sessions: GetExamTitleByID: %w", err)
 	}
 	return title, nil
+}
+
+// GetMyResults returns paginated completed sessions across all exams for the given user (FR-BB46).
+// sort and dir are allowlisted inside this method — never interpolated from raw user input.
+func (r *postgresRepository) GetMyResults(ctx context.Context, userID string, page, perPage int, sort, dir string) ([]MyResultsItem, int, error) {
+	// Allowlist sort column.
+	col := "es.submitted_at"
+	if sort == "score" {
+		col = "es.score_pct"
+	}
+	// Allowlist direction.
+	direction := "DESC"
+	if dir == "asc" {
+		direction = "ASC"
+	}
+
+	const countQ = `
+SELECT COUNT(*)
+FROM exam_sessions es
+WHERE es.user_id = $1 AND es.status IN ('submitted', 'auto_submitted')`
+	var total int
+	if err := r.db.GetContext(ctx, &total, countQ, userID); err != nil {
+		return nil, 0, fmt.Errorf("sessions: GetMyResults: count: %w", err)
+	}
+
+	//nolint:gosec // col and direction are allowlisted above; not raw user input.
+	rowsQ := fmt.Sprintf(`
+SELECT es.id AS session_id,
+       es.exam_id,
+       e.title AS exam_title,
+       es.submitted_at,
+       COALESCE(es.score_pct, 0) AS score_pct,
+       COALESCE(es.passed, false) AS passed,
+       EXTRACT(EPOCH FROM (es.submitted_at - es.started_at))::bigint AS time_taken_seconds,
+       (COALESCE(es.passed, false) AND e.certificate_enabled) AS certificate_available
+FROM exam_sessions es
+JOIN exams e ON es.exam_id = e.id
+WHERE es.user_id = $1 AND es.status IN ('submitted', 'auto_submitted')
+ORDER BY %s %s
+LIMIT $2 OFFSET $3`, col, direction)
+
+	offset := (page - 1) * perPage
+	rows, err := r.db.QueryxContext(ctx, rowsQ, userID, perPage, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("sessions: GetMyResults: query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []MyResultsItem
+	for rows.Next() {
+		var item MyResultsItem
+		if err := rows.StructScan(&item); err != nil {
+			return nil, 0, fmt.Errorf("sessions: GetMyResults: scan: %w", err)
+		}
+		result = append(result, item)
+	}
+	if result == nil {
+		result = []MyResultsItem{}
+	}
+	return result, total, rows.Err()
 }
 
 // gradeAnswerResult is the internal result returned by GradeAnswer.

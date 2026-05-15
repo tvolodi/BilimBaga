@@ -1,0 +1,57 @@
+{
+  "run_id": "FR-BB44",
+  "step": "01-requirement-development",
+  "revision": 1,
+  "status": "revised",
+  "document": "docs/requirements/FR-BB44.PDF-generation.md",
+  "changes_made": [
+    {
+      "finding": "Critical-1",
+      "description": "Replaced all *TenantConfig references with TemplateSnapshot (value type) to match the type defined in internal/certificates/model.go."
+    },
+    {
+      "finding": "Critical-2",
+      "description": "Aligned GeneratePDF signature to GeneratePDF(cert *Certificate, snap TemplateSnapshot, verifyBaseURL string) matching the existing call site in handler.go:streamPDF."
+    },
+    {
+      "finding": "High-3",
+      "description": "Added Scope section: Backend (internal/certificates/pdf.go, go.mod), Frontend N/A, Database N/A, i18n N/A."
+    },
+    {
+      "finding": "High-4",
+      "description": "Added Out of Scope section: storing PDF to disk/object storage, multi-font Cyrillic/Kazakh beyond native capability, email delivery."
+    },
+    {
+      "finding": "High-5",
+      "description": "Added Test Strategy section covering: valid PDF magic bytes (AC-10), invalid base64 error (AC-9), empty logo fallback (AC-3)."
+    },
+    {
+      "finding": "High-6",
+      "description": "Removed FR-BB43 from Depends On. Changed to 'none (requires only that Certificate and TemplateSnapshot types exist in the certificates package)' to break the circular dependency."
+    },
+    {
+      "finding": "High-7",
+      "description": "Replaced archived github.com/jung-kurt/gofpdf with github.com/go-pdf/fpdf (community successor, API-compatible). Updated all import references in code snippets."
+    },
+    {
+      "finding": "Medium-8",
+      "description": "Added library selection rationale note: go-pdf/fpdf chosen over unipdf (commercial licence) and wkhtmltopdf (system binary dependency)."
+    },
+    {
+      "finding": "Medium-9",
+      "description": "Updated Description to state this requirement replaces the existing stub in internal/certificates/pdf.go."
+    },
+    {
+      "finding": "Low-10a",
+      "description": "Fixed unit test: replaced bytes.HasPrefix (does not exist) with string(b[:5]) == \"%PDF-\"."
+    },
+    {
+      "finding": "Low-10b",
+      "description": "Fixed unit test: VerificationCode is type string — changed from uuid.MustParse(...) to plain string literal."
+    },
+    {
+      "finding": "additional",
+      "description": "Expanded test skeleton to three separate test functions covering all three test strategy cases. Added signatory fields to implementation notes using snap.SignatoryName and snap.SignatoryTitle."
+    }
+  ]
+}

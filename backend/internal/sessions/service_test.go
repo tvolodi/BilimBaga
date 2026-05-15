@@ -40,6 +40,7 @@ type mockRepo struct {
 	getCorrectAnswerTextsFn   func(ctx context.Context, questionIDs []string, locale string) (map[string][]string, error)
 	getExamHistoryFn          func(ctx context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error)
 	getExamTitleByIDFn        func(ctx context.Context, examID string) (string, error)
+	getMyResultsFn            func(ctx context.Context, userID string, page, perPage int, sort, dir string) ([]MyResultsItem, int, error)
 	listGradingQueueFn        func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error)
 	getGradingDetailFn        func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
 	gradeAnswerFn             func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error)
@@ -248,6 +249,12 @@ func (m *mockRepo) GetExamTitleByID(ctx context.Context, examID string) (string,
 		return m.getExamTitleByIDFn(ctx, examID)
 	}
 	return "Exam", nil
+}
+func (m *mockRepo) GetMyResults(ctx context.Context, userID string, page, perPage int, sort, dir string) ([]MyResultsItem, int, error) {
+	if m.getMyResultsFn != nil {
+		return m.getMyResultsFn(ctx, userID, page, perPage, sort, dir)
+	}
+	return []MyResultsItem{}, 0, nil
 }
 func (m *mockRepo) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error) {
 	if m.listGradingQueueFn != nil {
@@ -1772,5 +1779,78 @@ func TestGradeAnswer_RepoError(t *testing.T) {
 	}
 	svc := NewService(repo)
 	_, err := svc.GradeAnswer(context.Background(), "s1", "q1", "g1", "t1", "ip", GradeAnswerRequest{ScorePct: 50})
+	require.Error(t, err)
+}
+
+// ── FR-BB46: GetMyResults ─────────────────────────────────────────────────────
+
+func TestGetMyResults_ReturnsEmptySlice_WhenNoSessions(t *testing.T) {
+	repo := &mockRepo{
+		getMyResultsFn: func(_ context.Context, _ string, _, _ int, _, _ string) ([]MyResultsItem, int, error) {
+			return []MyResultsItem{}, 0, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetMyResults(context.Background(), "user-1", 1, 20, "date", "desc")
+	require.NoError(t, err)
+	assert.NotNil(t, resp.Sessions)
+	assert.Empty(t, resp.Sessions)
+	assert.Equal(t, 0, resp.Meta.Total)
+}
+
+func TestGetMyResults_ReturnsMappedItems(t *testing.T) {
+	now := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	timeTaken := int64(1200)
+	repo := &mockRepo{
+		getMyResultsFn: func(_ context.Context, _ string, _, _ int, _, _ string) ([]MyResultsItem, int, error) {
+			return []MyResultsItem{
+				{
+					SessionID:            "sess-1",
+					ExamID:               "exam-1",
+					ExamTitle:            "Test Exam",
+					SubmittedAt:          now,
+					ScorePct:             82.5,
+					Passed:               true,
+					TimeTakenSeconds:     &timeTaken,
+					CertificateAvailable: true,
+				},
+			}, 1, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetMyResults(context.Background(), "user-1", 1, 20, "date", "desc")
+	require.NoError(t, err)
+	require.Len(t, resp.Sessions, 1)
+	item := resp.Sessions[0]
+	assert.Equal(t, "sess-1", item.SessionID)
+	assert.Equal(t, "Test Exam", item.ExamTitle)
+	assert.InDelta(t, 82.5, item.ScorePct, 0.01)
+	assert.True(t, item.Passed)
+	assert.True(t, item.CertificateAvailable)
+	assert.Equal(t, int64(1200), *item.TimeTakenSeconds)
+}
+
+func TestGetMyResults_PaginationMeta(t *testing.T) {
+	repo := &mockRepo{
+		getMyResultsFn: func(_ context.Context, _ string, _, _ int, _, _ string) ([]MyResultsItem, int, error) {
+			return []MyResultsItem{}, 50, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.GetMyResults(context.Background(), "user-1", 3, 20, "score", "asc")
+	require.NoError(t, err)
+	assert.Equal(t, 3, resp.Meta.Page)
+	assert.Equal(t, 20, resp.Meta.PerPage)
+	assert.Equal(t, 50, resp.Meta.Total)
+}
+
+func TestGetMyResults_PropagatesRepoError(t *testing.T) {
+	repo := &mockRepo{
+		getMyResultsFn: func(_ context.Context, _ string, _, _ int, _, _ string) ([]MyResultsItem, int, error) {
+			return nil, 0, errors.New("db down")
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.GetMyResults(context.Background(), "user-1", 1, 20, "date", "desc")
 	require.Error(t, err)
 }

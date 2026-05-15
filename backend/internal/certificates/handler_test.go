@@ -19,7 +19,7 @@ import (
 // ── Mock Service ──────────────────────────────────────────────────────────────
 
 type mockSvc struct {
-	getOrCreateFn          func(ctx context.Context, sessionID, callerID string, isAdmin bool) (*Certificate, TemplateSnapshot, error)
+	getOrCreateFn           func(ctx context.Context, sessionID, callerID string, isAdmin bool) (*Certificate, TemplateSnapshot, error)
 	getByVerificationCodeFn func(ctx context.Context, code string) (*VerifyResponse, error)
 }
 

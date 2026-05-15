@@ -1,0 +1,25 @@
+﻿{
+  "run_id": "FR-BB312",
+  "pipeline": "A",
+  "commit_hash": "3212eb0",
+  "commit_message": "feat(frontend): implement FR-BB312 exam configuration wizard",
+  "files_committed": [
+    "frontend/src/api/exams.ts",
+    "frontend/src/components/ui/date-time-picker.tsx",
+    "frontend/src/pages/ExamWizard/index.tsx",
+    "frontend/src/pages/ExamWizard/Step1BasicSettings.tsx",
+    "frontend/src/pages/ExamWizard/Step2QuestionRules.tsx",
+    "frontend/src/pages/ExamWizard/Step2QuestionPickerModal.tsx",
+    "frontend/src/pages/ExamWizard/Step3Assignments.tsx",
+    "frontend/src/pages/ExamWizard/Step4Review.tsx",
+    "frontend/e2e/exam-wizard.spec.ts",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "docs/requirements/FR-BB312.Frontend-exam-configuration-UI.md",
+    "docs/requirements/README.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB312-INNER-REPORT.md",
+  "status": "success"
+}

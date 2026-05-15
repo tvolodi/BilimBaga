@@ -1,0 +1,49 @@
+{
+  "run_id": "FR-BB312",
+  "pipeline": "A",
+  "step": "03-requirement-implementation",
+  "status": "complete",
+  "requirement": "docs/requirements/FR-BB312.Frontend-exam-configuration-UI.md",
+  "files_changed": [
+    "frontend/src/api/exams.ts",
+    "frontend/src/components/ui/date-time-picker.tsx",
+    "frontend/src/pages/ExamWizard/index.tsx",
+    "frontend/src/pages/ExamWizard/Step1BasicSettings.tsx",
+    "frontend/src/pages/ExamWizard/Step2QuestionRules.tsx",
+    "frontend/src/pages/ExamWizard/Step2QuestionPickerModal.tsx",
+    "frontend/src/pages/ExamWizard/Step3Assignments.tsx",
+    "frontend/src/pages/ExamWizard/Step4Review.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/e2e/exam-wizard.spec.ts",
+    "docs/requirements/FR-BB312.Frontend-exam-configuration-UI.md",
+    "docs/requirements/README.md"
+  ],
+  "acceptance_criteria_verified": [
+    "AC-1: ExamWizardCreatePage and ExamWizardEditPage components created and routed",
+    "AC-2: StepIndicator shows 4 steps with active/done styling",
+    "AC-3: Step 1 form with all required fields (title, time limit, passing score, max attempts, dates, toggles)",
+    "AC-4: Step 1 create/update logic calls POST /api/v1/exams then POST /api/v1/exams/{id}/sections",
+    "AC-5: Step 2 drag-and-drop rules with mode toggle, category/difficulty/tag selectors",
+    "AC-6: Step 2 manual mode question picker modal with debounced search, pagination, multi-select",
+    "AC-7: Step 3 assignments panel with add/remove for admin+, read-only for examiner",
+    "AC-8: Step 4 read-only summary of all exam config",
+    "AC-9: Step 4 Publish button opens AlertDialog confirmation before calling publish API",
+    "AC-10: 422 ERR_VALIDATION shows unsatisfiedRules warning banner (not a toast)",
+    "AC-11: All user-visible strings in all 3 locale files (en, kk, ru)"
+  ],
+  "test_results": {
+    "unit_tests": "69 passed, 0 failed",
+    "typescript": "0 errors",
+    "e2e": "frontend/e2e/exam-wizard.spec.ts created (12 tests); requires live server to execute"
+  },
+  "deviations_from_spec": [
+    "Backend routes for rules use /api/v1/exams/{id}/rules (not /exams/{id}/sections/{sId}/rules)",
+    "show_answers enum: backend uses 'after_completion'/'after_all_attempts' (spec says 'after_submission'/'after_exam')",
+    "on_tab_switch enum: backend uses 'log' (spec says 'nothing'); i18n key exam.onTabSwitch.log translates to 'Do nothing'",
+    "DateTimePicker built with native HTML inputs (no Radix Calendar/Popover in codebase)"
+  ],
+  "notes": "Step3Assignments canMutate prop controlled by reading ['auth','currentUser'] JWT claims from QueryClient. Examiner role does NOT get canMutate=true."
+}

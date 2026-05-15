@@ -6,11 +6,20 @@
 | ID | FR-BB46 |
 | Phase | 4 — Results & Certificates |
 | Priority | 2 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB41 |
 
 ## Description
 Adds a "My Results" tab to the employee portal that presents a paginated, sortable table of all the employee's past exam sessions across all exams. Each row shows key outcome data and provides direct links to the detailed result view and certificate download where applicable. An empty state is shown when the employee has no completed sessions.
+
+## Scope
+
+| Layer | Items |
+|-------|-------|
+| Database | Read queries on existing `exam_sessions`, `exams`, and `users` tables — no schema changes required |
+| API endpoints | `GET /api/v1/portal/results` — new handler, service method, and repository query in `backend/internal/sessions/` |
+| Frontend pages/components | `MyResultsPage`, `ResultsTable`, `ResultsTableSkeleton`, `EmptyResults` components; `useMyResults` React Query hook; `PortalLayout` shell with tab navigation hosting both "My Exams" and "My Results" tabs |
+| i18n keys | `history.*` key prefix added to `en.json`, `ru.json`, `kk.json`; `common.loadError` key used for API error state |
 
 ## Acceptance Criteria
 - [ ] AC-1: The "My Results" tab is visible in the employee portal navigation; it is active only when the user navigates to the corresponding route.
@@ -23,6 +32,7 @@ Adds a "My Results" tab to the employee portal that presents a paginated, sortab
 - [ ] AC-8: The certificate download link calls `GET /portal/sessions/:id/certificate` and triggers a browser file download without navigating away.
 - [ ] AC-9: The table uses `useQuery` with `queryKey: ['my-results', page, sort, dir]`; changing page or sort parameters invalidates and refetches.
 - [ ] AC-10: Zero hardcoded user-visible strings; all text uses `useTranslation` i18n keys.
+- [ ] AC-11: When the API returns a non-2xx response, a visible inline error message (i18n key `common.loadError`) is displayed and the table is not rendered.
 
 ## Technical Specification
 
@@ -66,6 +76,17 @@ export function useMyResults(page: number, sort: 'date' | 'score', dir: 'asc' | 
 // Renders centred SVG illustration + i18n message + link to assigned exams
 ```
 
+#### Portal Shell: `PortalLayout`
+
+The employee portal is refactored to introduce a `PortalLayout` wrapper component that renders top-level tab navigation using the shadcn `Tabs` primitive. Routes are restructured as sub-routes under the `/portal/*` wildcard:
+
+| Tab | Route | Component |
+|-----|-------|-----------|
+| My Exams | `/portal` or `/portal/exams` | `EmployeePortalPage` (existing) |
+| My Results | `/portal/results` | `MyResultsPage` (new) |
+
+`PortalLayout` sits at the `/portal` route level in the React Router config and renders `<Tabs>` with `<TabsList>` containing both tab triggers. The active tab is driven by the current URL so navigating directly to `/portal/results` pre-selects the correct tab. The existing `EmployeePortalPage` is kept unchanged and rendered as the default (`index`) child route.
+
 ### API Contract
 
 The backend returns sessions **aggregated across all exams** for the calling user. This reuses the `GET /portal/exams/:id/history` design but via a new endpoint:
@@ -92,11 +113,75 @@ Query params: `page`, `per_page`, `sort` (`date` | `score`), `dir` (`asc` | `des
         "certificate_available": true
       }
     ],
-    "total_count": 7,
-    "page": 1,
-    "per_page": 20
+    "meta": {
+      "page": 1,
+      "per_page": 20,
+      "total": 7
+    }
   },
   "error": null
+}
+```
+
+### Backend Implementation
+
+**Package**: `backend/internal/sessions/`
+
+**Handler** (`handler.go`)
+```go
+// GetMyResults handles GET /api/v1/portal/results
+// Reads page, per_page, sort, dir from query params; calls svc.GetMyResults.
+func (h *Handler) GetMyResults(w http.ResponseWriter, r *http.Request)
+```
+
+**Service interface** (`service.go`)
+```go
+GetMyResults(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error)
+```
+`sort` is validated to `"date"` or `"score"`; `dir` to `"asc"` or `"desc"` — invalid values default to `date/desc`.
+
+**Repository query outline** (`repository.go`)
+```sql
+SELECT
+  es.id            AS session_id,
+  e.id             AS exam_id,
+  e.title          AS exam_title,
+  es.submitted_at,
+  es.score_pct,
+  es.passed,
+  es.time_taken_seconds,
+  (es.passed AND e.certificate_enabled) AS certificate_available
+FROM exam_sessions es
+JOIN exams e ON e.id = es.exam_id
+WHERE es.user_id = $1
+  AND es.status = 'submitted'
+ORDER BY <sort_col> <dir>
+LIMIT $2 OFFSET $3;
+-- A separate COUNT(*) query (same WHERE) provides the total for the meta object.
+```
+
+**Model** (`model.go`) — new types for FR-BB46:
+```go
+type MyResultsItem struct {
+    SessionID          string    `json:"session_id"`
+    ExamID             string    `json:"exam_id"`
+    ExamTitle          string    `json:"exam_title"`
+    SubmittedAt        time.Time `json:"submitted_at"`
+    ScorePct           float64   `json:"score_pct"`
+    Passed             bool      `json:"passed"`
+    TimeTakenSeconds   *int      `json:"time_taken_seconds"`
+    CertificateAvailable bool    `json:"certificate_available"`
+}
+
+type MyResultsMeta struct {
+    Page    int `json:"page"`
+    PerPage int `json:"per_page"`
+    Total   int `json:"total"`
+}
+
+type MyResultsResponse struct {
+    Sessions []MyResultsItem `json:"sessions"`
+    Meta     MyResultsMeta   `json:"meta"`
 }
 ```
 
@@ -134,11 +219,32 @@ export interface SessionHistoryItem {
 
 export interface MyResultsResponse {
   sessions: SessionHistoryItem[];
-  total_count: number;
-  page: number;
-  per_page: number;
+  meta: {
+    page: number;
+    per_page: number;
+    total: number;
+  };
 }
 ```
+
+## Out of Scope
+
+- Admin-facing session history views (covered by FR-BB42 / grading queue and reporting features).
+- CSV or PDF export of the results list.
+- Server-side search or filtering by exam name (pagination + sort only; text search is a future enhancement).
+- Pre-generation or storage of certificate files — certificates are generated on-demand when the download link is clicked.
+- Editing or deleting past session records.
+
+## Test Strategy
+
+| Layer | Test Type | What to Test |
+|-------|-----------|--------------|
+| `useMyResults` hook | Unit (React Testing Library + MSW) | Correct `queryKey`, `placeholderData` behaviour on page/sort change, error state surfaces when API returns 5xx |
+| `ResultsTable` | Component | Renders correct column headers; pass badge renders green, fail red; sort toggle calls `onSort` with correct arguments; certificate cell shown/hidden based on `certificate_available` |
+| `EmptyResults` | Component | Renders i18n message `history.empty` and CTA link to `/portal/exams` when sessions array is empty |
+| `MyResultsPage` | Component (integration) | Error banner rendered with `common.loadError` when `useMyResults` returns error; skeleton shown during loading |
+| Backend `GetMyResults` handler | Unit (Go httptest) | 200 with valid token and sessions; 401 without token; 400 for invalid sort/dir values |
+| Backend service | Unit | Correct delegation to repository; pagination math (offset = (page-1)*perPage) |
 
 ## Notes
 - `certificate_available` is a computed boolean from the backend (`passed AND exam.certificate_enabled`) to avoid requiring the frontend to know exam configuration.

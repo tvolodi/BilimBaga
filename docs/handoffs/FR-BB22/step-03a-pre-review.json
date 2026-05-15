@@ -1,0 +1,22 @@
+{
+  "run_id": "FR-BB22",
+  "pipeline": "A",
+  "requirement_doc": "docs/requirements/FR-BB22.Question-model.md",
+  "changed_files": [
+    "backend/internal/questions/service_test.go"
+  ],
+  "phase_notes": "Gap analysis: all 10 ACs satisfied by existing implementation. Added 5 new unit tests covering AC-7 (version=1 on create, +1 increment), AC-6 (only one active in chain), and AC-8 (ErrStemRequired when default_locale translation missing for review/active transitions). Added GetTranslationFn hook to mockRepository.",
+  "acceptance_criteria": [
+    "AC-1: questions table with CHECK constraints on type/difficulty/status",
+    "AC-2: question_translations composite PK + FK ON DELETE CASCADE",
+    "AC-3: answer_options FK + sort_order default + likert fields nullable",
+    "AC-4: answer_translations composite PK + FK ON DELETE CASCADE",
+    "AC-5: question_tags composite PK + both FKs ON DELETE CASCADE",
+    "AC-6: versioning transaction — parent_id set, previous archived atomically",
+    "AC-7: version starts at 1, increments by 1, set by application",
+    "AC-8: default_locale validated — stem required before status advance",
+    "AC-9: UTC timestamps, updated_at refreshed on UPDATE",
+    "AC-10: migration idempotent, does not break Phase 1 tables"
+  ],
+  "test_results": "All 55 tests in internal/questions PASS. Full backend suite PASS."
+}

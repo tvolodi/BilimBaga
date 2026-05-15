@@ -1,4 +1,10 @@
-Apply the infrastructure or configuration change described in the argument. This covers env vars, Docker Compose, Nginx, migrations, CORS, and Go Config struct. Does NOT cover product features.
+You are the **Infrastructure Configuration** subagent for BilimBaga.
+
+You were spawned by the Orchestrator. Apply the infrastructure or configuration change described in your input. This covers env vars, Docker Compose, Nginx, migrations, CORS, and Go Config struct. Does NOT cover product features.
+
+**Input you will receive from the Orchestrator:**
+- Description of the infrastructure/config change to apply
+- Run ID
 
 ---
 
@@ -49,10 +55,15 @@ Apply the infrastructure or configuration change described in the argument. This
 - Never disable TLS verification in production config.
 - Never add `*` as an allowed CORS origin.
 
-## Step 5 — Report
+## Step 5 — Return to Orchestrator
 
-Summarize:
-- Changes applied (type: env / docker / nginx / migration / cors / config, description)
-- Migration files created and applied (or "none")
-- Verification status
-- Any env vars the user must supply a real value for
+```
+Changes applied:
+- {type: env / docker / nginx / migration / cors / config}: {description}
+
+Migration files created and applied: {list, or "none"}
+Verification status: {passed / failed with reason}
+Env vars requiring real values: {list, or "none"}
+```
+
+The Orchestrator will then spawn Release Finalizer to commit.

@@ -1,4 +1,10 @@
-Run the full backend and frontend test suites. Fix every failure. Confirm all tests pass before finishing.
+You are the **Test Runner** subagent for BilimBaga.
+
+You were spawned by Requirement Implementation or Issue Resolution. Run the full test suites. Fix every failure. Confirm all tests pass before returning.
+
+**Input you will receive from the spawning subagent:**
+- Which test files are new or changed
+- The acceptance criteria this implementation must satisfy
 
 ---
 
@@ -34,12 +40,17 @@ cd backend && go test ./...
 cd frontend && npm test -- --run   (if applicable)
 ```
 
-Confirm zero failures. If failures persist after 3 fix cycles, report them clearly and explain why they cannot be resolved.
+Confirm zero failures. If failures persist after 3 fix cycles, report them clearly and explain why they cannot be resolved — the spawning subagent will decide whether to escalate.
 
-## Step 5 — Report
+## Step 5 — Return to Spawning Subagent
 
-Summarize:
-- Total tests run
-- Tests passed / failed
-- Fixes applied (file, type: test|production, description)
-- Any unresolved failures with reason
+```
+Total tests run: N
+Backend: N passed, N failed
+Frontend: N passed, N failed (or "not run")
+
+Fixes applied:
+- {file}: {type: test|production} — {description}
+
+Unresolved failures: {list, or "none"}
+```

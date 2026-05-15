@@ -7,7 +7,9 @@ import { RequireRole } from '@/components/RequireRole'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
 import { AdminLayout } from '@/layouts/AdminLayout'
+import { PortalLayout } from '@/layouts/PortalLayout'
 import { EmployeePortal } from '@/pages/EmployeePortal'
+import { MyResultsPage } from '@/pages/portal/MyResultsPage'
 import { UsersListPage } from '@/pages/admin/users/UsersListPage'
 import { DepartmentsPage } from '@/pages/admin/departments/DepartmentsPage'
 import { BrandingSettingsPage } from '@/pages/admin/settings/BrandingSettingsPage'
@@ -131,13 +133,16 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/portal/*"
+        path="/portal"
         element={
           <RequireRole roles={['employee']}>
-            <EmployeePortal />
+            <PortalLayout />
           </RequireRole>
         }
-      />
+      >
+        <Route index element={<EmployeePortal />} />
+        <Route path="results" element={<MyResultsPage />} />
+      </Route>
       <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
   )

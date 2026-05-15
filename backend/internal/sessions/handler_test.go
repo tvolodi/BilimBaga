@@ -30,6 +30,7 @@ type mockSvc struct {
 	listGradingQueueFn   func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
 	getGradingDetailFn   func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
 	gradeAnswerFn        func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
+	getMyResultsFn       func(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error)
 }
 
 func (m *mockSvc) CreateSession(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error) {
@@ -95,6 +96,12 @@ func (m *mockSvc) GetGradingDetail(ctx context.Context, sessionID string) (*Grad
 func (m *mockSvc) GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error) {
 	if m.gradeAnswerFn != nil {
 		return m.gradeAnswerFn(ctx, sessionID, questionID, graderID, tenantID, actorIP, req)
+	}
+	return nil, errors.New("not configured")
+}
+func (m *mockSvc) GetMyResults(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error) {
+	if m.getMyResultsFn != nil {
+		return m.getMyResultsFn(ctx, userID, page, perPage, sort, dir)
 	}
 	return nil, errors.New("not configured")
 }
@@ -1284,4 +1291,74 @@ func TestHandleGradeAnswer_200_AllGraded(t *testing.T) {
 	require.NotNil(t, data)
 	assert.Equal(t, true, data["all_graded"])
 	assert.Equal(t, "submitted", data["session_status"])
+}
+
+// ── FR-BB46: HandleGetMyResults ───────────────────────────────────────────────
+
+func TestHandleGetMyResults_200_Success(t *testing.T) {
+now := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+taken := int64(600)
+svc := &mockSvc{
+getMyResultsFn: func(_ context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error) {
+return &MyResultsResponse{
+Sessions: []MyResultsItem{
+{
+SessionID:            "sess-1",
+ExamID:               "exam-1",
+ExamTitle:            "Test Exam",
+SubmittedAt:          now,
+ScorePct:             88.0,
+Passed:               true,
+TimeTakenSeconds:     &taken,
+CertificateAvailable: true,
+},
+},
+Meta: MyResultsMeta{Page: 1, PerPage: 20, Total: 1},
+}, nil
+},
+}
+h := NewHandler(svc)
+req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/results?page=1&sort=date&dir=desc", nil)
+req = withUserCtx(req, "user-1", "dept-1")
+w := httptest.NewRecorder()
+h.HandleGetMyResults(w, req)
+assert.Equal(t, http.StatusOK, w.Code)
+body := decodeBody(t, w.Body.Bytes())
+data, _ := body["data"].(map[string]any)
+require.NotNil(t, data)
+sessions, _ := data["sessions"].([]any)
+assert.Len(t, sessions, 1)
+}
+
+func TestHandleGetMyResults_200_DefaultSort(t *testing.T) {
+var capturedSort, capturedDir string
+svc := &mockSvc{
+getMyResultsFn: func(_ context.Context, _ string, _, _ int, sort, dir string) (*MyResultsResponse, error) {
+capturedSort = sort
+capturedDir = dir
+return &MyResultsResponse{Sessions: []MyResultsItem{}, Meta: MyResultsMeta{Page: 1, PerPage: 20, Total: 0}}, nil
+},
+}
+h := NewHandler(svc)
+req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/results", nil)
+req = withUserCtx(req, "user-1", "dept-1")
+w := httptest.NewRecorder()
+h.HandleGetMyResults(w, req)
+assert.Equal(t, http.StatusOK, w.Code)
+assert.Equal(t, "date", capturedSort)
+assert.Equal(t, "desc", capturedDir)
+}
+
+func TestHandleGetMyResults_500_ServiceError(t *testing.T) {
+svc := &mockSvc{
+getMyResultsFn: func(_ context.Context, _ string, _, _ int, _, _ string) (*MyResultsResponse, error) {
+return nil, errors.New("db failure")
+},
+}
+h := NewHandler(svc)
+req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/results", nil)
+req = withUserCtx(req, "user-1", "dept-1")
+w := httptest.NewRecorder()
+h.HandleGetMyResults(w, req)
+assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

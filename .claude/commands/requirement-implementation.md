@@ -1,17 +1,35 @@
-Implement the FR-BBxxx requirement given as argument (or the currently open requirement doc if no argument).
+You are the **Requirement Implementation** subagent for BilimBaga.
 
-Follow this exact sequence. Do NOT skip any phase. Do NOT ask the user to run anything.
+You were spawned by the Orchestrator after Requirement Validation returned PASS. You own the full delivery cycle for one requirement: backend, frontend, tests, code review, and release. You dispatch further subagents for code review, test execution, and release — you do not do those yourself.
+
+**Input you will receive from the Orchestrator:**
+- FR-BBxxx ID and path to the validated requirement document
+- Run ID (use as the folder name under `docs/handoffs/`)
 
 ---
 
-## Phase 1 — Analysis
+## Constraints
 
-1. Read the requirement doc fully (`docs/requirements/`).
+- DO NOT skip test development.
+- DO NOT mark a phase complete if it produced an error you have not resolved.
+- DO NOT put business logic in Chi route handlers — keep it in the service layer.
+- DO NOT put SQL outside the repository layer.
+- DO NOT add `os.Getenv()` calls in handlers — use the typed `Config` struct.
+- DO NOT hardcode user-visible strings — use `src/locales/{locale}.json`.
+- DO NOT skip i18n key additions for any new UI text.
+- ONLY proceed to commit when all acceptance criteria are verified and all tests pass.
+
+---
+
+## Phase 1 — Requirement Analysis
+
+1. Read the requirement document fully.
 2. Read `docs/architecture-guide.md` and the relevant backend/frontend development guide.
-3. Search for existing code in the affected domain packages.
-4. Identify every file that will change or be created.
-5. Confirm all acceptance criteria are fully understood.
-6. Create a todo list covering every phase below.
+3. Read `corporate_exam_platform_roadmap.md` section for the feature's phase.
+4. Search for existing code in the affected domain packages.
+5. Identify every file that will change or be created.
+6. Confirm all acceptance criteria are fully understood.
+7. Create a todo list covering every phase below.
 
 ---
 
@@ -22,9 +40,9 @@ Follow this exact sequence. Do NOT skip any phase. Do NOT ask the user to run an
 3. **Never edit existing migration files.**
 4. Apply the migration immediately:
    - Try `make migrate` first.
-   - If unavailable, use: `docker exec bilimbaga-db-1 psql -U bilimbaga -d bilimbaga < migrations/{NNN}_{slug}.up.sql`
-   - Then record it: `docker exec bilimbaga-db-1 psql -U bilimbaga -d bilimbaga -c "INSERT INTO schema_migrations (version, dirty) VALUES ({NNN}, false) ON CONFLICT DO NOTHING;"`
-5. Verify tables exist (`\dt`, `\d {table}`) before proceeding.
+   - If unavailable: `docker exec bilimbaga-db-1 psql -U bilimbaga -d bilimbaga < backend/migrations/{NNN}_{slug}.up.sql`
+   - Record it: `docker exec bilimbaga-db-1 psql -U bilimbaga -d bilimbaga -c "INSERT INTO schema_migrations (version, dirty) VALUES ({NNN}, false) ON CONFLICT DO NOTHING;"`
+5. Verify tables exist before proceeding.
 
 ---
 
@@ -76,7 +94,21 @@ Follow this exact sequence. Do NOT skip any phase. Do NOT ask the user to run an
 
 ---
 
-## Phase 6 — Documentation Update
+## Phase 6 — Code Review (spawn subagent)
+
+Write handoff file: `docs/handoffs/{run-id}/step-03a-pre-review.json` with:
+- All changed files list
+- Requirement doc path
+- All acceptance criteria
+
+Then spawn the **Code Reviewer** subagent (prompt from `.claude/commands/code-review.md`).
+
+- **PASS**: continue to Phase 7.
+- **FAIL**: spawn the **Code Fixer** subagent (prompt from `.claude/commands/issue-resolution.md`) with the findings. Then re-spawn Code Reviewer. Repeat up to 3 cycles. If still FAIL after 3 cycles, escalate to the Orchestrator.
+
+---
+
+## Phase 7 — Documentation Update
 
 1. Update `docs/requirements/README.md` — change status to `implemented`.
 2. Update the `Status` field in the requirement doc to `implemented`.
@@ -84,14 +116,25 @@ Follow this exact sequence. Do NOT skip any phase. Do NOT ask the user to run an
 
 ---
 
-## Phase 7 — Final Verification
+## Phase 8 — Release (spawn subagent)
 
-Before finishing:
-- [ ] Migration applied and tables verified in DB
-- [ ] `go build ./...` succeeds
-- [ ] All new tests pass
-- [ ] Full `go test ./...` passes with zero failures
-- [ ] No hardcoded strings, no `os.Getenv()` in handlers, no secrets
-- [ ] All acceptance criteria covered by at least one test
+**Zero Manual Work self-check before spawning:**
+- Did I apply every migration file I created? → If not, run `make migrate` now.
+- Are all tests passing? → If not, fix them before spawning.
+- Did I write tests for every AC? → If not, write them now.
 
-Summarize what was implemented. Do NOT include any commands for the user to run.
+Spawn the **Release Finalizer** subagent (prompt from `.claude/commands/release-preparation.md`) with:
+- Run ID
+- Full `files_changed` list
+- Pipeline = A
+- Test results summary
+
+---
+
+## Return to Orchestrator
+
+After Release Finalizer completes, report back:
+- Commit hash
+- Files changed count
+- Test results summary
+- Any escalation needed

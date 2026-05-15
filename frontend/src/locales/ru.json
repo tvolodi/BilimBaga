@@ -581,7 +581,9 @@
     },
     "deadline": {
       "expired": "Истёк срок"
-    }
+    },
+    "tab_exams": "Мои экзамены",
+    "tab_results": "Мои результаты"
   },
   "result": {
     "title": "Результат экзамена",
@@ -603,5 +605,22 @@
     "download_certificate": "Скачать сертификат",
     "retake_exam": "Пройти экзамен снова",
     "back_to_portal": "Вернуться на портал"
+  },
+  "history": {
+    "title": "Мои результаты",
+    "empty": "Вы ещё не завершили ни одного экзамена.",
+    "empty_cta": "Перейти к назначенным экзаменам",
+    "col_exam": "Экзамен",
+    "col_date": "Дата прохождения",
+    "col_score": "Оценка",
+    "col_status": "Статус",
+    "col_time": "Время",
+    "col_certificate": "Сертификат",
+    "download_certificate": "Скачать",
+    "pagination_info": "Показано {{from}}–{{to}} из {{total}} результатов",
+    "status": {
+      "passed": "Сдан",
+      "failed": "Не сдан"
+    }
   }
 }

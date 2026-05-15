@@ -583,7 +583,9 @@
     },
     "deadline": {
       "expired": "Expired"
-    }
+    },
+    "tab_exams": "My Exams",
+    "tab_results": "My Results"
   },
   "result": {
     "title": "Exam Result",
@@ -605,5 +607,22 @@
     "download_certificate": "Download Certificate",
     "retake_exam": "Retake Exam",
     "back_to_portal": "Back to Portal"
+  },
+  "history": {
+    "title": "My Results",
+    "empty": "You have not completed any exams yet.",
+    "empty_cta": "View My Assigned Exams",
+    "col_exam": "Exam",
+    "col_date": "Date Taken",
+    "col_score": "Score",
+    "col_status": "Status",
+    "col_time": "Time Taken",
+    "col_certificate": "Certificate",
+    "download_certificate": "Download",
+    "pagination_info": "Showing {{from}}–{{to}} of {{total}} results",
+    "status": {
+      "passed": "Passed",
+      "failed": "Failed"
+    }
   }
 }

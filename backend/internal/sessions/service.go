@@ -42,6 +42,10 @@ type Service interface {
 	// Returns ErrExamNotFound if the exam does not exist.
 	GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
 
+	// GetMyResults returns paginated session history across all exams for the calling user (FR-BB46).
+	// sort must be 'date' or 'score'; dir must be 'asc' or 'desc'.
+	GetMyResults(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error)
+
 	// ListGradingQueue returns sessions pending manual grading (FR-BB42 AC-1/AC-2/AC-3).
 	ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
 
@@ -746,9 +750,24 @@ func (s *service) GetExamHistory(ctx context.Context, examID, userID string, pag
 	}, nil
 }
 
+// GetMyResults returns paginated session history across all exams for the calling user (FR-BB46).
+func (s *service) GetMyResults(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error) {
+	items, total, err := s.repo.GetMyResults(ctx, userID, page, perPage, sort, dir)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GetMyResults: %w", err)
+	}
+	return &MyResultsResponse{
+		Sessions: items,
+		Meta: MyResultsMeta{
+			Page:    page,
+			PerPage: perPage,
+			Total:   total,
+		},
+	}, nil
+}
+
 // ListGradingQueue returns sessions pending manual grading (FR-BB42 AC-1/AC-2/AC-3).
-func (s *service) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error) {
-	items, total, err := s.repo.ListGradingQueue(ctx, examID, dateFrom, dateTo, page, perPage)
+func (s *service) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error) {	items, total, err := s.repo.ListGradingQueue(ctx, examID, dateFrom, dateTo, page, perPage)
 	if err != nil {
 		return nil, fmt.Errorf("sessions: ListGradingQueue: %w", err)
 	}

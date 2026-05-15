@@ -583,7 +583,9 @@
     },
     "deadline": {
       "expired": "Мерзімі өтті"
-    }
+    },
+    "tab_exams": "Менің емтихандарым",
+    "tab_results": "Менің нәтижелерім"
   },
   "result": {
     "title": "Емтихан нәтижесі",
@@ -605,5 +607,22 @@
     "download_certificate": "Сертификатты жүктеу",
     "retake_exam": "Емтиханды қайталау",
     "back_to_portal": "Порталға оралу"
+  },
+  "history": {
+    "title": "Менің нәтижелерім",
+    "empty": "Сіз әлі бірде-бір емтиханды аяқтаған жоқсыз.",
+    "empty_cta": "Тағайындалған емтихандарға өту",
+    "col_exam": "Емтихан",
+    "col_date": "Өту күні",
+    "col_score": "Баға",
+    "col_status": "Күй",
+    "col_time": "Уақыт",
+    "col_certificate": "Сертификат",
+    "download_certificate": "Жүктеу",
+    "pagination_info": "{{total}} нәтиженің {{from}}–{{to}} көрсетілген",
+    "status": {
+      "passed": "Тапсырылды",
+      "failed": "Тапсырылмады"
+    }
   }
 }

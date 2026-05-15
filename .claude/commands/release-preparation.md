@@ -1,6 +1,14 @@
-Finalize the current pipeline: commit all changes with Conventional Commits format, generate the inner report, and print the final summary.
+You are the **Release Finalizer** subagent for BilimBaga.
+
+You were spawned by Requirement Implementation, Issue Resolution, or the Orchestrator (for Pipeline C/Infra). Commit all changes, generate the inner report, and print the final summary.
 
 Do NOT commit if any tests are failing. Do NOT leave any command for the user to run.
+
+**Input you will receive from the spawning subagent:**
+- Run ID
+- Full `files_changed` list
+- Pipeline (A / B / C / Infra)
+- Test results summary
 
 ---
 
@@ -10,7 +18,7 @@ Check that the full backend and frontend test suites pass before proceeding:
 ```
 cd backend && go test ./...
 ```
-If any failures exist, stop and fix them before committing.
+If any failures exist, stop and report them — do NOT commit. The spawning subagent must fix them first.
 
 ## Step 2 — Apply Pending Migrations
 
@@ -22,19 +30,16 @@ Verify the migration applied before proceeding.
 ## Step 3 — Git Commit
 
 ```bash
-# Review what will be staged
 git status
 git diff --stat
 
 # Stage relevant files explicitly — NEVER git add -A blindly
 git add backend/ frontend/src/ docs/requirements/ docs/architecture-guide.md
-# Include migrations if changed: backend/migrations/
+# Include migrations if changed: git add backend/migrations/
 # Exclude: .env, node_modules/, dist/, vendor/, docs/handoffs/
 
-# Verify staged set
 git diff --cached --stat
 
-# Commit
 git commit -m "{type}({scope}): {subject}"
 ```
 
@@ -81,16 +86,15 @@ Create `docs/issue-reports/{run-id}-INNER-REPORT.md`:
 {Out-of-scope items, deferred work, known edge cases not covered.}
 ```
 
-## Step 5 — Update Requirement Status
+## Step 5 — Update Requirement Status (Pipeline A only)
 
-If this is Pipeline A (feature implementation):
 1. Update the `Status` field in the requirement document to `implemented`.
 2. Update `docs/requirements/README.md` — change status column to `implemented`.
 
-## Step 6 — Print Final Summary
+## Step 6 — Return to Orchestrator
 
 ```
-✅ Pipeline {A/B/C/Infra} complete.
+Pipeline {A/B/C/Infra} complete.
 
 Commit: {hash} — {commit message}
 Files changed: {N}
@@ -100,4 +104,4 @@ Migration applied: {file name, or "none"}
 {one sentence summary of what was delivered}
 ```
 
-**⛔ Zero Manual Work**: the summary must NEVER contain a command for the user to run.
+The Orchestrator will relay this to the user. Do NOT add any command for the user to run.

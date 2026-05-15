@@ -1,0 +1,29 @@
+{
+  "run_id": "FR-BB23",
+  "pipeline": "A",
+  "requirement_doc": "docs/requirements/FR-BB23.Question-CRUD-API.md",
+  "changed_files": [
+    "backend/internal/questions/handler.go",
+    "backend/internal/questions/model.go",
+    "backend/internal/questions/service.go",
+    "backend/internal/questions/repository.go",
+    "backend/internal/questions/handler_test.go",
+    "backend/internal/questions/service_test.go",
+    "backend/migrations/010_question_tags_tag_id_index.up.sql",
+    "backend/migrations/010_question_tags_tag_id_index.down.sql"
+  ],
+  "acceptance_criteria": [
+    "AC-1: GET /api/v1/questions paginated list with all filter params, 401 on unauth",
+    "AC-2: POST /api/v1/questions creates draft, type-specific validation, 422 per-field errors",
+    "AC-3: GET /api/v1/questions/:id full detail with translations, options, tags, locale_coverage, 404",
+    "AC-4: PUT /api/v1/questions/:id in-place for draft/review, auto-versioning (serializable tx) for active",
+    "AC-5: POST /api/v1/questions/:id/status state machine, 422 ERR_INVALID_TRANSITION, 400 on missing stem",
+    "AC-6: DELETE /api/v1/questions/:id draft-only, 409 ERR_NOT_DRAFT",
+    "AC-7: GET /api/v1/questions/:id/versions oldest-first chain, data.versions shape",
+    "AC-8: POST/DELETE /api/v1/questions/:id/tags, 404 bad tag, idempotent add",
+    "AC-9: audit_log entry for every mutating endpoint",
+    "AC-10: migration 010 adds idx_question_tags_tag_id index",
+    "AC-11: non-examiner role returns 403"
+  ],
+  "test_results": "all passing — go test ./internal/questions/... -v -count=1"
+}

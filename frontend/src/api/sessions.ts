@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -169,5 +169,40 @@ export function useSessionResult(sessionId: string) {
     queryKey: ['session-result', sessionId],
     queryFn: () => apiFetch<SessionResult>(`/api/v1/portal/sessions/${sessionId}/result`),
     staleTime: Infinity,
+  })
+}
+
+// ---- FR-BB46: My Results ----------------------------------------------------
+
+export interface SessionHistoryItem {
+  session_id: string
+  exam_id: string
+  exam_title: string
+  submitted_at: string
+  score_pct: number
+  passed: boolean
+  time_taken_seconds: number | null
+  certificate_available: boolean
+}
+
+export interface MyResultsMeta {
+  page: number
+  per_page: number
+  total: number
+}
+
+export interface MyResultsResponse {
+  sessions: SessionHistoryItem[]
+  meta: MyResultsMeta
+}
+
+export function useMyResults(page: number, sort: 'date' | 'score', dir: 'asc' | 'desc') {
+  return useQuery<MyResultsResponse, Error>({
+    queryKey: ['my-results', page, sort, dir],
+    queryFn: () =>
+      apiFetch<MyResultsResponse>(
+        `/api/v1/portal/results?page=${page}&sort=${sort}&dir=${dir}&per_page=20`,
+      ),
+    placeholderData: keepPreviousData,
   })
 }

@@ -1,0 +1,49 @@
+{
+  "run_id": "FR-BB21",
+  "requirement_doc": "docs/requirements/FR-BB21.Categories-and-tags.md",
+  "changed_files": [
+    "backend/internal/categories/types.go",
+    "backend/internal/categories/repository.go",
+    "backend/internal/categories/service.go",
+    "backend/internal/categories/handler.go",
+    "backend/internal/categories/service_test.go",
+    "backend/internal/categories/handler_test.go",
+    "backend/internal/tags/types.go",
+    "backend/internal/tags/repository.go",
+    "backend/internal/tags/service.go",
+    "backend/internal/tags/handler.go",
+    "backend/internal/tags/service_test.go",
+    "backend/internal/tags/handler_test.go",
+    "backend/internal/audit/writer.go",
+    "backend/migrations/008_categories_tags.up.sql",
+    "backend/migrations/008_categories_tags.down.sql",
+    "docs/requirements/FR-BB21.Categories-and-tags.md",
+    "docs/requirements/README.md"
+  ],
+  "acceptance_criteria": [
+    "AC-1: categories table with correct columns; cyclic parent references rejected",
+    "AC-2: Three built-in root categories seeded idempotently",
+    "AC-3: GET /api/v1/categories returns nested JSON for any authenticated user",
+    "AC-4: POST/PUT/DELETE on categories require examiner+ role",
+    "AC-5: DELETE /api/v1/categories/:id rejected 409 ERR_CATEGORY_IN_USE when children/questions exist",
+    "AC-6: tags table with usage_count; GET /api/v1/tags alphabetical, examiner+",
+    "AC-7: POST /api/v1/tags creates normalized tag, 409 ERR_TAG_DUPLICATE on collision",
+    "AC-8: PUT /api/v1/tags/:id renames preserving question_tags links; 404/400/409",
+    "AC-9: DELETE /api/v1/tags/:id rejected 409 ERR_TAG_IN_USE when referenced",
+    "AC-10: All mutating endpoints emit audit_log entry (table audit_log not audit_logs)",
+    "AC-11: All API errors use keyed codes"
+  ],
+  "gap_analysis": {
+    "audit_log_table_name": "PASS - writer.go uses 'audit_log' (correct)",
+    "usage_count": "PASS - GetAll uses LEFT JOIN with question_tags probe",
+    "cyclic_parent_detection": "PASS - isDescendant walk in service.go",
+    "idempotent_seed": "PASS - ON CONFLICT (id) DO NOTHING in migration 008",
+    "tag_normalization": "PASS - NormalizeName trim+lowercase in service.go",
+    "all_tests_passing": "PASS - 23 categories tests, 25 tags tests, all green"
+  },
+  "test_results": {
+    "categories": "PASS - 23 tests (8 handler, 15 service/pure)",
+    "tags": "PASS - 25 tests (12 handler, 13 service/pure)",
+    "full_suite": "PASS - all 18 packages pass"
+  }
+}

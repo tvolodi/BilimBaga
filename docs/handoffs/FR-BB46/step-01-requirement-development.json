@@ -1,0 +1,61 @@
+{
+  "run_id": "FR-BB46",
+  "step": "01-requirement-development",
+  "mode": "revision",
+  "timestamp": "2026-05-15T00:00:00Z",
+  "agent": "Requirement Development",
+  "status": "complete",
+  "output": {
+    "requirement_file": "docs/requirements/FR-BB46.Frontend-employee-history.md",
+    "fr_id": "FR-BB46",
+    "status_set_to": "Ready",
+    "revision_round": 1,
+    "findings_addressed": [
+      {
+        "severity": "High",
+        "finding": "No Scope table",
+        "fix": "Added ## Scope section with DB, API endpoints, Frontend pages/components, and i18n keys rows."
+      },
+      {
+        "severity": "High",
+        "finding": "No error/failure-path AC",
+        "fix": "Added AC-11: non-2xx API response shows inline error with i18n key common.loadError and suppresses the table."
+      },
+      {
+        "severity": "High",
+        "finding": "Pagination response structure inconsistent — flat fields instead of meta sub-object",
+        "fix": "Changed API response JSON to use nested meta: { page, per_page, total } matching ExamHistoryMeta convention. Updated TypeScript MyResultsResponse interface accordingly."
+      },
+      {
+        "severity": "Medium",
+        "finding": "No Out of Scope section",
+        "fix": "Added ## Out of Scope section listing: admin history, CSV export, server-side search, certificate pre-generation, record editing/deletion."
+      },
+      {
+        "severity": "Medium",
+        "finding": "No Test Strategy section",
+        "fix": "Added ## Test Strategy table covering useMyResults hook, ResultsTable, EmptyResults, MyResultsPage integration, and backend handler + service unit tests."
+      },
+      {
+        "severity": "Medium",
+        "finding": "Backend layer not described",
+        "fix": "Added ### Backend Implementation section with handler method signature, service interface signature, repository SQL outline, and model type definitions."
+      },
+      {
+        "severity": "Medium",
+        "finding": "EmployeePortal shell tab-navigation refactor not described",
+        "fix": "Added #### Portal Shell: PortalLayout sub-section describing PortalLayout wrapper, shadcn Tabs usage, sub-route table, and URL-driven active-tab behaviour."
+      }
+    ],
+    "unchanged_sections": [
+      "Metadata (except Status)",
+      "Description",
+      "AC-1 through AC-10",
+      "Frontend Components (Page, Hook, ResultsTable, ResultsTableSkeleton, EmptyResults)",
+      "API Contract endpoint table and query params",
+      "i18n Keys Required",
+      "SessionHistoryItem TypeScript interface",
+      "Notes"
+    ]
+  }
+}

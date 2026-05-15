@@ -52,7 +52,7 @@
 | FR-BB43 | Certificate-generation | Certificate Generation | Draft |
 | FR-BB44 | PDF-generation | PDF Generation | Draft |
 | FR-BB45 | Frontend-result-screen | Frontend: Result Screen | Draft |
-| FR-BB46 | Frontend-employee-history | Frontend: Employee History | Draft |
+| FR-BB46 | Frontend-employee-history | Frontend: Employee History | Implemented |
 | FR-BB47 | Frontend-manual-grading-UI | Frontend: Manual Grading UI | Draft |
 | FR-BB51 | Dashboard-metrics-API | Dashboard Metrics API | Draft |
 | FR-BB52 | Per-exam-analytics-API | Per-Exam Analytics API | Draft |

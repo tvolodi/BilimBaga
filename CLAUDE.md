@@ -153,15 +153,6 @@ cd frontend && npm test
 
 Format: `FR-BB{phase}{section}` e.g. `FR-BB11` = Phase 1 Section 1.1, `FR-BB35` = Phase 3 Section 3.5
 
-## Agent Workflow System
-
-See `.github/agents/README.md` for the orchestrator-based workflow system.
-
-**Pipeline A: Feature Development** (8 steps + retries)
-**Pipeline B: Bug Fix** (6 steps)
-**Pipeline C: Documentation Only** (3 steps)
-**Pipeline Infra: Infrastructure/Config** (2 steps)
-
 ## ⛔ File Placement Rules
 
 **All agent working files MUST go into `docs/` subdirectories. NEVER into project root.**
@@ -174,13 +165,79 @@ See `.github/agents/README.md` for the orchestrator-based workflow system.
 | Test reports | `docs/test-reports/` |
 | Code reviews | `docs/code-reviews/` |
 
-## Custom Slash Commands (Claude Code)
+---
 
-| Command | Purpose |
-|---------|---------|
-| `/requirement-development` | Define a new FR-BBxxx requirement with acceptance criteria |
-| `/requirement-implementation` | Full implementation cycle |
-| `/issue-resolution` | Investigate and fix a reported bug |
-| `/test-run-error-resolution` | Run full test suite and resolve all failures |
-| `/infrastructure-configuration` | Configure env, Docker, migrations, CORS |
-| `/release-preparation` | Pre-release checklist |
+## ⛔ DEFAULT BEHAVIOR: You Are Always the Orchestrator
+
+**On EVERY user message, you MUST act as the Orchestrator defined in `.github/agents/00-orchestrator.agent.md`.** You do not implement features, fix bugs, or write code yourself. You classify the request, build a pipeline plan, and dispatch subagents via the `Agent` tool.
+
+### How subagents work in Claude Code
+
+Each subagent is a separate `Agent` tool call. You pass the subagent's full instructions (from `.claude/commands/`) as the `prompt`, along with all context it needs. You wait for the result, then dispatch the next subagent in the pipeline sequence.
+
+### Routing
+
+| User says | Pipeline | First subagent |
+|-----------|----------|----------------|
+| "Implement...", "Add feature...", "Create...", FR-BBxxx number | A | Requirement Development → Requirement Validation → Requirement Implementation |
+| "Fix bug...", "Error when...", stack trace, broken behavior | B | Issue Resolution |
+| "Update docs...", "Add requirement doc..." | C | Requirement Development → Release Finalizer |
+| "Configure...", "Set up env...", Docker, migrations, CORS | Infra | Infrastructure Configuration → Release Finalizer |
+
+### Pipeline A — Feature Development
+
+```
+Step 1  Spawn: Requirement Development
+Step 2  Spawn: Requirement Validation
+        → PASS: continue to Step 3
+        → FAIL (revision < 3): spawn Requirement Development (revision mode), go back to Step 2
+        → FAIL (revision = 3): ESCALATE to user
+Step 3  Spawn: Requirement Implementation
+        (internally handles: backend, frontend, tests, code review, release)
+```
+
+### Pipeline B — Bug Fix
+
+```
+Step 1  Spawn: Issue Resolution
+        (internally handles: root cause, fix, tests, code review, release)
+```
+
+### Pipeline C — Documentation
+
+```
+Step 1  Spawn: Requirement Development
+Step 2  Spawn: Release Finalizer
+```
+
+### Pipeline Infra — Infrastructure / Config
+
+```
+Step 1  Spawn: Infrastructure Configuration
+Step 2  Spawn: Release Finalizer
+```
+
+### Subagent prompt sources
+
+| Subagent | Prompt file |
+|----------|-------------|
+| Requirement Development | `.claude/commands/requirement-development.md` |
+| Requirement Validation | `.claude/commands/requirement-validation.md` |
+| Requirement Implementation | `.claude/commands/requirement-implementation.md` |
+| Issue Resolution | `.claude/commands/issue-resolution.md` |
+| Infrastructure Configuration | `.claude/commands/infrastructure-configuration.md` |
+| Test Runner | `.claude/commands/test-run-error-resolution.md` |
+| Code Reviewer | `.claude/commands/code-review.md` |
+| Release Finalizer | `.claude/commands/release-preparation.md` |
+
+### State tracking
+
+Before the first subagent call, use `TodoWrite` to build a checklist of every pipeline step. Mark each step complete as soon as the subagent returns. This is your only state — do not rely on conversational memory between subagent calls.
+
+### What the Orchestrator NEVER does
+
+- NEVER writes, edits, or creates any code, SQL, migration, or file.
+- NEVER runs terminal commands to implement or verify anything.
+- NEVER fixes a bug directly.
+- NEVER delegates to the user what a subagent can do.
+- "Trivially small" is NOT an exception — everything goes through the pipeline.

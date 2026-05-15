@@ -1,0 +1,48 @@
+{
+  "run_id": "FR-BB46",
+  "pipeline": "A",
+  "step": "03-requirement-implementation",
+  "status": "complete",
+  "requirement": "docs/requirements/FR-BB46.Frontend-employee-history.md",
+  "files_changed": [
+    "backend/internal/sessions/model.go",
+    "backend/internal/sessions/repository.go",
+    "backend/internal/sessions/service.go",
+    "backend/internal/sessions/handler.go",
+    "backend/internal/sessions/service_test.go",
+    "backend/internal/sessions/handler_test.go",
+    "backend/internal/router/router.go",
+    "frontend/src/api/sessions.ts",
+    "frontend/src/utils/format.ts",
+    "frontend/src/components/ui/skeleton.tsx",
+    "frontend/src/components/results/ResultsTable.tsx",
+    "frontend/src/components/results/ResultsTable.test.tsx",
+    "frontend/src/components/results/ResultsTableSkeleton.tsx",
+    "frontend/src/components/results/EmptyResults.tsx",
+    "frontend/src/pages/portal/MyResultsPage.tsx",
+    "frontend/src/pages/portal/MyResultsPage.test.tsx",
+    "frontend/src/layouts/PortalLayout.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json",
+    "frontend/e2e/my-results.spec.ts",
+    "docs/requirements/FR-BB46.Frontend-employee-history.md",
+    "docs/requirements/README.md"
+  ],
+  "test_results": {
+    "backend_unit": "7/7 new tests passing, 0 regressions (full suite: all ok)",
+    "frontend_unit": "17/17 new tests passing (11 ResultsTable + 6 MyResultsPage), full suite 100/100",
+    "e2e": "8/8 Playwright tests passing"
+  },
+  "acceptance_criteria_coverage": {
+    "AC1_paginated_table": "MyResultsPage renders paginated table via useMyResults hook",
+    "AC2_sortable_date_score": "ResultsTable column headers call onSort; URL params updated",
+    "AC3_pass_fail_badge": "ResultsTable renders Badge variant=success/destructive based on passed field",
+    "AC4_time_taken": "formatDuration utility renders Xm Ys; null renders dash",
+    "AC5_certificate_download": "Download button triggers anchor click to /api/v1/portal/sessions/:id/certificate",
+    "AC6_empty_state": "EmptyResults component shown when sessions.length === 0",
+    "AC7_api_endpoint": "GET /api/v1/portal/results implemented with page/sort/dir/per_page params",
+    "AC8_tab_navigation": "PortalLayout adds My Exams / My Results NavLink tabs above Outlet"
+  }
+}

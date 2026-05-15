@@ -14,10 +14,10 @@ import (
 // ── Mock Repository ───────────────────────────────────────────────────────────
 
 type mockRepo struct {
-	getSessionFn          func(ctx context.Context, sessionID string) (*certSessionRow, error)
-	getBySessionIDFn      func(ctx context.Context, sessionID string) (*Certificate, error)
-	createFn              func(ctx context.Context, input certInsert) (*Certificate, error)
-	getByVerificationFn   func(ctx context.Context, code string) (*Certificate, error)
+	getSessionFn        func(ctx context.Context, sessionID string) (*certSessionRow, error)
+	getBySessionIDFn    func(ctx context.Context, sessionID string) (*Certificate, error)
+	createFn            func(ctx context.Context, input certInsert) (*Certificate, error)
+	getByVerificationFn func(ctx context.Context, code string) (*Certificate, error)
 }
 
 func (m *mockRepo) GetSessionForCertificate(ctx context.Context, sessionID string) (*certSessionRow, error) {

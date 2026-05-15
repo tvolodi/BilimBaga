@@ -272,6 +272,33 @@ type ExamHistoryResponse struct {
 	Meta      ExamHistoryMeta  `json:"meta"`
 }
 
+// ── FR-BB46: My Results ───────────────────────────────────────────────────────
+
+// MyResultsItem is one completed session in the My Results list (FR-BB46).
+type MyResultsItem struct {
+	SessionID            string    `db:"session_id"            json:"session_id"`
+	ExamID               string    `db:"exam_id"               json:"exam_id"`
+	ExamTitle            string    `db:"exam_title"            json:"exam_title"`
+	SubmittedAt          time.Time `db:"submitted_at"          json:"submitted_at"`
+	ScorePct             float64   `db:"score_pct"             json:"score_pct"`
+	Passed               bool      `db:"passed"                json:"passed"`
+	TimeTakenSeconds     *int64    `db:"time_taken_seconds"    json:"time_taken_seconds"`
+	CertificateAvailable bool      `db:"certificate_available" json:"certificate_available"`
+}
+
+// MyResultsMeta holds pagination metadata for the My Results response (FR-BB46).
+type MyResultsMeta struct {
+	Page    int `json:"page"`
+	PerPage int `json:"per_page"`
+	Total   int `json:"total"`
+}
+
+// MyResultsResponse is the response for GET /portal/results (FR-BB46).
+type MyResultsResponse struct {
+	Sessions []MyResultsItem `json:"sessions"`
+	Meta     MyResultsMeta   `json:"meta"`
+}
+
 // ── FR-BB42: Manual Grading Queue ────────────────────────────────────────────
 
 // GradingQueueItem is one pending session in the manual grading queue (FR-BB42).

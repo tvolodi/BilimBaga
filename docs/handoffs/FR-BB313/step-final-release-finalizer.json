@@ -1,0 +1,23 @@
+﻿{
+    "commit_hash":  "23df2f4",
+    "files_committed":  [
+                            "frontend/src/api/portal.ts",
+                            "frontend/src/hooks/useCountdown.ts",
+                            "frontend/src/pages/EmployeePortal/index.tsx",
+                            "frontend/src/pages/EmployeePortal/ExamCard.tsx",
+                            "frontend/src/pages/EmployeePortal/ExamCardSkeleton.tsx",
+                            "frontend/src/pages/EmployeePortal/StartExamModal.tsx",
+                            "frontend/src/pages/EmployeePortal/EmptyPortal.tsx",
+                            "frontend/src/pages/EmployeePortal.tsx",
+                            "frontend/src/locales/en.json",
+                            "frontend/src/locales/kk.json",
+                            "frontend/src/locales/ru.json",
+                            "docs/requirements/FR-BB313.Frontend-employee-portal.md",
+                            "docs/requirements/README.md"
+                        ],
+    "status":  "success",
+    "commit_message":  "feat(frontend): implement FR-BB313 employee exam portal",
+    "inner_report_path":  "docs/issue-reports/FR-BB313-INNER-REPORT.md",
+    "pipeline":  "A",
+    "run_id":  "FR-BB313"
+}

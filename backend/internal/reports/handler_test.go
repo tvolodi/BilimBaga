@@ -17,8 +17,10 @@ import (
 // ── Manual mock service ───────────────────────────────────────────────────────
 
 type mockSvc struct {
-	getDashboardFn    func(ctx context.Context) (*DashboardMetrics, error)
-	getExamAnalyticsFn func(ctx context.Context, examID string) (*ExamAnalyticsResponse, error)
+	getDashboardFn      func(ctx context.Context) (*DashboardMetrics, error)
+	getExamAnalyticsFn  func(ctx context.Context, examID string) (*ExamAnalyticsResponse, error)
+	getUserRecordFn     func(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error)
+	getUserProgressFn   func(ctx context.Context, userID string) (*UserProgressResponse, error)
 }
 
 func (m *mockSvc) GetDashboardMetrics(ctx context.Context) (*DashboardMetrics, error) {
@@ -31,6 +33,20 @@ func (m *mockSvc) GetDashboardMetrics(ctx context.Context) (*DashboardMetrics, e
 func (m *mockSvc) GetExamAnalytics(ctx context.Context, examID string) (*ExamAnalyticsResponse, error) {
 	if m.getExamAnalyticsFn != nil {
 		return m.getExamAnalyticsFn(ctx, examID)
+	}
+	return nil, errors.New("not configured")
+}
+
+func (m *mockSvc) GetUserRecord(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error) {
+	if m.getUserRecordFn != nil {
+		return m.getUserRecordFn(ctx, userID, page, perPage)
+	}
+	return nil, 0, errors.New("not configured")
+}
+
+func (m *mockSvc) GetUserProgress(ctx context.Context, userID string) (*UserProgressResponse, error) {
+	if m.getUserProgressFn != nil {
+		return m.getUserProgressFn(ctx, userID)
 	}
 	return nil, errors.New("not configured")
 }
@@ -357,4 +373,195 @@ func TestGetExamAnalytics_500_ServiceError(t *testing.T) {
 	var errObj map[string]string
 	require.NoError(t, json.Unmarshal(body["error"], &errObj))
 	assert.Equal(t, "INTERNAL_ERROR", errObj["code"])
+}
+
+// ── FR-BB53: GetUserRecord handler tests ─────────────────────────────────────
+
+// AC-1: HTTP 200 with data + meta + error:null on happy path.
+func TestGetUserRecord_200_HappyPath(t *testing.T) {
+	submittedAt := time.Date(2026, 5, 14, 10, 30, 0, 0, time.UTC)
+	passed := true
+	timeSec := 1800
+	svc := &mockSvc{
+		getUserRecordFn: func(_ context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error) {
+			return &UserRecordResponse{
+				UserID:     userID,
+				FullName:   "Aibek Seitkali",
+				Department: "Operations",
+				Sessions: []SessionRecord{
+					{
+						SessionID:        "sess-uuid",
+						ExamID:           "exam-uuid",
+						ExamTitle:        "Fire Safety Fundamentals",
+						StartedAt:        time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC),
+						SubmittedAt:      &submittedAt,
+						ScorePct:         func() *float64 { v := 84.50; return &v }(),
+						Passed:           &passed,
+						TimeTakenSeconds: &timeSec,
+						Status:           "submitted",
+						CertificateID:    func() *string { s := "cert-uuid"; return &s }(),
+					},
+				},
+			}, 7, nil
+		},
+	}
+	h := NewHandler(svc)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/record?page=1&per_page=20", "user-uuid")
+	w := httptest.NewRecorder()
+	h.GetUserRecord(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var envelope struct {
+		Data  *UserRecordResponse    `json:"data"`
+		Meta  map[string]interface{} `json:"meta"`
+		Error *string                `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &envelope))
+	assert.Nil(t, envelope.Error)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, "user-uuid", envelope.Data.UserID)
+	assert.Equal(t, "Aibek Seitkali", envelope.Data.FullName)
+	assert.Equal(t, "Operations", envelope.Data.Department)
+	require.Len(t, envelope.Data.Sessions, 1)
+
+	require.NotNil(t, envelope.Meta)
+	assert.Equal(t, float64(1), envelope.Meta["page"])
+	assert.Equal(t, float64(20), envelope.Meta["per_page"])
+	assert.Equal(t, float64(7), envelope.Meta["total"])
+}
+
+// AC-2: HTTP 404 when user does not exist.
+func TestGetUserRecord_404_UserNotFound(t *testing.T) {
+	svc := &mockSvc{
+		getUserRecordFn: func(_ context.Context, _ string, _, _ int) (*UserRecordResponse, int, error) {
+			return nil, 0, ErrNotFound
+		},
+	}
+	h := NewHandler(svc)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/missing/record", "missing")
+	w := httptest.NewRecorder()
+	h.GetUserRecord(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var body map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	var errObj map[string]string
+	require.NoError(t, json.Unmarshal(body["error"], &errObj))
+	assert.Equal(t, "USER_NOT_FOUND", errObj["code"])
+}
+
+// HTTP 500 on unexpected service error.
+func TestGetUserRecord_500_ServiceError(t *testing.T) {
+	svc := &mockSvc{
+		getUserRecordFn: func(_ context.Context, _ string, _, _ int) (*UserRecordResponse, int, error) {
+			return nil, 0, errors.New("db failure")
+		},
+	}
+	h := NewHandler(svc)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/record", "user-uuid")
+	w := httptest.NewRecorder()
+	h.GetUserRecord(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// AC-5: per_page capped at 100.
+func TestGetUserRecord_PerPageCappedAt100(t *testing.T) {
+	var capturedPerPage int
+	svc := &mockSvc{
+		getUserRecordFn: func(_ context.Context, _ string, page, perPage int) (*UserRecordResponse, int, error) {
+			capturedPerPage = perPage
+			return &UserRecordResponse{Sessions: []SessionRecord{}}, 0, nil
+		},
+	}
+	h := NewHandler(svc)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/record?per_page=500", "user-uuid")
+	w := httptest.NewRecorder()
+	h.GetUserRecord(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, 100, capturedPerPage)
+}
+
+// ── FR-BB53: GetUserProgress handler tests ───────────────────────────────────
+
+// AC-1: HTTP 200 with three tracks and error:null.
+func TestGetUserProgress_200_HappyPath(t *testing.T) {
+	ts := time.Date(2026, 5, 14, 10, 30, 0, 0, time.UTC)
+	svc := &mockSvc{
+		getUserProgressFn: func(_ context.Context, userID string) (*UserProgressResponse, error) {
+			return &UserProgressResponse{
+				UserID:   userID,
+				FullName: "Aibek Seitkali",
+				Tracks: []TrackSummary{
+					{Track: "security", QuestionsAnswered: 120, LastActivity: &ts, RequiredExams: []ExamProgress{}},
+					{Track: "safety", QuestionsAnswered: 45, LastActivity: nil, RequiredExams: []ExamProgress{}},
+					{Track: "loyalty", QuestionsAnswered: 0, LastActivity: nil, RequiredExams: []ExamProgress{}},
+				},
+			}, nil
+		},
+	}
+	h := NewHandler(svc)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/progress", "user-uuid")
+	w := httptest.NewRecorder()
+	h.GetUserProgress(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var envelope struct {
+		Data  *UserProgressResponse `json:"data"`
+		Error *string               `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &envelope))
+	assert.Nil(t, envelope.Error)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, "user-uuid", envelope.Data.UserID)
+	require.Len(t, envelope.Data.Tracks, 3)
+	assert.Equal(t, "security", envelope.Data.Tracks[0].Track)
+	assert.Equal(t, 120, envelope.Data.Tracks[0].QuestionsAnswered)
+}
+
+// AC-2: HTTP 404 when user does not exist.
+func TestGetUserProgress_404_UserNotFound(t *testing.T) {
+	svc := &mockSvc{
+		getUserProgressFn: func(_ context.Context, _ string) (*UserProgressResponse, error) {
+			return nil, ErrNotFound
+		},
+	}
+	h := NewHandler(svc)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/missing/progress", "missing")
+	w := httptest.NewRecorder()
+	h.GetUserProgress(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var body map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	var errObj map[string]string
+	require.NoError(t, json.Unmarshal(body["error"], &errObj))
+	assert.Equal(t, "USER_NOT_FOUND", errObj["code"])
+}
+
+// HTTP 500 on unexpected service error.
+func TestGetUserProgress_500_ServiceError(t *testing.T) {
+	svc := &mockSvc{
+		getUserProgressFn: func(_ context.Context, _ string) (*UserProgressResponse, error) {
+			return nil, errors.New("db failure")
+		},
+	}
+	h := NewHandler(svc)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/progress", "user-uuid")
+	w := httptest.NewRecorder()
+	h.GetUserProgress(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

@@ -2,6 +2,8 @@ package reports
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -49,6 +51,31 @@ type Repository interface {
 	// GetAnswerDistribution returns option selection counts for every answer
 	// option across all completed sessions for an exam.
 	GetAnswerDistribution(ctx context.Context, examID string) ([]answerDistRow, error)
+
+	// ── FR-BB53: Per-Employee Record & Progress ───────────────────────────────
+
+	// GetUserInfo fetches basic user details (id, full_name, department name).
+	// Returns ErrNotFound if no user with that ID exists.
+	GetUserInfo(ctx context.Context, userID string) (*userInfoRow, error)
+
+	// GetUserSessionHistory returns a page of session history for one employee,
+	// excluding in_progress sessions, ordered by started_at DESC (AC-3).
+	GetUserSessionHistory(ctx context.Context, userID string, limit, offset int) ([]SessionRecord, error)
+
+	// GetUserSessionCount returns the total non-in_progress session count for
+	// one employee (used for pagination metadata, AC-5).
+	GetUserSessionCount(ctx context.Context, userID string) (int, error)
+
+	// GetUserTrackActivity returns per-track question counts and last activity
+	// for an employee.  Only tracks with activity are returned; the service
+	// layer fills in zero-value entries for the other tracks (AC-7 / AC-8).
+	GetUserTrackActivity(ctx context.Context, userID string) ([]TrackActivity, error)
+
+	// GetUserRequiredExams returns all active exams assigned to the employee
+	// (directly, via their department, or to all) with pass status and attempt
+	// count.  Exam track is inferred from the lowest-sort_order question rule
+	// category (AC-9).
+	GetUserRequiredExams(ctx context.Context, userID string) ([]ExamProgress, error)
 }
 
 type postgresRepository struct {
@@ -372,11 +399,9 @@ func (r *postgresRepository) GetExamTitle(ctx context.Context, examID string) (s
 	var title string
 	err := r.db.QueryRowContext(ctx, `SELECT title FROM exams WHERE id = $1`, examID).Scan(&title)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
+		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrNotFound
 		}
-		// Check for standard database/sql package sentinel using string match since
-		// we cannot import database/sql here without a cycle concern.
 		return "", fmt.Errorf("reports: GetExamTitle: %w", err)
 	}
 	return title, nil
@@ -537,4 +562,148 @@ ORDER BY q.id, ao.sort_order`
 		result = append(result, row)
 	}
 	return result, rows.Err()
+}
+
+// ── FR-BB53: Per-Employee Record & Progress ──────────────────────────────────
+
+// userInfoRow is the internal scan target for basic user lookup.
+type userInfoRow struct {
+	ID             string  `db:"id"`
+	FullName       string  `db:"full_name"`
+	DepartmentName *string `db:"department_name"`
+}
+
+// GetUserInfo fetches id, full_name and department name for one user.
+// Returns ErrNotFound when no user with that ID exists.
+func (r *postgresRepository) GetUserInfo(ctx context.Context, userID string) (*userInfoRow, error) {
+	const q = `
+SELECT u.id, u.full_name, d.name AS department_name
+FROM users u
+LEFT JOIN departments d ON d.id = u.department_id
+WHERE u.id = $1`
+	var row userInfoRow
+	if err := r.db.GetContext(ctx, &row, q, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("reports: GetUserInfo: %w", err)
+	}
+	return &row, nil
+}
+
+// GetUserSessionHistory returns a page of non-in_progress sessions for one
+// employee, ordered by started_at DESC (AC-3, AC-5).
+func (r *postgresRepository) GetUserSessionHistory(ctx context.Context, userID string, limit, offset int) ([]SessionRecord, error) {
+	const q = `
+SELECT
+  es.id AS session_id,
+  es.exam_id,
+  e.title AS exam_title,
+  es.started_at,
+  es.submitted_at,
+  es.score_pct,
+  es.passed,
+  EXTRACT(EPOCH FROM (es.submitted_at - es.started_at))::INT AS time_taken_seconds,
+  es.status,
+  c.id AS certificate_id
+FROM exam_sessions es
+JOIN exams e ON e.id = es.exam_id
+LEFT JOIN certificates c ON c.session_id = es.id
+WHERE es.user_id = $1
+  AND es.status != 'in_progress'
+ORDER BY es.started_at DESC
+LIMIT $2 OFFSET $3`
+
+	var result []SessionRecord
+	if err := r.db.SelectContext(ctx, &result, q, userID, limit, offset); err != nil {
+		return nil, fmt.Errorf("reports: GetUserSessionHistory: %w", err)
+	}
+	if result == nil {
+		result = []SessionRecord{}
+	}
+	return result, nil
+}
+
+// GetUserSessionCount returns the total non-in_progress session count for
+// one employee (AC-5 pagination).
+func (r *postgresRepository) GetUserSessionCount(ctx context.Context, userID string) (int, error) {
+	const q = `
+SELECT COUNT(*)
+FROM exam_sessions
+WHERE user_id = $1
+  AND status != 'in_progress'`
+	var count int
+	if err := r.db.GetContext(ctx, &count, q, userID); err != nil {
+		return 0, fmt.Errorf("reports: GetUserSessionCount: %w", err)
+	}
+	return count, nil
+}
+
+// GetUserTrackActivity returns per-track distinct question counts and last
+// submitted_at for submitted/grading_pending sessions (AC-7 / AC-8).
+// Only tracks with activity are returned.
+func (r *postgresRepository) GetUserTrackActivity(ctx context.Context, userID string) ([]TrackActivity, error) {
+	const q = `
+SELECT
+  cat.track,
+  COUNT(DISTINCT sqs.question_id) AS questions_answered,
+  MAX(es.submitted_at) AS last_activity
+FROM exam_sessions es
+JOIN session_question_scores sqs ON sqs.session_id = es.id
+JOIN questions q ON q.id = sqs.question_id
+JOIN categories cat ON cat.id = q.category_id
+WHERE es.user_id = $1
+  AND es.status IN ('submitted', 'grading_pending')
+  AND cat.track IN ('security', 'safety', 'loyalty')
+GROUP BY cat.track`
+
+	var result []TrackActivity
+	if err := r.db.SelectContext(ctx, &result, q, userID); err != nil {
+		return nil, fmt.Errorf("reports: GetUserTrackActivity: %w", err)
+	}
+	return result, nil
+}
+
+// GetUserRequiredExams returns active exams assigned to the employee with pass
+// status and attempt count.  Exam track is inferred via a LATERAL join to the
+// lowest-sort_order exam_question_rule whose category has a valid track (AC-9).
+func (r *postgresRepository) GetUserRequiredExams(ctx context.Context, userID string) ([]ExamProgress, error) {
+	const q = `
+SELECT
+  e.id AS exam_id,
+  e.title,
+  exam_track.track,
+  BOOL_OR(es.passed) AS passed,
+  COUNT(es.id) AS attempts
+FROM exams e
+JOIN LATERAL (
+  SELECT cat.track
+  FROM exam_question_rules eqr
+  JOIN categories cat ON cat.id = eqr.category_id
+  WHERE eqr.exam_id = e.id
+    AND cat.track IN ('security', 'safety', 'loyalty')
+  ORDER BY eqr.sort_order
+  LIMIT 1
+) AS exam_track ON true
+JOIN exam_assignments ea ON ea.exam_id = e.id
+  AND (
+    (ea.assignee_type = 'user'       AND ea.assignee_id = $1)
+    OR (ea.assignee_type = 'department'
+        AND ea.assignee_id = (SELECT department_id FROM users WHERE id = $1))
+    OR (ea.assignee_type = 'all')
+  )
+LEFT JOIN exam_sessions es ON es.exam_id = e.id
+  AND es.user_id = $1
+  AND es.status IN ('submitted', 'grading_pending')
+WHERE e.status = 'active'
+GROUP BY e.id, e.title, exam_track.track`
+
+	var result []ExamProgress
+	if err := r.db.SelectContext(ctx, &result, q, userID); err != nil {
+		return nil, fmt.Errorf("reports: GetUserRequiredExams: %w", err)
+	}
+	if result == nil {
+		result = []ExamProgress{}
+	}
+	return result, nil
 }

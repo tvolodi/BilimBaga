@@ -86,7 +86,67 @@ type QuestionStat struct {
 
 // AnswerOptionCount holds the selection count for one answer option.
 type AnswerOptionCount struct {
-	OptionID   string `json:"option_id"`
-	OptionText string `json:"option_text"`
-	SelectCount int   `json:"select_count"`
+	OptionID    string `json:"option_id"`
+	OptionText  string `json:"option_text"`
+	SelectCount int    `json:"select_count"`
+}
+
+// ── FR-BB53: Per-Employee Record & Progress ──────────────────────────────────
+
+// SessionRecord is one row in an employee's exam session history.
+type SessionRecord struct {
+	SessionID        string     `json:"session_id" db:"session_id"`
+	ExamID           string     `json:"exam_id" db:"exam_id"`
+	ExamTitle        string     `json:"exam_title" db:"exam_title"`
+	StartedAt        time.Time  `json:"started_at" db:"started_at"`
+	SubmittedAt      *time.Time `json:"submitted_at" db:"submitted_at"`
+	ScorePct         *float64   `json:"score_pct" db:"score_pct"`
+	Passed           *bool      `json:"passed" db:"passed"`
+	TimeTakenSeconds *int       `json:"time_taken_seconds" db:"time_taken_seconds"`
+	Status           string     `json:"status" db:"status"`
+	CertificateID    *string    `json:"certificate_id" db:"certificate_id"`
+}
+
+// TrackActivity holds the question count and last activity timestamp for one
+// compliance track.
+type TrackActivity struct {
+	Track             string     `json:"track" db:"track"`
+	QuestionsAnswered int        `json:"questions_answered" db:"questions_answered"`
+	LastActivity      *time.Time `json:"last_activity" db:"last_activity"`
+}
+
+// ExamProgress holds an exam's pass status and attempt count for one employee.
+// Track is used internally to group exams into TrackSummary; it is also
+// serialised so the frontend can use a single flat list if needed.
+type ExamProgress struct {
+	ExamID   string `json:"exam_id" db:"exam_id"`
+	Title    string `json:"title" db:"title"`
+	Track    string `json:"track" db:"track"`
+	Passed   *bool  `json:"passed" db:"passed"`
+	Attempts int    `json:"attempts" db:"attempts"`
+}
+
+// TrackSummary aggregates activity and required exams for one compliance track.
+type TrackSummary struct {
+	Track             string         `json:"track"`
+	QuestionsAnswered int            `json:"questions_answered"`
+	LastActivity      *time.Time     `json:"last_activity"`
+	RequiredExams     []ExamProgress `json:"required_exams"`
+}
+
+// UserRecordResponse is the top-level data object for
+// GET /api/v1/admin/users/{id}/record.
+type UserRecordResponse struct {
+	UserID     string          `json:"user_id"`
+	FullName   string          `json:"full_name"`
+	Department string          `json:"department"`
+	Sessions   []SessionRecord `json:"sessions"`
+}
+
+// UserProgressResponse is the top-level data object for
+// GET /api/v1/admin/users/{id}/progress.
+type UserProgressResponse struct {
+	UserID   string         `json:"user_id"`
+	FullName string         `json:"full_name"`
+	Tracks   []TrackSummary `json:"tracks"`
 }

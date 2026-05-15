@@ -14,6 +14,12 @@ type Service interface {
 
 	// GetExamAnalytics returns deep analytics for a single exam (FR-BB52).
 	GetExamAnalytics(ctx context.Context, examID string) (*ExamAnalyticsResponse, error)
+
+	// GetUserRecord returns the paginated session history for one employee (FR-BB53).
+	GetUserRecord(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error)
+
+	// GetUserProgress returns the three-track progress summary for one employee (FR-BB53).
+	GetUserProgress(ctx context.Context, userID string) (*UserProgressResponse, error)
 }
 
 type service struct {
@@ -192,3 +198,98 @@ func (s *service) GetExamAnalytics(ctx context.Context, examID string) (*ExamAna
 		PerQuestionStats:   perQuestion,
 	}, nil
 }
+
+// ── FR-BB53: Per-Employee Record & Progress ──────────────────────────────────
+
+// allTracks is the fixed ordered set of compliance tracks (AC-6).
+var allTracks = []string{"security", "safety", "loyalty"}
+
+// buildTrackProgress merges per-track activity rows and required exam rows
+// into a fixed three-element slice, one entry per compliance track.
+// Tracks with no activity get zero-value QuestionsAnswered and nil LastActivity.
+// Tracks with no required exams get an empty (non-nil) RequiredExams slice.
+func buildTrackProgress(activity []TrackActivity, exams []ExamProgress) []TrackSummary {
+	actMap := make(map[string]TrackActivity, len(activity))
+	for _, a := range activity {
+		actMap[a.Track] = a
+	}
+
+	examsByTrack := make(map[string][]ExamProgress)
+	for _, ex := range exams {
+		examsByTrack[ex.Track] = append(examsByTrack[ex.Track], ex)
+	}
+
+	result := make([]TrackSummary, len(allTracks))
+	for i, t := range allTracks {
+		a := actMap[t]
+		required := examsByTrack[t]
+		if required == nil {
+			required = []ExamProgress{}
+		}
+		result[i] = TrackSummary{
+			Track:             t,
+			QuestionsAnswered: a.QuestionsAnswered,
+			LastActivity:      a.LastActivity,
+			RequiredExams:     required,
+		}
+	}
+	return result
+}
+
+// GetUserRecord validates the target user exists, then returns their paginated
+// session history together with the total session count (AC-2 through AC-5).
+func (s *service) GetUserRecord(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error) {
+	info, err := s.repo.GetUserInfo(ctx, userID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("reports: GetUserRecord: %w", err)
+	}
+
+	total, err := s.repo.GetUserSessionCount(ctx, userID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("reports: GetUserRecord: %w", err)
+	}
+
+	offset := (page - 1) * perPage
+	sessions, err := s.repo.GetUserSessionHistory(ctx, userID, perPage, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("reports: GetUserRecord: %w", err)
+	}
+
+	dept := ""
+	if info.DepartmentName != nil {
+		dept = *info.DepartmentName
+	}
+
+	return &UserRecordResponse{
+		UserID:     info.ID,
+		FullName:   info.FullName,
+		Department: dept,
+		Sessions:   sessions,
+	}, total, nil
+}
+
+// GetUserProgress validates the target user exists, then returns a three-track
+// progress summary (AC-6 through AC-9).
+func (s *service) GetUserProgress(ctx context.Context, userID string) (*UserProgressResponse, error) {
+	info, err := s.repo.GetUserInfo(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetUserProgress: %w", err)
+	}
+
+	activity, err := s.repo.GetUserTrackActivity(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetUserProgress: %w", err)
+	}
+
+	requiredExams, err := s.repo.GetUserRequiredExams(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetUserProgress: %w", err)
+	}
+
+	return &UserProgressResponse{
+		UserID:   info.ID,
+		FullName: info.FullName,
+		Tracks:   buildTrackProgress(activity, requiredExams),
+	}, nil
+}
+

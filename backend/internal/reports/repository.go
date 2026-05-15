@@ -26,6 +26,29 @@ type Repository interface {
 	// 90 days. Tracks with no data are absent from the returned map; the service
 	// layer converts the map to the TrackScores struct with explicit nulls (AC-5/AC-6).
 	GetAvgScoreByTrack(ctx context.Context) (map[string]*float64, error)
+
+	// ── FR-BB52: Per-Exam Analytics ──────────────────────────────────────────
+
+	// GetExamTitle returns the title for the given exam ID, or ErrNotFound if
+	// no exam with that ID exists.
+	GetExamTitle(ctx context.Context, examID string) (string, error)
+
+	// GetExamScoreDistribution returns raw bucket counts for completed sessions
+	// of an exam.  Buckets with zero sessions are absent; the service layer fills
+	// them in.
+	GetExamScoreDistribution(ctx context.Context, examID string) ([]BucketCount, error)
+
+	// GetExamSummaryStats returns aggregate statistics for completed sessions of
+	// an exam.  All numeric fields may be nil when no sessions exist.
+	GetExamSummaryStats(ctx context.Context, examID string) (*examSummaryRow, error)
+
+	// GetPerQuestionStats returns per-question analytics rows for all distinct
+	// questions that appeared in completed sessions of an exam.
+	GetPerQuestionStats(ctx context.Context, examID string) ([]questionStatRow, error)
+
+	// GetAnswerDistribution returns option selection counts for every answer
+	// option across all completed sessions for an exam.
+	GetAnswerDistribution(ctx context.Context, examID string) ([]answerDistRow, error)
 }
 
 type postgresRepository struct {
@@ -313,6 +336,205 @@ GROUP BY c.track`
 		}
 		v := row.AvgScore
 		result[row.Track] = &v
+	}
+	return result, rows.Err()
+}
+
+// ── FR-BB52: Per-Exam Analytics ──────────────────────────────────────────────
+
+// examSummaryRow is the internal scan target for summary stats.
+type examSummaryRow struct {
+	AvgScore           *float64 `db:"avg_score"`
+	MedianScore        *float64 `db:"median_score"`
+	TotalAttempts      int      `db:"total_attempts"`
+	UniqueParticipants int      `db:"unique_participants"`
+	PassRate           *float64 `db:"pass_rate"`
+}
+
+// questionStatRow is the internal scan target for per-question analytics.
+type questionStatRow struct {
+	QuestionID     string   `db:"question_id"`
+	StemPreview    string   `db:"stem_preview"`
+	CorrectRate    *float64 `db:"correct_rate"`
+	AvgTimeSeconds *float64 `db:"avg_time_seconds"`
+}
+
+// answerDistRow is the internal scan target for answer distribution.
+type answerDistRow struct {
+	QuestionID  string `db:"question_id"`
+	OptionID    string `db:"option_id"`
+	OptionText  string `db:"option_text"`
+	SelectCount int    `db:"select_count"`
+}
+
+// GetExamTitle returns the exam title or ErrNotFound.
+func (r *postgresRepository) GetExamTitle(ctx context.Context, examID string) (string, error) {
+	var title string
+	err := r.db.QueryRowContext(ctx, `SELECT title FROM exams WHERE id = $1`, examID).Scan(&title)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return "", ErrNotFound
+		}
+		// Check for standard database/sql package sentinel using string match since
+		// we cannot import database/sql here without a cycle concern.
+		return "", fmt.Errorf("reports: GetExamTitle: %w", err)
+	}
+	return title, nil
+}
+
+// GetExamScoreDistribution returns raw (non-zero) bucket counts.
+func (r *postgresRepository) GetExamScoreDistribution(ctx context.Context, examID string) ([]BucketCount, error) {
+	const q = `
+SELECT
+  CASE
+    WHEN score_pct >= 90 THEN '90-100'
+    WHEN score_pct >= 80 THEN '80-90'
+    WHEN score_pct >= 70 THEN '70-80'
+    WHEN score_pct >= 60 THEN '60-70'
+    WHEN score_pct >= 50 THEN '50-60'
+    WHEN score_pct >= 40 THEN '40-50'
+    WHEN score_pct >= 30 THEN '30-40'
+    WHEN score_pct >= 20 THEN '20-30'
+    WHEN score_pct >= 10 THEN '10-20'
+    ELSE '0-10'
+  END AS bucket,
+  COUNT(*) AS count
+FROM exam_sessions
+WHERE exam_id = $1
+  AND status IN ('submitted','auto_submitted','grading_pending')
+GROUP BY bucket`
+
+	type bucketRow struct {
+		Bucket string `db:"bucket"`
+		Count  int    `db:"count"`
+	}
+
+	rows, err := r.db.QueryxContext(ctx, q, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetExamScoreDistribution: %w", err)
+	}
+	defer rows.Close()
+
+	var result []BucketCount
+	for rows.Next() {
+		var row bucketRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, fmt.Errorf("reports: GetExamScoreDistribution: scan: %w", err)
+		}
+		result = append(result, BucketCount{Bucket: row.Bucket, Count: row.Count})
+	}
+	return result, rows.Err()
+}
+
+// GetExamSummaryStats returns aggregate stats for completed sessions.
+func (r *postgresRepository) GetExamSummaryStats(ctx context.Context, examID string) (*examSummaryRow, error) {
+	const q = `
+SELECT
+  ROUND(AVG(score_pct)::numeric, 1)                                           AS avg_score,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score_pct)                      AS median_score,
+  COUNT(*)                                                                     AS total_attempts,
+  COUNT(DISTINCT user_id)                                                      AS unique_participants,
+  ROUND(
+    COUNT(*) FILTER (WHERE passed = TRUE)::DECIMAL / NULLIF(COUNT(*), 0), 4
+  )                                                                            AS pass_rate
+FROM exam_sessions
+WHERE exam_id = $1
+  AND status IN ('submitted','auto_submitted','grading_pending')`
+
+	var row examSummaryRow
+	if err := r.db.QueryRowxContext(ctx, q, examID).StructScan(&row); err != nil {
+		return nil, fmt.Errorf("reports: GetExamSummaryStats: %w", err)
+	}
+	return &row, nil
+}
+
+// GetPerQuestionStats returns per-question analytics for all questions that
+// appeared in at least one completed session.
+func (r *postgresRepository) GetPerQuestionStats(ctx context.Context, examID string) ([]questionStatRow, error) {
+	const q = `
+SELECT
+  q.id                                                                AS question_id,
+  LEFT(qt.stem, 100)                                                  AS stem_preview,
+  ROUND(
+    COUNT(sqs.question_id) FILTER (WHERE sqs.score = sqs.max_score)::DECIMAL
+    / NULLIF(COUNT(sqs.question_id), 0), 4
+  )                                                                   AS correct_rate,
+  ROUND(AVG(sqs.time_taken_seconds)::numeric, 1)                     AS avg_time_seconds
+FROM questions q
+JOIN question_translations qt ON qt.question_id = q.id AND qt.locale = q.default_locale
+LEFT JOIN session_question_scores sqs ON sqs.question_id = q.id
+  AND sqs.session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+  )
+WHERE q.id IN (
+  SELECT DISTINCT question_id FROM session_questions
+  WHERE session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+  )
+)
+GROUP BY q.id, qt.stem
+ORDER BY q.id`
+
+	rows, err := r.db.QueryxContext(ctx, q, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetPerQuestionStats: %w", err)
+	}
+	defer rows.Close()
+
+	var result []questionStatRow
+	for rows.Next() {
+		var row questionStatRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, fmt.Errorf("reports: GetPerQuestionStats: scan: %w", err)
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+// GetAnswerDistribution returns option-level selection counts across all completed
+// sessions for every question that appeared in those sessions.
+func (r *postgresRepository) GetAnswerDistribution(ctx context.Context, examID string) ([]answerDistRow, error) {
+	const q = `
+SELECT
+  q.id                                                               AS question_id,
+  ao.id                                                              AS option_id,
+  COALESCE(at_t.text, '')                                            AS option_text,
+  COUNT(sa.id)                                                       AS select_count
+FROM questions q
+JOIN answer_options ao ON ao.question_id = q.id
+LEFT JOIN answer_translations at_t ON at_t.option_id = ao.id AND at_t.locale = q.default_locale
+LEFT JOIN session_answers sa
+  ON sa.selected_option_ids @> jsonb_build_array(ao.id::text)
+  AND sa.session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+  )
+WHERE q.id IN (
+  SELECT DISTINCT question_id FROM session_questions
+  WHERE session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+  )
+)
+GROUP BY q.id, ao.id, at_t.text, ao.sort_order
+ORDER BY q.id, ao.sort_order`
+
+	rows, err := r.db.QueryxContext(ctx, q, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetAnswerDistribution: %w", err)
+	}
+	defer rows.Close()
+
+	var result []answerDistRow
+	for rows.Next() {
+		var row answerDistRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, fmt.Errorf("reports: GetAnswerDistribution: scan: %w", err)
+		}
+		result = append(result, row)
 	}
 	return result, rows.Err()
 }

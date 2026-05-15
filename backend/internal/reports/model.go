@@ -1,7 +1,14 @@
-// Package reports implements the dashboard metrics API (FR-BB51).
+// Package reports implements the dashboard metrics API (FR-BB51) and
+// per-exam analytics API (FR-BB52).
 package reports
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+// ErrNotFound is returned by repository methods when no matching row exists.
+var ErrNotFound = errors.New("not found")
 
 // DashboardMetrics is the top-level response returned by GET /api/v1/admin/dashboard.
 type DashboardMetrics struct {
@@ -45,4 +52,41 @@ type TrackScores struct {
 	Security *float64 `json:"security"`
 	Safety   *float64 `json:"safety"`
 	Loyalty  *float64 `json:"loyalty"`
+}
+
+// ── Per-Exam Analytics (FR-BB52) ─────────────────────────────────────────────
+
+// ExamAnalyticsResponse is the top-level response for GET /api/v1/admin/exams/{id}/analytics.
+type ExamAnalyticsResponse struct {
+	ExamID             string          `json:"exam_id"`
+	ExamTitle          string          `json:"exam_title"`
+	ScoreDistribution  []BucketCount   `json:"score_distribution"`
+	PassRate           float64         `json:"pass_rate"`
+	AvgScore           *float64        `json:"avg_score"`
+	MedianScore        *float64        `json:"median_score"`
+	TotalAttempts      int             `json:"total_attempts"`
+	UniqueParticipants int             `json:"unique_participants"`
+	PerQuestionStats   []QuestionStat  `json:"per_question_stats"`
+}
+
+// BucketCount holds the session count for one score-distribution bucket.
+type BucketCount struct {
+	Bucket string `json:"bucket"`
+	Count  int    `json:"count"`
+}
+
+// QuestionStat holds per-question analytics data.
+type QuestionStat struct {
+	QuestionID          string              `json:"question_id"`
+	StemPreview         string              `json:"stem_preview"`
+	CorrectRate         *float64            `json:"correct_rate"`
+	AvgTimeSeconds      *float64            `json:"avg_time_seconds"`
+	AnswerDistribution  []AnswerOptionCount  `json:"answer_distribution"`
+}
+
+// AnswerOptionCount holds the selection count for one answer option.
+type AnswerOptionCount struct {
+	OptionID   string `json:"option_id"`
+	OptionText string `json:"option_text"`
+	SelectCount int   `json:"select_count"`
 }

@@ -1,9 +1,11 @@
 package reports
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/go-chi/chi/v5"
 )
 
 // Handler handles HTTP requests for the reports domain.
@@ -26,4 +28,26 @@ func (h *Handler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": metrics, "error": nil})
+}
+
+// GetExamAnalytics handles GET /api/v1/admin/exams/{id}/analytics (FR-BB52).
+// Role restriction (examiner+) is enforced by the router via rbac.RequirePermission.
+func (h *Handler) GetExamAnalytics(w http.ResponseWriter, r *http.Request) {
+	examID := chi.URLParam(r, "id")
+	if examID == "" {
+		api.WriteError(w, http.StatusBadRequest, "ERR_INVALID_PARAM", "exam id is required")
+		return
+	}
+
+	result, err := h.svc.GetExamAnalytics(r.Context(), examID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			api.WriteError(w, http.StatusNotFound, "EXAM_NOT_FOUND", "exam not found")
+			return
+		}
+		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to load exam analytics")
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": result, "error": nil})
 }

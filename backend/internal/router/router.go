@@ -216,6 +216,10 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
 				Get("/admin/dashboard", reportsHandler.GetDashboard)
 
+			// Per-exam analytics (FR-BB52) — examiner+ only.
+			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+				Get("/admin/exams/{id}/analytics", reportsHandler.GetExamAnalytics)
+
 			// Manual grading queue (FR-BB42).
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading", sessionsHandler.HandleListGradingQueue)
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)

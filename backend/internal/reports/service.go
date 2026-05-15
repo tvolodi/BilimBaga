@@ -11,6 +11,9 @@ type Service interface {
 	// GetDashboardMetrics returns all four metric groups for the dashboard (FR-BB51).
 	// The four underlying queries are executed concurrently via goroutines + WaitGroup.
 	GetDashboardMetrics(ctx context.Context) (*DashboardMetrics, error)
+
+	// GetExamAnalytics returns deep analytics for a single exam (FR-BB52).
+	GetExamAnalytics(ctx context.Context, examID string) (*ExamAnalyticsResponse, error)
 }
 
 type service struct {
@@ -91,5 +94,101 @@ func (s *service) GetDashboardMetrics(ctx context.Context) (*DashboardMetrics, e
 		OverdueEmployees:     overdue,
 		RecentActivity:       recent,
 		AvgScoreByTrack:      trackScores,
+	}, nil
+}
+
+// ── FR-BB52: Per-Exam Analytics ──────────────────────────────────────────────
+
+// orderedBuckets defines the 10 fixed score-distribution buckets in ascending order.
+var orderedBuckets = []string{
+	"0-10", "10-20", "20-30", "30-40", "40-50",
+	"50-60", "60-70", "70-80", "80-90", "90-100",
+}
+
+// fillBuckets ensures the returned slice always contains exactly 10 buckets
+// labelled "0-10" through "90-100", zero-filling any that are absent from raw.
+func fillBuckets(raw []BucketCount) []BucketCount {
+	counts := make(map[string]int, len(raw))
+	for _, b := range raw {
+		counts[b.Bucket] = b.Count
+	}
+	out := make([]BucketCount, len(orderedBuckets))
+	for i, label := range orderedBuckets {
+		out[i] = BucketCount{Bucket: label, Count: counts[label]}
+	}
+	return out
+}
+
+// GetExamAnalytics returns full analytics for one exam (FR-BB52).
+func (s *service) GetExamAnalytics(ctx context.Context, examID string) (*ExamAnalyticsResponse, error) {
+	// Verify exam exists (returns 404-able ErrNotFound if absent).
+	title, err := s.repo.GetExamTitle(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetExamAnalytics: %w", err)
+	}
+
+	// Fetch all four analytics data sets.
+	rawBuckets, err := s.repo.GetExamScoreDistribution(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetExamAnalytics: %w", err)
+	}
+
+	summary, err := s.repo.GetExamSummaryStats(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetExamAnalytics: %w", err)
+	}
+
+	qStats, err := s.repo.GetPerQuestionStats(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetExamAnalytics: %w", err)
+	}
+
+	answerRows, err := s.repo.GetAnswerDistribution(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetExamAnalytics: %w", err)
+	}
+
+	// Coerce nil pass_rate to 0.0 (AC-3).
+	passRate := 0.0
+	if summary.PassRate != nil {
+		passRate = *summary.PassRate
+	}
+
+	// Group answer distribution rows by question_id.
+	optionsByQuestion := make(map[string][]AnswerOptionCount)
+	for _, row := range answerRows {
+		optionsByQuestion[row.QuestionID] = append(optionsByQuestion[row.QuestionID], AnswerOptionCount{
+			OptionID:    row.OptionID,
+			OptionText:  row.OptionText,
+			SelectCount: row.SelectCount,
+		})
+	}
+
+	// Build per-question stats.
+	perQuestion := make([]QuestionStat, 0, len(qStats))
+	for _, qs := range qStats {
+		options := optionsByQuestion[qs.QuestionID]
+		if options == nil {
+			options = []AnswerOptionCount{}
+		}
+		perQuestion = append(perQuestion, QuestionStat{
+			QuestionID:         qs.QuestionID,
+			StemPreview:        qs.StemPreview,
+			CorrectRate:        qs.CorrectRate,
+			AvgTimeSeconds:     qs.AvgTimeSeconds,
+			AnswerDistribution: options,
+		})
+	}
+
+	return &ExamAnalyticsResponse{
+		ExamID:             examID,
+		ExamTitle:          title,
+		ScoreDistribution:  fillBuckets(rawBuckets),
+		PassRate:           passRate,
+		AvgScore:           summary.AvgScore,
+		MedianScore:        summary.MedianScore,
+		TotalAttempts:      summary.TotalAttempts,
+		UniqueParticipants: summary.UniqueParticipants,
+		PerQuestionStats:   perQuestion,
 	}, nil
 }

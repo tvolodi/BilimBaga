@@ -6,22 +6,22 @@
 | ID | FR-BB52 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 1 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB311 |
 
 ## Description
 Delivers deep statistical analysis for a single exam: score distribution across 10 percentage buckets, pass rate, mean and median scores, attempt/participant counts, and per-question item analysis including correct rate, average answer time, and option selection distribution. This data powers the per-exam analytics frontend (FR-BB57) and the CSV export (FR-BB54).
 
 ## Acceptance Criteria
-- [ ] AC-1: The endpoint requires `role IN (examiner, hr_admin, super_admin)` and scopes data to the caller's tenant; returns 404 if the exam does not exist in the tenant.
+- [ ] AC-1: The endpoint requires the caller to have `reports.read` permission (roles: `examiner`, `department_admin`, `super_admin`); returns 401 if unauthenticated, 403 if the role lacks the permission, and 404 if no exam with the given ID exists.
 - [ ] AC-2: `score_distribution` always contains exactly 10 buckets labelled `"0-10"`, `"10-20"`, …, `"90-100"`, even if count is 0; the last bucket is inclusive of 100.
 - [ ] AC-3: `pass_rate` is `passed_count / total_attempts`; if `total_attempts = 0`, returns 0.0.
 - [ ] AC-4: `median_score` is computed using the `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score_pct)` PostgreSQL aggregate; returns null if no sessions exist.
-- [ ] AC-5: `total_attempts` counts all sessions with `status IN ('submitted','grading_pending')`; `unique_participants` counts distinct `user_id` values among those sessions.
-- [ ] AC-6: `per_question_stats` includes every question currently assigned to the exam (not deleted); `correct_rate` is the fraction of sessions where `score = max_score` for that question.
-- [ ] AC-7: `avg_time_seconds` per question is computed as the average of `session_question_scores.time_taken_seconds` where that column is not null; returns null if no timing data exists.
-- [ ] AC-8: `answer_distribution` in `per_question_stats` lists every option for that question with its selection count across all sessions; options with zero selections are included.
-- [ ] AC-9: `stem_preview` is the first 100 characters of `questions.stem`; truncation does not cut mid-word (uses `LEFT(stem, 100)`).
+- [ ] AC-5: `total_attempts` counts all sessions with `status IN ('submitted', 'auto_submitted', 'grading_pending')`; `unique_participants` counts distinct `user_id` values among those sessions. Sessions with status `in_progress` are excluded.
+- [ ] AC-6: `per_question_stats` covers every distinct question that appeared in at least one completed session for the exam (sourced from `session_questions`); `correct_rate` is the fraction of `session_question_scores` rows for that question where `score = max_score`.
+- [ ] AC-7: `avg_time_seconds` per question is computed as the average of `session_question_scores.time_taken_seconds` where that column is not null; returns null if no timing data exists. The `time_taken_seconds` column is added by migration 021.
+- [ ] AC-8: `answer_distribution` in `per_question_stats` lists every `answer_options` row for that question with its selection count across all completed sessions; options with zero selections are included. Option text is sourced from `answer_translations` using the question's `default_locale`.
+- [ ] AC-9: `stem_preview` is produced with `LEFT(qt.stem, 100)` where `qt` is the `question_translations` row for the question's `default_locale`.
 - [ ] AC-10: The endpoint responds in under 1 second for exams with up to 5,000 sessions and 50 questions.
 
 ## Technical Specification
@@ -30,7 +30,7 @@ Delivers deep statistical analysis for a single exam: score distribution across 
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/admin/exams/:id/analytics` | examiner+ | Full analytics for one exam |
+| GET | `/api/v1/admin/exams/:id/analytics` | `reports.read` permission | Full analytics for one exam |
 
 #### Response Shape (200)
 
@@ -74,9 +74,34 @@ Delivers deep statistical analysis for a single exam: score distribution across 
 }
 ```
 
+#### Error Responses
+
+| Status | `error.code` | Condition |
+|--------|-------------|-----------|
+| 401 | `UNAUTHORIZED` | Missing or invalid JWT |
+| 403 | `FORBIDDEN` | Authenticated but role lacks `reports.read` permission |
+| 404 | `EXAM_NOT_FOUND` | No exam exists with the given ID |
+| 500 | `INTERNAL_ERROR` | Unexpected database or server error |
+
 ### Repository Queries
 
+The completed-session subquery used in all queries below:
+
 ```sql
+-- Reusable subquery: IDs of completed sessions for an exam
+-- Included statuses: submitted, auto_submitted, grading_pending
+-- auto_submitted sessions (time-expired) are included because they represent
+-- genuine attempt data; excluding them would undercount attempts and distort analytics.
+-- in_progress sessions are excluded as grading is not yet complete.
+SELECT id FROM exam_sessions
+WHERE exam_id = $1
+  AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+```
+
+```sql
+-- Exam title lookup (404 if no row returned)
+SELECT title FROM exams WHERE id = $1;
+
 -- Score distribution (10 fixed buckets)
 SELECT
   bucket,
@@ -97,60 +122,87 @@ FROM (
     END AS bucket
   FROM exam_sessions
   WHERE exam_id = $1
-    AND tenant_id = $2
-    AND status IN ('submitted','grading_pending')
+    AND status IN ('submitted', 'auto_submitted', 'grading_pending')
 ) sub
 GROUP BY bucket;
 
 -- Summary stats
 SELECT
-  ROUND(AVG(score_pct), 1) AS avg_score,
-  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score_pct) AS median_score,
-  COUNT(*) AS total_attempts,
-  COUNT(DISTINCT user_id) AS unique_participants,
+  ROUND(AVG(score_pct), 1)                                              AS avg_score,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score_pct)               AS median_score,
+  COUNT(*)                                                              AS total_attempts,
+  COUNT(DISTINCT user_id)                                               AS unique_participants,
   ROUND(
     COUNT(*) FILTER (WHERE passed = TRUE)::DECIMAL / NULLIF(COUNT(*), 0), 4
-  ) AS pass_rate
+  )                                                                     AS pass_rate
 FROM exam_sessions
 WHERE exam_id = $1
-  AND tenant_id = $2
-  AND status IN ('submitted','grading_pending');
+  AND status IN ('submitted', 'auto_submitted', 'grading_pending');
 
 -- Per-question stats
+-- Questions are sourced from session_questions (the resolved question set per session).
+-- Distinct question_ids across all completed sessions give the full question pool for this exam.
+-- Stem text comes from question_translations using the question's default_locale.
+-- Questions are ordered by q.id for stable, deterministic output (no exam-level position column exists).
 SELECT
-  q.id AS question_id,
-  LEFT(q.stem, 100) AS stem_preview,
+  q.id                                                                  AS question_id,
+  LEFT(qt.stem, 100)                                                    AS stem_preview,
   ROUND(
-    COUNT(sqs.id) FILTER (WHERE sqs.score = sqs.max_score)::DECIMAL
-    / NULLIF(COUNT(sqs.id), 0), 4
-  ) AS correct_rate,
-  ROUND(AVG(sqs.time_taken_seconds), 1) AS avg_time_seconds
-FROM questions q
+    COUNT(sqs.question_id) FILTER (WHERE sqs.score = sqs.max_score)::DECIMAL
+    / NULLIF(COUNT(sqs.question_id), 0), 4
+  )                                                                     AS correct_rate,
+  ROUND(AVG(sqs.time_taken_seconds), 1)                                 AS avg_time_seconds
+FROM (
+  SELECT DISTINCT question_id
+  FROM session_questions
+  WHERE session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1
+      AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+  )
+) sq_dist
+JOIN questions q ON q.id = sq_dist.question_id
+JOIN question_translations qt ON qt.question_id = q.id AND qt.locale = q.default_locale
 LEFT JOIN session_question_scores sqs ON sqs.question_id = q.id
   AND sqs.session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND tenant_id = $2 AND status IN ('submitted','grading_pending')
+    WHERE exam_id = $1
+      AND status IN ('submitted', 'auto_submitted', 'grading_pending')
   )
-WHERE q.exam_id = $1
-GROUP BY q.id, q.stem
-ORDER BY q.position;
+GROUP BY q.id, qt.stem
+ORDER BY q.id;
 
--- Answer distribution per option (fetched in bulk, grouped in Go)
+-- Answer distribution per option (fetched in bulk for all questions, grouped in Go)
+-- answer_options replaces the non-existent question_options table.
+-- Option text comes from answer_translations using the question's default_locale.
+-- selected_option_ids is a JSONB array; containment operator @> is used for matching.
 SELECT
-  q.id AS question_id,
-  qo.id AS option_id,
-  LEFT(qo.text, 100) AS option_text,
-  COUNT(sa.id) AS select_count
-FROM questions q
-JOIN question_options qo ON qo.question_id = q.id
-LEFT JOIN session_answers sa ON sa.selected_option_id = qo.id
+  q.id                                                                  AS question_id,
+  ao.id                                                                 AS option_id,
+  LEFT(at2.text, 100)                                                   AS option_text,
+  COUNT(sa.id) FILTER (
+    WHERE sa.selected_option_ids @> jsonb_build_array(ao.id::text)
+  )                                                                     AS select_count
+FROM (
+  SELECT DISTINCT question_id
+  FROM session_questions
+  WHERE session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1
+      AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+  )
+) sq_dist
+JOIN questions q ON q.id = sq_dist.question_id
+JOIN answer_options ao ON ao.question_id = q.id
+JOIN answer_translations at2 ON at2.option_id = ao.id AND at2.locale = q.default_locale
+LEFT JOIN session_answers sa ON sa.question_id = ao.question_id
   AND sa.session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND tenant_id = $2 AND status IN ('submitted','grading_pending')
+    WHERE exam_id = $1
+      AND status IN ('submitted', 'auto_submitted', 'grading_pending')
   )
-WHERE q.exam_id = $1
-GROUP BY q.id, qo.id, qo.text
-ORDER BY q.position, qo.position;
+GROUP BY q.id, ao.id, at2.text
+ORDER BY q.id, ao.sort_order;
 ```
 
 ### Score Distribution: Zero-Filling in Go
@@ -172,6 +224,12 @@ func fillBuckets(raw []BucketCount) []BucketCount {
 ```
 
 ## Notes
-- `time_taken_seconds` on `session_question_scores` is not currently in the schema. The migration for this column should be added alongside the FR-BB52 implementation migration.
-- For short-text questions, `answer_distribution` is omitted (empty array) since there are no discrete options.
-- Per-question stats are sorted by question position to match the exam's question order in the UI.
+- **Tenant isolation**: The system is single-tenant per deployment. `exam_sessions` and `exams` have no `tenant_id` column. Tenant-level access control is enforced at the JWT middleware layer (claims-based). No `tenant_id` filter is applied in SQL queries.
+- **`time_taken_seconds` column**: Not present in the current schema. Migration **021** must add `ALTER TABLE session_question_scores ADD COLUMN IF NOT EXISTS time_taken_seconds DECIMAL(8,2);` before this feature is deployed. Until then, `avg_time_seconds` will always be null.
+- **`auto_submitted` sessions included**: Sessions with `status = 'auto_submitted'` (timer-expired auto-submit) are included in all analytics aggregates. These represent genuine completed attempts and excluding them would undercount participation and skew score distributions.
+- **Question sourcing via `session_questions`**: Questions have no `exam_id` column and are not directly linked to exams. The `session_questions` table records the resolved question set for each session. Distinct `question_id` values across all completed sessions for an exam form the analytics question pool.
+- **Stem text locale**: `question_translations.stem` is joined using `q.default_locale` as the fallback. If a question has no translation for its `default_locale`, the question is excluded from results (INNER JOIN semantics). Implementors may relax this to a LEFT JOIN with COALESCE if needed.
+- **Option text locale**: `answer_translations` is joined on `at2.locale = q.default_locale` (same locale as the stem). Missing translations cause the option to be excluded (same caveat as above).
+- **For short-text questions**: `answer_distribution` is omitted (empty array) since `answer_options` rows do not exist for `type = 'shorttext'` questions.
+- **Question ordering**: Questions are ordered by `q.id` (UUID, deterministic) because no exam-level question position column exists. The `session_questions.sort_order` varies per session due to shuffling and cannot be used as a canonical position.
+- **Roles with `reports.read` permission** (per migration 005): `examiner`, `department_admin`, and `super_admin`. The `employee` role does not have this permission.

@@ -11,11 +11,12 @@ import (
 // --- Mock Repository ---
 
 type mockRepository struct {
-	questions   map[string]*Question
-	createFn    func(ctx context.Context, q *Question) error
-	createVerFn func(ctx context.Context, newQ *Question, previousID string) error
-	createOptFn func(ctx context.Context, opt *AnswerOption) error
-	tagExistsFn func(ctx context.Context, tagID string) (bool, error)
+	questions        map[string]*Question
+	createFn         func(ctx context.Context, q *Question) error
+	createVerFn      func(ctx context.Context, newQ *Question, previousID string) error
+	createOptFn      func(ctx context.Context, opt *AnswerOption) error
+	tagExistsFn      func(ctx context.Context, tagID string) (bool, error)
+	GetTranslationFn func(ctx context.Context, questionID, locale string) (*QuestionTranslation, error)
 }
 
 func newMockRepo() *mockRepository {
@@ -84,7 +85,10 @@ func (m *mockRepository) CreateTranslation(_ context.Context, t *QuestionTransla
 	return nil
 }
 
-func (m *mockRepository) GetTranslation(_ context.Context, questionID, locale string) (*QuestionTranslation, error) {
+func (m *mockRepository) GetTranslation(ctx context.Context, questionID, locale string) (*QuestionTranslation, error) {
+	if m.GetTranslationFn != nil {
+		return m.GetTranslationFn(ctx, questionID, locale)
+	}
 	if _, ok := m.questions[questionID]; ok {
 		return &QuestionTranslation{QuestionID: questionID, Locale: locale, Stem: "mock stem"}, nil
 	}
@@ -601,5 +605,159 @@ func TestTagQuestion_NonExistentTagReturnsErrTagNotFound(t *testing.T) {
 	err := svc.TagQuestion(context.Background(), "q-1", "nonexistent-tag")
 	if !errors.Is(err, ErrTagNotFound) {
 		t.Errorf("expected ErrTagNotFound, got %v", err)
+	}
+}
+
+// ── FR-BB22 AC-specific tests ─────────────────────────────────────────────────
+
+// AC-7: version starts at 1, set by application (not DB trigger).
+func TestCreateQuestion_VersionStartsAtOne(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	q, err := svc.CreateQuestion(context.Background(), CreateQuestionInput{
+		CategoryID:    "cat-1",
+		Difficulty:    "easy",
+		Type:          "single",
+		DefaultLocale: "kk",
+		CreatedBy:     "user-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if q.Version != 1 {
+		t.Errorf("AC-7: version must start at 1, got %d", q.Version)
+	}
+}
+
+// AC-7: version increments by exactly 1 on each new version.
+func TestPublishNewVersion_VersionIncrementsBy1(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	// Seed a version-3 question to ensure increment is always +1.
+	prev := &Question{
+		ID:            "q-v3",
+		CategoryID:    "cat-1",
+		Difficulty:    "easy",
+		Type:          "single",
+		DefaultLocale: "kk",
+		Status:        "active",
+		CreatedBy:     "user-1",
+		Version:       3,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	repo.questions["q-v3"] = prev
+
+	newQ, err := svc.PublishNewVersion(context.Background(), "q-v3", CreateQuestionInput{
+		CategoryID: "cat-1",
+		Difficulty: "easy",
+		Type:       "single",
+		CreatedBy:  "user-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if newQ.Version != 4 {
+		t.Errorf("AC-7: expected version=4 (3+1), got %d", newQ.Version)
+	}
+}
+
+// AC-6: only one active question per version chain at any time.
+// Creating a new version archives the previous one atomically.
+func TestPublishNewVersion_OnlyOneActiveInChain(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	// Seed an active question (v1) and its already-archived parent (v1's predecessor).
+	prev := &Question{
+		ID:            "q-active",
+		CategoryID:    "cat-1",
+		Difficulty:    "easy",
+		Type:          "single",
+		DefaultLocale: "kk",
+		Status:        "active",
+		CreatedBy:     "user-1",
+		Version:       1,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	repo.questions["q-active"] = prev
+
+	newQ, err := svc.PublishNewVersion(context.Background(), "q-active", CreateQuestionInput{
+		CategoryID: "cat-1",
+		Difficulty: "easy",
+		Type:       "single",
+		CreatedBy:  "user-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The new question must not be active (it starts as draft).
+	if newQ.Status == "active" {
+		t.Errorf("AC-6: new version must not be active, got %q", newQ.Status)
+	}
+
+	// The previous active question must now be archived.
+	archived := repo.questions["q-active"]
+	if archived.Status != "archived" {
+		t.Errorf("AC-6: previous active question must be archived atomically, got %q", archived.Status)
+	}
+}
+
+// AC-8: TransitionStatus to 'review' requires default_locale stem to exist.
+func TestTransitionStatus_RequiresStemForReview(t *testing.T) {
+	repo := newMockRepo()
+
+	// Override GetTranslation to return ErrNotFound — no stem exists.
+	repo.GetTranslationFn = func(_ context.Context, _, _ string) (*QuestionTranslation, error) {
+		return nil, ErrNotFound
+	}
+	svc := NewService(repo)
+
+	q := &Question{
+		ID:            "q-nostem",
+		Status:        "draft",
+		DefaultLocale: "kk",
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	repo.questions["q-nostem"] = q
+
+	_, err := svc.TransitionStatus(context.Background(), "q-nostem", "review")
+	if err == nil {
+		t.Fatal("AC-8: expected ErrStemRequired when default_locale translation is missing, got nil")
+	}
+	if !errors.Is(err, ErrStemRequired) {
+		t.Errorf("AC-8: expected ErrStemRequired, got %v", err)
+	}
+}
+
+// AC-8: TransitionStatus to 'active' also requires default_locale stem.
+func TestTransitionStatus_RequiresStemForActive(t *testing.T) {
+	repo := newMockRepo()
+
+	repo.GetTranslationFn = func(_ context.Context, _, _ string) (*QuestionTranslation, error) {
+		return nil, ErrNotFound
+	}
+	svc := NewService(repo)
+
+	q := &Question{
+		ID:            "q-nostem",
+		Status:        "review",
+		DefaultLocale: "kk",
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	repo.questions["q-nostem"] = q
+
+	_, err := svc.TransitionStatus(context.Background(), "q-nostem", "active")
+	if err == nil {
+		t.Fatal("AC-8: expected ErrStemRequired when default_locale translation is missing, got nil")
+	}
+	if !errors.Is(err, ErrStemRequired) {
+		t.Errorf("AC-8: expected ErrStemRequired, got %v", err)
 	}
 }

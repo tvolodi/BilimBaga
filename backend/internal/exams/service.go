@@ -4,8 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 )
+
+// uuidPattern matches a UUID v4 string (case-insensitive).
+var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// isValidUUID returns true if s is a valid UUID string.
+func isValidUUID(s string) bool {
+	return uuidPattern.MatchString(s)
+}
 
 // Service defines the business logic for the exams domain.
 type Service interface {
@@ -49,6 +58,11 @@ var validTransitions = map[string]string{
 }
 
 func (s *service) CreateExam(ctx context.Context, input CreateExamInput) (*Exam, error) {
+	// Validate availability window.
+	if input.AvailableFrom != nil && input.AvailableUntil != nil &&
+		!input.AvailableFrom.Before(*input.AvailableUntil) {
+		return nil, fmt.Errorf("%w: available_from must be before available_until", ErrInvalidInput)
+	}
 	e := &Exam{
 		Title:              input.Title,
 		Description:        input.Description,
@@ -240,6 +254,12 @@ func (s *service) CreateRule(ctx context.Context, examID string, input QuestionR
 	if _, err := s.repo.GetByID(ctx, examID); err != nil {
 		return nil, fmt.Errorf("exams: CreateRule: %w", err)
 	}
+	// Validate that every tag_id is a valid UUID string.
+	for _, tagID := range input.TagIDs {
+		if !isValidUUID(tagID) {
+			return nil, fmt.Errorf("%w: tag_id %q is not a valid UUID", ErrInvalidInput, tagID)
+		}
+	}
 	rule, err := s.repo.CreateRule(ctx, examID, input)
 	if err != nil {
 		return nil, fmt.Errorf("exams: CreateRule: %w", err)
@@ -250,6 +270,12 @@ func (s *service) CreateRule(ctx context.Context, examID string, input QuestionR
 func (s *service) UpdateRule(ctx context.Context, examID, ruleID string, input QuestionRuleInput) (*ExamQuestionRule, error) {
 	if _, err := s.repo.GetByID(ctx, examID); err != nil {
 		return nil, fmt.Errorf("exams: UpdateRule: %w", err)
+	}
+	// Validate that every tag_id is a valid UUID string.
+	for _, tagID := range input.TagIDs {
+		if !isValidUUID(tagID) {
+			return nil, fmt.Errorf("%w: tag_id %q is not a valid UUID", ErrInvalidInput, tagID)
+		}
 	}
 	rule, err := s.repo.UpdateRule(ctx, ruleID, input)
 	if err != nil {

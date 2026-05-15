@@ -1,0 +1,36 @@
+{
+  "run_id": "FR-BB31",
+  "pipeline": "A",
+  "requirement_doc": "docs/requirements/FR-BB31.Exam-configuration-model.md",
+  "changed_files": [
+    "backend/internal/exams/service.go",
+    "backend/internal/exams/service_test.go"
+  ],
+  "pre_existing_files_reviewed": [
+    "backend/internal/exams/model.go",
+    "backend/internal/exams/repository.go",
+    "backend/internal/exams/handler.go",
+    "backend/internal/exams/handler_test.go",
+    "backend/migrations/012_exams.up.sql",
+    "backend/migrations/012_exams.down.sql"
+  ],
+  "acceptance_criteria": [
+    "AC-1: exams table exists with all specified columns; status column accepts only 'draft', 'active', 'archived' via ENUM constraint.",
+    "AC-2: exam_sections table exists with FK to exams.id ON DELETE CASCADE; sort_order is non-negative.",
+    "AC-3: exam_question_rules table exists; mode accepts only 'manual' or 'random'; FK to exams.id ON DELETE CASCADE; FK to exam_sections.id nullable ON DELETE SET NULL.",
+    "AC-4: exam_manual_questions table exists with composite PK (rule_id, question_id); FKs with ON DELETE CASCADE.",
+    "AC-5: show_answers ENUM accepts only 'never', 'after_completion', 'after_all_attempts'; on_tab_switch ENUM accepts only 'log', 'warn', 'submit'.",
+    "AC-6: All UUID primary keys generated via gen_random_uuid().",
+    "AC-7: created_at and updated_at default to NOW() UTC; updated_at maintained by trigger.",
+    "AC-8: tag_ids stored as JSONB; application validates it is an array of UUID strings.",
+    "AC-9: Migration file numbered sequentially; no existing migration edited.",
+    "AC-10: All tables have indexes on foreign key columns."
+  ],
+  "test_results": {
+    "suite": "backend/internal/exams",
+    "result": "PASS",
+    "total_tests": "80+",
+    "failures": 0
+  },
+  "notes": "The exams package was already substantially implemented (FR-BB32 was already done). This implementation adds service-layer validations required by FR-BB31: (1) available_from < available_until check in CreateExam, (2) tag_ids UUID format validation in CreateRule and UpdateRule. New tests added: TestCreateExam_Success, TestCreateExam_InvalidAvailability, TestCreateExam_EqualAvailability, TestCreateExam_NilAvailability, TestCreateExam_InvalidTagIDs, TestCreateRule_RandomMode, TestCreateRule_ManualMode, TestCreateRule_ValidUUIDTagIDs, TestSetManualQuestions_Success."
+}

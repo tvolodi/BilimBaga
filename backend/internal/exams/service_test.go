@@ -328,6 +328,86 @@ func seedExam(repo *mockRepo, id, status string) {
 
 // ── CreateExam ───────────────────────────────────────────────────────────────
 
+// TestCreateExam_Success is the canonical happy-path test required by FR-BB31.
+func TestCreateExam_Success(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	e, err := svc.CreateExam(context.Background(), CreateExamInput{
+		Title:            "Security Exam",
+		TimeLimitMinutes: 45,
+		PassingScorePct:  75,
+		MaxAttempts:      3,
+		ShowAnswers:      "after_completion",
+		OnTabSwitch:      "warn",
+		CreatedBy:        "user-42",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "draft", e.Status)
+	assert.Equal(t, "Security Exam", e.Title)
+	assert.Equal(t, "user-42", e.CreatedBy)
+}
+
+// TestCreateExam_InvalidAvailability verifies that available_from >= available_until is rejected.
+func TestCreateExam_InvalidAvailability(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	from := time.Now().Add(2 * time.Hour)
+	until := time.Now().Add(1 * time.Hour) // until is before from
+
+	_, err := svc.CreateExam(context.Background(), CreateExamInput{
+		Title:            "Bad Window",
+		TimeLimitMinutes: 30,
+		PassingScorePct:  70,
+		MaxAttempts:      1,
+		AvailableFrom:    &from,
+		AvailableUntil:   &until,
+		ShowAnswers:      "never",
+		OnTabSwitch:      "log",
+		CreatedBy:        "user-1",
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidInput)
+}
+
+// TestCreateExam_EqualAvailability verifies available_from == available_until is also rejected.
+func TestCreateExam_EqualAvailability(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+
+	ts := time.Now().Add(time.Hour)
+	_, err := svc.CreateExam(context.Background(), CreateExamInput{
+		Title:            "Equal Window",
+		TimeLimitMinutes: 30,
+		PassingScorePct:  70,
+		MaxAttempts:      1,
+		AvailableFrom:    &ts,
+		AvailableUntil:   &ts,
+		ShowAnswers:      "never",
+		OnTabSwitch:      "log",
+		CreatedBy:        "user-1",
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidInput)
+}
+
+// TestCreateExam_NilAvailability verifies both nil is valid (no window restriction).
+func TestCreateExam_NilAvailability(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	e, err := svc.CreateExam(context.Background(), CreateExamInput{
+		Title:            "Open Window",
+		TimeLimitMinutes: 30,
+		PassingScorePct:  70,
+		MaxAttempts:      1,
+		ShowAnswers:      "never",
+		OnTabSwitch:      "log",
+		CreatedBy:        "user-1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "draft", e.Status)
+}
+
 func TestCreateExam_SetsStatusDraft(t *testing.T) {
 	repo := newMockRepo()
 	svc := NewService(repo)
@@ -545,6 +625,87 @@ func TestCreateRule_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "random", rule.Mode)
 	assert.Equal(t, 5, rule.Count)
+}
+
+// TestCreateRule_RandomMode verifies a random-mode rule with valid UUIDs is created.
+func TestCreateRule_RandomMode(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	validUUID := "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	rule, err := svc.CreateRule(context.Background(), "exam-1", QuestionRuleInput{
+		Mode:      "random",
+		Count:     3,
+		SortOrder: 0,
+		TagIDs:    []string{validUUID},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "random", rule.Mode)
+	assert.Equal(t, 3, rule.Count)
+}
+
+// TestCreateRule_ManualMode verifies a manual-mode rule is created correctly.
+func TestCreateRule_ManualMode(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	rule, err := svc.CreateRule(context.Background(), "exam-1", QuestionRuleInput{
+		Mode:      "manual",
+		Count:     2,
+		SortOrder: 0,
+		TagIDs:    []string{},
+		Questions: []ManualQuestionInput{
+			{QuestionID: "q-1", SortOrder: 0},
+			{QuestionID: "q-2", SortOrder: 1},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "manual", rule.Mode)
+	assert.Equal(t, 2, rule.Count)
+}
+
+// TestCreateRule_InvalidTagIDs verifies that non-UUID strings in tag_ids are rejected.
+func TestCreateExam_InvalidTagIDs(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	_, err := svc.CreateRule(context.Background(), "exam-1", QuestionRuleInput{
+		Mode:      "random",
+		Count:     5,
+		SortOrder: 0,
+		TagIDs:    []string{"not-a-uuid", "also-bad"},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidInput)
+}
+
+// TestCreateRule_ValidUUIDTagIDs verifies that valid UUID tag_ids pass validation.
+func TestCreateRule_ValidUUIDTagIDs(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	rule, err := svc.CreateRule(context.Background(), "exam-1", QuestionRuleInput{
+		Mode:      "random",
+		Count:     5,
+		SortOrder: 0,
+		TagIDs:    []string{"550e8400-e29b-41d4-a716-446655440000"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "random", rule.Mode)
+}
+
+// TestSetManualQuestions_Success verifies questions are stored for a manual-mode rule.
+func TestSetManualQuestions_Success(t *testing.T) {
+	repo := newMockRepo()
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 3}
+	svc := NewService(repo)
+	err := svc.SetManualQuestions(context.Background(), "rule-1", []ManualQuestionInput{
+		{QuestionID: "q-10", SortOrder: 0},
+		{QuestionID: "q-11", SortOrder: 1},
+		{QuestionID: "q-12", SortOrder: 2},
+	})
+	require.NoError(t, err)
+	assert.Len(t, repo.manual["rule-1"], 3)
 }
 
 func TestCreateRule_ExamNotFound(t *testing.T) {

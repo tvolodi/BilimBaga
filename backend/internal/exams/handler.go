@@ -550,11 +550,14 @@ func (h *Handler) CreateRule(w http.ResponseWriter, r *http.Request) {
 		Questions:  questions,
 	})
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		switch {
+		case errors.Is(err, ErrNotFound):
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "exam not found")
-			return
+		case errors.Is(err, ErrInvalidInput):
+			writeValidationErrors(w, []fieldError{{"tag_ids", "tag_ids must contain valid UUID strings"}})
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to create rule")
 		}
-		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to create rule")
 		return
 	}
 
@@ -596,11 +599,14 @@ func (h *Handler) UpdateRule(w http.ResponseWriter, r *http.Request) {
 		Questions:  questions,
 	})
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		switch {
+		case errors.Is(err, ErrNotFound):
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "exam or rule not found")
-			return
+		case errors.Is(err, ErrInvalidInput):
+			writeValidationErrors(w, []fieldError{{"tag_ids", "tag_ids must contain valid UUID strings"}})
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to update rule")
 		}
-		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to update rule")
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": rule, "error": nil})

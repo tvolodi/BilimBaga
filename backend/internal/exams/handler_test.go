@@ -486,6 +486,19 @@ func TestCreateRule_Success_Returns201(t *testing.T) {
 	assert.Nil(t, decode(t, w).Error)
 }
 
+func TestCreateRule_InvalidTagIDs_Returns422(t *testing.T) {
+	h := newHandler(&mockSvc{
+		createRuleFn: func(_ context.Context, _ string, _ QuestionRuleInput) (*ExamQuestionRule, error) {
+			return nil, ErrInvalidInput
+		},
+	})
+	body := `{"mode":"random","count":5,"sort_order":0,"tag_ids":["not-a-uuid"]}`
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/rules", strings.NewReader(body)), "id", "exam-1")
+	h.CreateRule(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+}
+
 // ── DeleteRule ────────────────────────────────────────────────────────────────
 
 func TestDeleteRule_Success_Returns204(t *testing.T) {

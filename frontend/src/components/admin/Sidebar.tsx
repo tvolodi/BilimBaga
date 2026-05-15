@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { key: 'categories', icon: FolderTree, path: '/admin/categories', labelKey: 'nav.categories', end: false },
   { key: 'tags', icon: Hash, path: '/admin/tags', labelKey: 'nav.tags', end: false },
   { key: 'exams', icon: ClipboardList, path: '/admin/exams', labelKey: 'nav.exams', end: false },
+  { key: 'grading', icon: ClipboardCheck, path: '/admin/grading', labelKey: 'grading.nav', end: false },
   { key: 'reports', icon: BarChart2, path: '/admin/reports', labelKey: 'nav.reports', end: false },
   { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false },
 ]

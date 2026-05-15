@@ -623,6 +623,28 @@
     "status": {
       "passed": "Тапсырылды",
       "failed": "Тапсырылмады"
-    }
-  }
+    }  },
+  "grading": {
+    "queue_title": "Қолмен бағалау кезегі",
+    "col_session": "Сессия",
+    "col_employee": "Қызметкер",
+    "col_exam": "Емтихан",
+    "col_submitted": "Тапсырылған",
+    "col_pending": "Күтуде сұрақтар",
+    "queue_empty": "Қолмен бағалауды күтетін сессиялар жоқ.",
+    "detail_title": "Сессияны бағалау",
+    "question_indicator": "{{total}} сұрақтың {{current}} сұрағы",
+    "answer_label": "Қызметкердің жауабы",
+    "score_label": "Балл (0\u2013100%)",
+    "score_error": "Балл 0 мен 100 арасында болуы керек",
+    "feedback_label": "Пікір (міндетті емес)",
+    "feedback_placeholder": "Қызметкерге пікір қалдырыңыз...",
+    "prev_question": "Алдыңғы",
+    "next_question": "Келесі",
+    "submit_all": "Барлық бағаларды жіберу",
+    "submitting": "Жіберілуде...",
+    "success_toast": "Барлық бағалар жіберілді. Сессия аяқталды.",
+    "error_toast": "{{question}} сұрағы үшін баға жіберу сәтсіз аяқталды. Қайталап көріңіз.",
+    "already_graded": "Бағаланған",
+    "nav": "Қолмен бағалау"  }
 }

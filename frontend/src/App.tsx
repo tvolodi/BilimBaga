@@ -22,6 +22,8 @@ import { useRefreshToken } from '@/api/auth'
 import { ExamWizardCreatePage, ExamWizardEditPage } from '@/pages/ExamWizard'
 import { ExamTakingPage } from '@/pages/ExamTaking'
 import { ResultPage } from '@/pages/ResultPage'
+import { GradingQueuePage } from '@/pages/admin/GradingQueuePage'
+import { GradingDetailPage } from '@/pages/admin/GradingDetailPage'
 
 const queryClient = new QueryClient()
 
@@ -113,6 +115,22 @@ function AppRoutes() {
             <RequireSuperAdmin>
               <BrandingSettingsPage />
             </RequireSuperAdmin>
+          }
+        />
+        <Route
+          path="grading"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <GradingQueuePage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="grading/:sessionId"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <GradingDetailPage />
+            </RequireRole>
           }
         />
       </Route>

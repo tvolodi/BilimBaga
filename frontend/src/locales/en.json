@@ -623,6 +623,28 @@
     "status": {
       "passed": "Passed",
       "failed": "Failed"
-    }
-  }
+    }  },
+  "grading": {
+    "queue_title": "Manual Grading Queue",
+    "col_session": "Session",
+    "col_employee": "Employee",
+    "col_exam": "Exam",
+    "col_submitted": "Submitted",
+    "col_pending": "Pending Questions",
+    "queue_empty": "No sessions are awaiting manual grading.",
+    "detail_title": "Grade Session",
+    "question_indicator": "Question {{current}} of {{total}}",
+    "answer_label": "Employee's Answer",
+    "score_label": "Score (0\u2013100%)",
+    "score_error": "Score must be between 0 and 100",
+    "feedback_label": "Feedback (optional)",
+    "feedback_placeholder": "Add comments for the employee...",
+    "prev_question": "Previous",
+    "next_question": "Next",
+    "submit_all": "Submit All Grades",
+    "submitting": "Submitting...",
+    "success_toast": "All grades submitted. Session has been finalized.",
+    "error_toast": "Failed to submit grade for question {{question}}. Please retry.",
+    "already_graded": "Already graded",
+    "nav": "Manual Grading"  }
 }

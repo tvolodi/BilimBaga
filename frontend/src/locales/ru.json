@@ -621,6 +621,28 @@
     "status": {
       "passed": "Сдан",
       "failed": "Не сдан"
-    }
-  }
+    }  },
+  "grading": {
+    "queue_title": "Очередь ручного оценивания",
+    "col_session": "Сессия",
+    "col_employee": "Сотрудник",
+    "col_exam": "Экзамен",
+    "col_submitted": "Дата сдачи",
+    "col_pending": "Ожидающие вопросы",
+    "queue_empty": "Нет сессий, ожидающих ручной проверки.",
+    "detail_title": "Оценить сессию",
+    "question_indicator": "Вопрос {{current}} из {{total}}",
+    "answer_label": "Ответ сотрудника",
+    "score_label": "Балл (0\u2013100%)",
+    "score_error": "Балл должен быть от 0 до 100",
+    "feedback_label": "Комментарий (необязательно)",
+    "feedback_placeholder": "Добавьте комментарий для сотрудника...",
+    "prev_question": "Назад",
+    "next_question": "Вперёд",
+    "submit_all": "Отправить все оценки",
+    "submitting": "Отправка...",
+    "success_toast": "Все оценки отправлены. Сессия завершена.",
+    "error_toast": "Не удалось отправить оценку за вопрос {{question}}. Попробуйте снова.",
+    "already_graded": "Уже оценено",
+    "nav": "Ручная проверка"  }
 }

@@ -1,0 +1,20 @@
+{
+  "run_id": "FR-BB52",
+  "pipeline": "A",
+  "commit_hash": "31081e559b7383a9b4d20fe74674a72ebd7eaeb8",
+  "commit_message": "feat(reports): implement FR-BB52 per-exam analytics API",
+  "files_committed": [
+    "backend/migrations/021_analytics_timing.up.sql",
+    "backend/migrations/021_analytics_timing.down.sql",
+    "backend/internal/reports/model.go",
+    "backend/internal/reports/repository.go",
+    "backend/internal/reports/service.go",
+    "backend/internal/reports/handler.go",
+    "backend/internal/reports/service_test.go",
+    "backend/internal/reports/handler_test.go",
+    "backend/internal/router/router.go",
+    "docs/requirements/FR-BB52.Per-exam-analytics-API.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB52-INNER-REPORT.md",
+  "status": "success"
+}

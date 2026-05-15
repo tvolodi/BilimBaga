@@ -1,0 +1,29 @@
+{
+  "run_id": "FR-BB51",
+  "step": "pre-review",
+  "requirement_doc": "docs/requirements/FR-BB51.Dashboard-metrics-API.md",
+  "changed_files": [
+    "backend/migrations/020_dashboard_indexes.up.sql",
+    "backend/migrations/020_dashboard_indexes.down.sql",
+    "backend/internal/reports/model.go",
+    "backend/internal/reports/repository.go",
+    "backend/internal/reports/service.go",
+    "backend/internal/reports/handler.go",
+    "backend/internal/reports/service_test.go",
+    "backend/internal/reports/handler_test.go",
+    "backend/internal/router/router.go",
+    "backend/cmd/api/main.go"
+  ],
+  "acceptance_criteria": [
+    "AC-1: Endpoint requires role IN (examiner, hr_admin, super_admin); employees receive HTTP 403.",
+    "AC-2: completion_rate_by_exam includes every active exam; assigned_count, completed_count, passed_count computed correctly.",
+    "AC-3: overdue_employees contains at most 20 entries; deadline < NOW() AND no passed session.",
+    "AC-4: recent_activity contains last 20 sessions with status IN ('submitted','grading_pending') ordered by submitted_at DESC.",
+    "AC-5: avg_score_by_track computed over last 90 days; absent track is null (not 0).",
+    "AC-6: Track attribution via session_question_scores → questions → categories.track.",
+    "AC-7: Returns HTTP 200 with all four keys present even when arrays are empty or tracks null.",
+    "AC-8: All queries scoped to the single tenant (no cross-tenant data — single-tenant schema).",
+    "AC-9: Performance indexes added via migration 020.",
+    "AC-10: No audit log written for dashboard reads."
+  ]
+}

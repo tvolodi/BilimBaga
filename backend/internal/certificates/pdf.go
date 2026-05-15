@@ -2,94 +2,101 @@ package certificates
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"strings"
+
+	fpdf "github.com/go-pdf/fpdf"
+	"github.com/skip2/go-qrcode"
 )
 
-// GeneratePDF creates a simple single-page PDF certificate.
-// Uses only built-in PDF Type1 fonts (Helvetica / Helvetica-Bold) — no external font files required.
-// Non-ASCII characters (e.g. Cyrillic) render as Latin-1 equivalents; for Phase 4 this is acceptable.
-func GeneratePDF(cert *Certificate, snapshot TemplateSnapshot, verifyBaseURL string) ([]byte, error) {
-	verifyURL := verifyBaseURL + "/verify/" + cert.VerificationCode
+// GeneratePDF produces an A4-landscape PDF certificate.
+// cert must not be nil. snap is the TemplateSnapshot captured at issuance time.
+// Returns raw PDF bytes or an error.
+func GeneratePDF(cert *Certificate, snap TemplateSnapshot, verifyBaseURL string) ([]byte, error) {
+	pdf := fpdf.NewCustom(&fpdf.InitType{
+		OrientationStr: "L",
+		UnitStr:        "mm",
+		SizeStr:        "A4",
+	})
+	pdf.SetMargins(10, 10, 10)
+	pdf.AddPage()
 
-	companyName := snapshot.CompanyName
-	if companyName == "" {
-		companyName = "BilimBaga"
-	}
-
-	score := fmt.Sprintf("Score: %.1f%%", cert.ScorePct)
-	date := "Date: " + cert.IssuedAt.UTC().Format("January 2, 2006")
-	code := "Verification Code: " + cert.VerificationCode
-	verify := "Verify at: " + verifyURL
-
-	// Build the page content stream using PDF drawing operators.
-	var cs strings.Builder
-	text := func(font string, size int, x, y float64, s string) {
-		cs.WriteString(fmt.Sprintf("BT /%s %d Tf %.1f %.1f Td (%s) Tj ET\n",
-			font, size, x, y, pdfEscape(s)))
-	}
-
-	text("F1", 18, 50, 740, companyName)
-	text("F1", 24, 50, 700, "Certificate of Completion")
-	text("F2", 12, 50, 645, "This certifies that")
-	text("F1", 16, 50, 620, cert.EmployeeName)
-	text("F2", 12, 50, 588, "has successfully completed")
-	text("F1", 14, 50, 562, cert.ExamTitle)
-	text("F2", 12, 50, 520, score)
-	text("F2", 12, 50, 500, date)
-
-	if snapshot.SignatoryName != "" {
-		text("F1", 12, 50, 440, snapshot.SignatoryName)
-		if snapshot.SignatoryTitle != "" {
-			text("F2", 10, 50, 425, snapshot.SignatoryTitle)
+	// --- Header strip (h=20mm) ---
+	if snap.LogoBase64 != "" {
+		// Strip any data URI prefix (e.g. "data:image/png;base64,") before decoding.
+		logoData := snap.LogoBase64
+		if idx := strings.LastIndex(logoData, ","); idx >= 0 {
+			logoData = logoData[idx+1:]
 		}
+		imgBytes, err := base64.StdEncoding.DecodeString(logoData)
+		if err != nil {
+			return nil, fmt.Errorf("certificates: invalid logo base64: %w", err)
+		}
+		imgOpt := fpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}
+		pdf.RegisterImageOptionsReader("logo", imgOpt, bytes.NewReader(imgBytes))
+		pdf.ImageOptions("logo", 10, 5, 40, 0, false, imgOpt, 0, "")
+	} else {
+		pdf.SetFont("Helvetica", "B", 14)
+		pdf.SetXY(10, 8)
+		pdf.CellFormat(60, 10, snap.CompanyName, "", 0, "L", false, 0, "")
 	}
 
-	text("F2", 9, 50, 375, code)
-	text("F2", 9, 50, 360, verify)
+	// App name top-right
+	pdf.SetFont("Helvetica", "B", 12)
+	pdf.SetXY(200, 8)
+	pdf.CellFormat(87, 10, "BilimBaga", "", 0, "R", false, 0, "")
 
-	content := cs.String()
+	// --- Certificate body ---
+	pdf.SetFont("Helvetica", "B", 28)
+	pdf.SetXY(10, 30)
+	pdf.CellFormat(277, 12, "Certificate of Completion", "", 1, "C", false, 0, "")
 
-	// Assemble the PDF object bodies.
-	catalog := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
-	pages := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
-	page := "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n" +
-		"   /Contents 4 0 R\n" +
-		"   /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>\nendobj\n"
-	stream := fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n",
-		len(content), content)
-	fontBold := "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n"
-	fontPlain := "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+	pdf.SetFont("Helvetica", "", 22)
+	pdf.SetX(10)
+	pdf.CellFormat(277, 10, cert.EmployeeName, "", 1, "C", false, 0, "")
 
-	bodies := []string{catalog, pages, page, stream, fontBold, fontPlain}
+	pdf.SetFont("Helvetica", "", 14)
+	pdf.SetX(10)
+	pdf.CellFormat(277, 8, "for successfully completing", "", 1, "C", false, 0, "")
+
+	pdf.SetFont("Helvetica", "B", 18)
+	pdf.SetX(10)
+	pdf.CellFormat(277, 9, cert.ExamTitle, "", 1, "C", false, 0, "")
+
+	pdf.SetFont("Helvetica", "", 12)
+	pdf.SetX(10)
+	scoreDate := fmt.Sprintf("Score: %.2f%%          Issued: %s",
+		cert.ScorePct, cert.IssuedAt.UTC().Format("02 Jan 2006"))
+	pdf.CellFormat(277, 8, scoreDate, "", 1, "C", false, 0, "")
+
+	// --- Footer: signatory (bottom-left quadrant) ---
+	pdf.Line(10, 168, 100, 168)
+	pdf.SetXY(10, 170)
+	pdf.SetFont("Helvetica", "B", 12)
+	pdf.CellFormat(90, 6, snap.SignatoryName, "", 1, "L", false, 0, "")
+	pdf.SetFont("Helvetica", "", 10)
+	pdf.CellFormat(90, 5, snap.SignatoryTitle, "", 0, "L", false, 0, "")
+
+	// --- Footer: QR code (bottom-right quadrant, ≥30mm×30mm) ---
+	verifyURL := fmt.Sprintf("%s/verify/%s", verifyBaseURL, cert.VerificationCode)
+	qrBytes, err := qrcode.Encode(verifyURL, qrcode.Medium, 128)
+	if err != nil {
+		return nil, fmt.Errorf("certificates: qr generation failed: %w", err)
+	}
+	pdf.RegisterImageOptionsReader("qr", fpdf.ImageOptions{ImageType: "PNG"}, bytes.NewReader(qrBytes))
+	pdf.ImageOptions("qr", 255, 162, 32, 32, false, fpdf.ImageOptions{ImageType: "PNG"}, 0, "")
+
+	// Verify URL and Certificate ID text (footer right, below QR)
+	pdf.SetFont("Helvetica", "", 8)
+	pdf.SetXY(150, 186)
+	pdf.CellFormat(137, 4, "Verify: "+verifyURL, "", 1, "L", false, 0, "")
+	pdf.SetX(150)
+	pdf.CellFormat(137, 4, "Certificate ID: "+cert.VerificationCode, "", 0, "L", false, 0, "")
 
 	var buf bytes.Buffer
-	buf.WriteString("%PDF-1.4\n")
-
-	offsets := make([]int, len(bodies))
-	for i, body := range bodies {
-		offsets[i] = buf.Len()
-		buf.WriteString(body)
+	if err := pdf.Output(&buf); err != nil {
+		return nil, fmt.Errorf("certificates: pdf output failed: %w", err)
 	}
-
-	// Cross-reference table. Each entry is exactly 20 bytes (10+1+5+1+1+1+1).
-	xrefOffset := buf.Len()
-	fmt.Fprintf(&buf, "xref\n0 %d\n", len(bodies)+1)
-	fmt.Fprintf(&buf, "0000000000 65535 f \n") // free object 0
-	for _, off := range offsets {
-		fmt.Fprintf(&buf, "%010d 00000 n \n", off)
-	}
-
-	fmt.Fprintf(&buf, "trailer\n<< /Size %d /Root 1 0 R >>\n", len(bodies)+1)
-	fmt.Fprintf(&buf, "startxref\n%d\n%%%%EOF\n", xrefOffset)
-
 	return buf.Bytes(), nil
-}
-
-// pdfEscape escapes characters that are special inside PDF string literals.
-func pdfEscape(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "(", "\\(")
-	s = strings.ReplaceAll(s, ")", "\\)")
-	return s
 }

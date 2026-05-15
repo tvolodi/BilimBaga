@@ -44,7 +44,7 @@
 | FR-BB39 | Session-submission | Session Submission | implemented |
 | FR-BB310 | Auto-submit-background-job | Auto-Submit Background Job | implemented |
 | FR-BB311 | Grading-engine | Grading Engine | Implemented |
-| FR-BB312 | Frontend-exam-configuration-UI | Frontend: Exam Configuration UI | Draft |
+| FR-BB312 | Frontend-exam-configuration-UI | Frontend: Exam Configuration UI | Implemented |
 | FR-BB313 | Frontend-employee-portal | Frontend: Employee Portal | Draft |
 | FR-BB314 | Frontend-exam-taking-screen | Frontend: Exam Taking Screen | Draft |
 | FR-BB41 | Result-retrieval-API | Result Retrieval API | Draft |

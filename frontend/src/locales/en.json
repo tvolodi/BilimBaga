@@ -422,5 +422,77 @@
       "saveFailed": "Save failed. Please try again.",
       "statusTransitionFailed": "Status transition failed."
     }
+  },
+  "exam": {
+    "wizard": {
+      "step1": { "title": "Basic Settings" },
+      "step2": {
+        "title": "Question Rules",
+        "addRule": "Add rule",
+        "mode": { "manual": "Manual", "random": "Random" },
+        "editQuestions": "Edit questions"
+      },
+      "step3": { "title": "Assignments", "addAssignee": "Add assignee" },
+      "step4": {
+        "title": "Review & Publish",
+        "publishConfirm": "Publishing this exam will make it available to assigned users. This cannot be undone. Are you sure?"
+      },
+      "validationWarning": "Some question rules cannot be satisfied. Fix them before publishing.",
+      "publish": "Publish",
+      "publishing": "Publishing…",
+      "next": "Next",
+      "back": "Back",
+      "saving": "Saving…",
+      "createTitle": "Create Exam",
+      "editTitle": "Edit Exam"
+    },
+    "field": {
+      "title": "Exam title",
+      "description": "Description",
+      "timeLimitMinutes": "Time limit (minutes)",
+      "passingScorePct": "Passing score (%)",
+      "maxAttempts": "Max attempts",
+      "availableFrom": "Available from",
+      "availableUntil": "Available until",
+      "shuffleQuestions": "Shuffle questions",
+      "shuffleOptions": "Shuffle answer options",
+      "showAnswers": "Show answers",
+      "onTabSwitch": "On tab switch",
+      "certificateEnabled": "Issue certificate on pass"
+    },
+    "showAnswers": {
+      "never": "Never",
+      "after_completion": "After submission",
+      "after_all_attempts": "After exam closes"
+    },
+    "onTabSwitch": {
+      "log": "Do nothing",
+      "warn": "Warn user",
+      "submit": "Auto-submit"
+    },
+    "rule": {
+      "category": "Category",
+      "difficulty": "Difficulty",
+      "tags": "Tags",
+      "count": "Question count"
+    },
+    "assignment": {
+      "type": "Assignee type",
+      "type": {
+        "user": "User",
+        "department": "Department",
+        "all": "All employees"
+      },
+      "deadline": "Deadline",
+      "empty": "No assignments yet."
+    },
+    "publishSuccess": "Exam published successfully",
+    "saveSuccess": "Exam saved",
+    "error": {
+      "required": "is required",
+      "range": "must be between {{min}} and {{max}}",
+      "availableUntilOrder": "Available until must be after available from",
+      "assigneeRequired": "Assignee is required"
+    }
   }
 }

@@ -17,6 +17,7 @@ import { CategoriesPage } from '@/pages/admin/categories/CategoriesPage'
 import { TagsPage } from '@/pages/admin/tags/TagsPage'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
+import { ExamWizardCreatePage, ExamWizardEditPage } from '@/pages/ExamWizard'
 
 const queryClient = new QueryClient()
 
@@ -83,6 +84,22 @@ function AppRoutes() {
           element={
             <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
               <TagsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="exams/new"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <ExamWizardCreatePage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="exams/:id/edit"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <ExamWizardEditPage />
             </RequireRole>
           }
         />

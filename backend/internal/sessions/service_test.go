@@ -342,6 +342,7 @@ func TestCreateSession_ExamNotActive(t *testing.T) {
 	assert.ErrorIs(t, err, ErrExamNotActive)
 }
 
+// TestCreateSession_ExamArchived verifies FR-BB32 AC-5: archived exam returns ErrExamArchived (→ 403).
 func TestCreateSession_ExamArchived(t *testing.T) {
 	repo := &mockRepo{
 		getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
@@ -353,7 +354,7 @@ func TestCreateSession_ExamArchived(t *testing.T) {
 	svc := NewService(repo)
 	_, err := svc.CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrExamNotActive)
+	assert.ErrorIs(t, err, ErrExamArchived)
 }
 
 // ── AC-3: outside availability window ────────────────────────────────────────

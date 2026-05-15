@@ -154,12 +154,12 @@ func (m *mockRepo) CreateSection(ctx context.Context, examID string, input Secti
 	return s, nil
 }
 
-func (m *mockRepo) UpdateSection(ctx context.Context, id string, input SectionInput) (*ExamSection, error) {
+func (m *mockRepo) UpdateSection(ctx context.Context, examID, id string, input SectionInput) (*ExamSection, error) {
 	if m.updateSectionFn != nil {
 		return m.updateSectionFn(ctx, id, input)
 	}
 	s, ok := m.sections[id]
-	if !ok {
+	if !ok || s.ExamID != examID {
 		return nil, ErrNotFound
 	}
 	s.Title = input.Title
@@ -167,11 +167,12 @@ func (m *mockRepo) UpdateSection(ctx context.Context, id string, input SectionIn
 	return s, nil
 }
 
-func (m *mockRepo) DeleteSection(ctx context.Context, id string) error {
+func (m *mockRepo) DeleteSection(ctx context.Context, examID, id string) error {
 	if m.deleteSectionFn != nil {
 		return m.deleteSectionFn(ctx, id)
 	}
-	if _, ok := m.sections[id]; !ok {
+	s, ok := m.sections[id]
+	if !ok || s.ExamID != examID {
 		return ErrNotFound
 	}
 	delete(m.sections, id)
@@ -608,6 +609,30 @@ func TestDeleteSection_Success(t *testing.T) {
 	err := svc.DeleteSection(context.Background(), "exam-1", "sec-1")
 	require.NoError(t, err)
 	assert.Empty(t, repo.sections)
+}
+
+// TestUpdateSection_SectionNotInExam verifies AC-7: section belonging to a different exam → 404.
+func TestUpdateSection_SectionNotInExam(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	seedExam(repo, "exam-2", "draft")
+	// sec-1 belongs to exam-2, not exam-1.
+	repo.sections["sec-1"] = &ExamSection{ID: "sec-1", ExamID: "exam-2"}
+	svc := NewService(repo)
+	_, err := svc.UpdateSection(context.Background(), "exam-1", "sec-1", SectionInput{SortOrder: 0})
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+// TestDeleteSection_SectionNotInExam verifies AC-7: section belonging to a different exam → 404.
+func TestDeleteSection_SectionNotInExam(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	seedExam(repo, "exam-2", "draft")
+	// sec-1 belongs to exam-2, not exam-1.
+	repo.sections["sec-1"] = &ExamSection{ID: "sec-1", ExamID: "exam-2"}
+	svc := NewService(repo)
+	err := svc.DeleteSection(context.Background(), "exam-1", "sec-1")
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 // ── Rules ────────────────────────────────────────────────────────────────────

@@ -35,6 +35,9 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrNotAssigned):
 			api.WriteError(w, http.StatusForbidden, "EXAM_NOT_ASSIGNED",
 				"You do not have access to this exam.")
+		case errors.Is(err, ErrExamArchived):
+			api.WriteError(w, http.StatusForbidden, "EXAM_ARCHIVED",
+				"This exam has been archived and is no longer available.")
 		case errors.Is(err, ErrExamNotActive):
 			api.WriteError(w, http.StatusUnprocessableEntity, "EXAM_NOT_ACTIVE",
 				"This exam is not currently active.")

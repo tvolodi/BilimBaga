@@ -233,7 +233,8 @@ func (s *service) UpdateSection(ctx context.Context, examID, sectionID string, i
 	if _, err := s.repo.GetByID(ctx, examID); err != nil {
 		return nil, fmt.Errorf("exams: UpdateSection: %w", err)
 	}
-	section, err := s.repo.UpdateSection(ctx, sectionID, input)
+	// AC-7: repo enforces exam_id = examID so sections from other exams return ErrNotFound.
+	section, err := s.repo.UpdateSection(ctx, examID, sectionID, input)
 	if err != nil {
 		return nil, fmt.Errorf("exams: UpdateSection: %w", err)
 	}
@@ -244,7 +245,8 @@ func (s *service) DeleteSection(ctx context.Context, examID, sectionID string) e
 	if _, err := s.repo.GetByID(ctx, examID); err != nil {
 		return fmt.Errorf("exams: DeleteSection: %w", err)
 	}
-	if err := s.repo.DeleteSection(ctx, sectionID); err != nil {
+	// AC-7: repo enforces exam_id = examID so sections from other exams return ErrNotFound.
+	if err := s.repo.DeleteSection(ctx, examID, sectionID); err != nil {
 		return fmt.Errorf("exams: DeleteSection: %w", err)
 	}
 	return nil

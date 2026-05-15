@@ -25,8 +25,10 @@ type Repository interface {
 
 	// Sections
 	CreateSection(ctx context.Context, examID string, input SectionInput) (*ExamSection, error)
-	UpdateSection(ctx context.Context, id string, input SectionInput) (*ExamSection, error)
-	DeleteSection(ctx context.Context, id string) error
+	// UpdateSection updates a section; returns ErrNotFound if the section does not belong to examID.
+	UpdateSection(ctx context.Context, examID, id string, input SectionInput) (*ExamSection, error)
+	// DeleteSection deletes a section; returns ErrNotFound if the section does not belong to examID.
+	DeleteSection(ctx context.Context, examID, id string) error
 
 	// Rules
 	CreateRule(ctx context.Context, examID string, input QuestionRuleInput) (*ExamQuestionRule, error)
@@ -374,13 +376,13 @@ func (r *postgresRepository) CreateSection(ctx context.Context, examID string, i
 	return &s, nil
 }
 
-func (r *postgresRepository) UpdateSection(ctx context.Context, id string, input SectionInput) (*ExamSection, error) {
+func (r *postgresRepository) UpdateSection(ctx context.Context, examID, id string, input SectionInput) (*ExamSection, error) {
 	const q = `
 		UPDATE exam_sections SET title = $1, sort_order = $2
-		WHERE id = $3
+		WHERE id = $3 AND exam_id = $4
 		RETURNING id, exam_id, title, sort_order`
 	var s ExamSection
-	if err := r.db.GetContext(ctx, &s, q, input.Title, input.SortOrder, id); err != nil {
+	if err := r.db.GetContext(ctx, &s, q, input.Title, input.SortOrder, id, examID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -389,8 +391,8 @@ func (r *postgresRepository) UpdateSection(ctx context.Context, id string, input
 	return &s, nil
 }
 
-func (r *postgresRepository) DeleteSection(ctx context.Context, id string) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM exam_sections WHERE id = $1`, id)
+func (r *postgresRepository) DeleteSection(ctx context.Context, examID, id string) error {
+	res, err := r.db.ExecContext(ctx, `DELETE FROM exam_sections WHERE id = $1 AND exam_id = $2`, id, examID)
 	if err != nil {
 		return fmt.Errorf("exams: DeleteSection: %w", err)
 	}

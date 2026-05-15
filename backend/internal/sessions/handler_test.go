@@ -181,6 +181,28 @@ func TestCreateSession_Handler_403_NotAssigned(t *testing.T) {
 	assert.Equal(t, "EXAM_NOT_ASSIGNED", errObj["code"])
 }
 
+// ── AC-5 (FR-BB32): 403 when exam is archived ────────────────────────────────
+
+func TestCreateSession_Handler_403_ExamArchived(t *testing.T) {
+	svc := &mockSvc{
+		createSessionFn: func(_ context.Context, _, _, _ string) (*CreateSessionResponse, error) {
+			return nil, ErrExamArchived
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodPost, "/portal/exams/exam-1/sessions", nil)
+	req = withChiParam(req, "id", "exam-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.CreateSession(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "EXAM_ARCHIVED", errObj["code"])
+}
+
 // ── AC-2: 422 exam not active ────────────────────────────────────────────────
 
 func TestCreateSession_Handler_422_ExamNotActive(t *testing.T) {

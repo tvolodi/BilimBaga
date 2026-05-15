@@ -8,6 +8,7 @@ import (
 var (
 	ErrNotAssigned           = errors.New("exam not assigned to user")
 	ErrExamNotActive         = errors.New("exam is not active")
+	ErrExamArchived          = errors.New("exam has been archived")
 	ErrExamOutsideWindow     = errors.New("exam outside availability window")
 	ErrAttemptsExhausted     = errors.New("all allowed attempts exhausted")
 	ErrSessionAlreadyOpen    = errors.New("active session already exists for this exam")

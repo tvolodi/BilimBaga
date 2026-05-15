@@ -75,10 +75,13 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 		return nil, ErrNotAssigned
 	}
 
-	// AC-2: exam must be active.
+	// AC-2: exam must be active (FR-BB32 AC-5: archived exam returns ErrExamArchived → 403).
 	cfg, err := s.repo.GetExamConfig(ctx, examID)
 	if err != nil {
 		return nil, fmt.Errorf("sessions: CreateSession: get config: %w", err)
+	}
+	if cfg.Status == "archived" {
+		return nil, ErrExamArchived
 	}
 	if cfg.Status != "active" {
 		return nil, ErrExamNotActive

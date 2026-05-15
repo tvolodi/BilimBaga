@@ -1,0 +1,21 @@
+{
+  "run_id": "FR-BB32",
+  "pipeline": "A",
+  "step": "pre-review",
+  "requirement_doc": "docs/requirements/FR-BB32.Exam-configuration-API.md",
+  "changed_files": [
+    "backend/internal/sessions/model.go",
+    "backend/internal/sessions/service.go",
+    "backend/internal/sessions/handler.go",
+    "backend/internal/sessions/service_test.go",
+    "backend/internal/sessions/handler_test.go",
+    "backend/internal/exams/repository.go",
+    "backend/internal/exams/service.go",
+    "backend/internal/exams/service_test.go"
+  ],
+  "gaps_fixed": [
+    "AC-5: Sessions against archived exam now return 403 EXAM_ARCHIVED (was 422 EXAM_NOT_ACTIVE)",
+    "AC-7: Section UpdateSection and DeleteSection now enforce exam_id ownership in DB queries"
+  ],
+  "test_status": "all passing"
+}

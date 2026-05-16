@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RoleBadge } from '@/components/admin/RoleBadge'
+import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { useLogout } from '@/api/auth'
 import type { User } from '@/api/users'
 
@@ -22,6 +23,7 @@ export function TopBar({ user }: TopBarProps) {
     <header className="flex items-center justify-between h-14 px-6 border-b bg-white shadow-sm flex-shrink-0">
       <div />
       <div className="flex items-center gap-3">
+        <LocaleSwitcher />
         <span className="text-sm font-medium text-gray-700">{user.full_name}</span>
         <RoleBadge role={user.role_name} />
         <Button

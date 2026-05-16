@@ -19,6 +19,7 @@ import { CategoriesPage } from '@/pages/admin/categories/CategoriesPage'
 import { TagsPage } from '@/pages/admin/tags/TagsPage'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
+import { useLocaleDirection } from '@/hooks/useLocaleDirection'
 import { ExamWizardCreatePage, ExamWizardEditPage } from '@/pages/ExamWizard'
 import { ExamTakingPage } from '@/pages/ExamTaking'
 import { ResultPage } from '@/pages/ResultPage'
@@ -207,12 +208,17 @@ function AppRoutes() {
   )
 }
 
+function AppRoot() {
+  useLocaleDirection()
+  return <AppRoutes />
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TenantProvider>
         <BrowserRouter>
-          <AppRoutes />
+          <AppRoot />
         </BrowserRouter>
       </TenantProvider>
     </QueryClientProvider>

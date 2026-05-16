@@ -63,7 +63,7 @@
 | FR-BB57 | Frontend-per-exam-analytics | Frontend: Per-Exam Analytics | implemented |
 | FR-BB58 | Frontend-employee-record | Frontend: Employee Record | Draft |
 | FR-BB61 | Email-notifications | Email Notifications | Implemented |
-| FR-BB62 | Full-i18n-coverage | Full i18n Coverage | Draft |
+| FR-BB62 | Full-i18n-coverage | Full i18n Coverage | implemented |
 | FR-BB63 | Accessibility | Accessibility | Draft |
 | FR-BB64 | Security-hardening | Security Hardening | Draft |
 | FR-BB65 | Performance | Performance | Draft |

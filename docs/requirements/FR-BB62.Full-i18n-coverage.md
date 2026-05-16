@@ -6,7 +6,7 @@
 | ID | FR-BB62 |
 | Phase | 6 — Polish & Hardening |
 | Priority | 1 |
-| Status | Draft |
+| Status | implemented |
 | Depends On | FR-BB110, FR-BB111, FR-BB112, FR-BB26, FR-BB27, FR-BB312, FR-BB313, FR-BB314, FR-BB45, FR-BB46, FR-BB47, FR-BB56, FR-BB57, FR-BB58 |
 
 ## Description
@@ -38,21 +38,29 @@ import en from './locales/en.json';
 
 i18n.use(initReactI18next).init({
   resources: { kk: { translation: kk }, ru: { translation: ru }, en: { translation: en } },
-  lng: localStorage.getItem('locale') ?? 'ru',
-  fallbackLng: 'ru',
+  lng: localStorage.getItem('i18n-lang') ?? 'en',
+  fallbackLng: 'en',
   interpolation: { escapeValue: false },
 });
 ```
 
-**Locale persistence**: stored in `localStorage` key `'locale'`; also sent in `Accept-Language` header for API calls so the backend can localise email sends.
+**Locale persistence**: stored in `localStorage` key `'i18n-lang'` (matching the existing `src/i18n.ts` initialisation); also sent in `Accept-Language` header for API calls so the backend can localise email sends.
 
-**CI key-parity check** (`scripts/check-i18n.ts` or inline in `package.json` test script):
+**CI key-parity check** (`scripts/check-i18n.ts`):
 ```ts
 // Flatten all keys from each JSON, compare sets; exit 1 if any diff
 const locales = ['kk', 'ru', 'en'];
 const keysets = locales.map(l => new Set(Object.keys(flatten(require(`./src/locales/${l}.json`)))));
 // assert all sets are equal
 ```
+
+The script must be wired into `package.json` as a dedicated `check:i18n` script and called from the `test` script so it runs in CI:
+```jsonc
+// package.json (scripts section)
+"check:i18n": "tsx scripts/check-i18n.ts",
+"test": "vitest run && npm run check:i18n"
+```
+The `test` script must **not** pass unless all three locale files have identical key sets.
 
 ### Frontend Components
 
@@ -95,15 +103,88 @@ export const formatDate = (iso: string, locale: string) =>
   Translation key `question.originalLanguageBadge` must exist in all three locale files.
 
 **Backend error code mapping**:
-- Maintain `src/utils/errorMessages.ts` that maps backend error codes to i18n translation keys:
+- Maintain `src/utils/errorMessages.ts` that maps backend error codes to i18n translation keys.
+  The full set of known backend error codes (sourced from all `internal/*/handler.go` files) is enumerated below — every code must have a corresponding key in `errors.*` namespace across all three locale files:
   ```ts
   export const ERROR_CODE_MAP: Record<string, string> = {
-    EXAM_NOT_FOUND: 'errors.examNotFound',
-    UNAUTHORIZED: 'errors.unauthorized',
-    // ...
+    // Auth / token (auth/middleware.go, rbac/middleware.go)
+    MISSING_TOKEN:              'errors.missingToken',
+    INVALID_TOKEN:              'errors.invalidToken',
+    TOKEN_EXPIRED:              'errors.tokenExpired',
+    UNAUTHORIZED:               'errors.unauthorized',
+    FORBIDDEN:                  'errors.forbidden',
+
+    // General (multiple packages — both naming variants exist)
+    ERR_INTERNAL:               'errors.internal',
+    INTERNAL_ERROR:             'errors.internal',       // alias — same translation
+    ERR_INVALID_BODY:           'errors.invalidBody',
+    INVALID_BODY:               'errors.invalidBody',   // alias
+    ERR_NOT_FOUND:              'errors.notFound',
+    NOT_FOUND:                  'errors.notFound',      // alias
+    VALIDATION_ERROR:           'errors.validation',
+    ERR_VALIDATION:             'errors.validation',    // alias
+    ERR_INVALID_PARAM:          'errors.invalidParam',
+
+    // Exams (exams/handler.go)
+    ERR_INVALID_TRANSITION:     'errors.invalidTransition',
+    ERR_NOT_DRAFT:              'errors.examNotDraft',
+    EXAM_NOT_DRAFT:             'errors.examNotDraft',  // alias
+    EXAM_NOT_ACTIVE:            'errors.examNotActive',
+    EXAM_ARCHIVED:              'errors.examArchived',
+    EXAM_NOT_FOUND:             'errors.examNotFound',
+    EXAM_NOT_CERTIFIABLE:       'errors.examNotCertifiable',
+    EXAM_OUTSIDE_WINDOW:        'errors.examOutsideWindow',
+    ASSIGNMENT_ALREADY_EXISTS:  'errors.assignmentAlreadyExists',
+    ERR_DEADLINE_IN_PAST:       'errors.deadlineInPast',
+    RULE_NOT_MANUAL:            'errors.ruleNotManual',
+
+    // Sessions (sessions/handler.go)
+    SESSION_NOT_FOUND:          'errors.sessionNotFound',
+    SESSION_FORBIDDEN:          'errors.sessionForbidden',
+    SESSION_ALREADY_OPEN:       'errors.sessionAlreadyOpen',
+    SESSION_NOT_ACTIVE:         'errors.sessionNotActive',
+    SESSION_EXPIRED:            'errors.sessionExpired',
+    SESSION_NOT_SUBMITTED:      'errors.sessionNotSubmitted',
+    SESSION_NOT_PASSED:         'errors.sessionNotPassed',
+    SESSION_IN_PROGRESS:        'errors.sessionInProgress',
+    ATTEMPTS_EXHAUSTED:         'errors.attemptsExhausted',
+    INSUFFICIENT_QUESTIONS:     'errors.insufficientQuestions',
+    EXAM_NOT_ASSIGNED:          'errors.examNotAssigned',
+    INVALID_TIME_SPENT:         'errors.invalidTimeSpent',
+    INVALID_OPTION:             'errors.invalidOption',
+    INVALID_ANSWER_FORMAT:      'errors.invalidAnswerFormat',
+    INVALID_EVENT_TYPE:         'errors.invalidEventType',
+    INVALID_SCORE:              'errors.invalidScore',
+    QUESTION_NOT_IN_SESSION:    'errors.questionNotInSession',
+    INVALID_DATE:               'errors.invalidDate',
+
+    // Questions (questions/handler.go)
+    ERR_STEM_REQUIRED:          'errors.stemRequired',
+
+    // Categories (categories/handler.go)
+    ERR_PARENT_NOT_FOUND:       'errors.parentNotFound',
+    ERR_CATEGORY_CYCLE:         'errors.categoryCycle',
+    ERR_CATEGORY_IN_USE:        'errors.categoryInUse',
+    ERR_INVALID_NAME:           'errors.invalidName',
+
+    // Departments (departments/handler.go)
+    DUPLICATE_NAME:             'errors.duplicateName',
+    DEPARTMENT_HAS_CHILDREN:    'errors.departmentHasChildren',
+    DEPARTMENT_NOT_EMPTY:       'errors.departmentNotEmpty',
+
+    // Users (users/handler.go)
+    DUPLICATE_EMAIL:            'errors.duplicateEmail',
+    MISSING_FILE:               'errors.missingFile',
+    INVALID_CSV:                'errors.invalidCsv',
+    TOO_MANY_ROWS:              'errors.tooManyRows',
+    USER_NOT_FOUND:             'errors.userNotFound',
+
+    // Email (email/handler.go)
+    EMAIL_UNAVAILABLE:          'errors.emailUnavailable',
   };
   ```
 - API query hooks use this map in their `onError` handlers before displaying toasts.
+- The `errors.*` namespace keys listed above **must all exist** in `kk.json`, `ru.json`, and `en.json` — their absence will be caught by the CI key-parity check (AC-2).
 
 ### API Endpoints
 No new endpoints. The backend change is to ensure all error response bodies use `error.code` values from a defined enum (documented in `docs/architecture-guide.md`) rather than human-readable English prose.
@@ -124,12 +205,18 @@ email.*         — email template strings (used by FR-BB61)
 common.*        — shared labels: save, cancel, loading, etc.
 ```
 
-**ESLint rule** (optional but recommended):
+**ESLint rule** (required deliverable — not optional):
+
+The `eslint-plugin-i18next` package must be added to `devDependencies` and configured:
+```bash
+npm install --save-dev eslint-plugin-i18next
+```
 ```jsonc
-// .eslintrc
+// .eslintrc (or eslint.config.js)
 "plugins": ["i18next"],
 "rules": { "i18next/no-literal-string": ["warn", { "markupOnly": true }] }
 ```
+AC-1 is verified by this rule producing zero warnings on all `.tsx`/`.ts` files in `src/`. The rule must be present and the `npm test` run must not exit with lint errors from missing translations.
 
 ## Notes
 - Kazakh (`kk`) locale uses Cyrillic script for now; if Latin-script Kazakh (`kk-Latn`) is required later, it can be added as an additional locale without architectural changes.

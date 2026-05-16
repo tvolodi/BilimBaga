@@ -645,6 +645,28 @@
     "exporting": "Экспортталуда...",
     "pagination_info": "{{total}} жазбаның {{from}}–{{to}} көрсетілген"
   },
+  "dashboard": {
+    "title": "Басты бет",
+    "kpi_employees": "Жалпы қызметкерлер",
+    "kpi_active_exams": "Белсенді емтихандар",
+    "kpi_completion_rate": "Аяқтау деңгейі",
+    "kpi_pass_rate": "Өту деңгейі",
+    "kpi_last_30_days": "Соңғы 30 күн",
+    "chart_title": "Емтихан бойынша аяқтау деңгейі",
+    "chart_completed": "Аяқталды",
+    "chart_assigned": "Тапсырылды",
+    "overdue_title": "Мерзімі өткен қызметкерлер",
+    "overdue_empty": "Мерзімі өткен тапсырмалар жоқ.",
+    "col_employee": "Қызметкер",
+    "col_exam": "Емтихан",
+    "col_deadline": "Мерзімі",
+    "send_reminder": "Еске салу жіберу",
+    "reminder_sent": "Еске салу сәтті жіберілді.",
+    "reminder_error": "Еске салуды жіберу сәтсіз аяқталды.",
+    "activity_title": "Соңғы белсенділік",
+    "activity_empty": "Соңғы белсенділік жоқ.",
+    "refresh": "Жаңарту"
+  },
   "grading": {
     "queue_title": "Қолмен бағалау кезегі",
     "col_session": "Сессия",

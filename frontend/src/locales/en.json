@@ -645,6 +645,28 @@
     "exporting": "Exporting...",
     "pagination_info": "Showing {{from}}–{{to}} of {{total}} entries"
   },
+  "dashboard": {
+    "title": "Dashboard",
+    "kpi_employees": "Total Employees",
+    "kpi_active_exams": "Active Exams",
+    "kpi_completion_rate": "Completion Rate",
+    "kpi_pass_rate": "Pass Rate",
+    "kpi_last_30_days": "Last 30 days",
+    "chart_title": "Completion Rate by Exam",
+    "chart_completed": "Completed",
+    "chart_assigned": "Assigned",
+    "overdue_title": "Overdue Employees",
+    "overdue_empty": "No overdue assignments.",
+    "col_employee": "Employee",
+    "col_exam": "Exam",
+    "col_deadline": "Deadline",
+    "send_reminder": "Send Reminder",
+    "reminder_sent": "Reminder sent successfully.",
+    "reminder_error": "Failed to send reminder.",
+    "activity_title": "Recent Activity",
+    "activity_empty": "No recent activity.",
+    "refresh": "Refresh"
+  },
   "grading": {
     "queue_title": "Manual Grading Queue",
     "col_session": "Session",

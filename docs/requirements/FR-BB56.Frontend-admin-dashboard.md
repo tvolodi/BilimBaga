@@ -6,23 +6,23 @@
 | ID | FR-BB56 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 2 |
-| Status | Draft |
+| Status | implemented |
 | Depends On | FR-BB51 |
 
 ## Description
 Implements the main admin landing page that surfaces KPI metrics, a completion rate bar chart, an overdue employees table, and a recent activity feed. All data is fetched from the dashboard metrics API (FR-BB51) with a 5-minute stale window. HR admins and examiners land on this page after login. The page uses recharts for the bar chart visualisation and shadcn primitives for all other UI.
 
 ## Acceptance Criteria
-- [ ] AC-1: The dashboard page is the default landing page for users with `role IN (examiner, hr_admin, super_admin)` after login.
-- [ ] AC-2: Four KPI cards are displayed in a row: "Total Employees", "Active Exams", "Completion Rate (last 30 days)", "Pass Rate (last 30 days)"; each card shows an icon, a numeric value, and a label.
-- [ ] AC-3: "Completion Rate" is computed on the frontend as `SUM(completed_count) / SUM(assigned_count)` across `completion_rate_by_exam`; displayed as a percentage with one decimal place.
-- [ ] AC-4: "Pass Rate" is computed as `SUM(passed_count) / SUM(assigned_count)` across `completion_rate_by_exam`.
-- [ ] AC-5: The completion rate bar chart uses `recharts BarChart`; X-axis shows exam titles (truncated to 20 chars); Y-axis shows percentage 0–100%; bars use the tenant's `primary_color`.
-- [ ] AC-6: The overdue employees table shows name, exam name, and deadline; the deadline is formatted as a human-readable relative date (e.g. "3 days ago") using `date-fns`.
-- [ ] AC-7: Each overdue row has a "Send Reminder" action button; clicking it calls `POST /api/v1/admin/users/:userId/remind` with `{ exam_id }` and shows a success/error toast; the endpoint must exist (stub if not yet implemented).
-- [ ] AC-8: The recent activity feed renders the last 20 sessions as a scrollable list; each item shows employee name, exam name, score badge (coloured by pass/fail), and relative time.
-- [ ] AC-9: The page uses `useQuery` with `queryKey: ['dashboard']` and `staleTime: 5 * 60 * 1000`; a manual "Refresh" button invalidates the query.
-- [ ] AC-10: Zero hardcoded user-visible strings; all text uses `useTranslation` i18n keys.
+- [x] AC-1: The dashboard page is the default landing page for users with `role IN (examiner, hr_admin, super_admin)` after login.
+- [x] AC-2: Four KPI cards are displayed in a row: "Total Employees", "Active Exams", "Completion Rate (last 30 days)", "Pass Rate (last 30 days)"; each card shows an icon, a numeric value, and a label.
+- [x] AC-3: "Completion Rate" is computed on the frontend as `SUM(completed_count) / SUM(assigned_count)` across `completion_rate_by_exam`; displayed as a percentage with one decimal place.
+- [x] AC-4: "Pass Rate" is computed as `SUM(passed_count) / SUM(assigned_count)` across `completion_rate_by_exam`.
+- [x] AC-5: The completion rate bar chart uses `recharts BarChart`; X-axis shows exam titles (truncated to 20 chars); Y-axis shows percentage 0–100%; bars use the tenant's `primary_color`.
+- [x] AC-6: The overdue employees table shows name, exam name, and deadline; the deadline is formatted as a human-readable relative date (e.g. "3 days ago") using `date-fns`.
+- [x] AC-7: Each overdue row has a "Send Reminder" action button; clicking it calls `POST /api/v1/admin/users/:userId/remind` with `{ exam_id }` and shows a success/error toast; the endpoint must exist (stub if not yet implemented).
+- [x] AC-8: The recent activity feed renders the last 20 sessions as a scrollable list; each item shows employee name, exam name, score badge (coloured by pass/fail), and relative time.
+- [x] AC-9: The page uses `useQuery` with `queryKey: ['dashboard']` and `staleTime: 5 * 60 * 1000`; a manual "Refresh" button invalidates the query.
+- [x] AC-10: Zero hardcoded user-visible strings; all text uses `useTranslation` i18n keys.
 
 ## Technical Specification
 

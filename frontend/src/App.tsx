@@ -25,6 +25,7 @@ import { ResultPage } from '@/pages/ResultPage'
 import { GradingQueuePage } from '@/pages/admin/GradingQueuePage'
 import { GradingDetailPage } from '@/pages/admin/GradingDetailPage'
 import { AuditLogPage } from '@/pages/admin/AuditLogPage'
+import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
 
 const queryClient = new QueryClient()
 
@@ -46,12 +47,20 @@ function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+          <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
             <AdminLayout />
           </RequireRole>
         }
       >
-        <Route index element={<Navigate to="users" replace />} />
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route
+          path="dashboard"
+          element={
+            <RequireRole roles={['examiner', 'hr_admin', 'super_admin']}>
+              <AdminDashboardPage />
+            </RequireRole>
+          }
+        />
         <Route path="users" element={<UsersListPage />} />
         <Route path="departments" element={<DepartmentsPage />} />
         <Route

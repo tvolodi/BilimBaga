@@ -643,6 +643,28 @@
     "exporting": "Экспортируется...",
     "pagination_info": "Показано {{from}}–{{to}} из {{total}} записей"
   },
+  "dashboard": {
+    "title": "Главная",
+    "kpi_employees": "Всего сотрудников",
+    "kpi_active_exams": "Активные экзамены",
+    "kpi_completion_rate": "Уровень завершения",
+    "kpi_pass_rate": "Уровень сдачи",
+    "kpi_last_30_days": "Последние 30 дней",
+    "chart_title": "Уровень завершения по экзаменам",
+    "chart_completed": "Завершено",
+    "chart_assigned": "Назначено",
+    "overdue_title": "Просроченные сотрудники",
+    "overdue_empty": "Просроченных заданий нет.",
+    "col_employee": "Сотрудник",
+    "col_exam": "Экзамен",
+    "col_deadline": "Срок",
+    "send_reminder": "Отправить напоминание",
+    "reminder_sent": "Напоминание успешно отправлено.",
+    "reminder_error": "Не удалось отправить напоминание.",
+    "activity_title": "Последняя активность",
+    "activity_empty": "Нет последней активности.",
+    "refresh": "Обновить"
+  },
   "grading": {
     "queue_title": "Очередь ручного оценивания",
     "col_session": "Сессия",

@@ -97,10 +97,15 @@ func (h *Handler) SaveAnswer(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusUnprocessableEntity, "SESSION_EXPIRED",
 				"Your exam session has expired.")
 		case errors.Is(err, ErrQuestionNotInSession):
-			api.WriteError(w, http.StatusNotFound, "QUESTION_NOT_IN_SESSION",
+			// AC-4 (FR-BB64): question not in session is reported as INVALID_ANSWER_OPTION.
+			api.WriteError(w, http.StatusBadRequest, "INVALID_ANSWER_OPTION",
 				"Question does not belong to this session.")
+		case errors.Is(err, ErrInvalidAnswerOption):
+			// AC-4 (FR-BB64): unknown option ID reported as INVALID_ANSWER_OPTION.
+			api.WriteError(w, http.StatusBadRequest, "INVALID_ANSWER_OPTION",
+				"One or more supplied option IDs do not belong to any active question in this session.")
 		case errors.Is(err, ErrInvalidOption):
-			api.WriteError(w, http.StatusBadRequest, "INVALID_OPTION",
+			api.WriteError(w, http.StatusBadRequest, "INVALID_ANSWER_OPTION",
 				"One or more selected option IDs do not belong to this question.")
 		case errors.Is(err, ErrInvalidAnswerFormat):
 			api.WriteError(w, http.StatusBadRequest, "INVALID_ANSWER_FORMAT",
@@ -364,6 +369,31 @@ func (h *Handler) HandleGradeAnswer(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
 		default:
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to grade answer")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// GetNextQuestion handles GET /api/v1/portal/sessions/:id/next-question (FR-BB72 AC-3).
+func (h *Handler) GetNextQuestion(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "id")
+	userID := auth.UserIDFromCtx(r.Context())
+
+	resp, err := h.svc.SelectNextAdaptiveQuestion(r.Context(), sessionID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrSessionNotFound):
+			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
+		case errors.Is(err, ErrSessionForbidden):
+			api.WriteError(w, http.StatusForbidden, "SESSION_FORBIDDEN",
+				"You do not have access to this session.")
+		case errors.Is(err, ErrNotAdaptive):
+			api.WriteError(w, http.StatusNotFound, "NOT_ADAPTIVE",
+				"This session is not adaptive.")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to get next question")
 		}
 		return
 	}

@@ -3,11 +3,13 @@ package sessions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/email"
+	"github.com/bilimbaga/bilimbaga/internal/exams"
 )
 
 // Service defines the business logic for session creation and answer saving.
@@ -57,6 +59,16 @@ type Service interface {
 	// GradeAnswer validates and persists a manual grade for one short-text answer (FR-BB42 AC-5/AC-6/AC-7/AC-8/AC-10).
 	// Returns ErrInvalidScore if score_pct is not in [0, 100].
 	GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
+
+	// SelectNextAdaptiveQuestion picks the next question for an adaptive session (FR-BB72 AC-3/AC-4/AC-5).
+	// Returns ErrNotAdaptive if the session's exam is not adaptive.
+	// Returns ErrSessionForbidden if userID does not own the session.
+	SelectNextAdaptiveQuestion(ctx context.Context, sessionID, userID string) (*NextQuestionResponse, error)
+
+	// RecordAdaptiveAnswer updates adaptive_state after an answer is saved (FR-BB72 AC-6).
+	// Appends correctness to recent_results and clears current_question_id.
+	// No-op (nil error) if the session is not adaptive.
+	RecordAdaptiveAnswer(ctx context.Context, sessionID, questionID string, correct bool) error
 }
 
 type service struct {
@@ -348,7 +360,7 @@ func (s *service) SaveAnswer(ctx context.Context, sessionID, questionID, userID 
 		}
 	}
 
-	// AC-5: validate all selected_option_ids belong to the question.
+	// AC-5 / FR-BB64 AC-4: validate all selected_option_ids belong to the question.
 	if len(input.SelectedOptionIDs) > 0 {
 		validOpts, err := s.repo.GetValidOptionIDs(ctx, questionID)
 		if err != nil {
@@ -356,7 +368,7 @@ func (s *service) SaveAnswer(ctx context.Context, sessionID, questionID, userID 
 		}
 		for _, optID := range input.SelectedOptionIDs {
 			if _, ok := validOpts[optID]; !ok {
-				return nil, ErrInvalidOption
+				return nil, ErrInvalidAnswerOption
 			}
 		}
 	}
@@ -504,6 +516,7 @@ func (s *service) GetSessionState(ctx context.Context, sessionID, userID string)
 		RemainingSeconds:   remaining,
 		Questions:          questions,
 		Answers:            answers,
+		Adaptive:           sess.Adaptive,
 	}, nil
 }
 
@@ -801,6 +814,152 @@ func (s *service) GetGradingDetail(ctx context.Context, sessionID string) (*Grad
 		return nil, fmt.Errorf("sessions: GetGradingDetail: %w", err)
 	}
 	return detail, nil
+}
+
+// SelectNextAdaptiveQuestion picks the next question for an adaptive session (FR-BB72 AC-3/AC-4/AC-5).
+func (s *service) SelectNextAdaptiveQuestion(ctx context.Context, sessionID, userID string) (*NextQuestionResponse, error) {
+	// Verify ownership and get adaptive flag.
+	adaptive, err := s.repo.GetSessionAdaptive(ctx, sessionID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: %w", err)
+	}
+	if !adaptive {
+		return nil, ErrNotAdaptive
+	}
+
+	state, err := s.repo.GetAdaptiveState(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: get state: %w", err)
+	}
+
+	// AC-5: if current_question_id is set, return same question (idempotent).
+	if state.CurrentQuestionID != nil {
+		// Fetch that question's details.
+		qID := *state.CurrentQuestionID
+		details, err := s.repo.GetQuestionDetails(ctx, []string{qID})
+		if err != nil {
+			return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: get current q details: %w", err)
+		}
+		optIDs, err := s.repo.GetOptionIDs(ctx, qID)
+		if err != nil {
+			return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: get current q options: %w", err)
+		}
+		allOptIDs := make([]string, len(optIDs))
+		for i, o := range optIDs {
+			allOptIDs[i] = o.OptionID
+		}
+		optTexts, err := s.repo.GetOptionTexts(ctx, allOptIDs)
+		if err != nil {
+			return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: get option texts: %w", err)
+		}
+		answered, err := s.repo.CountAnsweredForSession(ctx, sessionID)
+		if err != nil {
+			return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: count answered: %w", err)
+		}
+		detail := details[qID]
+		opts := buildOptions(detail.Type, allOptIDs, optTexts)
+		return &NextQuestionResponse{
+			Question: &SessionQuestionResponse{
+				ID:        qID,
+				SortOrder: answered,
+				Stem:      detail.Stem,
+				Type:      detail.Type,
+				Options:   opts,
+			},
+			QuestionsAnswered: answered,
+			Done:              false,
+		}, nil
+	}
+
+	// Count already answered — if all served IDs are answered, check done condition.
+	answered, err := s.repo.CountAnsweredForSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: count answered: %w", err)
+	}
+
+	// Compute next difficulty using the adaptive algorithm.
+	nextDiff := exams.NextDifficulty(
+		exams.Difficulty(state.CurrentDifficulty),
+		state.RecentResults,
+	)
+
+	// Fetch a question at the target difficulty, excluding already-served IDs.
+	q, err := s.repo.GetRandomByDifficultyExcluding(ctx, "", string(nextDiff), state.ServedQuestionIDs)
+	if errors.Is(err, ErrNoQuestionsAvailable) {
+		// Fall back to any difficulty.
+		q, err = s.repo.GetRandomByDifficultyExcluding(ctx, "", string(exams.AnyDifficulty), state.ServedQuestionIDs)
+	}
+	if errors.Is(err, ErrNoQuestionsAvailable) {
+		// All questions have been served — session is done.
+		return &NextQuestionResponse{
+			QuestionsAnswered: answered,
+			Done:              true,
+		}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: pick question: %w", err)
+	}
+
+	// Update state: record selected question, update difficulty, add to served list.
+	state.CurrentDifficulty = q.Difficulty
+	qIDStr := q.ID
+	state.CurrentQuestionID = &qIDStr
+	state.ServedQuestionIDs = append(state.ServedQuestionIDs, q.ID)
+	if err := s.repo.UpdateAdaptiveState(ctx, sessionID, state); err != nil {
+		return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: update state: %w", err)
+	}
+
+	// Build response question.
+	optIDs, err := s.repo.GetOptionIDs(ctx, q.ID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: get option ids: %w", err)
+	}
+	allOptIDs := make([]string, len(optIDs))
+	for i, o := range optIDs {
+		allOptIDs[i] = o.OptionID
+	}
+	optTexts, err := s.repo.GetOptionTexts(ctx, allOptIDs)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: SelectNextAdaptiveQuestion: get option texts: %w", err)
+	}
+	opts := buildOptions(q.Type, allOptIDs, optTexts)
+	return &NextQuestionResponse{
+		Question: &SessionQuestionResponse{
+			ID:        q.ID,
+			SortOrder: answered,
+			Stem:      q.Stem,
+			Type:      q.Type,
+			Options:   opts,
+		},
+		QuestionsAnswered: answered,
+		Done:              false,
+	}, nil
+}
+
+// buildOptions constructs the option list for a question response, omitting options for short_text.
+func buildOptions(qType string, optIDs []string, optTexts map[string]string) []SessionOptionResponse {
+	if qType == "short_text" {
+		return []SessionOptionResponse{}
+	}
+	opts := make([]SessionOptionResponse, len(optIDs))
+	for i, id := range optIDs {
+		opts[i] = SessionOptionResponse{ID: id, Text: optTexts[id]}
+	}
+	return opts
+}
+
+// RecordAdaptiveAnswer updates adaptive_state after an answer is saved (FR-BB72 AC-6).
+func (s *service) RecordAdaptiveAnswer(ctx context.Context, sessionID, questionID string, correct bool) error {
+	state, err := s.repo.GetAdaptiveState(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("sessions: RecordAdaptiveAnswer: get state: %w", err)
+	}
+	state.RecentResults = append(state.RecentResults, correct)
+	state.CurrentQuestionID = nil // cleared; next call to next-question picks new q
+	if err := s.repo.UpdateAdaptiveState(ctx, sessionID, state); err != nil {
+		return fmt.Errorf("sessions: RecordAdaptiveAnswer: update state: %w", err)
+	}
+	return nil
 }
 
 // GradeAnswer validates and stores a manual grade for a short-text answer (FR-BB42).

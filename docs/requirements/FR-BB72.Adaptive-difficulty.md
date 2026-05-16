@@ -6,7 +6,7 @@
 | ID | FR-BB72 |
 | Phase | 7 — AI Layer |
 | Priority | 2 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB311, FR-BB35, FR-BB36, FR-BB37 |
 
 ## Description

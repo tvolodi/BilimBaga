@@ -1,8 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   useSaveAnswer,
   useSubmitSession,
+  useNextAdaptiveQuestion,
   type ResumeSessionResponse,
   type SavedAnswer,
   type SubmitResult,
@@ -17,6 +19,7 @@ import { SubmitConfirmModal } from './SubmitConfirmModal'
 import { TabSwitchWarningModal } from './TabSwitchWarningModal'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { FullPageSpinner } from '@/components/FullPageSpinner'
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type Screen = 'exam' | 'review'
@@ -28,6 +31,8 @@ interface ExamLayoutProps {
 
 export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const isAdaptive = session.adaptive === true
 
   // Timer
   const totalSeconds = Math.max(
@@ -40,6 +45,20 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
     session.remaining_seconds,
     session.expires_at,
   )
+
+  // FR-BB72: Adaptive next question query
+  const nextQuestionQuery = useNextAdaptiveQuestion(session.session_id, isAdaptive)
+
+  // Auto-submit when adaptive session is done
+  const submitSession = useSubmitSession(session.session_id)
+  useEffect(() => {
+    if (isAdaptive && nextQuestionQuery.data?.done) {
+      submitSession.mutate(undefined, {
+        onSuccess: (result) => onSubmitSuccess(result),
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdaptive, nextQuestionQuery.data?.done])
 
   // Local answers & flags
   const [localAnswers, setLocalAnswers] = useState<Record<string, SavedAnswer>>(
@@ -64,7 +83,6 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
 
   // Mutations
   const saveAnswer = useSaveAnswer(session.session_id)
-  const submitSession = useSubmitSession(session.session_id)
 
   // Refs for scrolling
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -132,6 +150,11 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
             setSaveStatus('saved')
             syncFromServer(data.remaining_seconds)
             scheduleSaveStatusReset(2000)
+            // FR-BB72 AC-6: in adaptive mode, invalidate the next-question query
+            // so the next call picks a new question
+            if (isAdaptive) {
+              queryClient.invalidateQueries({ queryKey: ['session-next-question', session.session_id] })
+            }
           },
           onError: () => {
             setSaveStatus('error')
@@ -140,7 +163,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
         },
       )
     },
-    [saveAnswer, syncFromServer],
+    [saveAnswer, syncFromServer, isAdaptive, queryClient, session.session_id],
   )
 
   // Immediate save (radio / checkbox / likert)
@@ -208,7 +231,9 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
       (ans.text_answer !== null && ans.text_answer.trim() !== '')
     )
   }
-  const answeredCount = session.questions.filter((q) => isAnswered(q.id)).length
+  const answeredCount = isAdaptive
+    ? (nextQuestionQuery.data?.questions_answered ?? 0)
+    : session.questions.filter((q) => isAnswered(q.id)).length
 
   const handleFinishClick = () => setScreen('review')
 
@@ -238,6 +263,52 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
           onCancel={() => setShowSubmitConfirm(false)}
         />
       </>
+    )
+  }
+
+  // FR-BB72: Adaptive mode render — single question at a time
+  if (isAdaptive) {
+    const nextQ = nextQuestionQuery.data?.question ?? null
+    return (
+      <div className="flex flex-col h-screen bg-background overflow-hidden">
+        <ExamTopBar
+          examTitle={session.exam_title}
+          remaining={remaining}
+          totalSeconds={totalSeconds}
+          answeredCount={answeredCount}
+          totalCount={0}
+          onTimerExpire={handleTimerExpire}
+          saveStatus={saveStatus}
+          onOpenNavigator={() => {}}
+          adaptive
+        />
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 md:p-6 outline-none">
+          {nextQuestionQuery.isLoading && <FullPageSpinner />}
+          {nextQ && (
+            <QuestionDisplay
+              question={nextQ}
+              savedAnswer={localAnswers[nextQ.id]}
+              onAnswer={(optionIds, textAnswer) => handleAnswer(nextQ.id, optionIds, textAnswer)}
+              isFlagged={false}
+              onToggleFlag={() => {}}
+            />
+          )}
+        </main>
+        {/* Tab switch warning */}
+        <TabSwitchWarningModal open={showTabWarning} onClose={() => setShowTabWarning(false)} />
+        {/* Time's up modal */}
+        <Dialog open={showTimesUp} onOpenChange={() => {}}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('exam.taking.timesUp.title')}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">{t('exam.taking.timesUp.message')}</p>
+            {submitSession.isError && (
+              <p className="text-sm text-amber-600">{t('exam.taking.timesUp.retrying')}</p>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     )
   }
 

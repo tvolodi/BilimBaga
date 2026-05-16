@@ -86,6 +86,7 @@ func (s *service) CreateExam(ctx context.Context, input CreateExamInput) (*Exam,
 		ShowAnswers:        input.ShowAnswers,
 		OnTabSwitch:        input.OnTabSwitch,
 		CertificateEnabled: input.CertificateEnabled,
+		Adaptive:           input.Adaptive,
 		CreatedBy:          input.CreatedBy,
 	}
 	if err := s.repo.Create(ctx, e); err != nil {
@@ -118,6 +119,8 @@ func (s *service) UpdateExam(ctx context.Context, id string, input UpdateExamInp
 	if e.Status != "draft" {
 		return nil, ErrNotDraft
 	}
+	// AC-1: adaptive can only be changed in draft status (already enforced by ErrNotDraft above).
+	// If the exam is not draft and the caller tries to change adaptive, it is rejected.
 	updated, err := s.repo.Update(ctx, id, input)
 	if err != nil {
 		return nil, fmt.Errorf("exams: UpdateExam: %w", err)
@@ -141,6 +144,10 @@ func (s *service) TransitionStatus(ctx context.Context, id, newStatus string) (*
 	return e, nil
 }
 
+// minAdaptiveQuestionsPerDifficulty is the minimum number of questions required at each
+// difficulty level for each rule when publishing an adaptive exam (FR-BB72 AC-2).
+const minAdaptiveQuestionsPerDifficulty = 5
+
 func (s *service) Publish(ctx context.Context, id string) (*Exam, error) {
 	e, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -153,6 +160,29 @@ func (s *service) Publish(ctx context.Context, id string) (*Exam, error) {
 	rules, err := s.repo.ListRulesForExam(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("exams: Publish: list rules: %w", err)
+	}
+
+	// AC-2 (FR-BB72): if adaptive, validate ≥5 questions per difficulty per rule.
+	if e.Adaptive {
+		for _, rule := range rules {
+			if rule.Mode == "manual" {
+				continue
+			}
+			for _, diff := range []string{"easy", "medium", "hard"} {
+				count, err := s.repo.CountQuestionsPerDifficulty(ctx, rule, diff)
+				if err != nil {
+					return nil, fmt.Errorf("exams: Publish: adaptive count rule %s diff %s: %w", rule.ID, diff, err)
+				}
+				if count < minAdaptiveQuestionsPerDifficulty {
+					return nil, &AdaptivePublishValidationError{
+						RuleID:     rule.ID,
+						Difficulty: diff,
+						Required:   minAdaptiveQuestionsPerDifficulty,
+						Available:  count,
+					}
+				}
+			}
+		}
 	}
 
 	var unsatisfied []RuleUnsatisfiedDetail

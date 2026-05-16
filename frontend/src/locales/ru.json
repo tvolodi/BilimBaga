@@ -842,7 +842,8 @@
   "session": {
     "timerFiveMinutes": "Осталось 5 минут",
     "timerOneMinute": "Осталась 1 минута",
-    "timerExpired": "Время вышло"
+    "timerExpired": "Время вышло",
+    "questionsAnswered": "Отвечено вопросов: {{count}}"
   },
   "status": {
     "active": {

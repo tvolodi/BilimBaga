@@ -842,7 +842,8 @@
   "session": {
     "timerFiveMinutes": "5 минут қалды",
     "timerOneMinute": "1 минут қалды",
-    "timerExpired": "Уақыт аяқталды"
+    "timerExpired": "Уақыт аяқталды",
+    "questionsAnswered": "Жауапталған сұрақтар: {{count}}"
   },
   "status": {
     "active": {

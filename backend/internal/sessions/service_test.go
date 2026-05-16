@@ -44,6 +44,14 @@ type mockRepo struct {
 	listGradingQueueFn      func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error)
 	getGradingDetailFn      func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
 	gradeAnswerFn           func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error)
+
+	// FR-BB72: Adaptive
+	getAdaptiveStateFn               func(ctx context.Context, sessionID string) (*AdaptiveState, error)
+	updateAdaptiveStateFn            func(ctx context.Context, sessionID string, state *AdaptiveState) error
+	getRandomByDifficultyExcludingFn func(ctx context.Context, examID, difficulty string, excludeIDs []string) (*adaptiveQuestion, error)
+	countAnsweredForSessionFn        func(ctx context.Context, sessionID string) (int, error)
+	getSessionAdaptiveFn             func(ctx context.Context, sessionID, userID string) (bool, error)
+	initAdaptiveStateFn              func(ctx context.Context, sessionID string, state *AdaptiveState) error
 }
 
 func (m *mockRepo) IsAssigned(ctx context.Context, examID, userID, deptID string) (bool, error) {
@@ -273,6 +281,59 @@ func (m *mockRepo) GradeAnswer(ctx context.Context, sessionID, questionID, grade
 		return m.gradeAnswerFn(ctx, sessionID, questionID, graderID, tenantID, actorIP, scorePct, feedback)
 	}
 	return &gradeAnswerResult{sessionStatus: "grading_pending"}, nil
+}
+
+// ── FR-BB72: Adaptive methods ─────────────────────────────────────────────────
+
+func (m *mockRepo) GetAdaptiveState(ctx context.Context, sessionID string) (*AdaptiveState, error) {
+	if m.getAdaptiveStateFn != nil {
+		return m.getAdaptiveStateFn(ctx, sessionID)
+	}
+	return &AdaptiveState{
+		CurrentDifficulty: "medium",
+		ServedQuestionIDs: []string{},
+		RecentResults:     []bool{},
+	}, nil
+}
+
+func (m *mockRepo) UpdateAdaptiveState(ctx context.Context, sessionID string, state *AdaptiveState) error {
+	if m.updateAdaptiveStateFn != nil {
+		return m.updateAdaptiveStateFn(ctx, sessionID, state)
+	}
+	return nil
+}
+
+func (m *mockRepo) GetRandomByDifficultyExcluding(ctx context.Context, examID, difficulty string, excludeIDs []string) (*adaptiveQuestion, error) {
+	if m.getRandomByDifficultyExcludingFn != nil {
+		return m.getRandomByDifficultyExcludingFn(ctx, examID, difficulty, excludeIDs)
+	}
+	return &adaptiveQuestion{
+		ID:         "adaptive-q-1",
+		Type:       "single_choice",
+		Stem:       "Adaptive question",
+		Difficulty: difficulty,
+	}, nil
+}
+
+func (m *mockRepo) CountAnsweredForSession(ctx context.Context, sessionID string) (int, error) {
+	if m.countAnsweredForSessionFn != nil {
+		return m.countAnsweredForSessionFn(ctx, sessionID)
+	}
+	return 0, nil
+}
+
+func (m *mockRepo) GetSessionAdaptive(ctx context.Context, sessionID, userID string) (bool, error) {
+	if m.getSessionAdaptiveFn != nil {
+		return m.getSessionAdaptiveFn(ctx, sessionID, userID)
+	}
+	return false, nil
+}
+
+func (m *mockRepo) InitAdaptiveState(ctx context.Context, sessionID string, state *AdaptiveState) error {
+	if m.initAdaptiveStateFn != nil {
+		return m.initAdaptiveStateFn(ctx, sessionID, state)
+	}
+	return nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -806,7 +867,8 @@ func TestSaveAnswer_InvalidOption(t *testing.T) {
 	_, err := svc.SaveAnswer(context.Background(), "sess-1", "q-1", "user-1", SaveAnswerInput{
 		SelectedOptionIDs: []string{"opt-z"},
 	})
-	require.ErrorIs(t, err, ErrInvalidOption)
+	// AC-4 (FR-BB64): invalid option IDs now return ErrInvalidAnswerOption.
+	require.ErrorIs(t, err, ErrInvalidAnswerOption)
 }
 
 // Notes: short_text with non-empty selected_option_ids → ErrInvalidAnswerFormat.
@@ -1853,4 +1915,148 @@ func TestGetMyResults_PropagatesRepoError(t *testing.T) {
 	svc := NewService(repo)
 	_, err := svc.GetMyResults(context.Background(), "user-1", 1, 20, "date", "desc")
 	require.Error(t, err)
+}
+
+// ── FR-BB72: Adaptive Difficulty ─────────────────────────────────────────────
+
+// TestSelectNextAdaptiveQuestion_NotAdaptive verifies ErrNotAdaptive is returned
+// when the session's exam does not have adaptive=true.
+func TestSelectNextAdaptiveQuestion_NotAdaptive(t *testing.T) {
+	repo := &mockRepo{
+		getSessionAdaptiveFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, nil
+		},
+	}
+	svc := NewService(repo)
+	_, err := svc.SelectNextAdaptiveQuestion(context.Background(), "sess-1", "user-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrNotAdaptive)
+}
+
+// TestSelectNextAdaptiveQuestion_ReturnsCurrentQuestion verifies idempotency when
+// current_question_id is already set.
+func TestSelectNextAdaptiveQuestion_ReturnsCurrentQuestion(t *testing.T) {
+	currentQID := "q-current"
+	repo := &mockRepo{
+		getSessionAdaptiveFn: func(_ context.Context, _, _ string) (bool, error) {
+			return true, nil
+		},
+		getAdaptiveStateFn: func(_ context.Context, _ string) (*AdaptiveState, error) {
+			return &AdaptiveState{
+				CurrentDifficulty: "medium",
+				CurrentQuestionID: &currentQID,
+				ServedQuestionIDs: []string{currentQID},
+				RecentResults:     []bool{},
+			}, nil
+		},
+		countAnsweredForSessionFn: func(_ context.Context, _ string) (int, error) {
+			return 0, nil
+		},
+		getQuestionDetailsFn: func(_ context.Context, ids []string) (map[string]questionDetail, error) {
+			result := make(map[string]questionDetail)
+			for _, id := range ids {
+				result[id] = questionDetail{Stem: "Q " + id, Type: "single_choice"}
+			}
+			return result, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.SelectNextAdaptiveQuestion(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	assert.False(t, resp.Done)
+	require.NotNil(t, resp.Question)
+	assert.Equal(t, currentQID, resp.Question.ID)
+}
+
+// TestSelectNextAdaptiveQuestion_SelectsNewQuestion verifies a new question is
+// selected when current_question_id is nil.
+func TestSelectNextAdaptiveQuestion_SelectsNewQuestion(t *testing.T) {
+	updatedState := false
+	repo := &mockRepo{
+		getSessionAdaptiveFn: func(_ context.Context, _, _ string) (bool, error) {
+			return true, nil
+		},
+		getAdaptiveStateFn: func(_ context.Context, _ string) (*AdaptiveState, error) {
+			return &AdaptiveState{
+				CurrentDifficulty: "medium",
+				CurrentQuestionID: nil,
+				ServedQuestionIDs: []string{},
+				RecentResults:     []bool{},
+			}, nil
+		},
+		countAnsweredForSessionFn: func(_ context.Context, _ string) (int, error) {
+			return 0, nil
+		},
+		getRandomByDifficultyExcludingFn: func(_ context.Context, _, _ string, _ []string) (*adaptiveQuestion, error) {
+			return &adaptiveQuestion{ID: "q-new", Type: "single_choice", Stem: "New Q", Difficulty: "medium"}, nil
+		},
+		updateAdaptiveStateFn: func(_ context.Context, _ string, _ *AdaptiveState) error {
+			updatedState = true
+			return nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.SelectNextAdaptiveQuestion(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	assert.False(t, resp.Done)
+	require.NotNil(t, resp.Question)
+	assert.Equal(t, "q-new", resp.Question.ID)
+	assert.True(t, updatedState, "adaptive state should be updated after picking a new question")
+}
+
+// TestSelectNextAdaptiveQuestion_DoneWhenNoQuestionsAvailable verifies Done=true is
+// returned when all questions have been served.
+func TestSelectNextAdaptiveQuestion_DoneWhenNoQuestionsAvailable(t *testing.T) {
+	repo := &mockRepo{
+		getSessionAdaptiveFn: func(_ context.Context, _, _ string) (bool, error) {
+			return true, nil
+		},
+		getAdaptiveStateFn: func(_ context.Context, _ string) (*AdaptiveState, error) {
+			return &AdaptiveState{
+				CurrentDifficulty: "medium",
+				CurrentQuestionID: nil,
+				ServedQuestionIDs: []string{"q1", "q2"},
+				RecentResults:     []bool{true, false},
+			}, nil
+		},
+		countAnsweredForSessionFn: func(_ context.Context, _ string) (int, error) {
+			return 2, nil
+		},
+		getRandomByDifficultyExcludingFn: func(_ context.Context, _, _ string, _ []string) (*adaptiveQuestion, error) {
+			return nil, ErrNoQuestionsAvailable
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.SelectNextAdaptiveQuestion(context.Background(), "sess-1", "user-1")
+	require.NoError(t, err)
+	assert.True(t, resp.Done)
+	assert.Equal(t, 2, resp.QuestionsAnswered)
+	assert.Nil(t, resp.Question)
+}
+
+// TestRecordAdaptiveAnswer_AppendsResultAndClearsCurrentQuestion verifies that
+// RecordAdaptiveAnswer appends correctness to RecentResults and clears CurrentQuestionID.
+func TestRecordAdaptiveAnswer_AppendsResultAndClearsCurrentQuestion(t *testing.T) {
+	qID := "q-current"
+	var savedState *AdaptiveState
+	repo := &mockRepo{
+		getAdaptiveStateFn: func(_ context.Context, _ string) (*AdaptiveState, error) {
+			return &AdaptiveState{
+				CurrentDifficulty: "medium",
+				CurrentQuestionID: &qID,
+				ServedQuestionIDs: []string{qID},
+				RecentResults:     []bool{true},
+			}, nil
+		},
+		updateAdaptiveStateFn: func(_ context.Context, _ string, state *AdaptiveState) error {
+			savedState = state
+			return nil
+		},
+	}
+	svc := NewService(repo)
+	err := svc.RecordAdaptiveAnswer(context.Background(), "sess-1", qID, false)
+	require.NoError(t, err)
+	require.NotNil(t, savedState)
+	assert.Nil(t, savedState.CurrentQuestionID, "CurrentQuestionID should be cleared")
+	assert.Equal(t, []bool{true, false}, savedState.RecentResults)
 }

@@ -35,6 +35,13 @@ export interface ResumeSessionResponse {
   remaining_seconds: number
   questions: SessionQuestion[]
   answers: Record<string, SavedAnswer>
+  adaptive: boolean
+}
+
+export interface NextQuestionResponse {
+  question: SessionQuestion | null
+  questions_answered: number
+  done: boolean
 }
 
 export interface SaveAnswerRequest {
@@ -125,7 +132,7 @@ export function useSession(sessionId: string) {
   return useQuery<ResumeSessionResponse, Error>({
     queryKey: ['portal', 'sessions', sessionId],
     queryFn: () => apiFetch<ResumeSessionResponse>(`/api/v1/portal/sessions/${sessionId}`),
-    staleTime: Infinity,
+    staleTime: 30 * 1000, // AC-6: 30 seconds — session state changes frequently
     retry: false,
   })
 }
@@ -169,6 +176,18 @@ export function useSessionResult(sessionId: string) {
     queryKey: ['session-result', sessionId],
     queryFn: () => apiFetch<SessionResult>(`/api/v1/portal/sessions/${sessionId}/result`),
     staleTime: Infinity,
+  })
+}
+
+// ---- FR-BB72: Adaptive next question ----------------------------------------
+
+export function useNextAdaptiveQuestion(sessionId: string, enabled: boolean) {
+  return useQuery<NextQuestionResponse, Error>({
+    queryKey: ['session-next-question', sessionId],
+    queryFn: () => apiFetch<NextQuestionResponse>(`/api/v1/portal/sessions/${sessionId}/next-question`),
+    enabled,
+    staleTime: 0, // always re-fetch on invalidation
+    retry: false,
   })
 }
 

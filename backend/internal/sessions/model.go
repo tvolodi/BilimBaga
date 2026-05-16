@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// AdaptiveState holds the per-session state for adaptive question serving (FR-BB72).
+type AdaptiveState struct {
+	CurrentDifficulty string   `json:"current_difficulty"`
+	ServedQuestionIDs []string `json:"served_question_ids"`
+	RecentResults     []bool   `json:"recent_results"`
+	CurrentQuestionID *string  `json:"current_question_id"`
+}
+
 var (
 	ErrNotAssigned           = errors.New("exam not assigned to user")
 	ErrExamNotActive         = errors.New("exam is not active")
@@ -24,6 +32,9 @@ var (
 	ErrInvalidAnswerFormat  = errors.New("invalid answer format for question type")
 	ErrNegativeTimeSpent    = errors.New("time_spent_seconds must be non-negative")
 
+	// FR-BB64 AC-4: answer option validation.
+	ErrInvalidAnswerOption = errors.New("supplied option ID does not belong to any active question in this session")
+
 	// FR-BB38 errors.
 	ErrInvalidEventType = errors.New("event type must be one of: tab_switch, blur, fullscreen_exit")
 
@@ -36,6 +47,10 @@ var (
 
 	// FR-BB42 errors.
 	ErrInvalidScore = errors.New("score_pct must be between 0 and 100")
+
+	// FR-BB72 errors.
+	ErrNotAdaptive          = errors.New("session is not adaptive")
+	ErrNoQuestionsAvailable = errors.New("no questions available at this difficulty")
 )
 
 // Session is the persisted exam session row.
@@ -100,6 +115,7 @@ type examConfig struct {
 	ShuffleQuestions bool       `db:"shuffle_questions"`
 	ShuffleOptions   bool       `db:"shuffle_options"`
 	OnTabSwitch      string     `db:"on_tab_switch"`
+	Adaptive         bool       `db:"adaptive"`
 }
 
 // questionRule is a resolved row from exam_question_rules.
@@ -184,6 +200,14 @@ type ResumeSessionResponse struct {
 	RemainingSeconds   float64                   `json:"remaining_seconds"`
 	Questions          []SessionQuestionResponse `json:"questions"`
 	Answers            map[string]SavedAnswer    `json:"answers"`
+	Adaptive           bool                      `json:"adaptive"`
+}
+
+// NextQuestionResponse is the 200 response body for GET /portal/sessions/:id/next-question (FR-BB72 AC-3).
+type NextQuestionResponse struct {
+	Question          *SessionQuestionResponse `json:"question,omitempty"`
+	QuestionsAnswered int                      `json:"questions_answered"`
+	Done              bool                     `json:"done"`
 }
 
 // ReportEventInput is the request body for POST /portal/sessions/:id/events (FR-BB38).

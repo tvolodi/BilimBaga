@@ -23,6 +23,10 @@ type Repository interface {
 	DeleteByID(ctx context.Context, id string) error
 	GetWithDetails(ctx context.Context, id string) (*ExamDetail, error)
 
+	// CountQuestionsPerDifficulty returns the count of active questions matching a rule
+	// for the given difficulty level. Used for adaptive publish validation (FR-BB72 AC-2).
+	CountQuestionsPerDifficulty(ctx context.Context, rule *ExamQuestionRule, difficulty string) (int, error)
+
 	// Sections
 	CreateSection(ctx context.Context, examID string, input SectionInput) (*ExamSection, error)
 	// UpdateSection updates a section; returns ErrNotFound if the section does not belong to examID.
@@ -68,11 +72,11 @@ func (r *postgresRepository) Create(ctx context.Context, e *Exam) error {
 		INSERT INTO exams (
 			title, description, status, time_limit_minutes, passing_score_pct,
 			max_attempts, available_from, available_until, shuffle_questions,
-			shuffle_options, show_answers, on_tab_switch, certificate_enabled, created_by
+			shuffle_options, show_answers, on_tab_switch, certificate_enabled, adaptive, created_by
 		) VALUES (
 			:title, :description, :status, :time_limit_minutes, :passing_score_pct,
 			:max_attempts, :available_from, :available_until, :shuffle_questions,
-			:shuffle_options, :show_answers, :on_tab_switch, :certificate_enabled, :created_by
+			:shuffle_options, :show_answers, :on_tab_switch, :certificate_enabled, :adaptive, :created_by
 		)
 		RETURNING id, created_at, updated_at`
 	rows, err := r.db.NamedQueryContext(ctx, q, e)
@@ -198,17 +202,17 @@ func (r *postgresRepository) Update(ctx context.Context, id string, input Update
 			title = $1, description = $2, time_limit_minutes = $3, passing_score_pct = $4,
 			max_attempts = $5, available_from = $6, available_until = $7,
 			shuffle_questions = $8, shuffle_options = $9, show_answers = $10,
-			on_tab_switch = $11, certificate_enabled = $12
-		WHERE id = $13
+			on_tab_switch = $11, certificate_enabled = $12, adaptive = $13
+		WHERE id = $14
 		RETURNING id, title, description, status, time_limit_minutes, passing_score_pct,
 		          max_attempts, available_from, available_until, shuffle_questions, shuffle_options,
-		          show_answers, on_tab_switch, certificate_enabled, created_by, created_at, updated_at`
+		          show_answers, on_tab_switch, certificate_enabled, adaptive, created_by, created_at, updated_at`
 	var e Exam
 	if err := r.db.GetContext(ctx, &e, q,
 		input.Title, input.Description, input.TimeLimitMinutes, input.PassingScorePct,
 		input.MaxAttempts, input.AvailableFrom, input.AvailableUntil,
 		input.ShuffleQuestions, input.ShuffleOptions, input.ShowAnswers,
-		input.OnTabSwitch, input.CertificateEnabled, id,
+		input.OnTabSwitch, input.CertificateEnabled, input.Adaptive, id,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -216,6 +220,41 @@ func (r *postgresRepository) Update(ctx context.Context, id string, input Update
 		return nil, fmt.Errorf("exams: Update: %w", err)
 	}
 	return &e, nil
+}
+
+// CountQuestionsPerDifficulty counts active questions matching a rule's category/tag filters
+// at the given difficulty level. Used for adaptive publish validation (FR-BB72 AC-2).
+func (r *postgresRepository) CountQuestionsPerDifficulty(ctx context.Context, rule *ExamQuestionRule, difficulty string) (int, error) {
+	var args []any
+	argN := 0
+	nextArg := func(v any) string {
+		argN++
+		args = append(args, v)
+		return fmt.Sprintf("$%d", argN)
+	}
+
+	wheres := []string{"q.status = 'active'", fmt.Sprintf("q.difficulty = %s", nextArg(difficulty))}
+	if rule.CategoryID != nil {
+		wheres = append(wheres, fmt.Sprintf("q.category_id = %s", nextArg(*rule.CategoryID)))
+	}
+
+	var tagIDs []string
+	if len(rule.TagIDs) > 0 {
+		_ = json.Unmarshal(rule.TagIDs, &tagIDs)
+	}
+	for _, tagID := range tagIDs {
+		wheres = append(wheres, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM question_tags qt WHERE qt.question_id = q.id AND qt.tag_id = %s)",
+			nextArg(tagID),
+		))
+	}
+
+	q := fmt.Sprintf(`SELECT COUNT(*) FROM questions q WHERE %s`, strings.Join(wheres, " AND "))
+	var count int
+	if err := r.db.QueryRowContext(ctx, q, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("exams: CountQuestionsPerDifficulty: %w", err)
+	}
+	return count, nil
 }
 
 func (r *postgresRepository) UpdateStatus(ctx context.Context, id, status string) error {
@@ -264,6 +303,7 @@ func (r *postgresRepository) GetWithDetails(ctx context.Context, id string) (*Ex
 		ShowAnswers:        e.ShowAnswers,
 		OnTabSwitch:        e.OnTabSwitch,
 		CertificateEnabled: e.CertificateEnabled,
+		Adaptive:           e.Adaptive,
 		CreatedBy:          e.CreatedBy,
 		CreatedAt:          e.CreatedAt,
 		UpdatedAt:          e.UpdatedAt,

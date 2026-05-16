@@ -842,7 +842,8 @@
   "session": {
     "timerFiveMinutes": "5 minutes remaining",
     "timerOneMinute": "1 minute remaining",
-    "timerExpired": "Time is up"
+    "timerExpired": "Time is up",
+    "questionsAnswered": "Questions answered: {{count}}"
   },
   "status": {
     "active": {

@@ -37,9 +37,10 @@ type mockRepo struct {
 	listRulesForExamFn          func(ctx context.Context, examID string) ([]*ExamQuestionRule, error)
 	countAvailableForRuleFn     func(ctx context.Context, rule *ExamQuestionRule) (int, error)
 	createAssignmentFn          func(ctx context.Context, a *ExamAssignment) error
-	getAssignmentByIDFn         func(ctx context.Context, id string) (*ExamAssignment, error)
-	deleteAssignmentFn          func(ctx context.Context, id string) error
-	listAssignmentsWithStatsFn  func(ctx context.Context, examID string) ([]*AssignmentDetail, error)
+	getAssignmentByIDFn              func(ctx context.Context, id string) (*ExamAssignment, error)
+	deleteAssignmentFn               func(ctx context.Context, id string) error
+	listAssignmentsWithStatsFn       func(ctx context.Context, examID string) ([]*AssignmentDetail, error)
+	countQuestionsPerDifficultyFn    func(ctx context.Context, rule *ExamQuestionRule, difficulty string) (int, error)
 }
 
 func newMockRepo() *mockRepo {
@@ -251,6 +252,13 @@ func (m *mockRepo) CountAvailableForRule(ctx context.Context, rule *ExamQuestion
 		return m.countAvailableForRuleFn(ctx, rule)
 	}
 	return 100, nil
+}
+
+func (m *mockRepo) CountQuestionsPerDifficulty(ctx context.Context, rule *ExamQuestionRule, difficulty string) (int, error) {
+	if m.countQuestionsPerDifficultyFn != nil {
+		return m.countQuestionsPerDifficultyFn(ctx, rule, difficulty)
+	}
+	return 10, nil // default: enough questions at every difficulty
 }
 
 func (m *mockRepo) CreateAssignment(ctx context.Context, a *ExamAssignment) error {

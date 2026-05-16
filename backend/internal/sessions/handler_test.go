@@ -27,10 +27,12 @@ type mockSvc struct {
 	getSessionResultFn func(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error)
 	getAdminResultFn   func(ctx context.Context, sessionID string) (*SessionResultResponse, error)
 	getExamHistoryFn   func(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
-	listGradingQueueFn func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
-	getGradingDetailFn func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
-	gradeAnswerFn      func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
-	getMyResultsFn     func(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error)
+	listGradingQueueFn                func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
+	getGradingDetailFn                func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
+	gradeAnswerFn                     func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
+	getMyResultsFn                    func(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error)
+	selectNextAdaptiveQuestionFn      func(ctx context.Context, sessionID, userID string) (*NextQuestionResponse, error)
+	recordAdaptiveAnswerFn            func(ctx context.Context, sessionID, questionID string, correct bool) error
 }
 
 func (m *mockSvc) CreateSession(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error) {
@@ -104,6 +106,20 @@ func (m *mockSvc) GetMyResults(ctx context.Context, userID string, page, perPage
 		return m.getMyResultsFn(ctx, userID, page, perPage, sort, dir)
 	}
 	return nil, errors.New("not configured")
+}
+
+func (m *mockSvc) SelectNextAdaptiveQuestion(ctx context.Context, sessionID, userID string) (*NextQuestionResponse, error) {
+	if m.selectNextAdaptiveQuestionFn != nil {
+		return m.selectNextAdaptiveQuestionFn(ctx, sessionID, userID)
+	}
+	return nil, errors.New("not configured")
+}
+
+func (m *mockSvc) RecordAdaptiveAnswer(ctx context.Context, sessionID, questionID string, correct bool) error {
+	if m.recordAdaptiveAnswerFn != nil {
+		return m.recordAdaptiveAnswerFn(ctx, sessionID, questionID, correct)
+	}
+	return nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -434,7 +450,23 @@ func TestSaveAnswer_Handler_400_InvalidOption(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	body := decodeBody(t, w.Body.Bytes())
 	errObj, _ := body["error"].(map[string]any)
-	assert.Equal(t, "INVALID_OPTION", errObj["code"])
+	// AC-4 (FR-BB64): ErrInvalidOption maps to INVALID_ANSWER_OPTION.
+	assert.Equal(t, "INVALID_ANSWER_OPTION", errObj["code"])
+}
+
+func TestSaveAnswer_Handler_400_InvalidAnswerOption(t *testing.T) {
+	svc := &mockSvc{
+		saveAnswerFn: func(_ context.Context, _, _, _ string, _ SaveAnswerInput) (*SaveAnswerResponse, error) {
+			return nil, ErrInvalidAnswerOption
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.SaveAnswer(w, saveAnswerRequest(`{"selected_option_ids":["unknown-opt"],"time_spent_seconds":0}`))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "INVALID_ANSWER_OPTION", errObj["code"])
 }
 
 func TestSaveAnswer_Handler_400_InvalidAnswerFormat(t *testing.T) {
@@ -452,7 +484,7 @@ func TestSaveAnswer_Handler_400_InvalidAnswerFormat(t *testing.T) {
 	assert.Equal(t, "INVALID_ANSWER_FORMAT", errObj["code"])
 }
 
-func TestSaveAnswer_Handler_404_QuestionNotInSession(t *testing.T) {
+func TestSaveAnswer_Handler_400_QuestionNotInSession(t *testing.T) {
 	svc := &mockSvc{
 		saveAnswerFn: func(_ context.Context, _, _, _ string, _ SaveAnswerInput) (*SaveAnswerResponse, error) {
 			return nil, ErrQuestionNotInSession
@@ -461,10 +493,11 @@ func TestSaveAnswer_Handler_404_QuestionNotInSession(t *testing.T) {
 	h := NewHandler(svc)
 	w := httptest.NewRecorder()
 	h.SaveAnswer(w, saveAnswerRequest(`{"selected_option_ids":[],"time_spent_seconds":0}`))
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	// AC-4 (FR-BB64): question-not-in-session is reported as 400 INVALID_ANSWER_OPTION.
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 	body := decodeBody(t, w.Body.Bytes())
 	errObj, _ := body["error"].(map[string]any)
-	assert.Equal(t, "QUESTION_NOT_IN_SESSION", errObj["code"])
+	assert.Equal(t, "INVALID_ANSWER_OPTION", errObj["code"])
 }
 
 func TestSaveAnswer_Handler_422_SessionExpired(t *testing.T) {
@@ -1360,5 +1393,138 @@ func TestHandleGetMyResults_500_ServiceError(t *testing.T) {
 	req = withUserCtx(req, "user-1", "dept-1")
 	w := httptest.NewRecorder()
 	h.HandleGetMyResults(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// ── FR-BB72: GetNextQuestion handler ─────────────────────────────────────────
+
+// TestGetNextQuestion_200_ReturnsQuestion verifies a 200 response with next question data.
+func TestGetNextQuestion_200_ReturnsQuestion(t *testing.T) {
+	q := &SessionQuestionResponse{ID: "q-1", SortOrder: 0, Stem: "Adaptive Q", Type: "single_choice", Options: []SessionOptionResponse{}}
+	svc := &mockSvc{
+		selectNextAdaptiveQuestionFn: func(_ context.Context, sessionID, userID string) (*NextQuestionResponse, error) {
+			assert.Equal(t, "sess-1", sessionID)
+			assert.Equal(t, "user-1", userID)
+			return &NextQuestionResponse{Question: q, QuestionsAnswered: 2, Done: false}, nil
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/sessions/sess-1/next-question", nil)
+	req = withChiParam(req, "id", "sess-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.GetNextQuestion(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	assert.Nil(t, body["error"])
+	data, ok := body["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, false, data["done"])
+	assert.Equal(t, float64(2), data["questions_answered"])
+}
+
+// TestGetNextQuestion_200_Done verifies done=true response triggers correctly.
+func TestGetNextQuestion_200_Done(t *testing.T) {
+	svc := &mockSvc{
+		selectNextAdaptiveQuestionFn: func(_ context.Context, _, _ string) (*NextQuestionResponse, error) {
+			return &NextQuestionResponse{QuestionsAnswered: 5, Done: true}, nil
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/sessions/sess-1/next-question", nil)
+	req = withChiParam(req, "id", "sess-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.GetNextQuestion(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	assert.Nil(t, body["error"])
+	data, ok := body["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["done"])
+}
+
+// TestGetNextQuestion_404_NotAdaptive verifies 404 NOT_ADAPTIVE for non-adaptive sessions.
+func TestGetNextQuestion_404_NotAdaptive(t *testing.T) {
+	svc := &mockSvc{
+		selectNextAdaptiveQuestionFn: func(_ context.Context, _, _ string) (*NextQuestionResponse, error) {
+			return nil, ErrNotAdaptive
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/sessions/sess-1/next-question", nil)
+	req = withChiParam(req, "id", "sess-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.GetNextQuestion(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "NOT_ADAPTIVE", errObj["code"])
+}
+
+// TestGetNextQuestion_404_SessionNotFound verifies 404 for missing sessions.
+func TestGetNextQuestion_404_SessionNotFound(t *testing.T) {
+	svc := &mockSvc{
+		selectNextAdaptiveQuestionFn: func(_ context.Context, _, _ string) (*NextQuestionResponse, error) {
+			return nil, ErrSessionNotFound
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/sessions/sess-missing/next-question", nil)
+	req = withChiParam(req, "id", "sess-missing")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.GetNextQuestion(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "SESSION_NOT_FOUND", errObj["code"])
+}
+
+// TestGetNextQuestion_403_Forbidden verifies 403 when session belongs to another user.
+func TestGetNextQuestion_403_Forbidden(t *testing.T) {
+	svc := &mockSvc{
+		selectNextAdaptiveQuestionFn: func(_ context.Context, _, _ string) (*NextQuestionResponse, error) {
+			return nil, ErrSessionForbidden
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/sessions/sess-1/next-question", nil)
+	req = withChiParam(req, "id", "sess-1")
+	req = withUserCtx(req, "other-user", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.GetNextQuestion(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	errObj, _ := body["error"].(map[string]any)
+	assert.Equal(t, "SESSION_FORBIDDEN", errObj["code"])
+}
+
+// TestGetNextQuestion_500_ServiceError verifies 500 on unexpected errors.
+func TestGetNextQuestion_500_ServiceError(t *testing.T) {
+	svc := &mockSvc{
+		selectNextAdaptiveQuestionFn: func(_ context.Context, _, _ string) (*NextQuestionResponse, error) {
+			return nil, errors.New("db failure")
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/portal/sessions/sess-1/next-question", nil)
+	req = withChiParam(req, "id", "sess-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.GetNextQuestion(w, req)
+
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

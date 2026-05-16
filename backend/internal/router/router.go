@@ -224,6 +224,9 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.With(ratelimit.AnswerSaveLimiter()).
 				Put("/portal/sessions/{id}/answers/{questionId}", sessionsHandler.SaveAnswer)
 
+			// Adaptive next question (FR-BB72 AC-3) — any authenticated user.
+			r.Get("/portal/sessions/{id}/next-question", sessionsHandler.GetNextQuestion)
+
 			// Tab-switch event reporting (FR-BB38) — any authenticated user.
 			r.Post("/portal/sessions/{id}/events", sessionsHandler.ReportEvent)
 

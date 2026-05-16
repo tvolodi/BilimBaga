@@ -13,6 +13,8 @@ interface ExamTopBarProps {
   onTimerExpire: () => void
   saveStatus: SaveStatus
   onOpenNavigator: () => void
+  /** FR-BB72: when true, show "Questions answered: N" instead of "N of M" */
+  adaptive?: boolean
 }
 
 export function ExamTopBar({
@@ -24,6 +26,7 @@ export function ExamTopBar({
   onTimerExpire,
   saveStatus,
   onOpenNavigator,
+  adaptive = false,
 }: ExamTopBarProps) {
   const { t } = useTranslation()
 
@@ -41,19 +44,23 @@ export function ExamTopBar({
         />
 
         <span className="text-sm text-muted-foreground hidden sm:inline">
-          {t('exam.taking.progress', { answered: answeredCount, total: totalCount })}
+          {adaptive
+            ? t('session.questionsAnswered', { count: answeredCount })
+            : t('exam.taking.progress', { answered: answeredCount, total: totalCount })}
         </span>
 
-        {/* Mobile navigator trigger */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="md:hidden"
-          onClick={onOpenNavigator}
-          aria-label={t('exam.taking.navigator.title')}
-        >
-          {t('exam.taking.navigator.title')}
-        </Button>
+        {/* Mobile navigator trigger — hidden in adaptive mode (no question list) */}
+        {!adaptive && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="md:hidden"
+            onClick={onOpenNavigator}
+            aria-label={t('exam.taking.navigator.title')}
+          >
+            {t('exam.taking.navigator.title')}
+          </Button>
+        )}
       </div>
     </header>
   )

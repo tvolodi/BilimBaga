@@ -39,6 +39,7 @@ type createExamReq struct {
 	ShowAnswers        string     `json:"show_answers"`
 	OnTabSwitch        string     `json:"on_tab_switch"`
 	CertificateEnabled bool       `json:"certificate_enabled"`
+	Adaptive           bool       `json:"adaptive"`
 }
 
 type updateExamReq struct {
@@ -54,6 +55,7 @@ type updateExamReq struct {
 	ShowAnswers        string     `json:"show_answers"`
 	OnTabSwitch        string     `json:"on_tab_switch"`
 	CertificateEnabled bool       `json:"certificate_enabled"`
+	Adaptive           bool       `json:"adaptive"`
 }
 
 type statusTransitionReq struct {
@@ -237,6 +239,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ShowAnswers:        showAnswers,
 		OnTabSwitch:        onTabSwitch,
 		CertificateEnabled: req.CertificateEnabled,
+		Adaptive:           req.Adaptive,
 		CreatedBy:          actorFromCtx(r),
 	})
 	if err != nil {
@@ -304,6 +307,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		ShowAnswers:        req.ShowAnswers,
 		OnTabSwitch:        req.OnTabSwitch,
 		CertificateEnabled: req.CertificateEnabled,
+		Adaptive:           req.Adaptive,
 	})
 	if err != nil {
 		switch {
@@ -336,7 +340,17 @@ func (h *Handler) Publish(w http.ResponseWriter, r *http.Request) {
 	exam, err := h.svc.Publish(r.Context(), id)
 	if err != nil {
 		var pve *PublishValidationError
+		var apve *AdaptivePublishValidationError
 		switch {
+		case errors.As(err, &apve):
+			api.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{
+				"data": nil,
+				"error": map[string]any{
+					"code":    "INSUFFICIENT_ADAPTIVE_QUESTIONS",
+					"message": "Adaptive exam requires at least 5 questions per difficulty level per rule.",
+					"details": apve,
+				},
+			})
 		case errors.As(err, &pve):
 			api.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{
 				"data": nil,

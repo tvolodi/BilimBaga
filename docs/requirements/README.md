@@ -69,7 +69,7 @@
 | FR-BB65 | Performance | Performance | Draft |
 | FR-BB66 | Observability | Observability | Implemented |
 | FR-BB71 | Question-generation-assist | Question Generation Assist | implemented |
-| FR-BB72 | Adaptive-difficulty | Adaptive Difficulty | Draft |
+| FR-BB72 | Adaptive-difficulty | Adaptive Difficulty | Implemented |
 | FR-BB73 | Short-text-auto-grading | Short-Text Auto-Grading | Draft |
 | FR-BB74 | Performance-insight-summaries | Performance Insight Summaries | Draft |
 | FR-BB75 | Loyalty-profile-narrative | Loyalty Profile Narrative | Draft |

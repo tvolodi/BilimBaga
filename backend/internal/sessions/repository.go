@@ -131,6 +131,32 @@ type Repository interface {
 	// If this is the last pending answer, recalculates session score and transitions to 'submitted'.
 	// Writes audit log entry inside the same transaction.
 	GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error)
+
+	// ── FR-BB72: Adaptive Difficulty ─────────────────────────────────────────────
+
+	// GetAdaptiveState returns the current adaptive_state JSONB for a session.
+	// Returns a default state (Medium difficulty, empty slices) if adaptive_state is NULL.
+	GetAdaptiveState(ctx context.Context, sessionID string) (*AdaptiveState, error)
+
+	// UpdateAdaptiveState persists the adaptive_state JSONB for a session.
+	UpdateAdaptiveState(ctx context.Context, sessionID string, state *AdaptiveState) error
+
+	// GetRandomByDifficultyExcluding fetches one random active question for the given exam
+	// at the given difficulty, excluding already-served question IDs.
+	// Pass difficulty="" (AnyDifficulty sentinel) to fetch from any difficulty.
+	// Returns ErrNoQuestionsAvailable when no candidates are found.
+	GetRandomByDifficultyExcluding(ctx context.Context, examID, difficulty string, excludeIDs []string) (*adaptiveQuestion, error)
+
+	// CountAnsweredForSession counts how many answers have been saved for a session.
+	CountAnsweredForSession(ctx context.Context, sessionID string) (int, error)
+
+	// GetSessionAdaptive returns whether the session's exam has adaptive=true,
+	// and also verifies the session belongs to userID.
+	// Returns ErrSessionNotFound / ErrSessionForbidden as appropriate.
+	GetSessionAdaptive(ctx context.Context, sessionID, userID string) (bool, error)
+
+	// InitAdaptiveState stores a fresh AdaptiveState for a new adaptive session.
+	InitAdaptiveState(ctx context.Context, sessionID string, state *AdaptiveState) error
 }
 
 // questionDetail is the stem+type data fetched for question display.
@@ -149,6 +175,7 @@ type sessionStateRow struct {
 	ExpiresAt          time.Time `db:"expires_at"`
 	ExamTitle          string    `db:"exam_title"`
 	CertificateEnabled bool      `db:"certificate_enabled"`
+	Adaptive           bool      `db:"adaptive"`
 }
 
 // sessionQuestionRow holds one session_questions row with question type.
@@ -182,6 +209,14 @@ type upsertAnswerInput struct {
 	SelectedOptionIDs []string
 	TextAnswer        *string
 	TimeSpentSeconds  int
+}
+
+// adaptiveQuestion is a question row returned for adaptive question selection (FR-BB72).
+type adaptiveQuestion struct {
+	ID         string `db:"id"`
+	Type       string `db:"type"`
+	Stem       string `db:"stem"`
+	Difficulty string `db:"difficulty"`
 }
 
 // createSessionInput holds everything needed for the transactional insert.
@@ -251,7 +286,7 @@ func NewRepository(db *sqlx.DB, engine GradingEngine) Repository {
 func (r *postgresRepository) GetExamConfig(ctx context.Context, examID string) (*examConfig, error) {
 	const q = `
 SELECT id, status, time_limit_minutes, max_attempts, available_from, available_until,
-       shuffle_questions, shuffle_options, on_tab_switch
+       shuffle_questions, shuffle_options, on_tab_switch, adaptive
 FROM exams WHERE id = $1`
 
 	var cfg examConfig
@@ -567,7 +602,7 @@ RETURNING id, started_at, expires_at`
 func (r *postgresRepository) GetSessionForUser(ctx context.Context, sessionID, userID string) (*sessionStateRow, error) {
 	const q = `
 SELECT es.id, es.exam_id, es.user_id, es.status, es.started_at, es.expires_at,
-       e.title AS exam_title, e.certificate_enabled
+       e.title AS exam_title, e.certificate_enabled, e.adaptive
 FROM exam_sessions es
 JOIN exams e ON e.id = es.exam_id
 WHERE es.id = $1`
@@ -1411,4 +1446,150 @@ VALUES ($1, $2, 'answer.grade', 'session_answer', $3, $4,
 		return nil, fmt.Errorf("sessions: GradeAnswer: commit: %w", err)
 	}
 	return res, nil
+}
+
+// ── FR-BB72: Adaptive Difficulty ─────────────────────────────────────────────
+
+func (r *postgresRepository) GetAdaptiveState(ctx context.Context, sessionID string) (*AdaptiveState, error) {
+	const q = `SELECT adaptive_state FROM exam_sessions WHERE id = $1`
+	var raw []byte
+	if err := r.db.QueryRowContext(ctx, q, sessionID).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("sessions: GetAdaptiveState: %w", err)
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		// Return a fresh default state (Medium difficulty, no history).
+		return &AdaptiveState{
+			CurrentDifficulty: "medium",
+			ServedQuestionIDs: []string{},
+			RecentResults:     []bool{},
+			CurrentQuestionID: nil,
+		}, nil
+	}
+	var state AdaptiveState
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return nil, fmt.Errorf("sessions: GetAdaptiveState: unmarshal: %w", err)
+	}
+	if state.ServedQuestionIDs == nil {
+		state.ServedQuestionIDs = []string{}
+	}
+	if state.RecentResults == nil {
+		state.RecentResults = []bool{}
+	}
+	return &state, nil
+}
+
+func (r *postgresRepository) UpdateAdaptiveState(ctx context.Context, sessionID string, state *AdaptiveState) error {
+	raw, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("sessions: UpdateAdaptiveState: marshal: %w", err)
+	}
+	const q = `UPDATE exam_sessions SET adaptive_state = $1 WHERE id = $2`
+	res, err := r.db.ExecContext(ctx, q, raw, sessionID)
+	if err != nil {
+		return fmt.Errorf("sessions: UpdateAdaptiveState: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
+}
+
+func (r *postgresRepository) InitAdaptiveState(ctx context.Context, sessionID string, state *AdaptiveState) error {
+	return r.UpdateAdaptiveState(ctx, sessionID, state)
+}
+
+func (r *postgresRepository) GetRandomByDifficultyExcluding(ctx context.Context, examID, difficulty string, excludeIDs []string) (*adaptiveQuestion, error) {
+	var args []interface{}
+	idx := 1
+
+	// Base query: join through session_questions to scope to examID's question pool,
+	// then use question_translations for the stem.
+	whereParts := []string{
+		"q.status = 'active'",
+		fmt.Sprintf(`EXISTS (
+			SELECT 1 FROM exam_question_rules eqr
+			WHERE eqr.exam_id = $%d
+			  AND (
+			    eqr.mode = 'random' OR
+			    EXISTS (SELECT 1 FROM exam_manual_questions emq WHERE emq.rule_id = eqr.id AND emq.question_id = q.id)
+			  )
+		)`, idx),
+	}
+	args = append(args, examID)
+	idx++
+
+	if difficulty != "" {
+		whereParts = append(whereParts, fmt.Sprintf("q.difficulty = $%d", idx))
+		args = append(args, difficulty)
+		idx++
+	}
+
+	if len(excludeIDs) > 0 {
+		placeholders := make([]string, len(excludeIDs))
+		for i, id := range excludeIDs {
+			placeholders[i] = fmt.Sprintf("$%d", idx)
+			args = append(args, id)
+			idx++
+		}
+		whereParts = append(whereParts, fmt.Sprintf("q.id NOT IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	q := fmt.Sprintf(`
+SELECT q.id, q.type, q.difficulty,
+       COALESCE(qt.stem, '') AS stem
+FROM questions q
+LEFT JOIN question_translations qt ON qt.question_id = q.id AND qt.locale = q.default_locale
+WHERE %s
+ORDER BY random()
+LIMIT 1`, strings.Join(whereParts, " AND "))
+
+	var aq adaptiveQuestion
+	if err := r.db.GetContext(ctx, &aq, q, args...); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNoQuestionsAvailable
+		}
+		return nil, fmt.Errorf("sessions: GetRandomByDifficultyExcluding: %w", err)
+	}
+	return &aq, nil
+}
+
+func (r *postgresRepository) CountAnsweredForSession(ctx context.Context, sessionID string) (int, error) {
+	const q = `SELECT COUNT(*) FROM session_answers WHERE session_id = $1`
+	var count int
+	if err := r.db.QueryRowContext(ctx, q, sessionID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("sessions: CountAnsweredForSession: %w", err)
+	}
+	return count, nil
+}
+
+func (r *postgresRepository) GetSessionAdaptive(ctx context.Context, sessionID, userID string) (bool, error) {
+	const q = `
+SELECT e.adaptive
+FROM exam_sessions es
+JOIN exams e ON e.id = es.exam_id
+WHERE es.id = $1`
+	var adaptive bool
+	err := r.db.QueryRowContext(ctx, q, sessionID).Scan(&adaptive)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, ErrSessionNotFound
+		}
+		return false, fmt.Errorf("sessions: GetSessionAdaptive: %w", err)
+	}
+	// Verify ownership via the already-existing GetSessionForUser path.
+	// We do a separate lightweight query to check user_id.
+	var ownerID string
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT user_id FROM exam_sessions WHERE id = $1`, sessionID,
+	).Scan(&ownerID); err != nil {
+		return false, fmt.Errorf("sessions: GetSessionAdaptive: owner check: %w", err)
+	}
+	if ownerID != userID {
+		return false, ErrSessionForbidden
+	}
+	return adaptive, nil
 }

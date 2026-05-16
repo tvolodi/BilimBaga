@@ -6,38 +6,40 @@ import (
 )
 
 var (
-	ErrNotFound              = errors.New("exam not found")
-	ErrInvalidInput          = errors.New("invalid input")
-	ErrInvalidTransition     = errors.New("invalid status transition")
-	ErrNotDraft              = errors.New("exam is not in draft status")
-	ErrRulesModeConflict     = errors.New("operation not allowed on random-mode rule")
-	ErrRulesUnsatisfied      = errors.New("one or more question rules cannot be satisfied")
-	ErrNotActive             = errors.New("exam is not in active status")
-	ErrAssignmentExists      = errors.New("assignment already exists")
-	ErrAssignmentNotFound    = errors.New("assignment not found")
-	ErrForbidden             = errors.New("forbidden")
-	ErrDeadlineInPast        = errors.New("deadline must be in the future")
+	ErrNotFound                        = errors.New("exam not found")
+	ErrInvalidInput                    = errors.New("invalid input")
+	ErrInvalidTransition               = errors.New("invalid status transition")
+	ErrNotDraft                        = errors.New("exam is not in draft status")
+	ErrRulesModeConflict               = errors.New("operation not allowed on random-mode rule")
+	ErrRulesUnsatisfied                = errors.New("one or more question rules cannot be satisfied")
+	ErrNotActive                       = errors.New("exam is not in active status")
+	ErrAssignmentExists                = errors.New("assignment already exists")
+	ErrAssignmentNotFound              = errors.New("assignment not found")
+	ErrForbidden                       = errors.New("forbidden")
+	ErrDeadlineInPast                  = errors.New("deadline must be in the future")
+	ErrInsufficientAdaptiveQuestions   = errors.New("insufficient questions per difficulty for adaptive exam")
 )
 
 // Exam is the core configuration row.
 type Exam struct {
-	ID                 string    `db:"id"`
-	Title              string    `db:"title"`
-	Description        *string   `db:"description"`
-	Status             string    `db:"status"`
-	TimeLimitMinutes   int       `db:"time_limit_minutes"`
-	PassingScorePct    float64   `db:"passing_score_pct"`
-	MaxAttempts        int       `db:"max_attempts"`
+	ID                 string     `db:"id"`
+	Title              string     `db:"title"`
+	Description        *string    `db:"description"`
+	Status             string     `db:"status"`
+	TimeLimitMinutes   int        `db:"time_limit_minutes"`
+	PassingScorePct    float64    `db:"passing_score_pct"`
+	MaxAttempts        int        `db:"max_attempts"`
 	AvailableFrom      *time.Time `db:"available_from"`
 	AvailableUntil     *time.Time `db:"available_until"`
-	ShuffleQuestions   bool      `db:"shuffle_questions"`
-	ShuffleOptions     bool      `db:"shuffle_options"`
-	ShowAnswers        string    `db:"show_answers"`
-	OnTabSwitch        string    `db:"on_tab_switch"`
-	CertificateEnabled bool      `db:"certificate_enabled"`
-	CreatedBy          string    `db:"created_by"`
-	CreatedAt          time.Time `db:"created_at"`
-	UpdatedAt          time.Time `db:"updated_at"`
+	ShuffleQuestions   bool       `db:"shuffle_questions"`
+	ShuffleOptions     bool       `db:"shuffle_options"`
+	ShowAnswers        string     `db:"show_answers"`
+	OnTabSwitch        string     `db:"on_tab_switch"`
+	CertificateEnabled bool       `db:"certificate_enabled"`
+	Adaptive           bool       `db:"adaptive"`
+	CreatedBy          string     `db:"created_by"`
+	CreatedAt          time.Time  `db:"created_at"`
+	UpdatedAt          time.Time  `db:"updated_at"`
 }
 
 // ExamSection is an optional grouping of question rules within an exam.
@@ -135,6 +137,7 @@ type ExamDetail struct {
 	ShowAnswers        string               `json:"show_answers"`
 	OnTabSwitch        string               `json:"on_tab_switch"`
 	CertificateEnabled bool                 `json:"certificate_enabled"`
+	Adaptive           bool                 `json:"adaptive"`
 	CreatedBy          string               `json:"created_by"`
 	CreatedAt          time.Time            `json:"created_at"`
 	UpdatedAt          time.Time            `json:"updated_at"`
@@ -196,6 +199,7 @@ type CreateExamInput struct {
 	ShowAnswers        string
 	OnTabSwitch        string
 	CertificateEnabled bool
+	Adaptive           bool
 	CreatedBy          string
 }
 
@@ -213,6 +217,23 @@ type UpdateExamInput struct {
 	ShowAnswers        string
 	OnTabSwitch        string
 	CertificateEnabled bool
+	Adaptive           bool
+}
+
+// AdaptivePublishValidationError is returned when an adaptive exam has insufficient
+// questions per difficulty level for publish validation (FR-BB72 AC-2).
+type AdaptivePublishValidationError struct {
+	RuleID     string `json:"rule_id"`
+	Difficulty string `json:"difficulty"`
+	Required   int    `json:"required"`
+	Available  int    `json:"available"`
+}
+
+func (e *AdaptivePublishValidationError) Error() string {
+	return ErrInsufficientAdaptiveQuestions.Error()
+}
+func (e *AdaptivePublishValidationError) Unwrap() error {
+	return ErrInsufficientAdaptiveQuestions
 }
 
 // ── Assignment types ──────────────────────────────────────────────────────────

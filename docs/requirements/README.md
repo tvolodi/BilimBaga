@@ -58,7 +58,7 @@
 | FR-BB52 | Per-exam-analytics-API | Per-Exam Analytics API | Draft |
 | FR-BB53 | Per-employee-record-API | Per-Employee Record API | Draft |
 | FR-BB54 | Export-API | Export API | Implemented |
-| FR-BB55 | Audit-log-viewer | Audit Log Viewer | Draft |
+| FR-BB55 | Audit-log-viewer | Audit Log Viewer | implemented |
 | FR-BB56 | Frontend-admin-dashboard | Frontend: Admin Dashboard | Draft |
 | FR-BB57 | Frontend-per-exam-analytics | Frontend: Per-Exam Analytics | Draft |
 | FR-BB58 | Frontend-employee-record | Frontend: Employee Record | Draft |

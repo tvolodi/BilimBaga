@@ -287,6 +287,10 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			// AI performance insight summaries (FR-BB74) — examiner+ only.
 			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
 				Get("/admin/ai/insights/{examId}", aiHandler.HandleGetInsights)
+
+			// AI loyalty profile narrative (FR-BB75) — department_admin+ only.
+			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+				Get("/admin/ai/loyalty-summary/{sessionId}", aiHandler.GetLoyaltyNarrative)
 		})
 	})
 

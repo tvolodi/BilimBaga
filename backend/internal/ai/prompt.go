@@ -76,3 +76,31 @@ Requirements:
 - Explanations are 1-3 sentences
 - Questions are clear, unambiguous, and professionally worded
 `
+
+// ── FR-BB75: Loyalty Profile Narrative ───────────────────────────────────────
+
+// loyaltyNarrativePromptTemplate is the prompt sent to the Anthropic model for
+// loyalty profile narratives. No employee names or IDs are included — only
+// anonymised, polarity-normalised Likert response weights.
+const loyaltyNarrativePromptTemplate = `You are an organizational psychologist interpreting Likert-scale survey responses from a corporate values assessment.
+
+Below are the anonymized response patterns from a single assessment. Each line shows:
+  Dimension | Normalized Weight (1=Low alignment, 5=High alignment — polarity already normalized)
+{{range .Responses}}
+- {{.DimensionLabel}} | NormalizedWeight: {{.NormalizedWeight}}
+{{end}}
+Write a 2-3 sentence narrative (third person, professional tone) describing the values profile these responses suggest. Do NOT mention any individual by name or pronoun. Use language like "the responses indicate" or "this profile suggests". Do not diagnose, make medical claims, or render employment judgments. Focus only on workplace values and organizational alignment patterns.
+`
+
+// BuildLoyaltyPrompt renders the loyalty narrative prompt template with the given data.
+func BuildLoyaltyPrompt(data LoyaltyPromptData) (string, error) {
+	tmpl, err := template.New("loyalty").Parse(loyaltyNarrativePromptTemplate)
+	if err != nil {
+		return "", fmt.Errorf("ai: build loyalty prompt: parse template: %w", err)
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("ai: build loyalty prompt: execute template: %w", err)
+	}
+	return buf.String(), nil
+}

@@ -167,6 +167,7 @@ type SessionRecord struct {
 	TimeTakenSeconds *int       `json:"time_taken_seconds" db:"time_taken_seconds"`
 	Status           string     `json:"status" db:"status"`
 	CertificateID    *string    `json:"certificate_id" db:"certificate_id"`
+	ExamCategoryTrack *string   `json:"exam_category_track" db:"exam_category_track"`
 }
 
 // TrackActivity holds the question count and last activity timestamp for one

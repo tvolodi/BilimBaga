@@ -36,6 +36,21 @@ type Repository interface {
 	// build the AI prompt.  Returns ErrExamNotFound when the exam does not exist
 	// or does not belong to the given tenant.
 	GetExamInsightData(ctx context.Context, examID, tenantID string) (*ExamInsightData, error)
+
+	// ── FR-BB75: Loyalty Profile Narrative ───────────────────────────────────
+
+	// GetSessionCategoryTrack loads the exam's category track and the session
+	// employee's user ID for the given session. Returns ErrLoyaltySessionNotFound
+	// when no session row exists.
+	GetSessionCategoryTrack(ctx context.Context, sessionID string) (track string, employeeUserID string, err error)
+
+	// IsEmployeeInAdminDepartment returns true if employeeUserID belongs to the
+	// same department as adminUserID.
+	IsEmployeeInAdminDepartment(ctx context.Context, adminUserID, employeeUserID string) (bool, error)
+
+	// CollectLikertResponses returns anonymised, polarity-inverted Likert
+	// response data for the given session.
+	CollectLikertResponses(ctx context.Context, sessionID string) ([]LikertResponseData, error)
 }
 
 type postgresRepository struct {
@@ -268,4 +283,89 @@ ORDER BY order_num`, examID,
 	}
 
 	return data, nil
+}
+
+// ── FR-BB75: Loyalty Profile Narrative ───────────────────────────────────────
+
+func (r *postgresRepository) GetSessionCategoryTrack(ctx context.Context, sessionID string) (track string, employeeUserID string, err error) {
+	var row struct {
+		Track          sql.NullString `db:"track"`
+		EmployeeUserID string         `db:"user_id"`
+	}
+	scanErr := r.db.QueryRowxContext(ctx, `
+SELECT c.track, es.user_id
+FROM exam_sessions es
+JOIN exams e ON e.id = es.exam_id
+LEFT JOIN categories c ON c.id = e.category_id
+WHERE es.id = $1`, sessionID).StructScan(&row)
+	if scanErr != nil {
+		if errors.Is(scanErr, sql.ErrNoRows) {
+			return "", "", ErrLoyaltySessionNotFound
+		}
+		return "", "", fmt.Errorf("ai: GetSessionCategoryTrack: %w", scanErr)
+	}
+	if row.Track.Valid {
+		track = row.Track.String
+	}
+	return track, row.EmployeeUserID, nil
+}
+
+func (r *postgresRepository) IsEmployeeInAdminDepartment(ctx context.Context, adminUserID, employeeUserID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM users u_emp
+  JOIN users u_adm ON u_adm.department_id = u_emp.department_id
+  WHERE u_emp.id = $1 AND u_adm.id = $2
+)`, employeeUserID, adminUserID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("ai: IsEmployeeInAdminDepartment: %w", err)
+	}
+	return exists, nil
+}
+
+type likertRow struct {
+	DimensionLabel string `db:"dimension_label"`
+	RawWeight      int    `db:"raw_weight"`
+	LikertPolarity string `db:"likert_polarity"`
+}
+
+func (r *postgresRepository) CollectLikertResponses(ctx context.Context, sessionID string) ([]LikertResponseData, error) {
+	rows, err := r.db.QueryxContext(ctx, `
+SELECT
+  COALESCE(c.name, '') AS dimension_label,
+  ROUND(ao.likert_weight)::int AS raw_weight,
+  COALESCE(ao.likert_polarity, 'positive') AS likert_polarity
+FROM session_answers sa
+JOIN questions q ON q.id = sa.question_id
+JOIN session_questions sq ON sq.question_id = q.id AND sq.session_id = $1
+JOIN answer_options ao ON ao.id = (sa.selected_option_ids->>0)::uuid
+LEFT JOIN categories c ON c.id = q.category_id
+WHERE sa.session_id = $1
+  AND q.type = 'likert'
+ORDER BY sq.sort_order`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("ai: CollectLikertResponses: %w", err)
+	}
+	defer rows.Close()
+
+	var result []LikertResponseData
+	for rows.Next() {
+		var row likertRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, fmt.Errorf("ai: CollectLikertResponses: scan: %w", err)
+		}
+		normalized := row.RawWeight
+		if row.LikertPolarity == "negative" {
+			normalized = 6 - row.RawWeight
+		}
+		result = append(result, LikertResponseData{
+			DimensionLabel:   row.DimensionLabel,
+			NormalizedWeight: normalized,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ai: CollectLikertResponses: iterate: %w", err)
+	}
+	return result, nil
 }

@@ -35,6 +35,13 @@ export interface AIInsightsResponse {
   cached: boolean
 }
 
+// ── FR-BB75: Loyalty Profile Narrative ───────────────────────────────────────
+
+export interface LoyaltyNarrativeResponse {
+  narrative: string
+  generated_at: string
+}
+
 // ---- API helpers -------------------------------------------------------------
 
 interface ApiResponse<T> {
@@ -83,6 +90,10 @@ async function generateQuestions(req: GenerateQuestionsRequest): Promise<Generat
 export function fetchAIInsights(examId: string, refresh = false): Promise<AIInsightsResponse> {
   const url = `/api/v1/admin/ai/insights/${examId}${refresh ? '?refresh=true' : ''}`
   return apiGet<AIInsightsResponse>(url)
+}
+
+export function fetchLoyaltyNarrative(sessionId: string): Promise<LoyaltyNarrativeResponse> {
+  return apiGet<LoyaltyNarrativeResponse>(`/api/v1/admin/ai/loyalty-summary/${sessionId}`)
 }
 
 // ---- React Query hooks -------------------------------------------------------

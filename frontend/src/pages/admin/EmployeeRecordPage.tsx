@@ -1,12 +1,75 @@
+import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { useUser } from '@/api/users'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useUser, useMe } from '@/api/users'
 import { useEmployeeRecord, useEmployeeProgress } from '@/api/employees'
+import { fetchLoyaltyNarrative } from '@/api/ai'
 import { EmployeeInfoHeader } from '@/components/employees/EmployeeInfoHeader'
 import { SessionHistoryTable } from '@/components/employees/SessionHistoryTable'
 import { TrackProgressCards } from '@/components/employees/TrackProgressCards'
 import { EmployeeRecordSkeleton } from '@/components/employees/EmployeeRecordSkeleton'
+import { formatDate } from '@/utils/format'
+
+// ── FR-BB75: Values Profile Section ─────────────────────────────────────────
+
+function ValuesProfileSection({
+  sessionId,
+  isLoyaltySession,
+}: {
+  sessionId: string
+  isLoyaltySession: boolean
+}) {
+  const { t, i18n } = useTranslation()
+  const [narrative, setNarrative] = useState<string | null>(null)
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
+
+  const { mutate, isPending, isError } = useMutation({
+    mutationFn: () => fetchLoyaltyNarrative(sessionId),
+    onSuccess: (data) => {
+      setNarrative(data.narrative)
+      setGeneratedAt(data.generated_at)
+    },
+  })
+
+  if (!isLoyaltySession) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('employee_record.valuesProfileTitle')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {narrative ? (
+          <>
+            <p className="text-sm">{narrative}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('common.aiGenerated')} · {formatDate(generatedAt!, i18n.language)}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => mutate()} disabled={isPending}>
+              {t('employee_record.regenerateNarrative')}
+            </Button>
+          </>
+        ) : (
+          <>
+            {isError && (
+              <p className="text-destructive text-sm">{t('errors.aiUnavailable')}</p>
+            )}
+            <Button onClick={() => mutate()} disabled={isPending}>
+              {isPending
+                ? t('employee_record.generating')
+                : t('employee_record.generateNarrative')}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Main Page ──────────────────────────────────────────────────────────────────
 
 export function EmployeeRecordPage() {
   const { userId = '' } = useParams<{ userId: string }>()
@@ -15,6 +78,7 @@ export function EmployeeRecordPage() {
 
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
 
+  const meQuery = useMe()
   const userQuery = useUser(userId)
   const recordQuery = useEmployeeRecord(userId, page)
   const progressQuery = useEmployeeProgress(userId)
@@ -113,6 +177,19 @@ export function EmployeeRecordPage() {
         <h2 className="text-lg font-semibold">{t('employee_record.progress_section')}</h2>
         <TrackProgressCards tracks={progress.tracks} />
       </section>
+
+      {/* Values Profile (FR-BB75) — loyalty sessions, admin+ only */}
+      {['super_admin', 'hr_admin', 'department_admin'].includes(
+        meQuery.data?.role_name ?? '',
+      ) &&
+        record.data.sessions
+          .filter((s) => s.exam_category_track === 'loyalty')
+          .map((s) => (
+            <section key={s.session_id} className="space-y-3">
+              <h2 className="text-lg font-semibold">{t('employee_record.history_section')}</h2>
+              <ValuesProfileSection sessionId={s.session_id} isLoyaltySession={true} />
+            </section>
+          ))}
     </div>
   )
 }

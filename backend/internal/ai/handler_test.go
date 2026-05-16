@@ -32,6 +32,10 @@ func (m *mockService) GetInsights(_ context.Context, _, _, _ string, _ bool) (*I
 	return nil, ErrAIUnavailable
 }
 
+func (m *mockService) GetLoyaltyNarrative(_ context.Context, _, _, _ string) (*LoyaltyNarrativeResult, error) {
+	return nil, ErrAIUnavailable
+}
+
 // ---- Helpers ----------------------------------------------------------------
 
 func makeRequest(t *testing.T, body interface{}, userID string) *http.Request {

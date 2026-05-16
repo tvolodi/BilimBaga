@@ -781,7 +781,11 @@
     "status_grading_pending": "Тексерілуде",
     "showing": "{{total}} ішінен {{from}}–{{to}} көрсетілуде",
     "load_error": "Қызметкер жазбасын жүктеу сәтсіз аяқталды.",
-    "retry": "Қайталау"
+    "retry": "Қайталау",
+    "valuesProfileTitle": "Құндылықтар профилі",
+    "generateNarrative": "Жасау",
+    "regenerateNarrative": "Жаңарту",
+    "generating": "Жасалуда..."
   },
   "errors": {
     "missingToken": "Аутентификация қажет. Жүйеге кіріңіз.",

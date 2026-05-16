@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -32,6 +33,11 @@ type Service interface {
 	// GetInsights returns AI-generated performance insights for the given exam.
 	// Results are cached for 24 hours; forceRefresh bypasses the cache.
 	GetInsights(ctx context.Context, examID, tenantID, userID string, forceRefresh bool) (*InsightResult, error)
+
+	// GetLoyaltyNarrative generates a 2–3 sentence values profile narrative for
+	// the given session's Likert responses. adminRole must be the JWT role of the
+	// requesting admin; it is used to skip the department check for super_admin.
+	GetLoyaltyNarrative(ctx context.Context, sessionID, adminUserID, adminRole string) (*LoyaltyNarrativeResult, error)
 }
 
 type aiService struct {
@@ -206,5 +212,76 @@ func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID st
 		Insights:    insights,
 		GeneratedAt: time.Now().UTC(),
 		Cached:      false,
+	}, nil
+}
+
+// GetLoyaltyNarrative implements Service.
+// AC-1: Validates that the session belongs to a loyalty-track exam.
+// AC-2: Verifies admin has department access to the employee (or is super_admin).
+// AC-3: Prompt contains only anonymised Likert weights — no PII.
+// AC-5: Logs usage with admin user_id, NOT employee user_id.
+// AC-6: Anthropic error or empty response → ErrAIUnavailable.
+func (s *aiService) GetLoyaltyNarrative(ctx context.Context, sessionID, adminUserID, adminRole string) (*LoyaltyNarrativeResult, error) {
+	// Step 1: Load session track and employee user ID.
+	track, employeeUserID, err := s.repo.GetSessionCategoryTrack(ctx, sessionID)
+	if err != nil {
+		if errors.Is(err, ErrLoyaltySessionNotFound) {
+			return nil, ErrLoyaltySessionNotFound
+		}
+		return nil, fmt.Errorf("ai: GetLoyaltyNarrative: get session track: %w", err)
+	}
+	if track != "loyalty" {
+		return nil, ErrNotLoyaltySession
+	}
+
+	// Step 2: Authorization — super_admin bypasses department check.
+	if adminRole != "super_admin" {
+		ok, depErr := s.repo.IsEmployeeInAdminDepartment(ctx, adminUserID, employeeUserID)
+		if depErr != nil {
+			return nil, fmt.Errorf("ai: GetLoyaltyNarrative: check department access: %w", depErr)
+		}
+		if !ok {
+			return nil, ErrForbidden
+		}
+	}
+
+	// Step 3: Collect anonymised Likert responses.
+	responses, err := s.repo.CollectLikertResponses(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("ai: GetLoyaltyNarrative: collect responses: %w", err)
+	}
+
+	// Step 4: Build prompt.
+	prompt, err := BuildLoyaltyPrompt(LoyaltyPromptData{Responses: responses})
+	if err != nil {
+		return nil, fmt.Errorf("ai: GetLoyaltyNarrative: build prompt: %w", err)
+	}
+
+	// Step 5: Call Anthropic.
+	text, tokensUsed, err := s.client.GenerateText(ctx, prompt, s.model)
+	if err != nil {
+		s.logger.Warn("anthropic call failed for loyalty narrative", "session_id", sessionID, "error", err)
+		return nil, ErrAIUnavailable
+	}
+
+	// Step 6: Validate response.
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil, ErrAIUnavailable
+	}
+
+	// Step 7: Log usage with admin user_id only (AC-5: employee ID must NOT be logged).
+	if logErr := s.repo.LogUsage(ctx, UsageLog{
+		UserID:     adminUserID,
+		Feature:    featureLoyaltyNarrative,
+		TokensUsed: tokensUsed,
+		Model:      s.model,
+	}); logErr != nil {
+		s.logger.Error("failed to log loyalty narrative usage", "error", logErr)
+	}
+
+	return &LoyaltyNarrativeResult{
+		Narrative:   text,
+		GeneratedAt: time.Now().UTC(),
 	}, nil
 }

@@ -72,7 +72,7 @@
 | FR-BB72 | Adaptive-difficulty | Adaptive Difficulty | Implemented |
 | FR-BB73 | Short-text-auto-grading | Short-Text Auto-Grading | Draft |
 | FR-BB74 | Performance-insight-summaries | Performance Insight Summaries | Draft |
-| FR-BB75 | Loyalty-profile-narrative | Loyalty Profile Narrative | Draft |
+| FR-BB75 | Loyalty-profile-narrative | Loyalty Profile Narrative | Implemented |
 
 ## Status Values
 

@@ -43,7 +43,7 @@ describe('AIInsightsCard', () => {
       isLoading: false,
       isError: false,
       refetch: buildRefetch(),
-    } as ReturnType<typeof useAIInsights>)
+    } as unknown as ReturnType<typeof useAIInsights>)
 
     setup()
 
@@ -57,7 +57,7 @@ describe('AIInsightsCard', () => {
       isLoading: true,
       isError: false,
       refetch: buildRefetch(),
-    } as ReturnType<typeof useAIInsights>)
+    } as unknown as ReturnType<typeof useAIInsights>)
 
     setup()
 
@@ -76,7 +76,7 @@ describe('AIInsightsCard', () => {
       isLoading: false,
       isError: true,
       refetch: buildRefetch(),
-    } as ReturnType<typeof useAIInsights>)
+    } as unknown as ReturnType<typeof useAIInsights>)
 
     setup()
 
@@ -99,7 +99,7 @@ describe('AIInsightsCard', () => {
       isLoading: false,
       isError: false,
       refetch: buildRefetch(),
-    } as ReturnType<typeof useAIInsights>)
+    } as unknown as ReturnType<typeof useAIInsights>)
 
     setup()
 
@@ -125,7 +125,7 @@ describe('AIInsightsCard', () => {
       isLoading: false,
       isError: false,
       refetch,
-    } as ReturnType<typeof useAIInsights>)
+    } as unknown as ReturnType<typeof useAIInsights>)
 
     setup()
 

@@ -23,4 +23,14 @@ function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 }
 CardContent.displayName = 'CardContent'
 
-export { Card, CardHeader, CardContent }
+function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h3
+      className={cn('text-lg font-semibold leading-none tracking-tight', className)}
+      {...props}
+    />
+  )
+}
+CardTitle.displayName = 'CardTitle'
+
+export { Card, CardHeader, CardContent, CardTitle }

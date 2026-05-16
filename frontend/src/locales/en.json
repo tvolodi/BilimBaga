@@ -781,7 +781,11 @@
     "status_grading_pending": "Grading Pending",
     "showing": "Showing {{from}}–{{to}} of {{total}}",
     "load_error": "Failed to load employee record.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "valuesProfileTitle": "Values Profile",
+    "generateNarrative": "Generate",
+    "regenerateNarrative": "Regenerate",
+    "generating": "Generating..."
   },
   "errors": {
     "missingToken": "Authentication required. Please sign in.",

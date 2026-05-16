@@ -781,7 +781,11 @@
     "status_grading_pending": "Проверяется",
     "showing": "Показано {{from}}–{{to}} из {{total}}",
     "load_error": "Не удалось загрузить карточку сотрудника.",
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "valuesProfileTitle": "Ценностный профиль",
+    "generateNarrative": "Создать",
+    "regenerateNarrative": "Обновить",
+    "generating": "Создание..."
   },
   "errors": {
     "missingToken": "Требуется аутентификация. Войдите в систему.",

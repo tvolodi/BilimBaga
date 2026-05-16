@@ -105,3 +105,47 @@ func (h *Handler) HandleGetInsights(w http.ResponseWriter, r *http.Request) {
 		"error": nil,
 	})
 }
+
+// GetLoyaltyNarrative handles GET /api/v1/admin/ai/loyalty-summary/{sessionId}.
+//
+// AC-1: Returns 400 NOT_A_LOYALTY_SESSION when session is not loyalty-track.
+// AC-2: JWT auth + role ≥ department_admin enforced at router level.
+//       Department access check enforced in service layer.
+// AC-6: Anthropic errors → 503 AI_UNAVAILABLE.
+func (h *Handler) GetLoyaltyNarrative(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+	if userID == "" {
+		api.WriteError(w, http.StatusUnauthorized, "MISSING_TOKEN", "authentication required")
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionId")
+	if sessionID == "" {
+		api.WriteError(w, http.StatusBadRequest, "INVALID_PARAM", "sessionId is required")
+		return
+	}
+
+	role := auth.RoleFromCtx(r.Context())
+
+	result, err := h.svc.GetLoyaltyNarrative(r.Context(), sessionID, userID, role)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrLoyaltySessionNotFound):
+			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "session not found")
+		case errors.Is(err, ErrNotLoyaltySession):
+			api.WriteError(w, http.StatusBadRequest, "NOT_A_LOYALTY_SESSION", "this session does not belong to a loyalty-track exam")
+		case errors.Is(err, ErrForbidden):
+			api.WriteError(w, http.StatusForbidden, "FORBIDDEN", "access denied")
+		case errors.Is(err, ErrAIUnavailable):
+			api.WriteError(w, http.StatusServiceUnavailable, "AI_UNAVAILABLE", "AI service is temporarily unavailable")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "an unexpected error occurred")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  result,
+		"error": nil,
+	})
+}

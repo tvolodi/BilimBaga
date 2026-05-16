@@ -87,3 +87,34 @@ type InsightResult struct {
 
 // ErrExamNotFound is returned when the exam does not exist or belongs to a different tenant.
 var ErrExamNotFound = errors.New("ai: exam not found")
+
+// ── FR-BB75: Loyalty Profile Narrative ───────────────────────────────────────
+
+// ErrLoyaltySessionNotFound is returned by GetSessionCategoryTrack when no session row exists.
+var ErrLoyaltySessionNotFound = errors.New("ai: loyalty session not found")
+
+// ErrNotLoyaltySession is returned when the session belongs to a non-loyalty-track exam.
+var ErrNotLoyaltySession = errors.New("ai: not a loyalty session")
+
+// ErrForbidden is returned when the admin does not have department access to the employee.
+var ErrForbidden = errors.New("ai: forbidden")
+
+const featureLoyaltyNarrative = "loyalty_narrative"
+
+// LikertResponseData holds one polarity-inverted Likert answer for prompt construction.
+// DimensionLabel comes from categories.name; no question text or PII is included.
+type LikertResponseData struct {
+	DimensionLabel   string // e.g. "Loyalty & Values" — from categories.name
+	NormalizedWeight int    // 1–5 after polarity inversion
+}
+
+// LoyaltyPromptData is passed to BuildLoyaltyPrompt in internal/ai/prompt.go.
+type LoyaltyPromptData struct {
+	Responses []LikertResponseData
+}
+
+// LoyaltyNarrativeResult is returned by GetLoyaltyNarrative.
+type LoyaltyNarrativeResult struct {
+	Narrative   string    `json:"narrative"`
+	GeneratedAt time.Time `json:"generated_at"`
+}

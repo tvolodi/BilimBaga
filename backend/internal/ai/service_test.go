@@ -27,6 +27,15 @@ type mockRepository struct {
 	upsertErr       error
 	examInsightData *ExamInsightData
 	examInsightErr  error
+
+	// Loyalty narrative fields.
+	sessionTrack       string
+	sessionEmployeeID  string
+	sessionTrackErr    error
+	inDepartment       bool
+	inDepartmentErr    error
+	likertResponses    []LikertResponseData
+	likertResponsesErr error
 }
 
 func (m *mockRepository) CountAIUsageLastHour(_ context.Context, _, _ string) (int, error) {
@@ -54,6 +63,18 @@ func (m *mockRepository) UpsertInsightCache(_ context.Context, _, _ string, _ []
 
 func (m *mockRepository) GetExamInsightData(_ context.Context, _, _ string) (*ExamInsightData, error) {
 	return m.examInsightData, m.examInsightErr
+}
+
+func (m *mockRepository) GetSessionCategoryTrack(_ context.Context, _ string) (string, string, error) {
+	return m.sessionTrack, m.sessionEmployeeID, m.sessionTrackErr
+}
+
+func (m *mockRepository) IsEmployeeInAdminDepartment(_ context.Context, _, _ string) (bool, error) {
+	return m.inDepartment, m.inDepartmentErr
+}
+
+func (m *mockRepository) CollectLikertResponses(_ context.Context, _ string) ([]LikertResponseData, error) {
+	return m.likertResponses, m.likertResponsesErr
 }
 
 type mockClient struct {
@@ -379,5 +400,154 @@ func TestGetInsights_ExamNotFound(t *testing.T) {
 	_, err := svc.GetInsights(context.Background(), "bad-exam", "tenant-1", "user-1", false)
 	if !errors.Is(err, ErrExamNotFound) {
 		t.Errorf("expected ErrExamNotFound, got %v", err)
+	}
+}
+
+// ── FR-BB75: GetLoyaltyNarrative tests ────────────────────────────────────────
+
+var sampleLikertResponses = []LikertResponseData{
+	{DimensionLabel: "Loyalty & Values", NormalizedWeight: 4},
+	{DimensionLabel: "Team Collaboration", NormalizedWeight: 5},
+}
+
+// AC-1 + AC-4: happy path returns a narrative.
+func TestGetLoyaltyNarrative_HappyPath(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrack:      "loyalty",
+		sessionEmployeeID: "emp-1",
+		inDepartment:      true,
+		likertResponses:   sampleLikertResponses,
+	}
+	client := &mockClient{text: "The responses indicate strong loyalty values.", tokens: 20}
+	svc := NewService(repo, client, "model", newLogger())
+
+	result, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "admin-1", "department_admin")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Narrative == "" {
+		t.Error("expected non-empty narrative")
+	}
+}
+
+// AC-1: non-loyalty session → ErrNotLoyaltySession.
+func TestGetLoyaltyNarrative_NotLoyaltySession(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrack:      "security",
+		sessionEmployeeID: "emp-1",
+	}
+	client := &mockClient{}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "admin-1", "department_admin")
+	if !errors.Is(err, ErrNotLoyaltySession) {
+		t.Errorf("expected ErrNotLoyaltySession, got %v", err)
+	}
+}
+
+// Session not found → ErrLoyaltySessionNotFound.
+func TestGetLoyaltyNarrative_SessionNotFound(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrackErr: ErrLoyaltySessionNotFound,
+	}
+	client := &mockClient{}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetLoyaltyNarrative(context.Background(), "bad-sess", "admin-1", "department_admin")
+	if !errors.Is(err, ErrLoyaltySessionNotFound) {
+		t.Errorf("expected ErrLoyaltySessionNotFound, got %v", err)
+	}
+}
+
+// AC-2: admin not in same department → ErrForbidden.
+func TestGetLoyaltyNarrative_ForbiddenDepartment(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrack:      "loyalty",
+		sessionEmployeeID: "emp-1",
+		inDepartment:      false,
+	}
+	client := &mockClient{}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "admin-1", "department_admin")
+	if !errors.Is(err, ErrForbidden) {
+		t.Errorf("expected ErrForbidden, got %v", err)
+	}
+}
+
+// AC-2: super_admin bypasses department check.
+func TestGetLoyaltyNarrative_SuperAdminBypassesDeptCheck(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrack:      "loyalty",
+		sessionEmployeeID: "emp-1",
+		inDepartment:      false, // would be forbidden for non-super_admin
+		likertResponses:   sampleLikertResponses,
+	}
+	client := &mockClient{text: "This profile suggests strong loyalty.", tokens: 10}
+	svc := NewService(repo, client, "model", newLogger())
+
+	result, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "super-1", "super_admin")
+	if err != nil {
+		t.Fatalf("super_admin should bypass dept check, got: %v", err)
+	}
+	if result.Narrative == "" {
+		t.Error("expected non-empty narrative")
+	}
+}
+
+// AC-5: usage log uses admin user_id.
+func TestGetLoyaltyNarrative_LogsAdminUserID(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrack:      "loyalty",
+		sessionEmployeeID: "emp-1",
+		inDepartment:      true,
+		likertResponses:   sampleLikertResponses,
+	}
+	client := &mockClient{text: "The responses indicate loyalty.", tokens: 15}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "admin-42", "department_admin")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.lastLog.UserID != "admin-42" {
+		t.Errorf("expected log UserID=admin-42, got %q", repo.lastLog.UserID)
+	}
+	if repo.lastLog.Feature != featureLoyaltyNarrative {
+		t.Errorf("expected feature=%q, got %q", featureLoyaltyNarrative, repo.lastLog.Feature)
+	}
+}
+
+// AC-6: Anthropic error → ErrAIUnavailable.
+func TestGetLoyaltyNarrative_AIUnavailable(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrack:      "loyalty",
+		sessionEmployeeID: "emp-1",
+		inDepartment:      true,
+		likertResponses:   sampleLikertResponses,
+	}
+	client := &mockClient{err: ErrAIUnavailable}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "admin-1", "department_admin")
+	if !errors.Is(err, ErrAIUnavailable) {
+		t.Errorf("expected ErrAIUnavailable, got %v", err)
+	}
+}
+
+// AC-6: empty Anthropic response → ErrAIUnavailable.
+func TestGetLoyaltyNarrative_EmptyResponse(t *testing.T) {
+	repo := &mockRepository{
+		sessionTrack:      "loyalty",
+		sessionEmployeeID: "emp-1",
+		inDepartment:      true,
+		likertResponses:   sampleLikertResponses,
+	}
+	client := &mockClient{text: "   ", tokens: 0}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "admin-1", "department_admin")
+	if !errors.Is(err, ErrAIUnavailable) {
+		t.Errorf("expected ErrAIUnavailable for empty response, got %v", err)
 	}
 }

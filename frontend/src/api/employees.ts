@@ -28,6 +28,7 @@ export interface SessionRecord {
   time_taken_seconds: number | null
   status: string
   certificate_id: string | null
+  exam_category_track: string | null
 }
 
 export interface EmployeeProgress {

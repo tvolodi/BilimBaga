@@ -439,14 +439,22 @@
   },
   "exam": {
     "wizard": {
-      "step1": { "title": "Basic Settings" },
+      "step1": {
+        "title": "Basic Settings"
+      },
       "step2": {
         "title": "Question Rules",
         "addRule": "Add rule",
-        "mode": { "manual": "Manual", "random": "Random" },
+        "mode": {
+          "manual": "Manual",
+          "random": "Random"
+        },
         "editQuestions": "Edit questions"
       },
-      "step3": { "title": "Assignments", "addAssignee": "Add assignee" },
+      "step3": {
+        "title": "Assignments",
+        "addAssignee": "Add assignee"
+      },
       "step4": {
         "title": "Review & Publish",
         "publishConfirm": "Publishing this exam will make it available to assigned users. This cannot be undone. Are you sure?"
@@ -491,7 +499,6 @@
       "count": "Question count"
     },
     "assignment": {
-      "type": "Assignee type",
       "type": {
         "user": "User",
         "department": "Department",
@@ -637,7 +644,8 @@
     "status": {
       "passed": "Passed",
       "failed": "Failed"
-    }  },
+    }
+  },
   "audit": {
     "title": "Audit Log",
     "filter_from": "From",
@@ -716,7 +724,7 @@
     "detail_title": "Grade Session",
     "question_indicator": "Question {{current}} of {{total}}",
     "answer_label": "Employee's Answer",
-    "score_label": "Score (0\u2013100%)",
+    "score_label": "Score (0–100%)",
     "score_error": "Score must be between 0 and 100",
     "feedback_label": "Feedback (optional)",
     "feedback_placeholder": "Add comments for the employee...",
@@ -812,10 +820,24 @@
     "invalidCsv": "The uploaded file is not a valid CSV.",
     "tooManyRows": "The file exceeds the maximum row limit.",
     "userNotFound": "User not found.",
-    "emailUnavailable": "Email service is currently unavailable."
+    "emailUnavailable": "Email service is currently unavailable.",
+    "aiUnavailable": "AI service is temporarily unavailable. Please try again later.",
+    "aiRateLimited": "You have reached the AI generation limit. Please try again in an hour."
   },
   "question": {
-    "originalLanguageBadge": "Original language"
+    "originalLanguageBadge": "Original language",
+    "aiGenerate": "AI Generate",
+    "aiGenerating": "Generating...",
+    "aiGenerateTitle": "Generate Questions with AI",
+    "aiGenerateCount": "Number of Questions",
+    "aiGenerateDifficulty": "Difficulty",
+    "aiGenerateContext": "Context (optional)",
+    "aiGenerateContextHint": "Provide context to guide question generation (max 2000 characters)",
+    "aiGeneratePreview": "Preview Generated Questions",
+    "aiGenerateNoCategoryError": "Please select a category before generating.",
+    "confirmSelected": "Confirm Selected",
+    "selectAll": "Select All",
+    "selectDraft": "Select draft question"
   },
   "session": {
     "timerFiveMinutes": "5 minutes remaining",
@@ -823,14 +845,41 @@
     "timerExpired": "Time is up"
   },
   "status": {
-    "active": { "label": "Active", "short": "Active" },
-    "inactive": { "label": "Inactive", "short": "Inactive" },
-    "pending": { "label": "Pending", "short": "Pending" },
-    "completed": { "label": "Completed", "short": "Completed" },
-    "passed": { "label": "Passed", "short": "Passed" },
-    "failed": { "label": "Failed", "short": "Failed" },
-    "draft": { "label": "Draft", "short": "Draft" },
-    "published": { "label": "Published", "short": "Published" },
-    "archived": { "label": "Archived", "short": "Archived" }
+    "active": {
+      "label": "Active",
+      "short": "Active"
+    },
+    "inactive": {
+      "label": "Inactive",
+      "short": "Inactive"
+    },
+    "pending": {
+      "label": "Pending",
+      "short": "Pending"
+    },
+    "completed": {
+      "label": "Completed",
+      "short": "Completed"
+    },
+    "passed": {
+      "label": "Passed",
+      "short": "Passed"
+    },
+    "failed": {
+      "label": "Failed",
+      "short": "Failed"
+    },
+    "draft": {
+      "label": "Draft",
+      "short": "Draft"
+    },
+    "published": {
+      "label": "Published",
+      "short": "Published"
+    },
+    "archived": {
+      "label": "Archived",
+      "short": "Archived"
+    }
   }
 }

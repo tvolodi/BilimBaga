@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/ai"
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/categories"
@@ -209,11 +210,17 @@ func main() {
 	reportsSvc := reports.NewService(reportsRepo)
 	reportsHandler := reports.NewHandler(reportsSvc, tenantSvc)
 
+	// Wire up AI question generation (FR-BB71).
+	aiRepo := ai.NewRepository(db)
+	aiClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, slogger)
+	aiSvc := ai.NewService(aiRepo, aiClient, cfg.AnthropicModel, slogger)
+	aiHandler := ai.NewHandler(aiSvc)
+
 	r := router.New(
 		tenantHandler, authHandler, deptHandler, usersHandler, auditHandler,
 		categoriesHandler, tagsHandler, questionsHandler, translationsHandler,
 		examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler,
-		emailHandler, cfg.JWTSecret, rbacCache, db, Version, zlog,
+		emailHandler, aiHandler, cfg.JWTSecret, rbacCache, db, Version, zlog,
 	)
 
 	srv := &http.Server{

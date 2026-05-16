@@ -439,14 +439,22 @@
   },
   "exam": {
     "wizard": {
-      "step1": { "title": "Негізгі параметрлер" },
+      "step1": {
+        "title": "Негізгі параметрлер"
+      },
       "step2": {
         "title": "Сұрақ ережелері",
         "addRule": "Ереже қосу",
-        "mode": { "manual": "Қолмен", "random": "Кездейсоқ" },
+        "mode": {
+          "manual": "Қолмен",
+          "random": "Кездейсоқ"
+        },
         "editQuestions": "Сұрақтарды өңдеу"
       },
-      "step3": { "title": "Тапсырмалар", "addAssignee": "Тапсырушы қосу" },
+      "step3": {
+        "title": "Тапсырмалар",
+        "addAssignee": "Тапсырушы қосу"
+      },
       "step4": {
         "title": "Тексеру және жариялау",
         "publishConfirm": "Емтиханды жариялау оны тапсырылған пайдаланушыларға қолжетімді етеді. Бұл әрекетті кері қайтару мүмкін емес. Сенімдісіз бе?"
@@ -491,7 +499,6 @@
       "count": "Сұрақ саны"
     },
     "assignment": {
-      "type": "Тапсырушы түрі",
       "type": {
         "user": "Пайдаланушы",
         "department": "Бөлім",
@@ -637,7 +644,8 @@
     "status": {
       "passed": "Тапсырылды",
       "failed": "Тапсырылмады"
-    }  },
+    }
+  },
   "audit": {
     "title": "Аудит журналы",
     "filter_from": "Бастап",
@@ -716,7 +724,7 @@
     "detail_title": "Сессияны бағалау",
     "question_indicator": "{{total}} сұрақтың {{current}} сұрағы",
     "answer_label": "Қызметкердің жауабы",
-    "score_label": "Балл (0\u2013100%)",
+    "score_label": "Балл (0–100%)",
     "score_error": "Балл 0 мен 100 арасында болуы керек",
     "feedback_label": "Пікір (міндетті емес)",
     "feedback_placeholder": "Қызметкерге пікір қалдырыңыз...",
@@ -812,10 +820,24 @@
     "invalidCsv": "Жүктелген файл жарамды CSV емес.",
     "tooManyRows": "Файл жол санының шегінен асты.",
     "userNotFound": "Пайдаланушы табылмады.",
-    "emailUnavailable": "Электрондық пошта қызметі қазір қолжетімсіз."
+    "emailUnavailable": "Электрондық пошта қызметі қазір қолжетімсіз.",
+    "aiUnavailable": "ЖИ қызметі уақытша қолжетімсіз. Кейінірек қайтадан кіріңіз.",
+    "aiRateLimited": "ЖИ жасау лимитіне жеттіңіз. Бір сағаттан кейін қайталаңыз."
   },
   "question": {
-    "originalLanguageBadge": "Бастапқы тіл"
+    "originalLanguageBadge": "Бастапқы тіл",
+    "aiGenerate": "ЖИ Жасау",
+    "aiGenerating": "Жасалуда...",
+    "aiGenerateTitle": "ЖИ арқылы сұрақтар жасау",
+    "aiGenerateCount": "Сұрақтар саны",
+    "aiGenerateDifficulty": "Қиындық деңгейі",
+    "aiGenerateContext": "Контекст (міндетті емес)",
+    "aiGenerateContextHint": "Сұрақтарды нақтылау үшін контекст беріңіз (максимум 2000 таңба)",
+    "aiGeneratePreview": "Жасалған сұрақтарды алдын ала қарау",
+    "aiGenerateNoCategoryError": "Жасамас бұрын санатты таңдаңыз.",
+    "confirmSelected": "Таңдалғандарды растау",
+    "selectAll": "Барлығын таңдау",
+    "selectDraft": "Жоба сұрағын таңдау"
   },
   "session": {
     "timerFiveMinutes": "5 минут қалды",
@@ -823,14 +845,41 @@
     "timerExpired": "Уақыт аяқталды"
   },
   "status": {
-    "active": { "label": "Белсенді", "short": "Белсенді" },
-    "inactive": { "label": "Белсенді емес", "short": "Белсенді емес" },
-    "pending": { "label": "Күтуде", "short": "Күтуде" },
-    "completed": { "label": "Аяқталды", "short": "Аяқталды" },
-    "passed": { "label": "Өтті", "short": "Өтті" },
-    "failed": { "label": "Өтпеді", "short": "Өтпеді" },
-    "draft": { "label": "Жоба", "short": "Жоба" },
-    "published": { "label": "Жарияланды", "short": "Жарияланды" },
-    "archived": { "label": "Мұрағатталды", "short": "Мұрағатталды" }
+    "active": {
+      "label": "Белсенді",
+      "short": "Белсенді"
+    },
+    "inactive": {
+      "label": "Белсенді емес",
+      "short": "Белсенді емес"
+    },
+    "pending": {
+      "label": "Күтуде",
+      "short": "Күтуде"
+    },
+    "completed": {
+      "label": "Аяқталды",
+      "short": "Аяқталды"
+    },
+    "passed": {
+      "label": "Өтті",
+      "short": "Өтті"
+    },
+    "failed": {
+      "label": "Өтпеді",
+      "short": "Өтпеді"
+    },
+    "draft": {
+      "label": "Жоба",
+      "short": "Жоба"
+    },
+    "published": {
+      "label": "Жарияланды",
+      "short": "Жарияланды"
+    },
+    "archived": {
+      "label": "Мұрағатталды",
+      "short": "Мұрағатталды"
+    }
   }
 }

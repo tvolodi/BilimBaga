@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/bilimbaga/bilimbaga/internal/ai"
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/categories"
@@ -31,7 +32,7 @@ import (
 // db is used by the health endpoint to verify database connectivity.
 // version is the build-time Git SHA injected via -ldflags.
 // log is the zerolog logger used by the structured middleware chain.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, aiHandler *ai.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Structured middleware chain (FR-BB66):
@@ -275,6 +276,10 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Email notification test (FR-BB61) — super_admin only.
 			r.With(rbac.RequirePermission(rbacCache, "tenant", "manage")).Post("/admin/notifications/test", emailHandler.HandleTestNotification)
+
+			// AI question generation (FR-BB71) — examiner+ only.
+			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+				Post("/admin/ai/generate-questions", aiHandler.HandleGenerateQuestions)
 		})
 	})
 

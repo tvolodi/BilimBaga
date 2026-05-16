@@ -46,6 +46,10 @@ type Config struct {
 
 	// Logging
 	LogLevel string // debug | info | warn | error; default "info"
+
+	// Anthropic AI (FR-BB71)
+	AnthropicAPIKey string
+	AnthropicModel  string
 }
 
 // Load reads all required environment variables and returns a validated Config.
@@ -125,6 +129,10 @@ func Load() (*Config, error) {
 	}
 
 	cfg.LogLevel = getEnv("LOG_LEVEL", "info")
+
+	// Anthropic AI (FR-BB71) — optional; handlers return 503 if key is blank.
+	cfg.AnthropicAPIKey = getEnv("ANTHROPIC_API_KEY", "")
+	cfg.AnthropicModel = getEnv("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
 
 	if err := cfg.validate(); err != nil {
 		return nil, err

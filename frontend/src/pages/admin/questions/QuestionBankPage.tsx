@@ -2,10 +2,12 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDebounceValue } from 'usehooks-ts'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Search,
   Plus,
   Upload,
+  Sparkles,
   MoreVertical,
   ChevronUp,
   ChevronDown,
@@ -20,6 +22,7 @@ import {
   Edit,
   Archive,
 } from 'lucide-react'
+import { AIGenerateDialog } from '@/components/questions/AIGenerateDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -815,9 +818,20 @@ function parseCSV(params: URLSearchParams, key: string): string[] {
   return val ? val.split(',').filter(Boolean) : []
 }
 
+interface CurrentUser {
+  role: string
+}
+
+function isExaminerOrAbove(role: string): boolean {
+  return ['examiner', 'department_admin', 'super_admin'].includes(role)
+}
+
 export function QuestionBankPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const currentUser = qc.getQueryData<CurrentUser>(['auth', 'currentUser'])
+  const canUseAI = currentUser ? isExaminerOrAbove(currentUser.role) : false
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Derive filter state from URL
@@ -932,6 +946,7 @@ export function QuestionBankPage() {
   // UI state
   const [versionsQuestionId, setVersionsQuestionId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [aiGenerateOpen, setAIGenerateOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [notification, setNotification] = useState<{
     type: 'success' | 'error'
@@ -1045,6 +1060,12 @@ export function QuestionBankPage() {
             <Upload size={16} className="mr-1" />
             {t('questionBank.importButton')}
           </Button>
+          {canUseAI && (
+            <Button variant="outline" onClick={() => setAIGenerateOpen(true)}>
+              <Sparkles size={16} className="mr-1" />
+              {t('question.aiGenerate')}
+            </Button>
+          )}
           <Button onClick={() => navigate('/admin/questions/new')}>
             <Plus size={16} className="mr-1" />
             {t('questionBank.newQuestion')}
@@ -1365,6 +1386,17 @@ export function QuestionBankPage() {
         onConfirm={handleDelete}
         isPending={deleteMutation.isPending}
       />
+
+      {/* AI Generate dialog (examiner+ only) */}
+      {canUseAI && (
+        <AIGenerateDialog
+          open={aiGenerateOpen}
+          onClose={() => setAIGenerateOpen(false)}
+          onSuccess={(count) =>
+            showNotification('success', t('questionBank.import.progress', { n: count, total: count }))
+          }
+        />
+      )}
     </div>
   )
 }

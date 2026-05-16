@@ -68,7 +68,7 @@
 | FR-BB64 | Security-hardening | Security Hardening | Draft |
 | FR-BB65 | Performance | Performance | Draft |
 | FR-BB66 | Observability | Observability | Implemented |
-| FR-BB71 | Question-generation-assist | Question Generation Assist | Draft |
+| FR-BB71 | Question-generation-assist | Question Generation Assist | implemented |
 | FR-BB72 | Adaptive-difficulty | Adaptive Difficulty | Draft |
 | FR-BB73 | Short-text-auto-grading | Short-Text Auto-Grading | Draft |
 | FR-BB74 | Performance-insight-summaries | Performance Insight Summaries | Draft |

@@ -439,14 +439,22 @@
   },
   "exam": {
     "wizard": {
-      "step1": { "title": "Основные настройки" },
+      "step1": {
+        "title": "Основные настройки"
+      },
       "step2": {
         "title": "Правила вопросов",
         "addRule": "Добавить правило",
-        "mode": { "manual": "Вручную", "random": "Случайно" },
+        "mode": {
+          "manual": "Вручную",
+          "random": "Случайно"
+        },
         "editQuestions": "Редактировать вопросы"
       },
-      "step3": { "title": "Назначения", "addAssignee": "Добавить назначение" },
+      "step3": {
+        "title": "Назначения",
+        "addAssignee": "Добавить назначение"
+      },
       "step4": {
         "title": "Обзор и публикация",
         "publishConfirm": "Публикация экзамена сделает его доступным для назначенных пользователей. Это действие нельзя отменить. Вы уверены?"
@@ -491,7 +499,6 @@
       "count": "Количество вопросов"
     },
     "assignment": {
-      "type": "Тип назначения",
       "type": {
         "user": "Пользователь",
         "department": "Отдел",
@@ -506,7 +513,8 @@
       "required": "обязательно",
       "range": "должно быть от {{min}} до {{max}}",
       "availableUntilOrder": "Дата окончания должна быть позже даты начала",
-      "assigneeRequired": "Выберите назначенного"    },
+      "assigneeRequired": "Выберите назначенного"
+    },
     "taking": {
       "progress": "{{answered}} / {{total}} отвечено",
       "flagButton": "Отметить для проверки",
@@ -558,7 +566,8 @@
         "title": "Время вышло",
         "message": "Ваше время истекло. Отправка экзамена…",
         "retrying": "Ошибка сети. Повторная попытка…"
-      }    }
+      }
+    }
   },
   "portal": {
     "title": "Мои экзамены",
@@ -635,7 +644,8 @@
     "status": {
       "passed": "Сдан",
       "failed": "Не сдан"
-    }  },
+    }
+  },
   "audit": {
     "title": "Журнал аудита",
     "filter_from": "С",
@@ -714,7 +724,7 @@
     "detail_title": "Оценить сессию",
     "question_indicator": "Вопрос {{current}} из {{total}}",
     "answer_label": "Ответ сотрудника",
-    "score_label": "Балл (0\u2013100%)",
+    "score_label": "Балл (0–100%)",
     "score_error": "Балл должен быть от 0 до 100",
     "feedback_label": "Комментарий (необязательно)",
     "feedback_placeholder": "Добавьте комментарий для сотрудника...",
@@ -810,10 +820,24 @@
     "invalidCsv": "Загруженный файл не является допустимым CSV.",
     "tooManyRows": "Файл превышает максимальное количество строк.",
     "userNotFound": "Пользователь не найден.",
-    "emailUnavailable": "Сервис электронной почты временно недоступен."
+    "emailUnavailable": "Сервис электронной почты временно недоступен.",
+    "aiUnavailable": "Сервис ИИ временно недоступен. Пожалуйста, попробуйте позже.",
+    "aiRateLimited": "Вы достигли лимита генерации ИИ. Пожалуйста, попробуйте через час."
   },
   "question": {
-    "originalLanguageBadge": "Исходный язык"
+    "originalLanguageBadge": "Исходный язык",
+    "aiGenerate": "Генерация ИИ",
+    "aiGenerating": "Генерация...",
+    "aiGenerateTitle": "Генерация вопросов с ИИ",
+    "aiGenerateCount": "Количество вопросов",
+    "aiGenerateDifficulty": "Сложность",
+    "aiGenerateContext": "Контекст (необязательно)",
+    "aiGenerateContextHint": "Предоставьте контекст для генерации вопросов (максимум 2000 символов)",
+    "aiGeneratePreview": "Предпросмотр сгенерированных вопросов",
+    "aiGenerateNoCategoryError": "Пожалуйста, выберите категорию перед генерацией.",
+    "confirmSelected": "Подтвердить выбранные",
+    "selectAll": "Выбрать все",
+    "selectDraft": "Выбрать черновой вопрос"
   },
   "session": {
     "timerFiveMinutes": "Осталось 5 минут",
@@ -821,14 +845,41 @@
     "timerExpired": "Время вышло"
   },
   "status": {
-    "active": { "label": "Активен", "short": "Активен" },
-    "inactive": { "label": "Неактивен", "short": "Неактивен" },
-    "pending": { "label": "Ожидает", "short": "Ожидает" },
-    "completed": { "label": "Завершён", "short": "Завершён" },
-    "passed": { "label": "Сдан", "short": "Сдан" },
-    "failed": { "label": "Не сдан", "short": "Не сдан" },
-    "draft": { "label": "Черновик", "short": "Черновик" },
-    "published": { "label": "Опубликован", "short": "Опубликован" },
-    "archived": { "label": "В архиве", "short": "В архиве" }
+    "active": {
+      "label": "Активен",
+      "short": "Активен"
+    },
+    "inactive": {
+      "label": "Неактивен",
+      "short": "Неактивен"
+    },
+    "pending": {
+      "label": "Ожидает",
+      "short": "Ожидает"
+    },
+    "completed": {
+      "label": "Завершён",
+      "short": "Завершён"
+    },
+    "passed": {
+      "label": "Сдан",
+      "short": "Сдан"
+    },
+    "failed": {
+      "label": "Не сдан",
+      "short": "Не сдан"
+    },
+    "draft": {
+      "label": "Черновик",
+      "short": "Черновик"
+    },
+    "published": {
+      "label": "Опубликован",
+      "short": "Опубликован"
+    },
+    "archived": {
+      "label": "В архиве",
+      "short": "В архиве"
+    }
   }
 }

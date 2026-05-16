@@ -19,6 +19,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/config"
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
+	"github.com/bilimbaga/bilimbaga/internal/email"
 	"github.com/bilimbaga/bilimbaga/internal/exams"
 	"github.com/bilimbaga/bilimbaga/internal/portal"
 	"github.com/bilimbaga/bilimbaga/internal/questions"
@@ -68,6 +69,19 @@ func main() {
 	logger := slog.Default()
 	auditWriter := audit.NewWriter(db, logger)
 
+	// Wire up email notification service (FR-BB61).
+	emailSvc := email.NewEmailService(email.Config{
+		Host:       cfg.SMTPHost,
+		Port:       cfg.SMTPPort,
+		User:       cfg.SMTPUser,
+		Pass:       cfg.SMTPPass,
+		TLS:        cfg.SMTPTLS,
+		From:       cfg.SMTPFrom,
+		APIBaseURL: cfg.APIBaseURL,
+	}, db, logger)
+	emailHandler := email.NewHandler(emailSvc)
+	go email.StartDeadlineReminderScheduler(appCtx, emailSvc, cfg.TenantTimezone)
+
 	// Wire up tenant configuration.
 	tenantRepo := tenant.NewRepository(db)
 	tenantSvc := tenant.NewService(tenantRepo)
@@ -110,7 +124,7 @@ func main() {
 
 	// Wire up user management.
 	usersRepo := users.NewRepository(db)
-	usersSvc := users.NewService(usersRepo)
+	usersSvc := users.NewService(usersRepo, emailSvc)
 	usersHandler := users.NewHandler(usersSvc, auditWriter)
 
 	// Wire up audit log.
@@ -138,7 +152,7 @@ func main() {
 
 	// Wire up exams (FR-BB31).
 	examsRepo := exams.NewRepository(db)
-	examsSvc := exams.NewService(examsRepo)
+	examsSvc := exams.NewService(examsRepo, emailSvc)
 	examsHandler := exams.NewHandler(examsSvc, auditWriter)
 
 	// Wire up employee exam portal (FR-BB34).
@@ -149,7 +163,7 @@ func main() {
 	// Wire up session creation (FR-BB35).
 	gradingEngine := sessions.NewGradingEngine()
 	sessionsRepo := sessions.NewRepository(db, gradingEngine)
-	sessionsSvc := sessions.NewService(sessionsRepo)
+	sessionsSvc := sessions.NewService(sessionsRepo, emailSvc)
 	sessionsHandler := sessions.NewHandler(sessionsSvc)
 
 	// Start FR-BB310 auto-submit background job.
@@ -165,7 +179,7 @@ func main() {
 	reportsSvc := reports.NewService(reportsRepo)
 	reportsHandler := reports.NewHandler(reportsSvc, tenantSvc)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler, cfg.JWTSecret, rbacCache)
+	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler, emailHandler, cfg.JWTSecret, rbacCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,

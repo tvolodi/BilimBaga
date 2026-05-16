@@ -1,0 +1,40 @@
+{
+  "run_id": "FR-BB57",
+  "requirement_doc": "docs/requirements/FR-BB57.Frontend-per-exam-analytics.md",
+  "files_changed": [
+    "frontend/src/api/analytics.ts",
+    "frontend/src/components/analytics/ScoreDistributionChart.tsx",
+    "frontend/src/components/analytics/PassRateChart.tsx",
+    "frontend/src/components/analytics/StatsSummaryRow.tsx",
+    "frontend/src/components/analytics/AnswerDistributionExpander.tsx",
+    "frontend/src/components/analytics/QuestionDifficultyTable.tsx",
+    "frontend/src/components/analytics/ExportCSVButton.tsx",
+    "frontend/src/components/analytics/__tests__/ScoreDistributionChart.test.tsx",
+    "frontend/src/components/analytics/__tests__/PassRateChart.test.tsx",
+    "frontend/src/components/analytics/__tests__/StatsSummaryRow.test.tsx",
+    "frontend/src/components/analytics/__tests__/QuestionDifficultyTable.test.tsx",
+    "frontend/src/components/analytics/__tests__/ExportCSVButton.test.tsx",
+    "frontend/src/pages/admin/ExamAnalyticsPage.tsx",
+    "frontend/src/pages/admin/ExamsListPage.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json"
+  ],
+  "acceptance_criteria": [
+    "AC-1: Page accessible from admin exam list via View Analytics button/link",
+    "AC-2: Score distribution histogram with recharts BarChart, 10 fixed buckets",
+    "AC-3: Pass rate visualisation with recharts PieChart/RadialBarChart",
+    "AC-4: Statistics row: avg score, median score, total attempts, unique participants",
+    "AC-5: Table sortable by correct_rate (default ascending) and avg_time_seconds",
+    "AC-6: correct_rate < 0.40 → red left border + Consider Revising tooltip",
+    "AC-7: correct_rate > 0.95 → amber/yellow left border + Consider Removing tooltip",
+    "AC-8: Export CSV button calls GET /admin/exams/:id/results/export",
+    "AC-9: useQuery with queryKey ['exam-analytics', examId]; loading skeletons",
+    "AC-10: Zero hardcoded strings; all use useTranslation i18n keys"
+  ],
+  "test_results": {
+    "frontend": "151 passed (0 failed)",
+    "backend": "all packages passed (cached)"
+  }
+}

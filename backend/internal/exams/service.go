@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+
+	"github.com/bilimbaga/bilimbaga/internal/email"
 )
 
 // uuidPattern matches a UUID v4 string (case-insensitive).
@@ -43,12 +45,19 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo     Repository
+	emailSvc *email.EmailService
 }
 
 // NewService returns a Service backed by the given Repository.
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+// An optional EmailService may be passed as the second argument to enable
+// transactional email delivery; pass nil or omit to disable.
+func NewService(repo Repository, emailSvc ...*email.EmailService) Service {
+	s := &service{repo: repo}
+	if len(emailSvc) > 0 {
+		s.emailSvc = emailSvc[0]
+	}
+	return s
 }
 
 // validTransitions defines the allowed exam status state machine.
@@ -346,6 +355,11 @@ func (s *service) CreateAssignment(ctx context.Context, input CreateAssignmentIn
 	if err := s.repo.CreateAssignment(ctx, a); err != nil {
 		return nil, fmt.Errorf("exams: CreateAssignment: %w", err)
 	}
+
+	if s.emailSvc != nil {
+		s.emailSvc.TriggerAssignment(input.ExamID, exam.Title, input.Deadline, input.AssigneeType, input.AssigneeID)
+	}
+
 	return a, nil
 }
 

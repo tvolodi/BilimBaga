@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/bilimbaga/bilimbaga/internal/email"
 )
 
 const bcryptCost = 12
@@ -29,12 +31,19 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo     Repository
+	emailSvc *email.EmailService
 }
 
 // NewService creates a new Service backed by the given Repository.
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+// An optional EmailService may be passed as the second argument to enable
+// transactional email delivery; pass nil or omit to disable.
+func NewService(repo Repository, emailSvc ...*email.EmailService) Service {
+	s := &service{repo: repo}
+	if len(emailSvc) > 0 {
+		s.emailSvc = emailSvc[0]
+	}
+	return s
 }
 
 // ListUsers returns a paginated, filtered user list. Department admins are automatically
@@ -225,6 +234,10 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 
 	if err := s.repo.UpdatePassword(ctx, id, string(hash)); err != nil {
 		return nil, fmt.Errorf("users.ResetPassword: %w", err)
+	}
+
+	if s.emailSvc != nil {
+		s.emailSvc.TriggerPasswordReset(id, tmpPwd)
 	}
 
 	return &ResetPasswordResponse{TemporaryPassword: tmpPwd}, nil

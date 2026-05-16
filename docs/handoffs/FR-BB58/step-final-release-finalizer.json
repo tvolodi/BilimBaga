@@ -1,0 +1,23 @@
+﻿{
+  "run_id": "FR-BB58",
+  "pipeline": "A",
+  "commit_hash": "5ed3c01cd0c859073a597480699587d20f351351",
+  "commit_message": "feat(FR-BB58): implement Employee Record page",
+  "files_committed": [
+    "docs/requirements/FR-BB58.Frontend-employee-record.md",
+    "frontend/src/App.tsx",
+    "frontend/src/api/employees.ts",
+    "frontend/src/components/employees/EmployeeInfoHeader.tsx",
+    "frontend/src/components/employees/EmployeeRecordSkeleton.tsx",
+    "frontend/src/components/employees/ExamStatusChip.tsx",
+    "frontend/src/components/employees/SessionHistoryTable.tsx",
+    "frontend/src/components/employees/TrackProgressCards.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/pages/admin/EmployeeRecordPage.tsx",
+    "frontend/src/pages/admin/users/UsersListPage.tsx"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB58-INNER-REPORT.md",
+  "status": "success"
+}

@@ -1,0 +1,18 @@
+{
+  "run_id": "FR-BB53",
+  "pipeline": "A",
+  "commit_hash": "9403f2c686b10ff11f41bb0efd92daf0e374489d",
+  "commit_message": "feat(reports): implement FR-BB53 per-employee record API",
+  "files_committed": [
+    "backend/internal/reports/model.go",
+    "backend/internal/reports/repository.go",
+    "backend/internal/reports/service.go",
+    "backend/internal/reports/handler.go",
+    "backend/internal/reports/handler_test.go",
+    "backend/internal/reports/service_test.go",
+    "backend/internal/router/router.go",
+    "docs/requirements/FR-BB53.Per-employee-record-API.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB53-INNER-REPORT.md",
+  "status": "success"
+}

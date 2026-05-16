@@ -32,6 +32,15 @@ type Config struct {
 	BcryptCost   int
 	CookieDomain string
 	CookieSecure bool
+
+	// Email / SMTP
+	SMTPHost       string
+	SMTPPort       int
+	SMTPUser       string
+	SMTPPass       string
+	SMTPTLS        bool
+	SMTPFrom       string
+	TenantTimezone string
 }
 
 // Load reads all required environment variables and returns a validated Config.
@@ -86,6 +95,22 @@ func Load() (*Config, error) {
 	cfg.CookieSecure, err = strconv.ParseBool(cookieSecureStr)
 	if err != nil {
 		return nil, fmt.Errorf("config: COOKIE_SECURE must be true or false: %w", err)
+	}
+
+	cfg.SMTPHost = getEnv("SMTP_HOST", "")
+	cfg.SMTPPort, err = getEnvInt("SMTP_PORT", 587)
+	if err != nil {
+		return nil, fmt.Errorf("config: SMTP_PORT: %w", err)
+	}
+	cfg.SMTPUser = getEnv("SMTP_USER", "")
+	cfg.SMTPPass = getEnv("SMTP_PASS", "")
+	cfg.SMTPFrom = getEnv("SMTP_FROM", "")
+	cfg.TenantTimezone = getEnv("TENANT_TIMEZONE", "UTC")
+
+	smtpTLSStr := getEnv("SMTP_TLS", "false")
+	cfg.SMTPTLS, err = strconv.ParseBool(smtpTLSStr)
+	if err != nil {
+		return nil, fmt.Errorf("config: SMTP_TLS must be true or false: %w", err)
 	}
 
 	if err := cfg.validate(); err != nil {

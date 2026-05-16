@@ -1,0 +1,21 @@
+{
+  "email.new_exam_assigned.subject":   "Жаңа емтихан тапсырылды: {{.ExamTitle}}",
+  "email.new_exam_assigned.body_text": "Сәлем,\n\nСізге жаңа емтихан тапсырылды: {{.ExamTitle}}.\n\nМерзімі: {{.Deadline}}\n\nЕмтиханды бастау: {{.PortalLink}}\n\nЕң жақсы тілектермен,\nBilimBaga",
+  "email.new_exam_assigned.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p>Сізге жаңа емтихан тапсырылды: <strong>{{.ExamTitle}}</strong></p><p><strong>Мерзімі:</strong> {{.Deadline}}</p><p><a href=\"{{.PortalLink}}\">Емтиханды бастау</a></p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
+
+  "email.exam_passed.subject":   "Құттықтаймыз! Сіз өттіңіз: {{.ExamTitle}}",
+  "email.exam_passed.body_text": "Сәлем,\n\nҚұттықтаймыз! Сіз «{{.ExamTitle}}» емтиханынан {{.ScorePct}}% нәтижесімен өттіңіз.\n\nСертификатты жүктеу: {{.CertDownloadLink}}\n\nЕң жақсы тілектермен,\nBilimBaga",
+  "email.exam_passed.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p>Құттықтаймыз! Сіз <strong>{{.ExamTitle}}</strong> емтиханынан <strong>{{.ScorePct}}%</strong> нәтижесімен өттіңіз.</p><p><a href=\"{{.CertDownloadLink}}\">Сертификатты жүктеу</a></p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
+
+  "email.exam_failed.subject":   "Емтихан нәтижесі: {{.ExamTitle}}",
+  "email.exam_failed.body_text": "Сәлем,\n\nСіз «{{.ExamTitle}}» емтиханынан өтпедіңіз. Нәтижеңіз {{.ScorePct}}% (өту балы: {{.PassingScorePct}}%).\n\nҚалған мүмкіндіктер: {{.AttemptsRemaining}}\n\nЕң жақсы тілектермен,\nBilimBaga",
+  "email.exam_failed.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p>Сіз <strong>{{.ExamTitle}}</strong> емтиханынан өтпедіңіз. Нәтижеңіз <strong>{{.ScorePct}}%</strong> (өту балы: {{.PassingScorePct}}%).</p><p>Қалған мүмкіндіктер: <strong>{{.AttemptsRemaining}}</strong></p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
+
+  "email.deadline_reminder.subject":   "Еске салу: емтихан мерзімі жақындап қалды — {{.ExamTitle}}",
+  "email.deadline_reminder.body_text": "Сәлем,\n\n«{{.ExamTitle}}» емтиханының мерзімі жақындап қалды.\n\nМерзімі: {{.Deadline}}\n\nМерзімі өткенге дейін емтиханды аяқтаңыз.\n\nЕң жақсы тілектермен,\nBilimBaga",
+  "email.deadline_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p><strong>{{.ExamTitle}}</strong> емтиханының мерзімі жақындап қалды.</p><p><strong>Мерзімі:</strong> {{.Deadline}}</p><p>Мерзімі өткенге дейін емтиханды аяқтаңыз.</p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
+
+  "email.password_reset.subject":   "Уақытша құпия сөз — BilimBaga",
+  "email.password_reset.body_text": "Сәлем,\n\nСіздің құпия сөзіңіз қалпына келтірілді. Уақытша құпия сөз:\n\n{{.TempPassword}}\n\nЖүйеге кіріп, құпия сөзді дереу өзгертіңіз.\n\nЕң жақсы тілектермен,\nBilimBaga",
+  "email.password_reset.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p>Сіздің құпия сөзіңіз қалпына келтірілді. Уақытша құпия сөз:</p><p style=\"font-size:1.2em;font-weight:bold;letter-spacing:2px\">{{.TempPassword}}</p><p>Жүйеге кіріп, құпия сөзді дереу өзгертіңіз.</p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>"
+}

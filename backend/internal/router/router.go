@@ -6,6 +6,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/categories"
 	"github.com/bilimbaga/bilimbaga/internal/certificates"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
+	"github.com/bilimbaga/bilimbaga/internal/email"
 	"github.com/bilimbaga/bilimbaga/internal/exams"
 	"github.com/bilimbaga/bilimbaga/internal/health"
 	"github.com/bilimbaga/bilimbaga/internal/portal"
@@ -23,7 +24,7 @@ import (
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -247,6 +248,9 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			// Certificate generation (FR-BB43).
 			r.Get("/portal/sessions/{id}/certificate", certHandler.HandleGetPortalCertificate)
 			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).Get("/admin/sessions/{id}/certificate", certHandler.HandleGetAdminCertificate)
+
+			// Email notification test (FR-BB61) — super_admin only.
+			r.With(rbac.RequirePermission(rbacCache, "tenant", "manage")).Post("/admin/notifications/test", emailHandler.HandleTestNotification)
 		})
 	})
 

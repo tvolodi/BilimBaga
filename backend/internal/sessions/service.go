@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+
+	"github.com/bilimbaga/bilimbaga/internal/email"
 )
 
 // Service defines the business logic for session creation and answer saving.
@@ -58,12 +60,19 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo     Repository
+	emailSvc *email.EmailService
 }
 
 // NewService returns a Service backed by the given Repository.
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+// An optional EmailService may be passed as the second argument to enable
+// transactional email delivery; pass nil or omit to disable.
+func NewService(repo Repository, emailSvc ...*email.EmailService) Service {
+	s := &service{repo: repo}
+	if len(emailSvc) > 0 {
+		s.emailSvc = emailSvc[0]
+	}
+	return s
 }
 
 // nowFn is overridable in tests.
@@ -566,6 +575,9 @@ func (s *service) SubmitSession(ctx context.Context, sessionID, userID, tenantID
 	if err != nil {
 		return nil, fmt.Errorf("sessions: SubmitSession: %w", err)
 	}
+	if s.emailSvc != nil && result.Passed != nil {
+		s.emailSvc.TriggerSessionResult(result.SessionID)
+	}
 	return result, nil
 }
 
@@ -811,6 +823,9 @@ func (s *service) GradeAnswer(ctx context.Context, sessionID, questionID, grader
 		AllGraded:     result.allGraded,
 		FinalScorePct: result.finalScorePct,
 		Passed:        result.passed,
+	}
+	if s.emailSvc != nil && resp.AllGraded {
+		s.emailSvc.TriggerSessionResult(sessionID)
 	}
 	return resp, nil
 }

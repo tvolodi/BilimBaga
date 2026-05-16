@@ -1,0 +1,21 @@
+{
+  "email.new_exam_assigned.subject":   "Назначен новый экзамен: {{.ExamTitle}}",
+  "email.new_exam_assigned.body_text": "Здравствуйте,\n\nВам назначен новый экзамен: {{.ExamTitle}}.\n\nСрок выполнения: {{.Deadline}}\n\nНачать экзамен: {{.PortalLink}}\n\nС уважением,\nBilimBaga",
+  "email.new_exam_assigned.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Вам назначен новый экзамен: <strong>{{.ExamTitle}}</strong></p><p><strong>Срок выполнения:</strong> {{.Deadline}}</p><p><a href=\"{{.PortalLink}}\">Начать экзамен</a></p><p>С уважением,<br>BilimBaga</p></body></html>",
+
+  "email.exam_passed.subject":   "Поздравляем! Вы сдали: {{.ExamTitle}}",
+  "email.exam_passed.body_text": "Здравствуйте,\n\nПоздравляем! Вы сдали экзамен «{{.ExamTitle}}» с результатом {{.ScorePct}}%.\n\nСкачать сертификат: {{.CertDownloadLink}}\n\nС уважением,\nBilimBaga",
+  "email.exam_passed.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Поздравляем! Вы сдали экзамен <strong>{{.ExamTitle}}</strong> с результатом <strong>{{.ScorePct}}%</strong>.</p><p><a href=\"{{.CertDownloadLink}}\">Скачать сертификат</a></p><p>С уважением,<br>BilimBaga</p></body></html>",
+
+  "email.exam_failed.subject":   "Результат экзамена: {{.ExamTitle}}",
+  "email.exam_failed.body_text": "Здравствуйте,\n\nВы не сдали экзамен «{{.ExamTitle}}». Ваш результат: {{.ScorePct}}% (проходной балл: {{.PassingScorePct}}%).\n\nОставшихся попыток: {{.AttemptsRemaining}}\n\nС уважением,\nBilimBaga",
+  "email.exam_failed.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Вы не сдали экзамен <strong>{{.ExamTitle}}</strong>. Ваш результат: <strong>{{.ScorePct}}%</strong> (проходной балл: {{.PassingScorePct}}%).</p><p>Оставшихся попыток: <strong>{{.AttemptsRemaining}}</strong></p><p>С уважением,<br>BilimBaga</p></body></html>",
+
+  "email.deadline_reminder.subject":   "Напоминание: приближается срок сдачи экзамена — {{.ExamTitle}}",
+  "email.deadline_reminder.body_text": "Здравствуйте,\n\nНапоминаем, что приближается срок сдачи экзамена «{{.ExamTitle}}».\n\nСрок: {{.Deadline}}\n\nПожалуйста, пройдите экзамен до истечения срока.\n\nС уважением,\nBilimBaga",
+  "email.deadline_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Напоминаем, что приближается срок сдачи экзамена <strong>{{.ExamTitle}}</strong>.</p><p><strong>Срок:</strong> {{.Deadline}}</p><p>Пожалуйста, пройдите экзамен до истечения срока.</p><p>С уважением,<br>BilimBaga</p></body></html>",
+
+  "email.password_reset.subject":   "Ваш временный пароль — BilimBaga",
+  "email.password_reset.body_text": "Здравствуйте,\n\nВаш пароль был сброшен. Временный пароль:\n\n{{.TempPassword}}\n\nПожалуйста, войдите в систему и немедленно смените пароль.\n\nС уважением,\nBilimBaga",
+  "email.password_reset.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Ваш пароль был сброшен. Временный пароль:</p><p style=\"font-size:1.2em;font-weight:bold;letter-spacing:2px\">{{.TempPassword}}</p><p>Пожалуйста, войдите в систему и немедленно смените пароль.</p><p>С уважением,<br>BilimBaga</p></body></html>"
+}

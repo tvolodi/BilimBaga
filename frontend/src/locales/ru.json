@@ -11,6 +11,8 @@
     "loadError": "Не удалось загрузить. Попробуйте ещё раз.",
     "skipToMain": "Перейти к основному содержимому",
     "deleteQuestion": "Удалить вопрос",
+    "signOut": "Выйти",
+    "remove": "Удалить",
     "dragHandle": "Перетащить для изменения порядка",
     "deleteRule": "Удалить правило",
     "removeAssignment": "Удалить назначение",
@@ -817,5 +819,16 @@
     "timerFiveMinutes": "Осталось 5 минут",
     "timerOneMinute": "Осталась 1 минута",
     "timerExpired": "Время вышло"
+  },
+  "status": {
+    "active": { "label": "Активен", "short": "Активен" },
+    "inactive": { "label": "Неактивен", "short": "Неактивен" },
+    "pending": { "label": "Ожидает", "short": "Ожидает" },
+    "completed": { "label": "Завершён", "short": "Завершён" },
+    "passed": { "label": "Сдан", "short": "Сдан" },
+    "failed": { "label": "Не сдан", "short": "Не сдан" },
+    "draft": { "label": "Черновик", "short": "Черновик" },
+    "published": { "label": "Опубликован", "short": "Опубликован" },
+    "archived": { "label": "В архиве", "short": "В архиве" }
   }
 }

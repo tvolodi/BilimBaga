@@ -11,6 +11,8 @@
     "loadError": "Failed to load. Please try again.",
     "skipToMain": "Skip to main content",
     "deleteQuestion": "Delete question",
+    "signOut": "Sign out",
+    "remove": "Remove",
     "dragHandle": "Drag to reorder",
     "deleteRule": "Delete rule",
     "removeAssignment": "Remove assignment",
@@ -819,5 +821,16 @@
     "timerFiveMinutes": "5 minutes remaining",
     "timerOneMinute": "1 minute remaining",
     "timerExpired": "Time is up"
+  },
+  "status": {
+    "active": { "label": "Active", "short": "Active" },
+    "inactive": { "label": "Inactive", "short": "Inactive" },
+    "pending": { "label": "Pending", "short": "Pending" },
+    "completed": { "label": "Completed", "short": "Completed" },
+    "passed": { "label": "Passed", "short": "Passed" },
+    "failed": { "label": "Failed", "short": "Failed" },
+    "draft": { "label": "Draft", "short": "Draft" },
+    "published": { "label": "Published", "short": "Published" },
+    "archived": { "label": "Archived", "short": "Archived" }
   }
 }

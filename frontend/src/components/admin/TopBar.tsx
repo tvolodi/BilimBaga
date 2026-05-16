@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
@@ -11,6 +12,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ user }: TopBarProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const logout = useLogout()
 
@@ -31,9 +33,10 @@ export function TopBar({ user }: TopBarProps) {
           size="sm"
           onClick={handleLogout}
           disabled={logout.isPending}
+          aria-label={t('common.signOut')}
           className="gap-1.5 text-gray-600 hover:text-gray-900"
         >
-          <LogOut size={16} />
+          <LogOut size={16} aria-hidden="true" />
         </Button>
       </div>
     </header>

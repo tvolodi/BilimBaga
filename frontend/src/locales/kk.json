@@ -11,6 +11,8 @@
     "loadError": "Жүктеу сәтсіз аяқталды. Қайталап көріңіз.",
     "skipToMain": "Негізгі мазмұнға өту",
     "deleteQuestion": "Сұрақты жою",
+    "signOut": "Шығу",
+    "remove": "Жою",
     "dragHandle": "Ретін өзгерту үшін сүйреңіз",
     "deleteRule": "Ережені жою",
     "removeAssignment": "Тапсырманы жою",
@@ -819,5 +821,16 @@
     "timerFiveMinutes": "5 минут қалды",
     "timerOneMinute": "1 минут қалды",
     "timerExpired": "Уақыт аяқталды"
+  },
+  "status": {
+    "active": { "label": "Белсенді", "short": "Белсенді" },
+    "inactive": { "label": "Белсенді емес", "short": "Белсенді емес" },
+    "pending": { "label": "Күтуде", "short": "Күтуде" },
+    "completed": { "label": "Аяқталды", "short": "Аяқталды" },
+    "passed": { "label": "Өтті", "short": "Өтті" },
+    "failed": { "label": "Өтпеді", "short": "Өтпеді" },
+    "draft": { "label": "Жоба", "short": "Жоба" },
+    "published": { "label": "Жарияланды", "short": "Жарияланды" },
+    "archived": { "label": "Мұрағатталды", "short": "Мұрағатталды" }
   }
 }

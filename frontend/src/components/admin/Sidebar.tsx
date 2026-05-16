@@ -67,6 +67,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             key={key}
             to={path}
             end={end}
+            aria-label={collapsed ? t(labelKey) : undefined}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors',
@@ -78,7 +79,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             }
             title={collapsed ? t(labelKey) : undefined}
           >
-            <Icon size={18} className="flex-shrink-0" />
+            <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
             {!collapsed && <span className="truncate">{t(labelKey)}</span>}
           </NavLink>
         ))}

@@ -389,8 +389,12 @@ function TagCombobox({ tagIds, onTagIdsChange }: TagComboboxProps) {
             className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs"
           >
             {tag.name}
-            <button onClick={() => handleRemove(tag.id)} className="hover:text-destructive">
-              <X size={10} />
+            <button
+              onClick={() => handleRemove(tag.id)}
+              className="hover:text-destructive"
+              aria-label={`${t('common.remove')} ${tag.name}`}
+            >
+              <X size={10} aria-hidden="true" />
             </button>
           </span>
         ))}

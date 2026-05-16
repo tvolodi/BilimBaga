@@ -44,7 +44,8 @@
       "edit": "Редактировать",
       "deactivate": "Деактивировать",
       "reset_password": "Сбросить пароль",
-      "import": "Массовый импорт"
+      "import": "Массовый импорт",
+      "view_record": "Просмотр записи"
     },
     "status": {
       "active": "Активен",
@@ -712,5 +713,37 @@
     "success_toast": "Все оценки отправлены. Сессия завершена.",
     "error_toast": "Не удалось отправить оценку за вопрос {{question}}. Попробуйте снова.",
     "already_graded": "Уже оценено",
-    "nav": "Ручная проверка"  }
+    "nav": "Ручная проверка"
+  },
+  "employee_record": {
+    "title": "Карточка сотрудника",
+    "info_section": "Информация о сотруднике",
+    "history_section": "История сессий",
+    "progress_section": "Прогресс по направлениям",
+    "col_exam": "Экзамен",
+    "col_date": "Дата сдачи",
+    "col_score": "Балл",
+    "col_status": "Статус",
+    "col_time": "Время",
+    "col_certificate": "Сертификат",
+    "download_certificate": "Скачать",
+    "history_empty": "У этого сотрудника нет записей об экзаменах.",
+    "track_security": "Безопасность",
+    "track_safety": "Охрана труда",
+    "track_loyalty": "Лояльность",
+    "questions_answered": "Отвечено на вопросов",
+    "last_activity": "Последняя активность",
+    "never": "Никогда",
+    "required_exams": "Обязательные экзамены",
+    "exam_passed": "Сдан",
+    "exam_failed": "Не сдан",
+    "exam_not_attempted": "Не сдавал",
+    "attempts": "{{count}} попытка(-ок)",
+    "status_passed": "Сдан",
+    "status_failed": "Не сдан",
+    "status_grading_pending": "Проверяется",
+    "showing": "Показано {{from}}–{{to}} из {{total}}",
+    "load_error": "Не удалось загрузить карточку сотрудника.",
+    "retry": "Повторить"
+  }
 }

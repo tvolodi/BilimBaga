@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
@@ -17,8 +19,13 @@ import type { CreateUserResponse } from '@/api/users'
 type SortKey = 'full_name' | 'email' | 'department_name' | 'role_name' | 'status'
 type SortDir = 'asc' | 'desc'
 
+const VIEW_RECORD_ROLES = new Set(['super_admin', 'department_admin', 'examiner'])
+
 export function UsersListPage() {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const currentUser = qc.getQueryData<{ role: string }>(['auth', 'currentUser'])
+  const canViewRecord = currentUser ? VIEW_RECORD_ROLES.has(currentUser.role) : false
 
   const [filters, setFilters] = useState<UsersFilters>({ page: 1, per_page: 20 })
   const [sortKey, setSortKey] = useState<SortKey>('full_name')
@@ -192,6 +199,13 @@ export function UsersListPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
+                    {canViewRecord && (
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link to={`/admin/users/${user.id}/record`}>
+                          {t('users.actions.view_record')}
+                        </Link>
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" onClick={() => setEditUser(user)}>
                       {t('users.actions.edit')}
                     </Button>

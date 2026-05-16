@@ -44,7 +44,8 @@
       "edit": "Edit",
       "deactivate": "Deactivate",
       "reset_password": "Reset Password",
-      "import": "Bulk Import"
+      "import": "Bulk Import",
+      "view_record": "View Record"
     },
     "status": {
       "active": "Active",
@@ -714,5 +715,37 @@
     "success_toast": "All grades submitted. Session has been finalized.",
     "error_toast": "Failed to submit grade for question {{question}}. Please retry.",
     "already_graded": "Already graded",
-    "nav": "Manual Grading"  }
+    "nav": "Manual Grading"
+  },
+  "employee_record": {
+    "title": "Employee Record",
+    "info_section": "Employee Information",
+    "history_section": "Session History",
+    "progress_section": "Track Progress",
+    "col_exam": "Exam",
+    "col_date": "Date Taken",
+    "col_score": "Score",
+    "col_status": "Status",
+    "col_time": "Time Taken",
+    "col_certificate": "Certificate",
+    "download_certificate": "Download",
+    "history_empty": "No exam sessions recorded for this employee.",
+    "track_security": "Security",
+    "track_safety": "Safety",
+    "track_loyalty": "Loyalty",
+    "questions_answered": "Questions Answered",
+    "last_activity": "Last Activity",
+    "never": "Never",
+    "required_exams": "Required Exams",
+    "exam_passed": "Passed",
+    "exam_failed": "Not Passed",
+    "exam_not_attempted": "Not Attempted",
+    "attempts": "{{count}} attempt(s)",
+    "status_passed": "Passed",
+    "status_failed": "Failed",
+    "status_grading_pending": "Grading Pending",
+    "showing": "Showing {{from}}–{{to}} of {{total}}",
+    "load_error": "Failed to load employee record.",
+    "retry": "Retry"
+  }
 }

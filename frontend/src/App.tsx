@@ -24,6 +24,7 @@ import { ExamTakingPage } from '@/pages/ExamTaking'
 import { ResultPage } from '@/pages/ResultPage'
 import { GradingQueuePage } from '@/pages/admin/GradingQueuePage'
 import { GradingDetailPage } from '@/pages/admin/GradingDetailPage'
+import { EmployeeRecordPage } from '@/pages/admin/EmployeeRecordPage'
 import { AuditLogPage } from '@/pages/admin/AuditLogPage'
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
 import { ExamsListPage } from '@/pages/admin/ExamsListPage'
@@ -64,6 +65,14 @@ function AppRoutes() {
           }
         />
         <Route path="users" element={<UsersListPage />} />
+        <Route
+          path="users/:userId/record"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <EmployeeRecordPage />
+            </RequireRole>
+          }
+        />
         <Route path="departments" element={<DepartmentsPage />} />
         <Route
           path="questions"

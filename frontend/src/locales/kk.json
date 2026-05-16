@@ -44,7 +44,8 @@
       "edit": "Өңдеу",
       "deactivate": "Өшіру",
       "reset_password": "Құпия сөзді қайта орнату",
-      "import": "Топтық жүктеу"
+      "import": "Топтық жүктеу",
+      "view_record": "Жазбаны қарау"
     },
     "status": {
       "active": "Белсенді",
@@ -714,5 +715,37 @@
     "success_toast": "Барлық бағалар жіберілді. Сессия аяқталды.",
     "error_toast": "{{question}} сұрағы үшін баға жіберу сәтсіз аяқталды. Қайталап көріңіз.",
     "already_graded": "Бағаланған",
-    "nav": "Қолмен бағалау"  }
+    "nav": "Қолмен бағалау"
+  },
+  "employee_record": {
+    "title": "Қызметкер жазбасы",
+    "info_section": "Қызметкер туралы ақпарат",
+    "history_section": "Сессия тарихы",
+    "progress_section": "Бағыт бойынша үдеріс",
+    "col_exam": "Емтихан",
+    "col_date": "Тапсырылған күні",
+    "col_score": "Балл",
+    "col_status": "Күй",
+    "col_time": "Уақыт",
+    "col_certificate": "Куәлік",
+    "download_certificate": "Жүктеу",
+    "history_empty": "Бұл қызметкер үшін емтихан сессиялары жоқ.",
+    "track_security": "Қауіпсіздік",
+    "track_safety": "Еңбек қорғау",
+    "track_loyalty": "Адалдық",
+    "questions_answered": "Жауапталған сұрақтар",
+    "last_activity": "Соңғы белсенділік",
+    "never": "Ешқашан",
+    "required_exams": "Міндетті емтихандар",
+    "exam_passed": "Өтті",
+    "exam_failed": "Өтпеді",
+    "exam_not_attempted": "Қатыспаған",
+    "attempts": "{{count}} рет",
+    "status_passed": "Өтті",
+    "status_failed": "Сәтсіз",
+    "status_grading_pending": "Тексерілуде",
+    "showing": "{{total}} ішінен {{from}}–{{to}} көрсетілуде",
+    "load_error": "Қызметкер жазбасын жүктеу сәтсіз аяқталды.",
+    "retry": "Қайталау"
+  }
 }

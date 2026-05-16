@@ -7,6 +7,7 @@ import (
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
+	"github.com/go-chi/chi/v5"
 )
 
 // Handler handles HTTP requests for the AI domain.
@@ -60,6 +61,47 @@ func (h *Handler) HandleGenerateQuestions(w http.ResponseWriter, r *http.Request
 
 	api.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"data":  map[string]interface{}{"questions": questions},
+		"error": nil,
+	})
+}
+
+// HandleGetInsights handles GET /api/v1/admin/ai/insights/{examId}.
+//
+// AC-2: JWT auth + examiner role enforced at router level via rbac.RequirePermission.
+// AC-3: Cache hit within 24 h returns cached result with "cached":true.
+// AC-4: ?refresh=true bypasses cache and calls Anthropic.
+// AC-6: Anthropic errors → 503 AI_UNAVAILABLE.
+func (h *Handler) HandleGetInsights(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+	if userID == "" {
+		api.WriteError(w, http.StatusUnauthorized, "MISSING_TOKEN", "authentication required")
+		return
+	}
+
+	examID := chi.URLParam(r, "examId")
+	if examID == "" {
+		api.WriteError(w, http.StatusBadRequest, "INVALID_PARAM", "examId is required")
+		return
+	}
+
+	tenantID := auth.TenantIDFromCtx(r.Context())
+	forceRefresh := r.URL.Query().Get("refresh") == "true"
+
+	result, err := h.svc.GetInsights(r.Context(), examID, tenantID, userID, forceRefresh)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrExamNotFound):
+			api.WriteError(w, http.StatusNotFound, "EXAM_NOT_FOUND", "exam not found or access denied")
+		case errors.Is(err, ErrAIUnavailable):
+			api.WriteError(w, http.StatusServiceUnavailable, "AI_UNAVAILABLE", "AI service unavailable")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "an unexpected error occurred")
+		}
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  result,
 		"error": nil,
 	})
 }

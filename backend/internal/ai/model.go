@@ -55,3 +55,35 @@ type UsageLog struct {
 	Model      string
 	CreatedAt  time.Time
 }
+
+// ── FR-BB74: Performance Insight Summaries ───────────────────────────────────
+
+// ExamInsightData holds anonymised aggregate statistics used to build the AI prompt.
+// No employee names or user IDs are included — only aggregate values.
+type ExamInsightData struct {
+	ExamTitle         string
+	TotalAttempts     int
+	PassRate          float64 // 0.0–1.0
+	AvgScorePct       float64 // 0.0–1.0
+	AvgCompletionSecs int
+	PassingScorePct   int
+	QuestionStats     []InsightQuestionStat
+}
+
+// InsightQuestionStat holds per-question analytics used in the AI prompt.
+type InsightQuestionStat struct {
+	OrderNum    int
+	Stem        string  // truncated to 100 chars
+	CorrectRate float64 // 0.0–1.0
+	AvgTimeSecs int
+}
+
+// InsightResult is the response returned by the GetInsights service method.
+type InsightResult struct {
+	Insights    []string  `json:"insights"`
+	GeneratedAt time.Time `json:"generated_at"`
+	Cached      bool      `json:"cached"`
+}
+
+// ErrExamNotFound is returned when the exam does not exist or belongs to a different tenant.
+var ErrExamNotFound = errors.New("ai: exam not found")

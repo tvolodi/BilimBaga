@@ -2,6 +2,9 @@ package ai
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,6 +22,20 @@ type Repository interface {
 
 	// GetCategoryName returns the name of a category by its UUID.
 	GetCategoryName(ctx context.Context, categoryID string) (string, error)
+
+	// ── FR-BB74: Insight cache ────────────────────────────────────────────────
+
+	// GetInsightCache returns the cached InsightResult for the given exam, or nil
+	// when no cache entry exists.
+	GetInsightCache(ctx context.Context, examID string) (*InsightResult, error)
+
+	// UpsertInsightCache writes (or overwrites) the cache entry for the exam.
+	UpsertInsightCache(ctx context.Context, examID, userID string, insights []string) error
+
+	// GetExamInsightData gathers all anonymised aggregate statistics needed to
+	// build the AI prompt.  Returns ErrExamNotFound when the exam does not exist
+	// or does not belong to the given tenant.
+	GetExamInsightData(ctx context.Context, examID, tenantID string) (*ExamInsightData, error)
 }
 
 type postgresRepository struct {
@@ -65,3 +82,191 @@ func (r *postgresRepository) GetCategoryName(ctx context.Context, categoryID str
 	}
 	return name, nil
 }
+
+// ── FR-BB74: Insight cache ────────────────────────────────────────────────────
+
+func (r *postgresRepository) GetInsightCache(ctx context.Context, examID string) (*InsightResult, error) {
+	var raw struct {
+		Insights    []byte    `db:"insights"`
+		GeneratedAt time.Time `db:"generated_at"`
+	}
+	err := r.db.QueryRowxContext(ctx,
+		`SELECT insights, generated_at FROM ai_insight_cache WHERE exam_id = $1`, examID,
+	).StructScan(&raw)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil //nolint:nilnil // nil means cache miss
+		}
+		return nil, fmt.Errorf("ai: GetInsightCache: %w", err)
+	}
+
+	var insights []string
+	if err := json.Unmarshal(raw.Insights, &insights); err != nil {
+		return nil, fmt.Errorf("ai: GetInsightCache: unmarshal insights: %w", err)
+	}
+
+	return &InsightResult{
+		Insights:    insights,
+		GeneratedAt: raw.GeneratedAt,
+		Cached:      true,
+	}, nil
+}
+
+func (r *postgresRepository) UpsertInsightCache(ctx context.Context, examID, userID string, insights []string) error {
+	insightsJSON, err := json.Marshal(insights)
+	if err != nil {
+		return fmt.Errorf("ai: UpsertInsightCache: marshal insights: %w", err)
+	}
+
+	_, err = r.db.ExecContext(ctx, `
+INSERT INTO ai_insight_cache (exam_id, insights, generated_at, generated_by)
+VALUES ($1, $2, NOW(), $3)
+ON CONFLICT (exam_id)
+DO UPDATE SET insights      = EXCLUDED.insights,
+              generated_at  = EXCLUDED.generated_at,
+              generated_by  = EXCLUDED.generated_by`,
+		examID, insightsJSON, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("ai: UpsertInsightCache: %w", err)
+	}
+	return nil
+}
+
+// examInsightRow is the scan target for the exam header query.
+type examInsightRow struct {
+	Title           string  `db:"title"`
+	PassingScorePct int     `db:"passing_score_pct"`
+	TenantID        string  `db:"tenant_id"`
+}
+
+// insightSummaryRow is the scan target for the session aggregate query.
+type insightSummaryRow struct {
+	TotalAttempts     int      `db:"total_attempts"`
+	PassRate          *float64 `db:"pass_rate"`
+	AvgScorePct       *float64 `db:"avg_score_pct"`
+	AvgCompletionSecs *float64 `db:"avg_completion_secs"`
+}
+
+// insightQuestionRow is the scan target for per-question stats.
+type insightQuestionRow struct {
+	OrderNum    int      `db:"order_num"`
+	Stem        string   `db:"stem"`
+	CorrectRate *float64 `db:"correct_rate"`
+	AvgTimeSecs *float64 `db:"avg_time_secs"`
+}
+
+func (r *postgresRepository) GetExamInsightData(ctx context.Context, examID, tenantID string) (*ExamInsightData, error) {
+	// Verify exam exists and belongs to the tenant.
+	var header examInsightRow
+	err := r.db.QueryRowxContext(ctx,
+		`SELECT title, passing_score_pct, tenant_id FROM exams WHERE id = $1`, examID,
+	).StructScan(&header)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrExamNotFound
+		}
+		return nil, fmt.Errorf("ai: GetExamInsightData: fetch exam: %w", err)
+	}
+	if header.TenantID != tenantID {
+		return nil, ErrExamNotFound
+	}
+
+	// Aggregate session statistics.
+	var summary insightSummaryRow
+	err = r.db.QueryRowxContext(ctx, `
+SELECT
+  COUNT(*)                                                                            AS total_attempts,
+  ROUND(
+    COUNT(*) FILTER (WHERE passed = TRUE)::DECIMAL / NULLIF(COUNT(*), 0), 4
+  )                                                                                   AS pass_rate,
+  ROUND(AVG(score_pct)::numeric / 100, 4)                                            AS avg_score_pct,
+  ROUND(AVG(
+    EXTRACT(EPOCH FROM (submitted_at - started_at))
+  )::numeric, 0)                                                                      AS avg_completion_secs
+FROM exam_sessions
+WHERE exam_id = $1
+  AND status IN ('submitted', 'auto_submitted', 'grading_pending')`, examID,
+	).StructScan(&summary)
+	if err != nil {
+		return nil, fmt.Errorf("ai: GetExamInsightData: aggregate sessions: %w", err)
+	}
+
+	// Per-question stats — use order_num from session_questions to preserve display order.
+	rows, err := r.db.QueryxContext(ctx, `
+SELECT
+  MIN(sq.order_num)                                                               AS order_num,
+  LEFT(qt.stem, 100)                                                              AS stem,
+  ROUND(
+    COUNT(sqs.question_id) FILTER (WHERE sqs.score = sqs.max_score)::DECIMAL
+    / NULLIF(COUNT(sqs.question_id), 0), 4
+  )                                                                               AS correct_rate,
+  ROUND(AVG(sqs.time_taken_seconds)::numeric, 0)                                 AS avg_time_secs
+FROM questions q
+JOIN question_translations qt ON qt.question_id = q.id AND qt.locale = q.default_locale
+LEFT JOIN session_question_scores sqs ON sqs.question_id = q.id
+  AND sqs.session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+  )
+LEFT JOIN session_questions sq ON sq.question_id = q.id
+  AND sq.session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+  )
+WHERE q.id IN (
+  SELECT DISTINCT question_id FROM session_questions
+  WHERE session_id IN (
+    SELECT id FROM exam_sessions
+    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+  )
+)
+GROUP BY q.id, qt.stem
+ORDER BY order_num`, examID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ai: GetExamInsightData: per-question stats: %w", err)
+	}
+	defer rows.Close()
+
+	var qStats []InsightQuestionStat
+	for rows.Next() {
+		var row insightQuestionRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, fmt.Errorf("ai: GetExamInsightData: scan question row: %w", err)
+		}
+		stat := InsightQuestionStat{
+			OrderNum: row.OrderNum,
+			Stem:     row.Stem,
+		}
+		if row.CorrectRate != nil {
+			stat.CorrectRate = *row.CorrectRate
+		}
+		if row.AvgTimeSecs != nil {
+			stat.AvgTimeSecs = int(*row.AvgTimeSecs)
+		}
+		qStats = append(qStats, stat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ai: GetExamInsightData: iterate question rows: %w", err)
+	}
+
+	data := &ExamInsightData{
+		ExamTitle:       header.Title,
+		PassingScorePct: header.PassingScorePct,
+		TotalAttempts:   summary.TotalAttempts,
+		QuestionStats:   qStats,
+	}
+	if summary.PassRate != nil {
+		data.PassRate = *summary.PassRate
+	}
+	if summary.AvgScorePct != nil {
+		data.AvgScorePct = *summary.AvgScorePct
+	}
+	if summary.AvgCompletionSecs != nil {
+		data.AvgCompletionSecs = int(*summary.AvgCompletionSecs)
+	}
+
+	return data, nil
+}
+

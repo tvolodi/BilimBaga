@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -27,7 +27,37 @@ export interface GenerateQuestionsResponse {
   questions: DraftQuestion[]
 }
 
-// ---- API client -------------------------------------------------------------
+// ── FR-BB74: Performance Insight Summaries ────────────────────────────────────
+
+export interface AIInsightsResponse {
+  insights: string[]
+  generated_at: string
+  cached: boolean
+}
+
+// ---- API helpers -------------------------------------------------------------
+
+interface ApiResponse<T> {
+  data: T
+  error: null | { code: string; message: string }
+}
+
+async function apiGet<T>(url: string, token?: string | null): Promise<T> {
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
+  })
+  const body: ApiResponse<T> = await res.json()
+  if (body.error) {
+    const err = new Error(body.error.message) as Error & { code: string }
+    err.code = body.error.code
+    throw err
+  }
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+  return body.data
+}
+
+// ---- API client functions ----------------------------------------------------
 
 async function generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
   const response = await fetch('/api/v1/admin/ai/generate-questions', {
@@ -50,10 +80,29 @@ async function generateQuestions(req: GenerateQuestionsRequest): Promise<Generat
   return json.data as GenerateQuestionsResponse
 }
 
-// ---- React Query hooks ------------------------------------------------------
+export function fetchAIInsights(examId: string, refresh = false): Promise<AIInsightsResponse> {
+  const url = `/api/v1/admin/ai/insights/${examId}${refresh ? '?refresh=true' : ''}`
+  return apiGet<AIInsightsResponse>(url)
+}
+
+// ---- React Query hooks -------------------------------------------------------
 
 export function useGenerateQuestions() {
   return useMutation<GenerateQuestionsResponse, Error & { code?: string }, GenerateQuestionsRequest>({
     mutationFn: generateQuestions,
+  })
+}
+
+export function useAIInsights(examId: string, refresh = false) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+  return useQuery<AIInsightsResponse, Error>({
+    queryKey: ['ai-insights', examId, refresh],
+    queryFn: () => {
+      const url = `/api/v1/admin/ai/insights/${examId}${refresh ? '?refresh=true' : ''}`
+      return apiGet<AIInsightsResponse>(url, token)
+    },
+    staleTime: 0,
+    enabled: !!examId,
   })
 }

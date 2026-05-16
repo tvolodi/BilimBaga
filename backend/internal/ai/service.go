@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 )
 
 const (
 	featureQuestionGeneration = "question_generation"
+	featureExamInsights       = "exam_insights"
 	rateLimit                 = 20
+	insightCacheTTL           = 24 * time.Hour
 )
 
 // validDifficulties lists the accepted values for the difficulty field.
@@ -25,6 +28,10 @@ type Service interface {
 	// GenerateQuestions generates draft questions using the Anthropic API.
 	// It validates inputs, enforces rate limits, calls the AI, logs usage, and returns drafts.
 	GenerateQuestions(ctx context.Context, userID string, req GenerateQuestionsRequest) ([]DraftQuestion, error)
+
+	// GetInsights returns AI-generated performance insights for the given exam.
+	// Results are cached for 24 hours; forceRefresh bypasses the cache.
+	GetInsights(ctx context.Context, examID, tenantID, userID string, forceRefresh bool) (*InsightResult, error)
 }
 
 type aiService struct {
@@ -127,4 +134,77 @@ func (s *aiService) validateRequest(req GenerateQuestionsRequest) error {
 		return fmt.Errorf("%w: category_id is required", ErrValidation)
 	}
 	return nil
+}
+
+// GetInsights implements Service.
+// AC-3: Cache hit within 24 h → return cached, no Anthropic call.
+// AC-4: forceRefresh=true → call Anthropic regardless, upsert cache.
+// AC-6: Anthropic error → ErrAIUnavailable (no stale-cache fallback).
+// AC-8: Every Anthropic call is logged in ai_usage_log with feature="exam_insights".
+func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID string, forceRefresh bool) (*InsightResult, error) {
+	// AC-3: Check cache first when not forcing refresh.
+	if !forceRefresh {
+		cached, err := s.repo.GetInsightCache(ctx, examID)
+		if err != nil {
+			s.logger.Warn("insight cache read failed", "exam_id", examID, "error", err)
+			// Non-fatal: fall through to generate fresh.
+		}
+		if cached != nil && time.Since(cached.GeneratedAt) < insightCacheTTL {
+			return cached, nil
+		}
+	}
+
+	// Gather anonymised analytics data (AC-5: no PII).
+	data, err := s.repo.GetExamInsightData(ctx, examID, tenantID)
+	if err != nil {
+		if errors.Is(err, ErrExamNotFound) {
+			return nil, ErrExamNotFound
+		}
+		return nil, fmt.Errorf("ai: GetInsights: gather data: %w", err)
+	}
+
+	// Build prompt.
+	prompt, err := BuildInsightPrompt(*data)
+	if err != nil {
+		return nil, fmt.Errorf("ai: GetInsights: build prompt: %w", err)
+	}
+
+	// Call Anthropic.
+	text, tokensUsed, err := s.client.GenerateText(ctx, prompt, s.model)
+	if err != nil {
+		s.logger.Warn("anthropic call failed for insights", "exam_id", examID, "error", err)
+		return nil, ErrAIUnavailable
+	}
+
+	// Parse the JSON array of insight strings.
+	var insights []string
+	if parseErr := json.Unmarshal([]byte(text), &insights); parseErr != nil {
+		s.logger.Warn("failed to parse insight response", "raw", text, "error", parseErr)
+		return nil, ErrAIUnavailable
+	}
+	if len(insights) < 3 || len(insights) > 5 {
+		s.logger.Warn("insight count out of expected range", "count", len(insights), "exam_id", examID)
+		// Partial results are acceptable per spec — do not reject.
+	}
+
+	// AC-8: Log usage before writing cache.
+	if logErr := s.repo.LogUsage(ctx, UsageLog{
+		UserID:     userID,
+		Feature:    featureExamInsights,
+		TokensUsed: tokensUsed,
+		Model:      s.model,
+	}); logErr != nil {
+		s.logger.Error("failed to log insight usage", "error", logErr)
+	}
+
+	// Upsert cache.
+	if cacheErr := s.repo.UpsertInsightCache(ctx, examID, userID, insights); cacheErr != nil {
+		s.logger.Error("failed to upsert insight cache", "exam_id", examID, "error", cacheErr)
+	}
+
+	return &InsightResult{
+		Insights:    insights,
+		GeneratedAt: time.Now().UTC(),
+		Cached:      false,
+	}, nil
 }

@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useExamAnalytics } from '@/api/analytics'
+import { useAIInsights } from '@/api/ai'
 import { useTenantConfig } from '@/api/useTenantConfig'
 import { RequireRole } from '@/components/RequireRole'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ScoreDistributionChart } from '@/components/analytics/ScoreDistributionChart'
 import { PassRateChart } from '@/components/analytics/PassRateChart'
 import { StatsSummaryRow } from '@/components/analytics/StatsSummaryRow'
@@ -27,6 +30,84 @@ function sortQuestions(
     const bv = b[col] ?? 0
     return dir === 'asc' ? av - bv : bv - av
   })
+}
+
+function formatDate(iso: string, locale: string): string {
+  try {
+    return new Date(iso).toLocaleString(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+  } catch {
+    return iso
+  }
+}
+
+export function AIInsightsCard({ examId }: { examId: string }) {
+  const { t, i18n } = useTranslation()
+  const [refresh, setRefresh] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const { data, isLoading, isError, refetch } = useAIInsights(examId, refresh)
+
+  const handleRegenerate = () => {
+    setRefresh(true)
+    refetch().finally(() => setRefresh(false))
+  }
+
+  return (
+    <Card data-testid="ai-insights-card">
+      <CardHeader className="flex flex-row items-center justify-between py-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold">{t('exam_analytics.aiInsightsTitle')}</h2>
+          <Badge variant="outline" className="text-xs">{t('common.aiGenerated')}</Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          {data && (
+            <span className="text-xs text-muted-foreground">
+              {t('exam_analytics.generatedAt', { date: formatDate(data.generated_at, i18n.language) })}
+              {data.cached && ` · ${t('exam_analytics.cached')}`}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRegenerate}
+            disabled={isLoading}
+          >
+            {t('exam_analytics.regenerate')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={t('common.toggleExpand')}
+            aria-expanded={open}
+          >
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+
+      {open && (
+        <CardContent>
+          {isLoading && <Skeleton className="h-20 w-full" data-testid="ai-insights-skeleton" />}
+          {isError && (
+            <p className="text-destructive text-sm" data-testid="ai-insights-error">
+              {t('errors.aiUnavailable')}
+            </p>
+          )}
+          {data && !isLoading && (
+            <ul className="list-disc list-inside space-y-1" data-testid="ai-insights-list">
+              {data.insights.map((insight, i) => (
+                <li key={i} className="text-sm">{insight}</li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  )
 }
 
 function PageSkeleton() {
@@ -156,6 +237,9 @@ function ExamAnalyticsContent({ examId }: { examId: string }) {
       <div className="flex justify-end">
         <ExportCSVButton examId={examId} />
       </div>
+
+      {/* AI Insights (FR-BB74) */}
+      <AIInsightsCard examId={examId} />
     </div>
   )
 }

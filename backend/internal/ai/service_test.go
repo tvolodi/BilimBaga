@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 )
 
 // ---- Manual mocks -----------------------------------------------------------
@@ -18,6 +19,14 @@ type mockRepository struct {
 	lastLog         UsageLog
 	categoryName    string
 	categoryNameErr error
+
+	// Insight cache fields.
+	insightCache      *InsightResult
+	insightCacheErr   error
+	upsertCalled      bool
+	upsertErr         error
+	examInsightData   *ExamInsightData
+	examInsightErr    error
 }
 
 func (m *mockRepository) CountAIUsageLastHour(_ context.Context, _, _ string) (int, error) {
@@ -32,6 +41,19 @@ func (m *mockRepository) LogUsage(_ context.Context, log UsageLog) error {
 
 func (m *mockRepository) GetCategoryName(_ context.Context, _ string) (string, error) {
 	return m.categoryName, m.categoryNameErr
+}
+
+func (m *mockRepository) GetInsightCache(_ context.Context, _ string) (*InsightResult, error) {
+	return m.insightCache, m.insightCacheErr
+}
+
+func (m *mockRepository) UpsertInsightCache(_ context.Context, _, _ string, _ []string) error {
+	m.upsertCalled = true
+	return m.upsertErr
+}
+
+func (m *mockRepository) GetExamInsightData(_ context.Context, _, _ string) (*ExamInsightData, error) {
+	return m.examInsightData, m.examInsightErr
 }
 
 type mockClient struct {
@@ -232,3 +254,131 @@ func TestGenerateQuestions_Validation_NoCategoryID(t *testing.T) {
 		t.Errorf("expected ErrValidation for missing category_id, got %v", err)
 	}
 }
+
+// ── FR-BB74: GetInsights tests ─────────────────────────────────────────────
+
+var sampleExamData = &ExamInsightData{
+	ExamTitle:         "Safety Exam",
+	TotalAttempts:     50,
+	PassRate:          0.68,
+	AvgScorePct:       0.72,
+	AvgCompletionSecs: 1800,
+	PassingScorePct:   75,
+	QuestionStats: []InsightQuestionStat{
+		{OrderNum: 1, Stem: "What is fire safety?", CorrectRate: 0.9, AvgTimeSecs: 30},
+	},
+}
+
+const validInsightJSON = `["Insight one.", "Insight two.", "Insight three."]`
+
+// AC-3: cache hit within 24 h → return cached, no Anthropic call.
+func TestGetInsights_CacheHit_NoChatCall(t *testing.T) {
+	freshCache := &InsightResult{
+		Insights:    []string{"Cached insight."},
+		GeneratedAt: time.Now().UTC().Add(-1 * time.Hour), // 1 h old — within 24 h
+		Cached:      true,
+	}
+	repo := &mockRepository{
+		insightCache: freshCache,
+	}
+	client := &mockClient{} // must not be called
+	svc := NewService(repo, client, "model", newLogger())
+
+	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	if err != nil {
+		t.Fatalf("expected no error on cache hit, got: %v", err)
+	}
+	if !result.Cached {
+		t.Error("expected Cached=true for cache hit")
+	}
+	if client.text != "" {
+		t.Error("Anthropic client should not have been called on cache hit")
+	}
+}
+
+// AC-4: force refresh bypasses fresh cache and calls Anthropic.
+func TestGetInsights_ForceRefresh_BypassesFreshCache(t *testing.T) {
+	freshCache := &InsightResult{
+		Insights:    []string{"Old insight."},
+		GeneratedAt: time.Now().UTC().Add(-30 * time.Minute),
+		Cached:      true,
+	}
+	repo := &mockRepository{
+		insightCache:    freshCache,
+		examInsightData: sampleExamData,
+	}
+	client := &mockClient{text: validInsightJSON, tokens: 100}
+	svc := NewService(repo, client, "model", newLogger())
+
+	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Cached {
+		t.Error("expected Cached=false for force refresh")
+	}
+	if !repo.logCalled {
+		t.Error("expected LogUsage to be called for force refresh")
+	}
+	if repo.lastLog.Feature != featureExamInsights {
+		t.Errorf("expected feature %q, got %q", featureExamInsights, repo.lastLog.Feature)
+	}
+	if !repo.upsertCalled {
+		t.Error("expected UpsertInsightCache to be called")
+	}
+}
+
+// Cache miss → Anthropic called → result returned.
+func TestGetInsights_CacheMiss_CallsAnthropic(t *testing.T) {
+	repo := &mockRepository{
+		insightCache:    nil, // cache miss
+		examInsightData: sampleExamData,
+	}
+	client := &mockClient{text: validInsightJSON, tokens: 200}
+	svc := NewService(repo, client, "model", newLogger())
+
+	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Cached {
+		t.Error("expected Cached=false for cache miss")
+	}
+	if len(result.Insights) != 3 {
+		t.Errorf("expected 3 insights, got %d", len(result.Insights))
+	}
+	if !repo.upsertCalled {
+		t.Error("expected UpsertInsightCache to be called after fresh generation")
+	}
+}
+
+// AC-6: Anthropic error → ErrAIUnavailable; no stale-cache fallback.
+func TestGetInsights_AnthropicError_ReturnsUnavailable(t *testing.T) {
+	repo := &mockRepository{
+		insightCache:    nil,
+		examInsightData: sampleExamData,
+	}
+	client := &mockClient{err: ErrAIUnavailable}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	if !errors.Is(err, ErrAIUnavailable) {
+		t.Errorf("expected ErrAIUnavailable, got %v", err)
+	}
+}
+
+// AC-2: exam not found → ErrExamNotFound.
+func TestGetInsights_ExamNotFound(t *testing.T) {
+	repo := &mockRepository{
+		insightCache:   nil,
+		examInsightErr: ErrExamNotFound,
+	}
+	client := &mockClient{}
+	svc := NewService(repo, client, "model", newLogger())
+
+	_, err := svc.GetInsights(context.Background(), "bad-exam", "tenant-1", "user-1", false)
+	if !errors.Is(err, ErrExamNotFound) {
+		t.Errorf("expected ErrExamNotFound, got %v", err)
+	}
+}
+

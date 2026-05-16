@@ -20,7 +20,9 @@
     "back": "Go back",
     "rowActions": "Row actions",
     "actions": "Actions",
-    "language": "Language"
+    "language": "Language",
+    "aiGenerated": "AI-generated",
+    "toggleExpand": "Toggle expand"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -711,7 +713,11 @@
     "export_csv": "Export Results CSV",
     "no_data": "No attempts recorded for this exam yet.",
     "answer_distribution": "Answer Distribution",
-    "failed": "Failed"
+    "failed": "Failed",
+    "aiInsightsTitle": "AI Insights",
+    "generatedAt": "Generated {{date}}",
+    "cached": "cached",
+    "regenerate": "Regenerate"
   },
   "exam_list": {
     "col_status": "Status",

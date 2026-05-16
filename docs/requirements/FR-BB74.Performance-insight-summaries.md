@@ -6,27 +6,36 @@
 | ID | FR-BB74 |
 | Phase | 7 — AI Layer |
 | Priority | 2 |
-| Status | Draft |
+| Status | implemented |
 | Depends On | FR-BB52, FR-BB71 |
 
 ## Description
 Allows examiners and admins to request AI-generated natural-language summaries of exam performance data for a specific exam. Anthropic Claude analyses anonymized aggregate statistics from the analytics API and returns 3–5 observation bullets. Results are cached for 24 hours to minimize API costs. A force-refresh option bypasses the cache. The frontend surfaces insights in a collapsible card on the per-exam analytics page.
 
+## Scope
+
+| Layer | Items |
+|-------|-------|
+| Database | New `ai_insight_cache` table (migration `028_ai_insight_cache`) |
+| Backend | `internal/ai/` — handler, service (`insights.go`), repository (`repo.go`), prompt builder (`prompt.go`); router wiring in `internal/router/` |
+| Frontend | `src/pages/admin/ExamAnalytics.tsx` — `AIInsightsCard` component; `src/api/ai.ts` — `fetchAIInsights` wrapper |
+| i18n | `analytics.aiInsightsTitle`, `common.aiGenerated`, `analytics.generatedAt`, `analytics.cached`, `analytics.regenerate`, `common.toggleExpand`, `errors.aiUnavailable` |
+
 ## Acceptance Criteria
-- [ ] AC-1: `GET /api/v1/admin/ai/insights/:examId` returns between 3 and 5 natural-language insight strings derived from the exam's aggregate analytics data; each insight is a complete, actionable observation (e.g. identifying low-performing questions, time-to-complete patterns, pass/fail distribution anomalies).
-- [ ] AC-2: The endpoint requires JWT auth with role ≥ `examiner`; requests from employees return `403 Forbidden`; requests for exams the requester cannot access (wrong tenant) return `404`.
-- [ ] AC-3: Insight results are cached in the `ai_insight_cache` table for 24 hours; a second request within the cache window returns the cached result with `"cached": true` without calling the Anthropic API.
-- [ ] AC-4: Passing `?refresh=true` to the endpoint bypasses the cache, calls the Anthropic API, updates the cache entry, and returns `"cached": false`.
-- [ ] AC-5: The data sent to the Anthropic API contains only aggregate statistics (pass rate, avg score, per-question correct rates, avg completion time) — no employee names, user IDs, or other personally identifying information are included in the prompt.
-- [ ] AC-6: When the Anthropic API is unavailable, the endpoint returns `503` with error code `AI_UNAVAILABLE`; it does not fall back to returning stale cache beyond the 24-hour window.
-- [ ] AC-7: The frontend per-exam analytics page renders an "AI Insights" collapsible card showing the insight bullet list, a `"AI-generated"` label in the card header, a timestamp of when insights were generated, and a "Regenerate" button that calls the endpoint with `?refresh=true`.
-- [ ] AC-8: Every Anthropic API call for this feature is recorded in `ai_usage_log` with `feature = "exam_insights"` and the calling user's ID.
+- [x] AC-1: `GET /api/v1/admin/ai/insights/:examId` returns between 3 and 5 natural-language insight strings derived from the exam's aggregate analytics data; each insight is a complete, actionable observation (e.g. identifying low-performing questions, time-to-complete patterns, pass/fail distribution anomalies).
+- [x] AC-2: The endpoint requires JWT auth with role ≥ `examiner`; requests from employees return `403 Forbidden`; requests for exams the requester cannot access (wrong tenant) return `404`.
+- [x] AC-3: Insight results are cached in the `ai_insight_cache` table for 24 hours; a second request within the cache window returns the cached result with `"cached": true` without calling the Anthropic API.
+- [x] AC-4: Passing `?refresh=true` to the endpoint bypasses the cache, calls the Anthropic API, updates the cache entry, and returns `"cached": false`.
+- [x] AC-5: The data sent to the Anthropic API contains only aggregate statistics (pass rate, avg score, per-question correct rates, avg completion time) — no employee names, user IDs, or other personally identifying information are included in the prompt.
+- [x] AC-6: When the Anthropic API is unavailable, the endpoint returns `503` with error code `AI_UNAVAILABLE`; it does not fall back to returning stale cache beyond the 24-hour window.
+- [x] AC-7: The frontend per-exam analytics page renders an "AI Insights" collapsible card showing the insight bullet list, a `"AI-generated"` label in the card header, a timestamp of when insights were generated, and a "Regenerate" button that calls the endpoint with `?refresh=true`.
+- [x] AC-8: Every Anthropic API call for this feature is recorded in `ai_usage_log` with `feature = "exam_insights"` and the calling user's ID.
 
 ## Technical Specification
 
 ### Configuration / Infrastructure
 
-**New migration** — `migrations/NNN_ai_insight_cache.sql`:
+**New migration** — `migrations/028_ai_insight_cache.up.sql`:
 ```sql
 CREATE TABLE ai_insight_cache (
   exam_id       UUID        PRIMARY KEY REFERENCES exams(id) ON DELETE CASCADE,
@@ -37,6 +46,11 @@ CREATE TABLE ai_insight_cache (
 ```
 
 `insights` column stores a JSON array of strings, e.g. `["Insight 1", "Insight 2", ...]`.
+
+**Down migration** — `migrations/028_ai_insight_cache.down.sql`:
+```sql
+DROP TABLE IF EXISTS ai_insight_cache;
+```
 
 ### API Endpoints
 
@@ -63,9 +77,9 @@ CREATE TABLE ai_insight_cache (
   }
   ```
 - **Error responses**:
-  - `403` — insufficient role
-  - `404` — exam not found or access denied
-  - `503` — `AI_UNAVAILABLE`
+  - `403` — `{ "data": null, "error": { "code": "FORBIDDEN", "message": "insufficient role" } }`
+  - `404` — `{ "data": null, "error": { "code": "EXAM_NOT_FOUND", "message": "exam not found or access denied" } }`
+  - `503` — `{ "data": null, "error": { "code": "AI_UNAVAILABLE", "message": "AI service unavailable" } }`
 
 ### Implementation Details
 
@@ -197,6 +211,19 @@ function AIInsightsCard({ examId }: { examId: string }) {
 ```
 
 The `AIInsightsCard` is rendered below the existing charts on the per-exam analytics page, visible only when the authenticated user has `examiner` or higher role.
+
+## Out of Scope
+- Streaming insight responses
+- Per-department aggregate insights
+- Scheduled or webhook-triggered auto-generation
+- Insight generation for question banks outside an exam context
+
+## Test Strategy
+- **Unit** — Prompt builder tested with a fixed `ExamInsightData` fixture; verify the rendered prompt contains expected statistics and no PII.
+- **Unit** — Cache hit/miss logic tested with a mock repository; verify that requests within 24 hours return cached data and that `?refresh=true` bypasses the cache.
+- **Unit** — Anthropic response parser tested with arrays of 2, 3, 5, and 6 strings; verify boundary logging.
+- **Integration** — `GET /api/v1/admin/ai/insights/:examId` tested with a real DB and mocked Anthropic client; verify 200 (cache miss), 200 (cache hit, `cached: true`), 403 (employee role), 404 (wrong tenant), 503 (Anthropic error).
+- **Frontend** — `AIInsightsCard` component tested for loading skeleton, error state, populated insight list, and "Regenerate" button click triggering a refetch with `?refresh=true`.
 
 ## Notes
 - The 24-hour cache window balances freshness with API cost; if the exam has no new attempts since the last generation, regenerating produces identical insights. The "Regenerate" UI is provided but discouraged for frequent use — consider adding a tooltip noting insights are cached for 24 hours.

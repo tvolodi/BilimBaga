@@ -28,6 +28,10 @@ func (m *mockService) GenerateQuestions(_ context.Context, _ string, _ GenerateQ
 	return m.questions, m.err
 }
 
+func (m *mockService) GetInsights(_ context.Context, _, _, _ string, _ bool) (*InsightResult, error) {
+	return nil, ErrAIUnavailable
+}
+
 // ---- Helpers ----------------------------------------------------------------
 
 func makeRequest(t *testing.T, body interface{}, userID string) *http.Request {

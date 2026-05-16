@@ -20,7 +20,9 @@
     "back": "Артқа",
     "rowActions": "Жолдың әрекеттері",
     "actions": "Әрекеттер",
-    "language": "Тіл"
+    "language": "Тіл",
+    "aiGenerated": "ЖИ жасады",
+    "toggleExpand": "Жаю/жию"
   },
   "nav": {
     "dashboard": "Басты бет",
@@ -711,7 +713,11 @@
     "export_csv": "CSV-ге экспорт",
     "no_data": "Бұл емтихан бойынша әрекеттер жоқ.",
     "answer_distribution": "Жауап таралуы",
-    "failed": "Сәтсіз"
+    "failed": "Сәтсіз",
+    "aiInsightsTitle": "AI-түсінік",
+    "generatedAt": "{{date}} жасалды",
+    "cached": "кэштен",
+    "regenerate": "Жаңарту"
   },
   "exam_list": {
     "col_status": "Күй",

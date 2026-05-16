@@ -20,7 +20,9 @@
     "back": "Назад",
     "rowActions": "Действия со строкой",
     "actions": "Действия",
-    "language": "Язык"
+    "language": "Язык",
+    "aiGenerated": "Создано ИИ",
+    "toggleExpand": "Развернуть/свернуть"
   },
   "nav": {
     "dashboard": "Главная",
@@ -711,7 +713,11 @@
     "export_csv": "Экспорт результатов CSV",
     "no_data": "Попыток для этого экзамена пока нет.",
     "answer_distribution": "Распределение ответов",
-    "failed": "Не сдали"
+    "failed": "Не сдали",
+    "aiInsightsTitle": "AI-аналитика",
+    "generatedAt": "Создано {{date}}",
+    "cached": "из кэша",
+    "regenerate": "Обновить"
   },
   "exam_list": {
     "col_status": "Статус",

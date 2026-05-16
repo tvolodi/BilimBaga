@@ -283,6 +283,10 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			// AI question generation (FR-BB71) — examiner+ only.
 			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
 				Post("/admin/ai/generate-questions", aiHandler.HandleGenerateQuestions)
+
+			// AI performance insight summaries (FR-BB74) — examiner+ only.
+			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+				Get("/admin/ai/insights/{examId}", aiHandler.HandleGetInsights)
 		})
 	})
 

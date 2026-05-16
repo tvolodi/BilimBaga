@@ -18,6 +18,7 @@
     "categories": "Санаттар",
     "exams": "Емтихандар",
     "reports": "Есептер",
+    "audit": "Аудит журналы",
     "settings": "Параметрлер",
     "tags": "Тегтер"
   },
@@ -624,6 +625,26 @@
       "passed": "Тапсырылды",
       "failed": "Тапсырылмады"
     }  },
+  "audit": {
+    "title": "Аудит журналы",
+    "filter_from": "Бастап",
+    "filter_to": "Дейін",
+    "filter_actor": "Орындаушы аты",
+    "filter_action": "Әрекет",
+    "filter_entity": "Нысан түрі",
+    "filter_clear": "Сүзгілерді тазалау",
+    "col_timestamp": "Уақыт",
+    "col_actor": "Орындаушы",
+    "col_action": "Әрекет",
+    "col_entity_type": "Нысан түрі",
+    "col_entity_id": "Нысан ID",
+    "col_ip": "IP мекенжайы",
+    "expand": "Метадеректерді көрсету",
+    "collapse": "Метадеректерді жасыру",
+    "export_csv": "CSV-ге экспорт",
+    "exporting": "Экспортталуда...",
+    "pagination_info": "{{total}} жазбаның {{from}}–{{to}} көрсетілген"
+  },
   "grading": {
     "queue_title": "Қолмен бағалау кезегі",
     "col_session": "Сессия",

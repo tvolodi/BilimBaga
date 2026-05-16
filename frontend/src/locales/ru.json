@@ -18,6 +18,7 @@
     "categories": "Категории",
     "exams": "Экзамены",
     "reports": "Отчёты",
+    "audit": "Журнал аудита",
     "settings": "Настройки",
     "tags": "Теги"
   },
@@ -622,6 +623,26 @@
       "passed": "Сдан",
       "failed": "Не сдан"
     }  },
+  "audit": {
+    "title": "Журнал аудита",
+    "filter_from": "С",
+    "filter_to": "По",
+    "filter_actor": "Имя исполнителя",
+    "filter_action": "Действие",
+    "filter_entity": "Тип объекта",
+    "filter_clear": "Сбросить фильтры",
+    "col_timestamp": "Время",
+    "col_actor": "Исполнитель",
+    "col_action": "Действие",
+    "col_entity_type": "Тип объекта",
+    "col_entity_id": "ID объекта",
+    "col_ip": "IP-адрес",
+    "expand": "Показать метаданные",
+    "collapse": "Скрыть метаданные",
+    "export_csv": "Экспорт в CSV",
+    "exporting": "Экспортируется...",
+    "pagination_info": "Показано {{from}}–{{to}} из {{total}} записей"
+  },
   "grading": {
     "queue_title": "Очередь ручного оценивания",
     "col_session": "Сессия",

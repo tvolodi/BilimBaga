@@ -10,6 +10,7 @@ import (
 
 // ListAudit returns paginated audit entries scoped to tenantID.
 // tenantID is ALWAYS the first WHERE clause — cross-tenant reads are impossible.
+// The users table is LEFT JOINed to populate actor_name for display.
 func ListAudit(
 	ctx context.Context,
 	db *sqlx.DB,
@@ -18,46 +19,52 @@ func ListAudit(
 	page, perPage int,
 ) ([]AuditEntry, int, error) {
 	args := []any{tenantID}
-	where := []string{"tenant_id = $1"}
+	where := []string{"al.tenant_id = $1"}
 	idx := 2
 
 	if filters.ActorID != nil {
-		where = append(where, fmt.Sprintf("actor_id = $%d", idx))
+		where = append(where, fmt.Sprintf("al.actor_id = $%d", idx))
 		args = append(args, *filters.ActorID)
 		idx++
 	}
+	if filters.Actor != nil {
+		where = append(where, fmt.Sprintf("u.full_name ILIKE $%d", idx))
+		args = append(args, "%"+*filters.Actor+"%")
+		idx++
+	}
 	if filters.Action != nil {
-		where = append(where, fmt.Sprintf("action = $%d", idx))
+		where = append(where, fmt.Sprintf("al.action = $%d", idx))
 		args = append(args, *filters.Action)
 		idx++
 	}
 	if filters.EntityType != nil {
-		where = append(where, fmt.Sprintf("entity_type = $%d", idx))
+		where = append(where, fmt.Sprintf("al.entity_type = $%d", idx))
 		args = append(args, *filters.EntityType)
 		idx++
 	}
 	if filters.From != nil {
-		where = append(where, fmt.Sprintf("created_at >= $%d", idx))
+		where = append(where, fmt.Sprintf("al.created_at >= $%d", idx))
 		args = append(args, *filters.From)
 		idx++
 	}
 	if filters.To != nil {
-		where = append(where, fmt.Sprintf("created_at <= $%d", idx))
+		where = append(where, fmt.Sprintf("al.created_at <= $%d", idx))
 		args = append(args, *filters.To)
 		idx++
 	}
 
-	base := "FROM audit_log WHERE " + strings.Join(where, " AND ")
+	join := "FROM audit_log al LEFT JOIN users u ON u.id = al.actor_id WHERE " + strings.Join(where, " AND ")
 
 	var total int
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) "+base, args...).Scan(&total); err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) "+join, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("audit list count: %w", err)
 	}
 
 	offset := (page - 1) * perPage
 	query := fmt.Sprintf(
-		"SELECT id, tenant_id, actor_id, action, entity_type, entity_id, ip, metadata, created_at "+
-			base+" ORDER BY created_at DESC LIMIT $%d OFFSET $%d",
+		"SELECT al.id, al.tenant_id, al.actor_id, u.full_name AS actor_name, al.action, "+
+			"al.entity_type, al.entity_id, al.ip, al.metadata, al.created_at "+
+			join+" ORDER BY al.created_at DESC LIMIT $%d OFFSET $%d",
 		idx, idx+1,
 	)
 	args = append(args, perPage, offset)

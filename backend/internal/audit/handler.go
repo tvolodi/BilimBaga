@@ -2,6 +2,7 @@ package audit
 
 import (
 	"encoding/csv"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -55,7 +56,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Export handles GET /api/v1/audit/export.
-// Returns the filtered audit log as a CSV file.
+// Returns the filtered audit log as a CSV file with columns matching AC-8:
+// timestamp, actor_id, actor_name, action, entity_type, entity_id, ip_address, metadata_json.
 func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 	tenantID := ctxkeys.TenantIDFromCtx(r.Context())
 	if tenantID == "" {
@@ -71,17 +73,22 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", `attachment; filename="audit_export.csv"`)
+	filename := fmt.Sprintf("audit-%s.csv", time.Now().UTC().Format("20060102"))
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.WriteHeader(http.StatusOK)
 
 	csvWriter := csv.NewWriter(w)
-	_ = csvWriter.Write([]string{"id", "actor_id", "action", "entity_type", "entity_id", "ip", "metadata", "created_at"})
+	_ = csvWriter.Write([]string{"timestamp", "actor_id", "actor_name", "action", "entity_type", "entity_id", "ip_address", "metadata_json"})
 
 	for _, e := range entries {
 		actorID := ""
 		if e.ActorID != nil {
 			actorID = *e.ActorID
+		}
+		actorName := ""
+		if e.ActorName != nil {
+			actorName = *e.ActorName
 		}
 		entityType := ""
 		if e.EntityType != nil {
@@ -91,19 +98,23 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 		if e.EntityID != nil {
 			entityID = *e.EntityID
 		}
+		ip := ""
+		if e.IP != nil {
+			ip = *e.IP
+		}
 		metadata := ""
 		if e.Metadata != nil {
 			metadata = string(e.Metadata)
 		}
 		_ = csvWriter.Write([]string{
-			e.ID,
+			e.CreatedAt.UTC().Format(time.RFC3339),
 			actorID,
+			actorName,
 			e.Action,
 			entityType,
 			entityID,
-			e.IP,
+			ip,
 			metadata,
-			e.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 	csvWriter.Flush()
@@ -111,10 +122,15 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 
 // parseFilters reads the allowed query params from r and populates AuditFilters.
 // Only explicitly allowlisted params are mapped — free-form WHERE injection is not possible.
+// The "actor" param is a free-text partial match on actor full_name (ILIKE).
+// The "actor_id" param is an exact UUID match.
 func parseFilters(r *http.Request) AuditFilters {
 	var f AuditFilters
 	if v := r.URL.Query().Get("actor_id"); v != "" {
 		f.ActorID = &v
+	}
+	if v := r.URL.Query().Get("actor"); v != "" {
+		f.Actor = &v
 	}
 	if v := r.URL.Query().Get("action"); v != "" {
 		f.Action = &v

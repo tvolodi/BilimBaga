@@ -24,6 +24,7 @@ import { ExamTakingPage } from '@/pages/ExamTaking'
 import { ResultPage } from '@/pages/ResultPage'
 import { GradingQueuePage } from '@/pages/admin/GradingQueuePage'
 import { GradingDetailPage } from '@/pages/admin/GradingDetailPage'
+import { AuditLogPage } from '@/pages/admin/AuditLogPage'
 
 const queryClient = new QueryClient()
 
@@ -130,6 +131,14 @@ function AppRoutes() {
           element={
             <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
               <GradingDetailPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="audit"
+          element={
+            <RequireRole roles={['super_admin', 'hr_admin', 'examiner']}>
+              <AuditLogPage />
             </RequireRole>
           }
         />

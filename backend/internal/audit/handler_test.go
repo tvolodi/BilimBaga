@@ -86,10 +86,12 @@ func TestHandler_List_MissingTenant_Returns401(t *testing.T) {
 
 func TestHandler_Export_ReturnsCsv(t *testing.T) {
 	actorID := "aaaaaaaa-0000-4000-8000-000000000002"
+	actorName := "Test User"
 	entry := audit.AuditEntry{
 		ID:        "aaaaaaaa-0000-4000-8000-000000000003",
 		TenantID:  "public",
 		ActorID:   &actorID,
+		ActorName: &actorName,
 		Action:    "user.create",
 		CreatedAt: time.Now().UTC(),
 	}
@@ -108,12 +110,16 @@ func TestHandler_Export_ReturnsCsv(t *testing.T) {
 	h.Export(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "text/csv", w.Header().Get("Content-Type"))
-	assert.Contains(t, w.Header().Get("Content-Disposition"), "audit_export.csv")
-	// CSV body should contain at least the header row and the entry row.
+	assert.Contains(t, w.Header().Get("Content-Type"), "text/csv")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "audit-")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), ".csv")
+	// CSV body should contain the AC-8 header columns and entry data.
 	body := w.Body.String()
-	assert.Contains(t, body, "id")
-	assert.Contains(t, body, entry.ID)
+	assert.Contains(t, body, "timestamp")
+	assert.Contains(t, body, "actor_name")
+	assert.Contains(t, body, "metadata_json")
+	assert.Contains(t, body, entry.Action)
+	assert.Contains(t, body, actorName)
 }
 
 func TestHandler_Export_MissingTenant_Returns401(t *testing.T) {

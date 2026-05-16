@@ -18,6 +18,7 @@
     "categories": "Categories",
     "exams": "Exams",
     "reports": "Reports",
+    "audit": "Audit Log",
     "settings": "Settings",
     "tags": "Tags"
   },
@@ -624,6 +625,26 @@
       "passed": "Passed",
       "failed": "Failed"
     }  },
+  "audit": {
+    "title": "Audit Log",
+    "filter_from": "From",
+    "filter_to": "To",
+    "filter_actor": "Actor name",
+    "filter_action": "Action",
+    "filter_entity": "Entity Type",
+    "filter_clear": "Clear Filters",
+    "col_timestamp": "Timestamp",
+    "col_actor": "Actor",
+    "col_action": "Action",
+    "col_entity_type": "Entity Type",
+    "col_entity_id": "Entity ID",
+    "col_ip": "IP Address",
+    "expand": "Show metadata",
+    "collapse": "Hide metadata",
+    "export_csv": "Export to CSV",
+    "exporting": "Exporting...",
+    "pagination_info": "Showing {{from}}–{{to}} of {{total}} entries"
+  },
   "grading": {
     "queue_title": "Manual Grading Queue",
     "col_session": "Session",

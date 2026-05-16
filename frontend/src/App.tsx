@@ -26,6 +26,8 @@ import { GradingQueuePage } from '@/pages/admin/GradingQueuePage'
 import { GradingDetailPage } from '@/pages/admin/GradingDetailPage'
 import { AuditLogPage } from '@/pages/admin/AuditLogPage'
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
+import { ExamsListPage } from '@/pages/admin/ExamsListPage'
+import { ExamAnalyticsPage } from '@/pages/admin/ExamAnalyticsPage'
 
 const queryClient = new QueryClient()
 
@@ -104,6 +106,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="exams"
+          element={
+            <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
+              <ExamsListPage />
+            </RequireRole>
+          }
+        />
+        <Route
           path="exams/new"
           element={
             <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
@@ -118,6 +128,10 @@ function AppRoutes() {
               <ExamWizardEditPage />
             </RequireRole>
           }
+        />
+        <Route
+          path="exams/:examId/analytics"
+          element={<ExamAnalyticsPage />}
         />
         <Route
           path="settings/branding"

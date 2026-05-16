@@ -6,7 +6,7 @@
 | ID | FR-BB57 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 2 |
-| Status | Draft |
+| Status | implemented |
 | Depends On | FR-BB52 |
 
 ## Description

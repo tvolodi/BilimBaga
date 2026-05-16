@@ -667,6 +667,31 @@
     "activity_empty": "No recent activity.",
     "refresh": "Refresh"
   },
+  "exam_analytics": {
+    "title": "Exam Analytics",
+    "score_distribution": "Score Distribution",
+    "pass_rate": "Pass Rate",
+    "avg_score": "Average Score",
+    "median_score": "Median Score",
+    "total_attempts": "Total Attempts",
+    "unique_participants": "Unique Participants",
+    "question_difficulty": "Question Analysis",
+    "col_number": "#",
+    "col_question": "Question",
+    "col_correct_rate": "Correct Rate",
+    "col_avg_time": "Avg Time (s)",
+    "badge_revise": "Consider Revising",
+    "badge_remove": "Consider Removing",
+    "export_csv": "Export Results CSV",
+    "no_data": "No attempts recorded for this exam yet.",
+    "answer_distribution": "Answer Distribution",
+    "failed": "Failed"
+  },
+  "exam_list": {
+    "col_status": "Status",
+    "col_actions": "Actions",
+    "minutes_format": "{{minutes}} min"
+  },
   "grading": {
     "queue_title": "Manual Grading Queue",
     "col_session": "Session",

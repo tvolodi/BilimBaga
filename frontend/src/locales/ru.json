@@ -665,6 +665,31 @@
     "activity_empty": "Нет последней активности.",
     "refresh": "Обновить"
   },
+  "exam_analytics": {
+    "title": "Аналитика экзамена",
+    "score_distribution": "Распределение баллов",
+    "pass_rate": "Уровень сдачи",
+    "avg_score": "Средний балл",
+    "median_score": "Медианный балл",
+    "total_attempts": "Всего попыток",
+    "unique_participants": "Уникальные участники",
+    "question_difficulty": "Анализ вопросов",
+    "col_number": "#",
+    "col_question": "Вопрос",
+    "col_correct_rate": "Правильные ответы",
+    "col_avg_time": "Ср. время (с)",
+    "badge_revise": "Рекомендуем пересмотреть",
+    "badge_remove": "Рекомендуем удалить",
+    "export_csv": "Экспорт результатов CSV",
+    "no_data": "Попыток для этого экзамена пока нет.",
+    "answer_distribution": "Распределение ответов",
+    "failed": "Не сдали"
+  },
+  "exam_list": {
+    "col_status": "Статус",
+    "col_actions": "Действия",
+    "minutes_format": "{{minutes}} мин"
+  },
   "grading": {
     "queue_title": "Очередь ручного оценивания",
     "col_session": "Сессия",

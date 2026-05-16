@@ -667,6 +667,31 @@
     "activity_empty": "Соңғы белсенділік жоқ.",
     "refresh": "Жаңарту"
   },
+  "exam_analytics": {
+    "title": "Емтихан аналитикасы",
+    "score_distribution": "Балл таралуы",
+    "pass_rate": "Өту деңгейі",
+    "avg_score": "Орташа балл",
+    "median_score": "Медиандық балл",
+    "total_attempts": "Жалпы әрекеттер",
+    "unique_participants": "Бірегей қатысушылар",
+    "question_difficulty": "Сұрақтарды талдау",
+    "col_number": "#",
+    "col_question": "Сұрақ",
+    "col_correct_rate": "Дұрыс жауаптар",
+    "col_avg_time": "Орт. уақыт (с)",
+    "badge_revise": "Қарап шығуды ұсыну",
+    "badge_remove": "Жоюды ұсыну",
+    "export_csv": "CSV-ге экспорт",
+    "no_data": "Бұл емтихан бойынша әрекеттер жоқ.",
+    "answer_distribution": "Жауап таралуы",
+    "failed": "Сәтсіз"
+  },
+  "exam_list": {
+    "col_status": "Күй",
+    "col_actions": "Әрекеттер",
+    "minutes_format": "{{minutes}} мин"
+  },
   "grading": {
     "queue_title": "Қолмен бағалау кезегі",
     "col_session": "Сессия",

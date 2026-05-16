@@ -60,6 +60,8 @@ interface FormState {
   difficulty: Difficulty
   category_id: string
   tag_ids: string[]
+  model_answer: string
+  auto_grade: boolean
   translations: Record<string, { stem: string; explanation: string }>
   answer_options: LocalAnswerOption[]
 }
@@ -102,6 +104,8 @@ function makeEmptyForm(): FormState {
     difficulty: 'medium',
     category_id: '',
     tag_ids: [],
+    model_answer: '',
+    auto_grade: false,
     translations,
     answer_options: [
       {
@@ -148,6 +152,8 @@ function detailToForm(q: QuestionDetail): FormState {
     difficulty: q.difficulty,
     category_id: q.category_id,
     tag_ids: q.tag_ids,
+    model_answer: q.model_answer ?? '',
+    auto_grade: q.auto_grade ?? false,
     translations,
     answer_options,
   }
@@ -714,6 +720,8 @@ export function QuestionEditorPage() {
     return {
       difficulty: f.difficulty,
       category_id: f.category_id,
+      auto_grade: f.auto_grade,
+      model_answer: f.type === 'shorttext' ? (f.model_answer || null) : null,
       translations,
       answer_options: f.answer_options.map((o) => ({
         id: o.id,
@@ -758,6 +766,8 @@ export function QuestionEditorPage() {
         default_locale: defaultLocale,
         stem: form.translations[defaultLocale]?.stem ?? '',
         explanation: form.translations[defaultLocale]?.explanation || undefined,
+        auto_grade: form.type === 'shorttext' ? form.auto_grade : undefined,
+        model_answer: form.type === 'shorttext' ? (form.model_answer || null) : undefined,
         answer_options:
           form.type !== 'shorttext'
             ? form.answer_options.map((o) => ({
@@ -1047,6 +1057,45 @@ export function QuestionEditorPage() {
                   + {t('questionEditor.addOption')}
                 </Button>
               )}
+            </section>
+          )}
+
+          {/* Auto-grading section — shorttext only */}
+          {form.type === 'shorttext' && (
+            <section className="space-y-3">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {t('questionEditor.section.autoGrading')}
+              </h2>
+              <div className="space-y-1.5">
+                <Label htmlFor="model-answer">{t('questionEditor.field.modelAnswer')}</Label>
+                <textarea
+                  id="model-answer"
+                  value={form.model_answer}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    updateFormField('model_answer', val)
+                    // If model answer is cleared, disable auto_grade.
+                    if (!val.trim()) updateFormField('auto_grade', false)
+                  }}
+                  rows={3}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
+                  placeholder={t('questionEditor.field.modelAnswerPlaceholder')}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="auto-grade-toggle"
+                  checked={form.auto_grade}
+                  disabled={!form.model_answer.trim()}
+                  onChange={(e) => updateFormField('auto_grade', e.target.checked)}
+                  className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                />
+                <Label htmlFor="auto-grade-toggle">{t('questionEditor.field.autoGrade')}</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t('questionEditor.field.autoGradeHelp')}
+              </p>
             </section>
           )}
         </div>

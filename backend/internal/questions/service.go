@@ -3,6 +3,7 @@ package questions
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // CreateQuestionInput carries the fields needed to create a new question.
@@ -219,6 +220,19 @@ func (s *service) UpdateQuestion(ctx context.Context, id string, input UpdateQue
 	if err != nil {
 		return nil, fmt.Errorf("questions: UpdateQuestion: %w", err)
 	}
+
+	// Validate auto_grade / model_answer against the immutable question type.
+	if input.AutoGrade || (input.ModelAnswer != nil && strings.TrimSpace(*input.ModelAnswer) != "") {
+		if q.Type != "shorttext" {
+			return nil, fmt.Errorf("questions: UpdateQuestion: %w", ErrInvalidFieldForType)
+		}
+	}
+	if input.AutoGrade && q.Type == "shorttext" {
+		if input.ModelAnswer == nil || strings.TrimSpace(*input.ModelAnswer) == "" {
+			return nil, fmt.Errorf("questions: UpdateQuestion: %w", ErrMissingModelAnswer)
+		}
+	}
+
 	switch q.Status {
 	case "active":
 		newQ, err := s.repo.CreateVersionFull(ctx, id, input)

@@ -393,7 +393,8 @@
     "section": {
       "metadata": "Metadata",
       "translation": "Content",
-      "answerOptions": "Answer Options"
+      "answerOptions": "Answer Options",
+      "autoGrading": "Auto-Grading"
     },
     "field": {
       "type": "Question Type",
@@ -401,9 +402,13 @@
       "category": "Category",
       "tags": "Tags",
       "stem": "Question Stem",
-      "stemPlaceholder": "Enter the question text…",
+      "stemPlaceholder": "Enter the question text\u2026",
       "explanation": "Explanation",
-      "explanationPlaceholder": "Optional explanation shown after the question is answered…"
+      "explanationPlaceholder": "Optional explanation shown after the question is answered\u2026",
+      "modelAnswer": "Model Answer",
+      "modelAnswerPlaceholder": "Enter the expected answer for AI comparison\u2026",
+      "autoGrade": "Enable Auto-Grading",
+      "autoGradeHelp": "AI will score this question automatically. Requires a model answer."
     },
     "category": {
       "placeholder": "Select a category"
@@ -735,6 +740,10 @@
     "success_toast": "All grades submitted. Session has been finalized.",
     "error_toast": "Failed to submit grade for question {{question}}. Please retry.",
     "already_graded": "Already graded",
+    "ai_graded": "AI Graded",
+    "ai_reasoning_label": "AI Reasoning",
+    "ai_reasoning_show": "Show AI reasoning",
+    "ai_reasoning_hide": "Hide AI reasoning",
     "nav": "Manual Grading"
   },
   "employee_record": {

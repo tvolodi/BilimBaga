@@ -32,6 +32,8 @@ type createQuestionReq struct {
 	Difficulty    string                    `json:"difficulty"`
 	Type          string                    `json:"type"`
 	DefaultLocale string                    `json:"default_locale"`
+	AutoGrade     bool                      `json:"auto_grade"`
+	ModelAnswer   *string                   `json:"model_answer"`
 	Translations  map[string]translationReq `json:"translations"`
 	AnswerOptions []answerOptionReq         `json:"answer_options"`
 	TagIDs        []string                  `json:"tag_ids"`
@@ -40,6 +42,8 @@ type createQuestionReq struct {
 type updateQuestionReq struct {
 	CategoryID    string                    `json:"category_id"`
 	Difficulty    string                    `json:"difficulty"`
+	AutoGrade     bool                      `json:"auto_grade"`
+	ModelAnswer   *string                   `json:"model_answer"`
 	Translations  map[string]translationReq `json:"translations"`
 	AnswerOptions []answerOptionReq         `json:"answer_options"`
 	TagIDs        []string                  `json:"tag_ids"`
@@ -134,6 +138,18 @@ func validateCreateRequest(req createQuestionReq) []fieldError {
 					"likert_weight is required for each option in a likert question",
 				})
 			}
+		}
+	}
+
+	// auto_grade / model_answer are only valid for shorttext questions.
+	if req.AutoGrade || (req.ModelAnswer != nil && strings.TrimSpace(*req.ModelAnswer) != "") {
+		if req.Type != "shorttext" {
+			errs = append(errs, fieldError{"auto_grade", "INVALID_FIELD_FOR_TYPE"})
+		}
+	}
+	if req.AutoGrade && req.Type == "shorttext" {
+		if req.ModelAnswer == nil || strings.TrimSpace(*req.ModelAnswer) == "" {
+			errs = append(errs, fieldError{"model_answer", "MISSING_MODEL_ANSWER"})
 		}
 	}
 
@@ -247,6 +263,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Type:          req.Type,
 		DefaultLocale: req.DefaultLocale,
 		CreatedBy:     actorID,
+		AutoGrade:     req.AutoGrade,
+		ModelAnswer:   req.ModelAnswer,
 		Translations:  translations,
 		AnswerOptions: options,
 		TagIDs:        tagIDs,
@@ -318,6 +336,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		CategoryID:    req.CategoryID,
 		Difficulty:    req.Difficulty,
 		UpdatedBy:     actorID,
+		AutoGrade:     req.AutoGrade,
+		ModelAnswer:   req.ModelAnswer,
 		Translations:  translations,
 		AnswerOptions: options,
 		TagIDs:        tagIDs,
@@ -325,6 +345,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, ErrQuestionNotFound) {
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "question not found")
+			return
+		}
+		if errors.Is(err, ErrMissingModelAnswer) {
+			api.WriteError(w, http.StatusBadRequest, "MISSING_MODEL_ANSWER", "model_answer is required when auto_grade is true")
+			return
+		}
+		if errors.Is(err, ErrInvalidFieldForType) {
+			api.WriteError(w, http.StatusBadRequest, "INVALID_FIELD_FOR_TYPE", "auto_grade and model_answer are only valid for shorttext questions")
 			return
 		}
 		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to update question")

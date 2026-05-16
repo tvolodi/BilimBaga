@@ -1,10 +1,14 @@
 package sessions
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math"
+	"strings"
 
+	"github.com/bilimbaga/bilimbaga/internal/ai"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -338,4 +342,242 @@ func gradeLikert(options []gradingOptionRow, selectedIDs []string) (float64, flo
 		score = 1
 	}
 	return score, 1.0, GradingStatusGraded, nil
+}
+
+// ---------------------------------------------------------------------------
+// AIGradingEngine — Anthropic-backed grading for short-text questions
+// ---------------------------------------------------------------------------
+
+// aiGradingQuestionRow extends gradingQuestionRow with auto_grade / model_answer / text_answer.
+type aiGradingQuestionRow struct {
+	QuestionID        string  `db:"question_id"`
+	QuestionType      string  `db:"question_type"`
+	SelectedOptionIDs []byte  `db:"selected_option_ids"`
+	AutoGrade         bool    `db:"auto_grade"`
+	ModelAnswer       *string `db:"model_answer"`
+	TextAnswer        *string `db:"text_answer"`
+}
+
+// aiGradingResult is the JSON shape returned by the LLM for short-text grading.
+type aiGradingResult struct {
+	ScorePct  int    `json:"score_pct"`
+	Reasoning string `json:"reasoning"`
+}
+
+// AIGradingEngine extends DefaultGradingEngine with Anthropic-backed short-text scoring.
+type AIGradingEngine struct {
+	aiClient ai.AnthropicClient
+	model    string
+	db       *sqlx.DB
+	logger   *slog.Logger
+}
+
+// NewAIGradingEngine constructs an AIGradingEngine.
+func NewAIGradingEngine(aiClient ai.AnthropicClient, model string, db *sqlx.DB, logger *slog.Logger) GradingEngine {
+	return &AIGradingEngine{aiClient: aiClient, model: model, db: db, logger: logger}
+}
+
+// Grade runs the full grading cycle, using AI for auto-graded short-text questions.
+func (e *AIGradingEngine) Grade(tx *sqlx.Tx, sessionID string) (float64, bool, error) {
+	// 1. Fetch exam passing score via the session.
+	const examQ = `
+SELECT e.passing_score_pct
+FROM exams e
+JOIN exam_sessions es ON es.exam_id = e.id
+WHERE es.id = $1`
+
+	var exam gradingExamRow
+	if err := tx.QueryRowx(examQ, sessionID).StructScan(&exam); err != nil {
+		return 0, false, fmt.Errorf("aiGradeSession: fetch exam: %w", err)
+	}
+
+	// 2. Fetch all session questions with answers, plus auto_grade / model_answer / text_answer.
+	const questionsQ = `
+SELECT
+    sq.question_id,
+    q.type AS question_type,
+    COALESCE(sa.selected_option_ids, '[]'::jsonb) AS selected_option_ids,
+    q.auto_grade,
+    q.model_answer,
+    sa.text_answer
+FROM session_questions sq
+JOIN questions q ON q.id = sq.question_id
+LEFT JOIN session_answers sa
+    ON sa.session_id = sq.session_id AND sa.question_id = sq.question_id
+WHERE sq.session_id = $1`
+
+	qRows, err := tx.Queryx(questionsQ, sessionID)
+	if err != nil {
+		return 0, false, fmt.Errorf("aiGradeSession: fetch questions: %w", err)
+	}
+	var questions []aiGradingQuestionRow
+	for qRows.Next() {
+		var q aiGradingQuestionRow
+		if err := qRows.StructScan(&q); err != nil {
+			qRows.Close()
+			return 0, false, fmt.Errorf("aiGradeSession: scan question: %w", err)
+		}
+		questions = append(questions, q)
+	}
+	qRows.Close()
+	if err := qRows.Err(); err != nil {
+		return 0, false, fmt.Errorf("aiGradeSession: iterate questions: %w", err)
+	}
+
+	// 3. Grade each question.
+	var totalScore, totalMax float64
+
+	for _, q := range questions {
+		var score, maxScore float64
+		var status GradingStatus
+		var aiReasoning *string
+
+		if q.QuestionType == "shorttext" {
+			score, maxScore, status, aiReasoning = e.gradeShortText(sessionID, q.QuestionID, q.AutoGrade, q.ModelAnswer, q.TextAnswer)
+		} else {
+			// Non-shorttext: use the standard grading helpers.
+			const optionsQ = `
+SELECT id, is_correct, likert_weight, likert_polarity
+FROM answer_options
+WHERE question_id = $1`
+
+			optRows, oErr := tx.Queryx(optionsQ, q.QuestionID)
+			if oErr != nil {
+				return 0, false, fmt.Errorf("aiGradeSession: fetch options for %s: %w", q.QuestionID, oErr)
+			}
+			var options []gradingOptionRow
+			for optRows.Next() {
+				var opt gradingOptionRow
+				if err := optRows.StructScan(&opt); err != nil {
+					optRows.Close()
+					return 0, false, fmt.Errorf("aiGradeSession: scan option for %s: %w", q.QuestionID, err)
+				}
+				options = append(options, opt)
+			}
+			optRows.Close()
+			if err := optRows.Err(); err != nil {
+				return 0, false, fmt.Errorf("aiGradeSession: iterate options for %s: %w", q.QuestionID, err)
+			}
+
+			var selectedIDs []string
+			if len(q.SelectedOptionIDs) > 0 {
+				if err := json.Unmarshal(q.SelectedOptionIDs, &selectedIDs); err != nil {
+					return 0, false, fmt.Errorf("aiGradeSession: parse selected_option_ids for %s: %w", q.QuestionID, err)
+				}
+			}
+
+			score, maxScore, status, err = gradeQuestion(q.QuestionType, options, selectedIDs)
+			if err != nil {
+				return 0, false, fmt.Errorf("aiGradeSession: grade question %s: %w", q.QuestionID, err)
+			}
+		}
+
+		const insertQ = `
+INSERT INTO session_question_scores (session_id, question_id, score, max_score, grading_status, ai_reasoning)
+VALUES ($1, $2, $3, $4, $5, $6)`
+		if _, err := tx.Exec(insertQ, sessionID, q.QuestionID, score, maxScore, string(status), aiReasoning); err != nil {
+			return 0, false, fmt.Errorf("aiGradeSession: insert score for %s: %w", q.QuestionID, err)
+		}
+
+		totalScore += score
+		totalMax += maxScore
+	}
+
+	// 4. Compute aggregate score_pct.
+	var scorePct float64
+	if totalMax > 0 {
+		scorePct = math.Round(totalScore/totalMax*100*100) / 100
+	}
+
+	passed := scorePct >= exam.PassingScorePct
+
+	// 5. Update exam_sessions aggregate.
+	const updateQ = `UPDATE exam_sessions SET score_pct = $2, passed = $3 WHERE id = $1`
+	if _, err := tx.Exec(updateQ, sessionID, scorePct, passed); err != nil {
+		return 0, false, fmt.Errorf("aiGradeSession: update session: %w", err)
+	}
+
+	return scorePct, passed, nil
+}
+
+// gradeShortText calls the LLM to score a short-text answer.
+// Falls back to pending_manual on any error or missing data.
+func (e *AIGradingEngine) gradeShortText(
+	sessionID, questionID string,
+	autoGrade bool,
+	modelAnswer, textAnswer *string,
+) (score, maxScore float64, status GradingStatus, aiReasoning *string) {
+	// Cannot auto-grade without a model answer or employee answer.
+	if !autoGrade || modelAnswer == nil || strings.TrimSpace(*modelAnswer) == "" || textAnswer == nil {
+		return 0.0, 1.0, GradingStatusPendingManual, nil
+	}
+
+	prompt := fmt.Sprintf(`You are an exam grader. Compare the employee's answer to the model answer and provide a score.
+
+Model Answer: %s
+
+Employee's Answer: %s
+
+Respond with ONLY valid JSON in this exact format, no other text:
+{"score_pct": <integer 0-100>, "reasoning": "<brief explanation>"}
+
+Where score_pct is 100 if the answer is fully correct, 0 if completely wrong, and a proportional value in between for partial credit.`,
+		*modelAnswer, *textAnswer)
+
+	text, tokensUsed, err := e.aiClient.GenerateText(context.Background(), prompt, e.model)
+	if err != nil {
+		e.logger.Warn("aiGradeShortText: GenerateText failed",
+			"session_id", sessionID,
+			"question_id", questionID,
+			"error", err,
+		)
+		return 0.0, 1.0, GradingStatusPendingManual, nil
+	}
+
+	// Extract the first JSON object from the response.
+	start := strings.Index(text, "{")
+	end := strings.LastIndex(text, "}")
+	if start == -1 || end == -1 || end < start {
+		e.logger.Error("aiGradeShortText: no JSON object in response",
+			"session_id", sessionID,
+			"question_id", questionID,
+			"response", text,
+		)
+		return 0.0, 1.0, GradingStatusPendingManual, nil
+	}
+
+	var result aiGradingResult
+	if err := json.Unmarshal([]byte(text[start:end+1]), &result); err != nil {
+		e.logger.Error("aiGradeShortText: JSON parse failed",
+			"session_id", sessionID,
+			"question_id", questionID,
+			"error", err,
+			"response", text,
+		)
+		return 0.0, 1.0, GradingStatusPendingManual, nil
+	}
+
+	if result.ScorePct < 0 || result.ScorePct > 100 {
+		e.logger.Error("aiGradeShortText: score_pct out of range",
+			"session_id", sessionID,
+			"question_id", questionID,
+			"score_pct", result.ScorePct,
+		)
+		return 0.0, 1.0, GradingStatusPendingManual, nil
+	}
+
+	e.logAIUsage(context.Background(), "short_text_grading", tokensUsed)
+	reasoning := result.Reasoning
+	return float64(result.ScorePct) / 100.0, 1.0, GradingStatusAIGraded, &reasoning
+}
+
+// logAIUsage records an ai_usage_log entry. Errors are logged but not propagated.
+func (e *AIGradingEngine) logAIUsage(ctx context.Context, feature string, tokensUsed int) {
+	if e.db == nil {
+		return
+	}
+	const q = `INSERT INTO ai_usage_log (user_id, feature, tokens_used, model) VALUES (NULL, $1, $2, $3)`
+	if _, err := e.db.ExecContext(ctx, q, feature, tokensUsed, e.model); err != nil {
+		e.logger.Error("aiGradeShortText: ai_usage_log insert failed", "error", err)
+	}
 }

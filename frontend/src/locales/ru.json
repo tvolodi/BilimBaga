@@ -393,7 +393,8 @@
     "section": {
       "metadata": "Метаданные",
       "translation": "Содержимое",
-      "answerOptions": "Варианты ответов"
+      "answerOptions": "Варианты ответов",
+      "autoGrading": "Автоматическое оценивание"
     },
     "field": {
       "type": "Тип вопроса",
@@ -403,7 +404,11 @@
       "stem": "Текст вопроса",
       "stemPlaceholder": "Введите текст вопроса…",
       "explanation": "Пояснение",
-      "explanationPlaceholder": "Необязательное пояснение, показываемое после ответа…"
+      "explanationPlaceholder": "Необязательное пояснение, показываемое после ответа…",
+      "modelAnswer": "Эталонный ответ",
+      "modelAnswerPlaceholder": "Введите ожидаемый ответ для сравнения С ИИ…",
+      "autoGrade": "Включить автооценивание",
+      "autoGradeHelp": "ИИ автоматически оценит этот вопрос. Требуется эталонный ответ."
     },
     "category": {
       "placeholder": "Выберите категорию"
@@ -735,6 +740,10 @@
     "success_toast": "Все оценки отправлены. Сессия завершена.",
     "error_toast": "Не удалось отправить оценку за вопрос {{question}}. Попробуйте снова.",
     "already_graded": "Уже оценено",
+    "ai_graded": "Оценено ИИ",
+    "ai_reasoning_label": "Обоснование ИИ",
+    "ai_reasoning_show": "Показать обоснование ИИ",
+    "ai_reasoning_hide": "Скрыть обоснование ИИ",
     "nav": "Ручная проверка"
   },
   "employee_record": {

@@ -64,19 +64,19 @@ func NewRepository(db *sqlx.DB) Repository {
 func (r *postgresRepository) Create(ctx context.Context, q *Question) error {
 	const query = `
 		INSERT INTO questions
-			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at)
+			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at)
 		VALUES
-			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, now(), now())
-		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at`
+			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at`
 	return r.db.GetContext(ctx, q, query,
 		q.CategoryID, q.Difficulty, q.Type, q.DefaultLocale,
-		q.Status, q.CreatedBy, q.Version, q.ParentID,
+		q.Status, q.CreatedBy, q.Version, q.ParentID, q.AutoGrade, q.ModelAnswer,
 	)
 }
 
 func (r *postgresRepository) GetByID(ctx context.Context, id string) (*Question, error) {
 	const query = `
-		SELECT id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at
+		SELECT id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at
 		FROM questions WHERE id = $1`
 	var q Question
 	if err := r.db.GetContext(ctx, &q, query, id); err != nil {
@@ -90,7 +90,7 @@ func (r *postgresRepository) GetByID(ctx context.Context, id string) (*Question,
 
 func (r *postgresRepository) ListByCategory(ctx context.Context, categoryID string) ([]*Question, error) {
 	const query = `
-		SELECT id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at
+		SELECT id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at
 		FROM questions WHERE category_id = $1 ORDER BY created_at DESC`
 	var rows []*Question
 	if err := r.db.SelectContext(ctx, &rows, query, categoryID); err != nil {
@@ -105,7 +105,7 @@ func (r *postgresRepository) Update(ctx context.Context, q *Question) error {
 		SET category_id = $1, difficulty = $2, type = $3, default_locale = $4,
 		    status = $5, version = $6, parent_id = $7, updated_at = now()
 		WHERE id = $8
-		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at`
+		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at`
 	if err := r.db.GetContext(ctx, q, query,
 		q.CategoryID, q.Difficulty, q.Type, q.DefaultLocale,
 		q.Status, q.Version, q.ParentID, q.ID,
@@ -140,10 +140,10 @@ func (r *postgresRepository) CreateVersion(ctx context.Context, newQ *Question, 
 	// Insert the new version.
 	const insertQ = `
 		INSERT INTO questions
-			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at)
+			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at)
 		VALUES
-			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, now(), now())
-		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at`
+			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, false, NULL, now(), now())
+		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at`
 	if err = tx.GetContext(ctx, newQ, insertQ,
 		newQ.CategoryID, newQ.Difficulty, newQ.Type, newQ.DefaultLocale,
 		newQ.Status, newQ.CreatedBy, newQ.Version, newQ.ParentID,
@@ -270,16 +270,18 @@ func (r *postgresRepository) CreateFull(ctx context.Context, input CreateQuestio
 		Status:        "draft",
 		CreatedBy:     input.CreatedBy,
 		Version:       1,
+		AutoGrade:     input.AutoGrade,
+		ModelAnswer:   input.ModelAnswer,
 	}
 	const insertQ = `
 		INSERT INTO questions
-			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at)
+			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at)
 		VALUES
-			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, now(), now())
-		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at`
+			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at`
 	if err = tx.GetContext(ctx, q, insertQ,
 		q.CategoryID, q.Difficulty, q.Type, q.DefaultLocale,
-		q.Status, q.CreatedBy, q.Version, q.ParentID,
+		q.Status, q.CreatedBy, q.Version, q.ParentID, q.AutoGrade, q.ModelAnswer,
 	); err != nil {
 		return nil, fmt.Errorf("questions.CreateFull: insert question: %w", err)
 	}
@@ -303,6 +305,8 @@ func (r *postgresRepository) CreateFull(ctx context.Context, input CreateQuestio
 		DefaultLocale:  q.DefaultLocale,
 		Version:        q.Version,
 		ParentID:       q.ParentID,
+		AutoGrade:      q.AutoGrade,
+		ModelAnswer:    q.ModelAnswer,
 		LocaleCoverage: localeCoverage,
 		Translations:   detail.translations,
 		AnswerOptions:  detail.answerOptions,
@@ -328,10 +332,10 @@ func (r *postgresRepository) UpdateInPlace(ctx context.Context, id string, input
 	var q Question
 	const updateQ = `
 		UPDATE questions
-		SET category_id = $1, difficulty = $2, updated_at = now()
-		WHERE id = $3
-		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at`
-	if err = tx.GetContext(ctx, &q, updateQ, input.CategoryID, input.Difficulty, id); err != nil {
+		SET category_id = $1, difficulty = $2, auto_grade = $3, model_answer = $4, updated_at = now()
+		WHERE id = $5
+		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at`
+	if err = tx.GetContext(ctx, &q, updateQ, input.CategoryID, input.Difficulty, input.AutoGrade, input.ModelAnswer, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrQuestionNotFound
 		}
@@ -376,7 +380,7 @@ func (r *postgresRepository) CreateVersionFull(ctx context.Context, previousID s
 	// Lock and read the previous question.
 	var prev Question
 	const lockQ = `
-		SELECT id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at
+		SELECT id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at
 		FROM questions WHERE id = $1 FOR UPDATE`
 	if err = tx.GetContext(ctx, &prev, lockQ, previousID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -400,16 +404,18 @@ func (r *postgresRepository) CreateVersionFull(ctx context.Context, previousID s
 		CreatedBy:     input.UpdatedBy,
 		Version:       prev.Version + 1,
 		ParentID:      &previousID,
+		AutoGrade:     input.AutoGrade,
+		ModelAnswer:   input.ModelAnswer,
 	}
 	const insertQ = `
 		INSERT INTO questions
-			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at)
+			(id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at)
 		VALUES
-			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, now(), now())
-		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, created_at, updated_at`
+			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+		RETURNING id, category_id, difficulty, type, default_locale, status, created_by, version, parent_id, auto_grade, model_answer, created_at, updated_at`
 	if err = tx.GetContext(ctx, newQ, insertQ,
 		newQ.CategoryID, newQ.Difficulty, newQ.Type, newQ.DefaultLocale,
-		newQ.Status, newQ.CreatedBy, newQ.Version, newQ.ParentID,
+		newQ.Status, newQ.CreatedBy, newQ.Version, newQ.ParentID, newQ.AutoGrade, newQ.ModelAnswer,
 	); err != nil {
 		return nil, fmt.Errorf("questions.CreateVersionFull: insert new: %w", err)
 	}
@@ -753,6 +759,8 @@ func (r *postgresRepository) GetWithDetails(ctx context.Context, id string) (*Qu
 		DefaultLocale:  q.DefaultLocale,
 		Version:        q.Version,
 		ParentID:       q.ParentID,
+		AutoGrade:      q.AutoGrade,
+		ModelAnswer:    q.ModelAnswer,
 		LocaleCoverage: localeCoverage,
 		Translations:   translations,
 		AnswerOptions:  answerOptions,

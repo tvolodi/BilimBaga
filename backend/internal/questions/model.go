@@ -7,14 +7,16 @@ import (
 
 // Sentinel errors for the questions domain.
 var (
-	ErrNotFound          = errors.New("not found")
-	ErrQuestionNotFound  = errors.New("question not found")
-	ErrForbidden         = errors.New("forbidden")
-	ErrInvalidInput      = errors.New("invalid input")
-	ErrInvalidTransition = errors.New("invalid status transition")
-	ErrNotDraft          = errors.New("question is not in draft status")
-	ErrStemRequired      = errors.New("default locale stem is required for this transition")
-	ErrTagNotFound       = errors.New("tag not found")
+	ErrNotFound            = errors.New("not found")
+	ErrQuestionNotFound    = errors.New("question not found")
+	ErrForbidden           = errors.New("forbidden")
+	ErrInvalidInput        = errors.New("invalid input")
+	ErrInvalidTransition   = errors.New("invalid status transition")
+	ErrNotDraft            = errors.New("question is not in draft status")
+	ErrStemRequired        = errors.New("default locale stem is required for this transition")
+	ErrTagNotFound         = errors.New("tag not found")
+	ErrMissingModelAnswer  = errors.New("MISSING_MODEL_ANSWER")
+	ErrInvalidFieldForType = errors.New("INVALID_FIELD_FOR_TYPE")
 )
 
 // Question is the core metadata row — no user-visible text.
@@ -28,6 +30,8 @@ type Question struct {
 	CreatedBy     string    `db:"created_by"`
 	Version       int       `db:"version"`
 	ParentID      *string   `db:"parent_id"`
+	AutoGrade     bool      `db:"auto_grade"`
+	ModelAnswer   *string   `db:"model_answer"`
 	CreatedAt     time.Time `db:"created_at"`
 	UpdatedAt     time.Time `db:"updated_at"`
 }
@@ -131,6 +135,8 @@ type QuestionDetail struct {
 	DefaultLocale  string                       `json:"default_locale"`
 	Version        int                          `json:"version"`
 	ParentID       *string                      `json:"parent_id"`
+	AutoGrade      bool                         `json:"auto_grade"`
+	ModelAnswer    *string                      `json:"model_answer"`
 	LocaleCoverage []string                     `json:"locale_coverage"`
 	Translations   map[string]TranslationDetail `json:"translations"`
 	AnswerOptions  []AnswerOptionDetail         `json:"answer_options"`
@@ -176,6 +182,8 @@ type CreateQuestionFullInput struct {
 	Type          string
 	DefaultLocale string
 	CreatedBy     string
+	AutoGrade     bool
+	ModelAnswer   *string
 	Translations  map[string]TranslationInput
 	AnswerOptions []AnswerOptionInput
 	TagIDs        []string
@@ -186,6 +194,8 @@ type UpdateQuestionInput struct {
 	CategoryID    string
 	Difficulty    string
 	UpdatedBy     string
+	AutoGrade     bool
+	ModelAnswer   *string
 	Translations  map[string]TranslationInput
 	AnswerOptions []AnswerOptionInput
 	TagIDs        []string

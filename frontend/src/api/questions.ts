@@ -85,6 +85,8 @@ export interface QuestionDetail {
   default_locale: string
   version: number
   parent_id: string | null
+  auto_grade: boolean
+  model_answer: string | null
   locale_coverage: string[]
   translations: Record<string, QuestionTranslation>
   answer_options: AnswerOption[]
@@ -102,6 +104,8 @@ export interface QuestionCreatePayload {
   default_locale: string
   stem: string
   explanation?: string
+  auto_grade?: boolean
+  model_answer?: string | null
   answer_options?: AnswerOptionCreatePayload[]
   tag_ids?: string[]
 }
@@ -117,6 +121,8 @@ export interface AnswerOptionCreatePayload {
 export interface QuestionUpdatePayload {
   difficulty?: string
   category_id?: string
+  auto_grade?: boolean
+  model_answer?: string | null
   translations?: Record<string, Partial<QuestionTranslation>>
   answer_options?: AnswerOptionUpdatePayload[]
   tag_ids?: string[]

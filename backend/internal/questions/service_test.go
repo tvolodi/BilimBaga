@@ -945,3 +945,156 @@ func TestTagQuestion_IdempotentAdd(t *testing.T) {
 		t.Fatalf("second TagQuestion (idempotent): unexpected error: %v", err)
 	}
 }
+
+// ── FR-BB73: auto_grade / model_answer validation ────────────────────────────
+
+func seedShortTextQuestion(repo *mockRepository, id, status string) {
+	repo.questions[id] = &Question{
+		ID:            id,
+		Type:          "shorttext",
+		Status:        status,
+		CategoryID:    "cat-1",
+		Difficulty:    "medium",
+		DefaultLocale: "en",
+		CreatedBy:     "user-1",
+		Version:       1,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+}
+
+func seedSingleQuestion(repo *mockRepository, id string) {
+	repo.questions[id] = &Question{
+		ID:            id,
+		Type:          "single",
+		Status:        "draft",
+		CategoryID:    "cat-1",
+		Difficulty:    "easy",
+		DefaultLocale: "en",
+		CreatedBy:     "user-1",
+		Version:       1,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+}
+
+func TestUpdateQuestion_AutoGradeWithoutModelAnswer_ReturnsErrMissingModelAnswer(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	seedShortTextQuestion(repo, "q-st", "draft")
+
+	_, err := svc.UpdateQuestion(context.Background(), "q-st", UpdateQuestionInput{
+		CategoryID: "cat-1",
+		Difficulty: "medium",
+		UpdatedBy:  "user-1",
+		AutoGrade:  true,
+		// ModelAnswer intentionally nil
+	})
+	if err == nil {
+		t.Fatal("expected ErrMissingModelAnswer, got nil")
+	}
+	if !errors.Is(err, ErrMissingModelAnswer) {
+		t.Errorf("expected ErrMissingModelAnswer, got %v", err)
+	}
+}
+
+func TestUpdateQuestion_AutoGradeWithBlankModelAnswer_ReturnsErrMissingModelAnswer(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	seedShortTextQuestion(repo, "q-st", "draft")
+
+	blank := "   "
+	_, err := svc.UpdateQuestion(context.Background(), "q-st", UpdateQuestionInput{
+		CategoryID:  "cat-1",
+		Difficulty:  "medium",
+		UpdatedBy:   "user-1",
+		AutoGrade:   true,
+		ModelAnswer: &blank,
+	})
+	if err == nil {
+		t.Fatal("expected ErrMissingModelAnswer, got nil")
+	}
+	if !errors.Is(err, ErrMissingModelAnswer) {
+		t.Errorf("expected ErrMissingModelAnswer, got %v", err)
+	}
+}
+
+func TestUpdateQuestion_AutoGradeOnNonShorttext_ReturnsErrInvalidFieldForType(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	seedSingleQuestion(repo, "q-single")
+
+	answer := "42"
+	_, err := svc.UpdateQuestion(context.Background(), "q-single", UpdateQuestionInput{
+		CategoryID:  "cat-1",
+		Difficulty:  "easy",
+		UpdatedBy:   "user-1",
+		AutoGrade:   true,
+		ModelAnswer: &answer,
+	})
+	if err == nil {
+		t.Fatal("expected ErrInvalidFieldForType, got nil")
+	}
+	if !errors.Is(err, ErrInvalidFieldForType) {
+		t.Errorf("expected ErrInvalidFieldForType, got %v", err)
+	}
+}
+
+func TestUpdateQuestion_ModelAnswerOnNonShorttext_ReturnsErrInvalidFieldForType(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	seedSingleQuestion(repo, "q-single")
+
+	answer := "some model answer"
+	_, err := svc.UpdateQuestion(context.Background(), "q-single", UpdateQuestionInput{
+		CategoryID:  "cat-1",
+		Difficulty:  "easy",
+		UpdatedBy:   "user-1",
+		AutoGrade:   false,
+		ModelAnswer: &answer,
+	})
+	if err == nil {
+		t.Fatal("expected ErrInvalidFieldForType, got nil")
+	}
+	if !errors.Is(err, ErrInvalidFieldForType) {
+		t.Errorf("expected ErrInvalidFieldForType, got %v", err)
+	}
+}
+
+func TestUpdateQuestion_AutoGradeWithValidModelAnswer_Succeeds(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	seedShortTextQuestion(repo, "q-st", "draft")
+
+	answer := "The capital of France is Paris."
+	_, err := svc.UpdateQuestion(context.Background(), "q-st", UpdateQuestionInput{
+		CategoryID:  "cat-1",
+		Difficulty:  "medium",
+		UpdatedBy:   "user-1",
+		AutoGrade:   true,
+		ModelAnswer: &answer,
+	})
+	if err != nil {
+		t.Fatalf("expected no error for valid auto_grade + model_answer, got %v", err)
+	}
+}
+
+func TestUpdateQuestion_ShortTextWithModelAnswerNoAutoGrade_Succeeds(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	seedShortTextQuestion(repo, "q-st", "draft")
+
+	answer := "Reference answer text."
+	// model_answer without auto_grade is allowed — enables manual review with reference.
+	_, err := svc.UpdateQuestion(context.Background(), "q-st", UpdateQuestionInput{
+		CategoryID:  "cat-1",
+		Difficulty:  "medium",
+		UpdatedBy:   "user-1",
+		AutoGrade:   false,
+		ModelAnswer: &answer,
+	})
+	if err != nil {
+		t.Fatalf("expected no error for model_answer without auto_grade on shorttext, got %v", err)
+	}
+}
+

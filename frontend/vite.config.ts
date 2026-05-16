@@ -14,6 +14,17 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          query: ['@tanstack/react-query'],
+          ui: ['@radix-ui/react-dialog'],
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

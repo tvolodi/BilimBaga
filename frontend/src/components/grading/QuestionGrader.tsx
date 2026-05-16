@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +9,28 @@ interface QuestionGraderProps {
   score: number | null
   feedback: string
   onChange: (score: number | null, feedback: string) => void
+}
+
+function AIReasoningSection({ reasoning }: { reasoning: string }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs text-blue-700 hover:underline focus:outline-none"
+      >
+        {open ? t('grading.ai_reasoning_hide') : t('grading.ai_reasoning_show')}
+      </button>
+      {open && (
+        <div className="mt-1 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <p className="font-medium mb-1">{t('grading.ai_reasoning_label')}</p>
+          <p className="whitespace-pre-wrap">{reasoning}</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function QuestionGrader({ question, score, feedback, onChange }: QuestionGraderProps) {
@@ -43,6 +66,14 @@ export function QuestionGrader({ question, score, feedback, onChange }: Question
           <Badge variant="secondary" className="mt-1">
             {t('grading.already_graded')}
           </Badge>
+        )}
+        {question.grading_status === 'ai_graded' && (
+          <Badge variant="secondary" className="mt-1 bg-blue-100 text-blue-800">
+            {t('grading.ai_graded')}
+          </Badge>
+        )}
+        {question.grading_status === 'ai_graded' && question.ai_reasoning && (
+          <AIReasoningSection reasoning={question.ai_reasoning} />
         )}
       </div>
 

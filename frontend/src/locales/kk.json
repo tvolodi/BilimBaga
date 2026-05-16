@@ -393,7 +393,8 @@
     "section": {
       "metadata": "Мета деректер",
       "translation": "Мазмұн",
-      "answerOptions": "Жауап нұсқалары"
+      "answerOptions": "Жауап нұсқалары",
+      "autoGrading": "Автоматты бағалау"
     },
     "field": {
       "type": "Сұрақ түрі",
@@ -403,7 +404,11 @@
       "stem": "Сұрақ мәтіні",
       "stemPlaceholder": "Сұрақ мәтінін енгізіңіз…",
       "explanation": "Түсіндірме",
-      "explanationPlaceholder": "Жауап берілгеннен кейін көрсетілетін түсіндірме (міндетті емес)…"
+      "explanationPlaceholder": "Жауап берілгеннен кейін көрсетілетін түсіндірме (міндетті емес)…",
+      "modelAnswer": "Үлгі жауап",
+      "modelAnswerPlaceholder": "ЖИ салыстыруы үшін күтілетін жауапты енгізіңіз…",
+      "autoGrade": "Автобағалауды қосу",
+      "autoGradeHelp": "ЖИ бұл сұрақты автоматты түрде бағалайды. Үлгі жауап қажет."
     },
     "category": {
       "placeholder": "Санатты таңдаңыз"
@@ -735,6 +740,10 @@
     "success_toast": "Барлық бағалар жіберілді. Сессия аяқталды.",
     "error_toast": "{{question}} сұрағы үшін баға жіберу сәтсіз аяқталды. Қайталап көріңіз.",
     "already_graded": "Бағаланған",
+    "ai_graded": "ЖИ бағалады",
+    "ai_reasoning_label": "ЖИ негіздемесі",
+    "ai_reasoning_show": "ЖИ негіздемесін көрсету",
+    "ai_reasoning_hide": "ЖИ негіздемесін жасыру",
     "nav": "Қолмен бағалау"
   },
   "employee_record": {

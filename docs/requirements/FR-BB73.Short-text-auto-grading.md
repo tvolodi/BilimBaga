@@ -6,7 +6,7 @@
 | ID | FR-BB73 |
 | Phase | 7 — AI Layer |
 | Priority | 1 |
-| Status | Revised |
+| Status | Implemented |
 | Depends On | FR-BB311, FR-BB71 |
 
 ## Affected Layers

@@ -6,7 +6,7 @@
 | ID | FR-BB65 |
 | Phase | 6 — Polish & Hardening |
 | Priority | 2 |
-| Status | Draft |
+| Status | Validated |
 | Depends On | FR-BB12, FR-BB36, FR-BB37, FR-BB13, FR-BB43, FR-BB62 |
 
 ## Description

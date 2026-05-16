@@ -192,7 +192,14 @@ func main() {
 	portalHandler := portal.NewHandler(portalSvc)
 
 	// Wire up session creation (FR-BB35).
-	gradingEngine := sessions.NewGradingEngine()
+	// If AnthropicAPIKey is configured, use AI-backed grading for short-text questions (FR-BB73).
+	var gradingEngine sessions.GradingEngine
+	if cfg.AnthropicAPIKey != "" {
+		aiGradingClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, slogger)
+		gradingEngine = sessions.NewAIGradingEngine(aiGradingClient, cfg.AnthropicModel, db, slogger)
+	} else {
+		gradingEngine = sessions.NewGradingEngine()
+	}
 	sessionsRepo := sessions.NewRepository(db, gradingEngine)
 	sessionsSvc := sessions.NewService(sessionsRepo, emailSvc)
 	sessionsHandler := sessions.NewHandler(sessionsSvc)

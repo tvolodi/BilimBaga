@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
+	"github.com/bilimbaga/bilimbaga/internal/upload"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -213,7 +215,23 @@ func (h *Handler) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	reader := csv.NewReader(file)
+	// AC-3 (FR-BB64): read all bytes for magic-byte validation before parsing.
+	rawBytes, err := io.ReadAll(file)
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "failed to read uploaded file")
+		return
+	}
+	if err := upload.ValidateCSVFile(rawBytes); err != nil {
+		switch err {
+		case upload.ErrFileTooLarge:
+			api.WriteError(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "CSV file must not exceed 10 MB")
+		default:
+			api.WriteError(w, http.StatusUnsupportedMediaType, "INVALID_FILE_TYPE", "uploaded file must be a plain-text CSV")
+		}
+		return
+	}
+
+	reader := csv.NewReader(strings.NewReader(string(rawBytes)))
 	allRows, err := reader.ReadAll()
 	if err != nil {
 		api.WriteError(w, http.StatusBadRequest, "INVALID_CSV", "failed to parse CSV file")

@@ -128,4 +128,3 @@ func renderHTML(name, tmplStr string, data map[string]any) (string, error) {
 	}
 	return buf.String(), nil
 }
-

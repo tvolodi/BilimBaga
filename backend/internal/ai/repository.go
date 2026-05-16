@@ -135,9 +135,9 @@ DO UPDATE SET insights      = EXCLUDED.insights,
 
 // examInsightRow is the scan target for the exam header query.
 type examInsightRow struct {
-	Title           string  `db:"title"`
-	PassingScorePct int     `db:"passing_score_pct"`
-	TenantID        string  `db:"tenant_id"`
+	Title           string `db:"title"`
+	PassingScorePct int    `db:"passing_score_pct"`
+	TenantID        string `db:"tenant_id"`
 }
 
 // insightSummaryRow is the scan target for the session aggregate query.
@@ -269,4 +269,3 @@ ORDER BY order_num`, examID,
 
 	return data, nil
 }
-

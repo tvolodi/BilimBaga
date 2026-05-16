@@ -183,7 +183,7 @@ export function useExams(filters: { page?: number; per_page?: number; status?: s
   return useQuery<ExamListResponse, ExamApiError>({
     queryKey: ['exams', filters],
     queryFn: () => examsFetch<ExamListResponse>(`/api/v1/exams${qs ? `?${qs}` : ''}`),
-    staleTime: 30_000,
+    staleTime: 5 * 60 * 1000, // AC-6: 5 minutes — exam list is stable
   })
 }
 

@@ -21,12 +21,12 @@ type mockRepository struct {
 	categoryNameErr error
 
 	// Insight cache fields.
-	insightCache      *InsightResult
-	insightCacheErr   error
-	upsertCalled      bool
-	upsertErr         error
-	examInsightData   *ExamInsightData
-	examInsightErr    error
+	insightCache    *InsightResult
+	insightCacheErr error
+	upsertCalled    bool
+	upsertErr       error
+	examInsightData *ExamInsightData
+	examInsightErr  error
 }
 
 func (m *mockRepository) CountAIUsageLastHour(_ context.Context, _, _ string) (int, error) {
@@ -57,9 +57,9 @@ func (m *mockRepository) GetExamInsightData(_ context.Context, _, _ string) (*Ex
 }
 
 type mockClient struct {
-	text       string
-	tokens     int
-	err        error
+	text   string
+	tokens int
+	err    error
 }
 
 func (m *mockClient) GenerateText(_ context.Context, _, _ string) (string, int, error) {
@@ -381,4 +381,3 @@ func TestGetInsights_ExamNotFound(t *testing.T) {
 		t.Errorf("expected ErrExamNotFound, got %v", err)
 	}
 }
-

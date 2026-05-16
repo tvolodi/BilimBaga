@@ -1,36 +1,80 @@
+import { lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { TenantProvider } from '@/components/TenantProvider'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { RequireAuth } from '@/components/RequireAuth'
 import { RequireRole } from '@/components/RequireRole'
-import { LoginPage } from '@/pages/auth/LoginPage'
-import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
-import { AdminLayout } from '@/layouts/AdminLayout'
-import { PortalLayout } from '@/layouts/PortalLayout'
-import { EmployeePortal } from '@/pages/EmployeePortal'
-import { MyResultsPage } from '@/pages/portal/MyResultsPage'
-import { UsersListPage } from '@/pages/admin/users/UsersListPage'
-import { DepartmentsPage } from '@/pages/admin/departments/DepartmentsPage'
-import { BrandingSettingsPage } from '@/pages/admin/settings/BrandingSettingsPage'
-import { QuestionBankPage } from '@/pages/admin/questions/QuestionBankPage'
-import { QuestionEditorPage } from '@/pages/admin/questions/QuestionEditorPage'
-import { CategoriesPage } from '@/pages/admin/categories/CategoriesPage'
-import { TagsPage } from '@/pages/admin/tags/TagsPage'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { useRefreshToken } from '@/api/auth'
 import { useLocaleDirection } from '@/hooks/useLocaleDirection'
 import { SkipLink } from '@/components/SkipLink'
-import { ExamWizardCreatePage, ExamWizardEditPage } from '@/pages/ExamWizard'
+
+// Non-admin routes — eagerly loaded (employee-facing, on the critical path)
+import { LoginPage } from '@/pages/auth/LoginPage'
+import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
+import { EmployeePortal } from '@/pages/EmployeePortal'
+import { MyResultsPage } from '@/pages/portal/MyResultsPage'
 import { ExamTakingPage } from '@/pages/ExamTaking'
 import { ResultPage } from '@/pages/ResultPage'
-import { GradingQueuePage } from '@/pages/admin/GradingQueuePage'
-import { GradingDetailPage } from '@/pages/admin/GradingDetailPage'
-import { EmployeeRecordPage } from '@/pages/admin/EmployeeRecordPage'
-import { AuditLogPage } from '@/pages/admin/AuditLogPage'
-import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
-import { ExamsListPage } from '@/pages/admin/ExamsListPage'
-import { ExamAnalyticsPage } from '@/pages/admin/ExamAnalyticsPage'
+
+// Layouts — eagerly loaded (shell chrome shared by all authenticated routes)
+import { AdminLayout } from '@/layouts/AdminLayout'
+import { PortalLayout } from '@/layouts/PortalLayout'
+
+// AC-7: Admin-only routes lazy-loaded so the employee bundle stays lean
+const UsersListPage = lazy(() =>
+  import('@/pages/admin/users/UsersListPage').then((m) => ({ default: m.UsersListPage })),
+)
+const DepartmentsPage = lazy(() =>
+  import('@/pages/admin/departments/DepartmentsPage').then((m) => ({ default: m.DepartmentsPage })),
+)
+const BrandingSettingsPage = lazy(() =>
+  import('@/pages/admin/settings/BrandingSettingsPage').then((m) => ({
+    default: m.BrandingSettingsPage,
+  })),
+)
+const QuestionBankPage = lazy(() =>
+  import('@/pages/admin/questions/QuestionBankPage').then((m) => ({ default: m.QuestionBankPage })),
+)
+const QuestionEditorPage = lazy(() =>
+  import('@/pages/admin/questions/QuestionEditorPage').then((m) => ({
+    default: m.QuestionEditorPage,
+  })),
+)
+const CategoriesPage = lazy(() =>
+  import('@/pages/admin/categories/CategoriesPage').then((m) => ({ default: m.CategoriesPage })),
+)
+const TagsPage = lazy(() =>
+  import('@/pages/admin/tags/TagsPage').then((m) => ({ default: m.TagsPage })),
+)
+const ExamWizardCreatePage = lazy(() =>
+  import('@/pages/ExamWizard').then((m) => ({ default: m.ExamWizardCreatePage })),
+)
+const ExamWizardEditPage = lazy(() =>
+  import('@/pages/ExamWizard').then((m) => ({ default: m.ExamWizardEditPage })),
+)
+const GradingQueuePage = lazy(() =>
+  import('@/pages/admin/GradingQueuePage').then((m) => ({ default: m.GradingQueuePage })),
+)
+const GradingDetailPage = lazy(() =>
+  import('@/pages/admin/GradingDetailPage').then((m) => ({ default: m.GradingDetailPage })),
+)
+const EmployeeRecordPage = lazy(() =>
+  import('@/pages/admin/EmployeeRecordPage').then((m) => ({ default: m.EmployeeRecordPage })),
+)
+const AuditLogPage = lazy(() =>
+  import('@/pages/admin/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+)
+const AdminDashboardPage = lazy(() =>
+  import('@/pages/admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
+)
+const ExamsListPage = lazy(() =>
+  import('@/pages/admin/ExamsListPage').then((m) => ({ default: m.ExamsListPage })),
+)
+const ExamAnalyticsPage = lazy(() =>
+  import('@/pages/admin/ExamAnalyticsPage').then((m) => ({ default: m.ExamAnalyticsPage })),
+)
 
 const queryClient = new QueryClient()
 
@@ -53,7 +97,9 @@ function AppRoutes() {
         path="/admin"
         element={
           <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
-            <AdminLayout />
+            <Suspense fallback={<FullPageSpinner />}>
+              <AdminLayout />
+            </Suspense>
           </RequireRole>
         }
       >

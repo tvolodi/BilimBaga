@@ -1,0 +1,29 @@
+﻿{
+  "run_id": "FR-BB73",
+  "pipeline": "A",
+  "commit_hash": "a546e67",
+  "commit_message": "feat(ai): implement FR-BB73 short-text auto-grading",
+  "files_committed": [
+    "backend/migrations/027_short_text_autograding.up.sql",
+    "backend/migrations/027_short_text_autograding.down.sql",
+    "backend/internal/sessions/grading.go",
+    "backend/internal/sessions/grading_ai_test.go",
+    "backend/internal/questions/model.go",
+    "backend/internal/questions/handler.go",
+    "backend/internal/questions/service.go",
+    "backend/internal/questions/service_test.go",
+    "backend/internal/questions/repository.go",
+    "frontend/src/pages/admin/questions/QuestionEditorPage.tsx",
+    "frontend/src/components/grading/QuestionGrader.tsx",
+    "frontend/src/api/questions.ts",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json",
+    "frontend/vite.config.ts",
+    "frontend/e2e/grading/ai-grading.spec.ts",
+    "frontend/src/test/QuestionGrader.test.tsx",
+    "docs/requirements/FR-BB73.Short-text-auto-grading.md"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB73-implementation-report.md",
+  "status": "success"
+}

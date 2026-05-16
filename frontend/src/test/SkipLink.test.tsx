@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { SkipLink } from '@/components/SkipLink'
 
 // i18next is not initialised in unit tests; the component will fall back to the key

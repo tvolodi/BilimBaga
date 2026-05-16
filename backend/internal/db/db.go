@@ -19,6 +19,7 @@ type Config struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxIdleTime time.Duration
+	ConnMaxLifetime time.Duration // AC-8: FR-BB65 — total connection lifetime
 }
 
 // New opens a sqlx connection pool using the provided Config, applies pool
@@ -37,6 +38,9 @@ func New(cfg Config) (*sqlx.DB, error) {
 	db.SetMaxOpenConns(cfg.MaxOpenConns)
 	db.SetMaxIdleConns(cfg.MaxIdleConns)
 	db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
+	if cfg.ConnMaxLifetime > 0 {
+		db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	}
 
 	return db, nil
 }

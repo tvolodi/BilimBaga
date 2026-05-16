@@ -210,15 +210,15 @@ func (s *service) Logout(ctx context.Context, rawToken, ipAddr string) (*http.Co
 	return clearCookie, nil
 }
 
-// ChangePassword validates the current password, enforces length constraints,
+// ChangePassword validates the current password, enforces complexity constraints,
 // hashes and stores the new password, and clears force_password_change.
 func (s *service) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) error {
-	// AC-12: validate new password length.
-	if len(req.NewPassword) < 8 {
+	// AC-8 (FR-BB64): enforce password complexity.
+	if err := ValidateComplexity(req.NewPassword); err != nil {
 		return &ServiceError{
-			Code:       "VALIDATION_ERROR",
-			Message:    "new password must be at least 8 characters",
-			HTTPStatus: http.StatusUnprocessableEntity,
+			Code:       "WEAK_PASSWORD",
+			Message:    "password must be at least 8 characters and contain uppercase, lowercase, and a digit",
+			HTTPStatus: http.StatusBadRequest,
 		}
 	}
 

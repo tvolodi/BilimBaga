@@ -86,6 +86,7 @@ func (h *Handler) GetLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=3600")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(imgBytes)
 }

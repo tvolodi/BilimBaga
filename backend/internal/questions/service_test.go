@@ -12,13 +12,13 @@ import (
 // --- Mock Repository ---
 
 type mockRepository struct {
-	questions              map[string]*Question
-	createFn               func(ctx context.Context, q *Question) error
-	createVerFn            func(ctx context.Context, newQ *Question, previousID string) error
-	createOptFn            func(ctx context.Context, opt *AnswerOption) error
-	tagExistsFn            func(ctx context.Context, tagID string) (bool, error)
-	GetTranslationFn       func(ctx context.Context, questionID, locale string) (*QuestionTranslation, error)
-	findSimilarStemsFn     func(ctx context.Context, stems []string, locale string) (map[string]StemSimilarityResult, error)
+	questions          map[string]*Question
+	createFn           func(ctx context.Context, q *Question) error
+	createVerFn        func(ctx context.Context, newQ *Question, previousID string) error
+	createOptFn        func(ctx context.Context, opt *AnswerOption) error
+	tagExistsFn        func(ctx context.Context, tagID string) (bool, error)
+	GetTranslationFn   func(ctx context.Context, questionID, locale string) (*QuestionTranslation, error)
+	findSimilarStemsFn func(ctx context.Context, stems []string, locale string) (map[string]StemSimilarityResult, error)
 }
 
 func newMockRepo() *mockRepository {
@@ -1097,4 +1097,3 @@ func TestUpdateQuestion_ShortTextWithModelAnswerNoAutoGrade_Succeeds(t *testing.
 		t.Fatalf("expected no error for model_answer without auto_grade on shorttext, got %v", err)
 	}
 }
-

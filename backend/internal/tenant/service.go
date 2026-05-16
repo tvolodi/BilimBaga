@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/bilimbaga/bilimbaga/internal/upload"
 )
 
-const maxLogoBytes = 1 << 20 // 1 MB
+const maxLogoBytes = upload.MaxLogoBytes // 2 MB (AC-3: FR-BB64)
 
 // publicKeys is the set of keys exposed via GET /api/v1/tenant/config.
 var publicKeys = map[string]struct{}{
@@ -166,8 +168,14 @@ func (s *service) UpdateConfig(ctx context.Context, updates map[string]json.RawM
 				if err != nil {
 					return nil, fmt.Errorf("tenant.UpdateConfig: invalid logo base64: %w", err)
 				}
-				if len(decoded) > maxLogoBytes {
-					return nil, &ValidationError{Code: "LOGO_TOO_LARGE", Message: "logo exceeds 1 MB limit"}
+				// AC-3 (FR-BB64): validate size and magic bytes server-side.
+				if err := upload.ValidateLogoFile(decoded); err != nil {
+					switch err {
+					case upload.ErrFileTooLarge:
+						return nil, &ValidationError{Code: "LOGO_TOO_LARGE", Message: "logo exceeds 2 MB limit"}
+					default:
+						return nil, &ValidationError{Code: "INVALID_LOGO_TYPE", Message: "logo must be a PNG or JPEG image"}
+					}
 				}
 			}
 		}

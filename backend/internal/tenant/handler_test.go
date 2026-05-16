@@ -71,6 +71,32 @@ func TestGetLogo_Returns204WhenNoLogo(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, w.Result().StatusCode)
 }
 
+// TestGetLogo_CacheControlHeader verifies that when a logo is present the response
+// includes Cache-Control: public, max-age=3600 (AC-5, FR-BB65).
+func TestGetLogo_CacheControlHeader(t *testing.T) {
+	// Build a minimal valid data-URI PNG (1×1 PNG magic bytes, base64-encoded).
+	// The upload validator checks the first bytes; use a real PNG header.
+	// For the unit test we bypass the upload validator by setting the logo
+	// directly in the mock repository rather than going through UpdateConfig.
+	repo := newMockRepository(defaultSeedData())
+	// Use a tiny valid-ish base64 blob — the handler only decodes, it does not
+	// re-validate the MIME type.
+	logoVal, _ := json.Marshal("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
+	repo.(*mockRepository).data["logo"] = logoVal
+
+	svc := NewService(repo)
+	require.NoError(t, svc.LoadCache(context.Background()))
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/tenant/logo", nil)
+	w := httptest.NewRecorder()
+	h.GetLogo(w, req)
+
+	resp := w.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "public, max-age=3600", resp.Header.Get("Cache-Control"))
+}
+
 // TestUpdateConfig_AcceptsPartialUpdate verifies that PUT updates the supplied keys.
 func TestUpdateConfig_AcceptsPartialUpdate(t *testing.T) {
 	h := newTestHandler(t)

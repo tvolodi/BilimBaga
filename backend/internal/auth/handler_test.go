@@ -493,8 +493,9 @@ func TestService_ChangePassword_ShortPassword_Returns422(t *testing.T) {
 	require.Error(t, err)
 	var svcErr *ServiceError
 	require.ErrorAs(t, err, &svcErr)
-	assert.Equal(t, "VALIDATION_ERROR", svcErr.Code)
-	assert.Equal(t, http.StatusUnprocessableEntity, svcErr.HTTPStatus)
+	// AC-8 (FR-BB64): short/weak password returns WEAK_PASSWORD 400.
+	assert.Equal(t, "WEAK_PASSWORD", svcErr.Code)
+	assert.Equal(t, http.StatusBadRequest, svcErr.HTTPStatus)
 }
 
 func TestService_ParseAccessToken_ValidToken(t *testing.T) {

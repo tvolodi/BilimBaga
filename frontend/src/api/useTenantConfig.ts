@@ -29,6 +29,6 @@ export function useTenantConfig() {
   return useQuery<TenantConfig, Error>({
     queryKey: ['tenant', 'config'],
     queryFn: fetchTenantConfig,
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000, // AC-6: 5 minutes — tenant config rarely changes
   })
 }

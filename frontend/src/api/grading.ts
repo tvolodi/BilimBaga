@@ -15,9 +15,10 @@ export interface GradingQuestion {
   question_id: string
   stem: string
   text_answer: string
-  grading_status: 'pending_manual' | 'graded'
+  grading_status: 'pending_manual' | 'graded' | 'ai_graded'
   current_score_pct: number | null
   manual_feedback: string | null
+  ai_reasoning: string | null
 }
 
 export interface GradingSessionDetail {
@@ -89,6 +90,7 @@ export function useGradingQueue(page: number, examId?: string) {
       apiGet<GradingQueueResponse>(
         `/admin/grading?page=${page}&per_page=20${examId ? `&exam_id=${examId}` : ''}`,
       ),
+    staleTime: 0, // AC-6: always fresh — grading queue must reflect current state
   })
 }
 

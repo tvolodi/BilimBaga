@@ -1,0 +1,41 @@
+{
+  "run_id": "FR-BB66",
+  "requirement_doc": "docs/requirements/FR-BB66.Observability.md",
+  "pipeline": "A",
+  "phase": "code-review",
+  "files_changed": [
+    "backend/cmd/api/main.go",
+    "backend/internal/config/config.go",
+    "backend/internal/db/instrumented.go",
+    "backend/internal/health/handler.go",
+    "backend/internal/health/handler_test.go",
+    "backend/internal/middleware/request_id.go",
+    "backend/internal/middleware/request_id_test.go",
+    "backend/internal/middleware/logger.go",
+    "backend/internal/middleware/logger_test.go",
+    "backend/internal/middleware/recovery.go",
+    "backend/internal/middleware/recovery_test.go",
+    "backend/internal/router/router.go",
+    "backend/go.mod",
+    "backend/go.sum",
+    "backend/.env.example",
+    "Makefile",
+    "deploy/docker-compose.prod.yml",
+    "deploy/docker-compose.test.yml"
+  ],
+  "acceptance_criteria": [
+    "AC-1: Every HTTP request produces a structured JSON log line with method, path, status_code, latency_ms, user_id, ip, request_id",
+    "AC-2: UUID request ID generated per request, stored in context, included in every log line",
+    "AC-3: LOG_LEVEL env var controls verbosity; defaults to info; invalid falls back to info with warning",
+    "AC-4: GET /api/v1/health - 200+db_ok:true when DB reachable, 503+db_ok:false when not; version field from build",
+    "AC-5: Panic recovery middleware - panic logged at error level with request_id, client gets 500 JSON with no stack",
+    "AC-6: Docker Compose log driver json-file with max-size:100m max-file:3 for all services",
+    "AC-7: Makefile build target uses -ldflags to inject git SHA into main.Version",
+    "AC-8: Slow query helper LogSlowQuery logs at warn when query >500ms with sanitized SQL"
+  ],
+  "test_results": {
+    "middleware": "PASS (12 tests)",
+    "health": "PASS (3 tests)",
+    "full_suite": "PASS (all packages)"
+  }
+}

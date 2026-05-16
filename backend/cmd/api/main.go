@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -30,7 +29,31 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 	"github.com/bilimbaga/bilimbaga/internal/users"
+	"github.com/rs/zerolog"
 )
+
+// Version is the Git commit SHA injected at build time via:
+//
+//	go build -ldflags "-X main.Version=$(git rev-parse --short HEAD)"
+//
+// It defaults to "dev" when no linker flag is provided.
+var Version = "dev"
+
+// initLogger initialises the zerolog global level and returns a configured
+// structured JSON logger that writes NDJSON to stdout.  If level is invalid,
+// it falls back to InfoLevel and emits a startup warning.
+func initLogger(level string) zerolog.Logger {
+	lvl, err := zerolog.ParseLevel(level)
+	if err != nil {
+		lvl = zerolog.InfoLevel
+	}
+	zerolog.SetGlobalLevel(lvl)
+	log := zerolog.New(os.Stdout).With().Timestamp().Str("version", Version).Logger()
+	if err != nil {
+		log.Warn().Str("log_level", level).Msg("invalid LOG_LEVEL — defaulting to info")
+	}
+	return log
+}
 
 func main() {
 	// appCtx is cancelled on SIGINT/SIGTERM; used by background jobs for clean shutdown.
@@ -43,6 +66,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// zerolog logger for the middleware chain and structured startup messages.
+	zlog := initLogger(cfg.LogLevel)
+
+	// slog.Default() is kept for existing services that were written against *slog.Logger.
+	// They are not migrated here to avoid a large, unrelated diff.
+	slogger := slog.Default()
+
 	db, err := dbpkg.New(dbpkg.Config{
 		Host:            cfg.DBHost,
 		Port:            cfg.DBPort,
@@ -53,6 +83,7 @@ func main() {
 		MaxOpenConns:    cfg.DBMaxOpenConns,
 		MaxIdleConns:    cfg.DBMaxIdleConns,
 		ConnMaxIdleTime: time.Duration(cfg.DBConnMaxIdleSeconds) * time.Second,
+		ConnMaxLifetime: cfg.DBConnMaxLifetime,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "startup error: open database: %v\n", err)
@@ -63,11 +94,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "startup error: run migrations: %v\n", err)
 		os.Exit(1)
 	}
-	log.Println("database migrations applied")
+	zlog.Info().Msg("database migrations applied")
 
 	// Set up structured logger and audit writer.
-	logger := slog.Default()
-	auditWriter := audit.NewWriter(db, logger)
+	auditWriter := audit.NewWriter(db, slogger)
 
 	// Wire up email notification service (FR-BB61).
 	emailSvc := email.NewEmailService(email.Config{
@@ -78,7 +108,7 @@ func main() {
 		TLS:        cfg.SMTPTLS,
 		From:       cfg.SMTPFrom,
 		APIBaseURL: cfg.APIBaseURL,
-	}, db, logger)
+	}, db, slogger)
 	emailHandler := email.NewHandler(emailSvc)
 	go email.StartDeadlineReminderScheduler(appCtx, emailSvc, cfg.TenantTimezone)
 
@@ -95,7 +125,7 @@ func main() {
 		os.Exit(1)
 	}
 	cancelStartup()
-	log.Println("tenant config cache loaded")
+	zlog.Info().Msg("tenant config cache loaded")
 
 	// Wire up authentication.
 	authRepo := auth.NewRepository(db)
@@ -115,7 +145,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "startup error: load rbac cache: %v\n", err)
 		os.Exit(1)
 	}
-	log.Println("rbac permission cache loaded")
+	zlog.Info().Msg("rbac permission cache loaded")
 
 	// Wire up department management.
 	deptRepo := departments.NewRepository(db)
@@ -167,7 +197,7 @@ func main() {
 	sessionsHandler := sessions.NewHandler(sessionsSvc)
 
 	// Start FR-BB310 auto-submit background job.
-	go sessions.AutoSubmitJob(appCtx, db, logger, gradingEngine)
+	go sessions.AutoSubmitJob(appCtx, db, slogger, gradingEngine)
 
 	// Wire up certificates (FR-BB43).
 	certsRepo := certificates.NewRepository(db)
@@ -179,7 +209,12 @@ func main() {
 	reportsSvc := reports.NewService(reportsRepo)
 	reportsHandler := reports.NewHandler(reportsSvc, tenantSvc)
 
-	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler, emailHandler, cfg.JWTSecret, rbacCache)
+	r := router.New(
+		tenantHandler, authHandler, deptHandler, usersHandler, auditHandler,
+		categoriesHandler, tagsHandler, questionsHandler, translationsHandler,
+		examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler,
+		emailHandler, cfg.JWTSecret, rbacCache, db, Version, zlog,
+	)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.APIPort,
@@ -190,23 +225,23 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("API listening on :%s", cfg.APIPort)
+		zlog.Info().Str("addr", ":"+cfg.APIPort).Msg("API listening")
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("server error: %v", err)
+			zlog.Fatal().Err(err).Msg("server error")
 		}
 	}()
 
 	// Wait for SIGINT / SIGTERM (appCtx is cancelled by signal.NotifyContext).
 	<-appCtx.Done()
 	stopApp()
-	log.Println("shutting down server...")
+	zlog.Info().Msg("shutting down server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("forced shutdown: %v", err)
+		zlog.Fatal().Err(err).Msg("forced shutdown")
 	}
 
-	log.Println("server stopped")
+	zlog.Info().Msg("server stopped")
 }

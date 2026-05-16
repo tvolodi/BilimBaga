@@ -9,46 +9,68 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/email"
 	"github.com/bilimbaga/bilimbaga/internal/exams"
 	"github.com/bilimbaga/bilimbaga/internal/health"
+	appmw "github.com/bilimbaga/bilimbaga/internal/middleware"
 	"github.com/bilimbaga/bilimbaga/internal/portal"
 	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
+	"github.com/bilimbaga/bilimbaga/internal/ratelimit"
 	"github.com/bilimbaga/bilimbaga/internal/reports"
 	"github.com/bilimbaga/bilimbaga/internal/sessions"
 	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
 	"github.com/bilimbaga/bilimbaga/internal/users"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/jmoiron/sqlx"
+	"github.com/rs/zerolog"
 )
 
 // New creates and returns a configured Chi router with all registered routes.
 // jwtSecret is passed to auth.Authenticate() so the router package never calls os.Getenv().
 // rbacCache is the in-memory permission cache loaded at startup.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, jwtSecret string, rbacCache *rbac.Cache) *chi.Mux {
+// db is used by the health endpoint to verify database connectivity.
+// version is the build-time Git SHA injected via -ldflags.
+// log is the zerolog logger used by the structured middleware chain.
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	// Structured middleware chain (FR-BB66):
+	//   1. RequestID  — assign UUID correlation ID
+	//   2. Recovery   — recover panics and return 500 (wraps everything below)
+	//   3. RequestLogger — structured JSON log after response written
+	//   4. RealIP / Heartbeat — chi built-ins
+	r.Use(appmw.RequestID)
+	r.Use(appmw.Recovery(log))
+	r.Use(appmw.RequestLogger(log))
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Heartbeat("/ping"))
 
 	// Global middleware — injects tenant_id for every request (public and protected alike).
 	r.Use(auth.TenantContext())
 
 	r.Route("/api/v1", func(r chi.Router) {
-		// Public routes — no JWT validation.
-		r.Get("/health", health.Handler())
-		r.Post("/auth/login", authHandler.Login)
-		r.Post("/auth/refresh", authHandler.Refresh)
-		r.Post("/auth/logout", authHandler.Logout)
-		r.Get("/tenant/config", tenantHandler.GetConfig)
-		r.Get("/tenant/logo", tenantHandler.GetLogo)
-
-		// Certificate verification — public, no auth required (AC-7).
-		r.Get("/verify/{code}", certHandler.HandleVerifyCertificate)
-
-		// Protected routes — Bearer JWT required.
+		// Auth endpoints — tight rate limit: 10 req/min per IP (AC-1).
 		r.Group(func(r chi.Router) {
+			r.Use(ratelimit.AuthLimiter())
+			r.Get("/health", health.Handler(db, version))
+			r.Post("/auth/login", authHandler.Login)
+			r.Post("/auth/refresh", authHandler.Refresh)
+			r.Post("/auth/logout", authHandler.Logout)
+		})
+
+		// Public non-auth routes — general rate limit (AC-1).
+		r.Group(func(r chi.Router) {
+			r.Use(ratelimit.GlobalLimiter())
+			r.Get("/tenant/config", tenantHandler.GetConfig)
+			r.Get("/tenant/logo", tenantHandler.GetLogo)
+
+			// Certificate verification — public, no auth required (AC-7).
+			r.Get("/verify/{code}", certHandler.HandleVerifyCertificate)
+		})
+
+		// Protected routes — Bearer JWT required; general rate limit (AC-1).
+		r.Group(func(r chi.Router) {
+			r.Use(ratelimit.GlobalLimiter())
 			r.Use(auth.Authenticate(jwtSecret))
 			r.Post("/auth/change-password", authHandler.ChangePassword)
 
@@ -197,7 +219,9 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Answer saving and session resume (FR-BB37) — any authenticated user.
 			r.Get("/portal/sessions/{id}", sessionsHandler.GetSessionState)
-			r.Put("/portal/sessions/{id}/answers/{questionId}", sessionsHandler.SaveAnswer)
+			// Answer-save has a tighter per-session rate limit: 60 req/min (AC-1).
+			r.With(ratelimit.AnswerSaveLimiter()).
+				Put("/portal/sessions/{id}/answers/{questionId}", sessionsHandler.SaveAnswer)
 
 			// Tab-switch event reporting (FR-BB38) — any authenticated user.
 			r.Post("/portal/sessions/{id}/events", sessionsHandler.ReportEvent)

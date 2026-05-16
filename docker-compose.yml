@@ -14,6 +14,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   api:
     build: ./backend
@@ -23,6 +28,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   frontend:
     build:
@@ -30,6 +40,11 @@ services:
       target: build
     volumes:
       - frontend_dist:/app/dist
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   nginx:
     image: nginx:alpine
@@ -41,12 +56,22 @@ services:
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - frontend_dist:/usr/share/nginx/html:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # Web UI
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
 volumes:
   pgdata:

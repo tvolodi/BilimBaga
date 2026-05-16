@@ -9,6 +9,7 @@ import (
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
+	appmw "github.com/bilimbaga/bilimbaga/internal/middleware"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -54,6 +55,11 @@ func Authenticate(jwtSecret string) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, ctxkeys.CtxUserID, userID)
 			ctx = context.WithValue(ctx, ctxkeys.CtxRole, role)
 			ctx = context.WithValue(ctx, ctxkeys.CtxDepartmentID, deptID)
+
+			// Populate the logger middleware's mutable holder so that the request
+			// log line records the correct user_id even though the logger wraps this
+			// middleware from the outside and cannot see values set on child contexts.
+			appmw.SetUserIDInHolder(ctx, userID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

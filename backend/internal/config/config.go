@@ -4,20 +4,22 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 // Config holds all application configuration loaded once at startup.
 type Config struct {
 	// Database
-	DBHost               string
-	DBPort               string
-	DBName               string
-	DBUser               string
-	DBPassword           string
-	DBSSLMode            string
-	DBMaxOpenConns       int
-	DBMaxIdleConns       int
+	DBHost              string
+	DBPort              string
+	DBName              string
+	DBUser              string
+	DBPassword          string
+	DBSSLMode           string
+	DBMaxOpenConns      int
+	DBMaxIdleConns      int
 	DBConnMaxIdleSeconds int
+	DBConnMaxLifetime   time.Duration
 
 	// API
 	APIPort    string
@@ -41,6 +43,9 @@ type Config struct {
 	SMTPTLS        bool
 	SMTPFrom       string
 	TenantTimezone string
+
+	// Logging
+	LogLevel string // debug | info | warn | error; default "info"
 }
 
 // Load reads all required environment variables and returns a validated Config.
@@ -74,6 +79,12 @@ func Load() (*Config, error) {
 	cfg.DBConnMaxIdleSeconds, err = getEnvInt("DB_CONN_MAX_IDLE_SECONDS", 300)
 	if err != nil {
 		return nil, fmt.Errorf("config: DB_CONN_MAX_IDLE_SECONDS: %w", err)
+	}
+
+	connMaxLifetimeStr := getEnv("DB_CONN_MAX_LIFETIME", "5m")
+	cfg.DBConnMaxLifetime, err = time.ParseDuration(connMaxLifetimeStr)
+	if err != nil {
+		return nil, fmt.Errorf("config: DB_CONN_MAX_LIFETIME must be a valid duration (e.g. 5m): %w", err)
 	}
 
 	cfg.JWTAccessTTLMinutes, err = getEnvInt("JWT_ACCESS_TTL_MINUTES", 15)
@@ -112,6 +123,8 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("config: SMTP_TLS must be true or false: %w", err)
 	}
+
+	cfg.LogLevel = getEnv("LOG_LEVEL", "info")
 
 	if err := cfg.validate(); err != nil {
 		return nil, err

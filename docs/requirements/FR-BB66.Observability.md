@@ -6,21 +6,21 @@
 | ID | FR-BB66 |
 | Phase | 6 — Polish & Hardening |
 | Priority | 1 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB11, FR-BB14, FR-BB65 |
 
 ## Description
 Equips the Go API with structured JSON logging, per-request correlation IDs, a health check endpoint, and panic recovery middleware. Docker Compose is configured with log rotation to prevent unbounded disk usage. The API binary embeds its Git commit SHA at build time for traceability. Slow database queries are surfaced at warn level to assist performance investigation.
 
 ## Acceptance Criteria
-- [ ] AC-1: Every HTTP request produces a structured JSON log line containing at minimum: `method`, `path`, `status_code`, `latency_ms`, `user_id` (authenticated) or `"-"` (anonymous), `ip`, and `request_id` fields.
-- [ ] AC-2: A UUID request ID is generated per incoming request by middleware, stored in the request context, and included in every log line emitted within that request's lifetime (handler, service, repository layers).
-- [ ] AC-3: Log verbosity is controlled by the `LOG_LEVEL` environment variable accepting `debug`, `info`, `warn`, `error`; the default level is `info`; invalid values fall back to `info` with a startup warning.
-- [ ] AC-4: `GET /api/v1/health` responds with no authentication required; returns HTTP 200 and `{ "data": { "status": "ok", "db_ok": true, "version": "<git-sha>" }, "error": null }` when the database is reachable; returns HTTP 503 and `db_ok: false` when `db.Ping()` fails; the `version` field contains the Git commit SHA injected at build time.
-- [ ] AC-5: Panic recovery middleware wraps all route handlers; any panic is recovered, its full stack trace is logged at error level with the associated `request_id`, and the client receives a `500` response with `{ "data": null, "error": { "code": "INTERNAL_ERROR", "message": "An unexpected error occurred" } }` — no stack trace or internal detail is ever included in the response body.
-- [ ] AC-6: Docker Compose log driver for all services is configured with `max-size: 100m` and `max-file: 3` so log files do not grow unboundedly.
-- [ ] AC-7: The API binary version string is injected at build time via linker flags `-ldflags "-X main.Version=$(git rev-parse --short HEAD)"`; the `Makefile` `build` target includes these flags.
-- [ ] AC-8: Any database query whose execution time exceeds 500ms is logged at warn level with the query text sanitized (parameter bind values are replaced with `?` placeholders, not logged); the log line includes `latency_ms` and `query` fields.
+- [x] AC-1: Every HTTP request produces a structured JSON log line containing at minimum: `method`, `path`, `status_code`, `latency_ms`, `user_id` (authenticated) or `"-"` (anonymous), `ip`, and `request_id` fields.
+- [x] AC-2: A UUID request ID is generated per incoming request by middleware, stored in the request context, and included in every log line emitted within that request's lifetime (handler, service, repository layers).
+- [x] AC-3: Log verbosity is controlled by the `LOG_LEVEL` environment variable accepting `debug`, `info`, `warn`, `error`; the default level is `info`; invalid values fall back to `info` with a startup warning.
+- [x] AC-4: `GET /api/v1/health` responds with no authentication required; returns HTTP 200 and `{ "data": { "status": "ok", "db_ok": true, "version": "<git-sha>" }, "error": null }` when the database is reachable; returns HTTP 503 and `db_ok: false` when `db.Ping()` fails; the `version` field contains the Git commit SHA injected at build time.
+- [x] AC-5: Panic recovery middleware wraps all route handlers; any panic is recovered, its full stack trace is logged at error level with the associated `request_id`, and the client receives a `500` response with `{ "data": null, "error": { "code": "INTERNAL_ERROR", "message": "An unexpected error occurred" } }` — no stack trace or internal detail is ever included in the response body.
+- [x] AC-6: Docker Compose log driver for all services is configured with `max-size: 100m` and `max-file: 3` so log files do not grow unboundedly.
+- [x] AC-7: The API binary version string is injected at build time via linker flags `-ldflags "-X main.Version=$(git rev-parse --short HEAD)"`; the `Makefile` `build` target includes these flags.
+- [x] AC-8: Any database query whose execution time exceeds 500ms is logged at warn level with the query text sanitized (parameter bind values are replaced with `?` placeholders, not logged); the log line includes `latency_ms` and `query` fields.
 
 ## Technical Specification
 

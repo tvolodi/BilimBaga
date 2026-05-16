@@ -11,7 +11,7 @@ const LOCALE_LABELS: Record<string, string> = {
 }
 
 export function LanguageSelector({ availableLocales }: LanguageSelectorProps) {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const lang = e.target.value
@@ -25,7 +25,7 @@ export function LanguageSelector({ availableLocales }: LanguageSelectorProps) {
         value={i18n.language}
         onChange={handleChange}
         className="rounded-md border border-input bg-background px-3 py-1 text-sm"
-        aria-label="Language"
+        aria-label={t('common.language')}
       >
         {availableLocales.map((locale) => (
           <option key={locale} value={locale}>

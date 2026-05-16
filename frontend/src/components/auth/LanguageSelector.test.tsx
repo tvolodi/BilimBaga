@@ -16,7 +16,7 @@ afterEach(() => {
 describe('LanguageSelector', () => {
   it('renders a select with the provided locales', () => {
     render(<LanguageSelector availableLocales={LOCALES} />)
-    const select = screen.getByRole('combobox', { name: /language/i })
+    const select = screen.getByRole('combobox')
     expect(select).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Қазақша/i })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Русский/i })).toBeInTheDocument()
@@ -25,14 +25,14 @@ describe('LanguageSelector', () => {
 
   it('persists language choice to localStorage on change', () => {
     render(<LanguageSelector availableLocales={LOCALES} />)
-    const select = screen.getByRole('combobox', { name: /language/i })
+    const select = screen.getByRole('combobox')
     fireEvent.change(select, { target: { value: 'ru' } })
     expect(localStorage.getItem('i18n-lang')).toBe('ru')
   })
 
   it('persists kk choice to localStorage', () => {
     render(<LanguageSelector availableLocales={LOCALES} />)
-    const select = screen.getByRole('combobox', { name: /language/i })
+    const select = screen.getByRole('combobox')
     fireEvent.change(select, { target: { value: 'kk' } })
     expect(localStorage.getItem('i18n-lang')).toBe('kk')
   })

@@ -74,8 +74,9 @@ export function CompletionBarChart({ data, primaryColor }: CompletionBarChartPro
   const assignedKey = t('dashboard.chart_assigned')
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+    <div role="img" aria-label={t('dashboard.chart_title')}>
+      <ResponsiveContainer width="100%" height={280}>
+        <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis
           dataKey="name"
@@ -99,6 +100,7 @@ export function CompletionBarChart({ data, primaryColor }: CompletionBarChartPro
         <Bar dataKey={assignedKey} fill="#e5e7eb" radius={[4, 4, 0, 0]} />
         <Bar dataKey={completedKey} fill={primaryColor || '#6366f1'} radius={[4, 4, 0, 0]} />
       </BarChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+    </div>
   )
 }

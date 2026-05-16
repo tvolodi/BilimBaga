@@ -8,7 +8,17 @@
     "cancel": "Болдырмау",
     "save": "Сақтау",
     "loading": "Жүктелуде…",
-    "loadError": "Жүктеу сәтсіз аяқталды. Қайталап көріңіз."
+    "loadError": "Жүктеу сәтсіз аяқталды. Қайталап көріңіз.",
+    "skipToMain": "Негізгі мазмұнға өту",
+    "deleteQuestion": "Сұрақты жою",
+    "dragHandle": "Ретін өзгерту үшін сүйреңіз",
+    "deleteRule": "Ережені жою",
+    "removeAssignment": "Тапсырманы жою",
+    "removeOption": "Нұсқаны жою",
+    "back": "Артқа",
+    "rowActions": "Жолдың әрекеттері",
+    "actions": "Әрекеттер",
+    "language": "Тіл"
   },
   "nav": {
     "dashboard": "Басты бет",
@@ -804,5 +814,10 @@
   },
   "question": {
     "originalLanguageBadge": "Бастапқы тіл"
+  },
+  "session": {
+    "timerFiveMinutes": "5 минут қалды",
+    "timerOneMinute": "1 минут қалды",
+    "timerExpired": "Уақыт аяқталды"
   }
 }

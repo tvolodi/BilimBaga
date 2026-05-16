@@ -16,7 +16,11 @@ export function PassRateChart({ passRate, primaryColor }: PassRateChartProps) {
   const COLORS = [primaryColor || '#6366f1', '#e5e7eb']
 
   return (
-    <div className="flex flex-col items-center">
+    <div
+      role="img"
+      aria-label={`${t('exam_analytics.pass_rate')}: ${(passRate * 100).toFixed(1)}%`}
+      className="flex flex-col items-center"
+    >
       <ResponsiveContainer width={200} height={200}>
         <PieChart>
           <Pie

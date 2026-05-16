@@ -64,7 +64,7 @@
 | FR-BB58 | Frontend-employee-record | Frontend: Employee Record | Draft |
 | FR-BB61 | Email-notifications | Email Notifications | Implemented |
 | FR-BB62 | Full-i18n-coverage | Full i18n Coverage | implemented |
-| FR-BB63 | Accessibility | Accessibility | Draft |
+| FR-BB63 | Accessibility | Accessibility | Implemented |
 | FR-BB64 | Security-hardening | Security Hardening | Draft |
 | FR-BB65 | Performance | Performance | Draft |
 | FR-BB66 | Observability | Observability | Draft |

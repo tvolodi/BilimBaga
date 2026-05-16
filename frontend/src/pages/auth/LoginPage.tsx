@@ -37,7 +37,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted">
+    <div id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
       <Card className="w-full max-w-md p-8">
         <TenantLogo appName={config?.app_name} />
         <h1 className="mt-4 text-xl font-semibold text-center">

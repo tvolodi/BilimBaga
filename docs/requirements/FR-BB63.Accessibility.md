@@ -6,11 +6,30 @@
 | ID | FR-BB63 |
 | Phase | 6 — Polish & Hardening |
 | Priority | 2 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB110, FR-BB111, FR-BB112, FR-BB26, FR-BB27, FR-BB312, FR-BB313, FR-BB314, FR-BB45, FR-BB46, FR-BB47, FR-BB56, FR-BB57, FR-BB58 |
+
+## Scope
+
+| Layer | Items |
+|-------|-------|
+| Frontend | All component and page changes: `SkipLink`, `ExamTimer`, icon-only buttons, form label/error patterns, status badges, chart accessibility, focus ring global CSS, `App.tsx` layout |
+| Backend | None |
+| Database | None |
+| Migrations | None |
+| Infrastructure | None |
+| i18n | New locale keys added to `kk`, `ru`, and `en` JSON files (see § New i18n Keys) |
 
 ## Description
 Brings the entire frontend to WCAG 2.1 Level AA conformance. All interactive elements are keyboard-navigable and screen-reader-friendly. The exam timer makes live time announcements. Color contrast ratios meet AA thresholds, and the branding settings screen warns when a chosen color combination fails. Forms use proper label associations and error linkage via ARIA attributes.
+
+## Out of Scope
+
+- Backend / server-side accessibility concerns (not applicable — this is a purely frontend requirement).
+- Native mobile applications (iOS / Android).
+- Browser extensions or assistive-technology plugins.
+- WCAG 2.2 criteria that go beyond WCAG 2.1 AA (e.g., 2.4.11 Focus Not Obscured, 2.5.7 Dragging Movements).
+- AAA-level conformance requirements (e.g., 1.4.6 Contrast Enhanced, 1.4.7 Low or No Background Audio).
 
 ## Acceptance Criteria
 - [ ] AC-1: Every interactive element (buttons, links, form controls, modal dialogs, dropdown menus) is reachable and operable via keyboard alone; tab order follows visual reading order; no keyboard focus traps exist except inside open modal dialogs (where focus is intentionally constrained until dismissed).
@@ -125,6 +144,26 @@ return (
 
 **Recommended ESLint plugins**:
 - `eslint-plugin-jsx-a11y` — catches missing `alt`, missing labels, improper ARIA roles.
+
+### New i18n Keys
+
+| Key | Namespace | English Default |
+|-----|-----------|----------------|
+| `common.skipToMain` | `common` | "Skip to main content" |
+| `session.timerFiveMinutes` | `session` | "5 minutes remaining" |
+| `session.timerOneMinute` | `session` | "1 minute remaining" |
+| `session.timerExpired` | `session` | "Time is up" |
+| `common.deleteQuestion` | `common` | "Delete question" |
+| `status.{status}.label` | `common` | Template key — e.g. `status.active.label` → "Active" |
+| `status.{status}.short` | `common` | Template key — e.g. `status.active.short` → "Active" |
+
+## Test Strategy
+
+- **Automated**: `@axe-core/playwright` (playwright-axe) runs against every route in CI; any new violation fails the build.
+- **Unit**:
+  - `SkipLink` renders as the first DOM child of `<body>` and its `href` resolves to `#main-content`.
+  - `ExamTimer` live region fires the `session.timerFiveMinutes` announcement at exactly 300 seconds remaining and `session.timerOneMinute` at exactly 60 seconds remaining; outside those values the live region content is empty.
+- **Manual (per AC-10)**: Full exam-taking flow walkthrough using VoiceOver + Safari on macOS and NVDA + Chrome / Firefox on Windows — reading a question, selecting an answer, navigating to the next question, and submitting the exam — to be completed as a QA gate before Phase 6 release.
 
 ## Notes
 - All shadcn/ui primitives (Button, Input, Select, Dialog, etc.) are built on Radix UI which provides ARIA semantics by default; custom styling must not override Radix UI's ARIA attributes.

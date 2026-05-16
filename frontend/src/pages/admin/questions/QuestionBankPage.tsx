@@ -224,9 +224,9 @@ function RowActionsMenu({ question, onEdit, onArchive, onViewVersions, onDelete 
       <button
         onClick={() => setOpen((o) => !o)}
         className="p-1 rounded hover:bg-muted"
-        aria-label="Row actions"
+        aria-label={t('common.rowActions')}
       >
-        <MoreVertical size={16} />
+        <MoreVertical size={16} aria-hidden="true" />
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-44 bg-background border rounded-md shadow-lg py-1 text-sm">

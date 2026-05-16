@@ -8,7 +8,17 @@
     "cancel": "Отмена",
     "save": "Сохранить",
     "loading": "Загрузка…",
-    "loadError": "Не удалось загрузить. Попробуйте ещё раз."
+    "loadError": "Не удалось загрузить. Попробуйте ещё раз.",
+    "skipToMain": "Перейти к основному содержимому",
+    "deleteQuestion": "Удалить вопрос",
+    "dragHandle": "Перетащить для изменения порядка",
+    "deleteRule": "Удалить правило",
+    "removeAssignment": "Удалить назначение",
+    "removeOption": "Удалить вариант",
+    "back": "Назад",
+    "rowActions": "Действия со строкой",
+    "actions": "Действия",
+    "language": "Язык"
   },
   "nav": {
     "dashboard": "Главная",
@@ -802,5 +812,10 @@
   },
   "question": {
     "originalLanguageBadge": "Исходный язык"
+  },
+  "session": {
+    "timerFiveMinutes": "Осталось 5 минут",
+    "timerOneMinute": "Осталась 1 минута",
+    "timerExpired": "Время вышло"
   }
 }

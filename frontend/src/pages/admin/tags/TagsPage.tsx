@@ -73,9 +73,9 @@ function ActionsMenu({ tag, onRename, onDelete }: ActionsMenuProps) {
         size="sm"
         className="h-7 w-7 p-0"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Actions"
+        aria-label={t('common.actions')}
       >
-        <MoreHorizontal size={15} />
+        <MoreHorizontal size={15} aria-hidden="true" />
       </Button>
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-36 rounded-md border bg-white shadow-md text-sm">

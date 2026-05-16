@@ -96,9 +96,9 @@ function SortableRuleRow({
           {...attributes}
           {...listeners}
           className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
-          aria-label="drag"
+          aria-label={t('common.dragHandle')}
         >
-          <GripVertical size={16} />
+          <GripVertical size={16} aria-hidden="true" />
         </button>
 
         {/* Mode toggle */}
@@ -135,9 +135,9 @@ function SortableRuleRow({
           onClick={() => onDelete(index)}
           disabled={isDeleting}
           className="text-muted-foreground hover:text-destructive transition-colors"
-          aria-label="delete rule"
+          aria-label={t('common.deleteRule')}
         >
-          <Trash2 size={16} />
+          <Trash2 size={16} aria-hidden="true" />
         </button>
       </div>
 

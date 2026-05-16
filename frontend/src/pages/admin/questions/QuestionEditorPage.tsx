@@ -261,9 +261,9 @@ function SortableAnswerOption({
           {...attributes}
           {...listeners}
           className="mt-2 cursor-grab text-muted-foreground hover:text-foreground"
-          aria-label="drag handle"
+          aria-label={t('common.dragHandle')}
         >
-          <GripVertical size={16} />
+          <GripVertical size={16} aria-hidden="true" />
         </button>
       )}
       <div className="flex-1 space-y-2">
@@ -328,9 +328,9 @@ function SortableAnswerOption({
         <button
           onClick={() => onDelete(option.tempId)}
           className="mt-2 text-muted-foreground hover:text-destructive"
-          aria-label="remove option"
+          aria-label={t('common.removeOption')}
         >
-          <X size={16} />
+          <X size={16} aria-hidden="true" />
         </button>
       )}
     </div>
@@ -824,9 +824,9 @@ export function QuestionEditorPage() {
         <button
           onClick={() => navigate('/admin/questions')}
           className="text-muted-foreground hover:text-foreground"
-          aria-label="back"
+          aria-label={t('common.back')}
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={18} aria-hidden="true" />
         </button>
         <h1 className="text-sm font-semibold flex-1 truncate">{pageTitle}</h1>
         {currentStatus && <EditorStatusBadge status={currentStatus} />}

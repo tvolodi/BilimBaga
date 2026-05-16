@@ -258,7 +258,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Questions */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 outline-none">
           {session.questions.map((question) => (
             <div
               key={question.id}

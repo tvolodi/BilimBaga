@@ -25,7 +25,9 @@ export function PortalLayout() {
           </NavLink>
         </nav>
       </div>
-      <Outlet />
+      <main id="main-content" tabIndex={-1} className="outline-none">
+        <Outlet />
+      </main>
     </div>
   )
 }

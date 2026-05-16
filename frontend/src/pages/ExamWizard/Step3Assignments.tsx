@@ -138,9 +138,9 @@ export function Step3Assignments({ examId, canMutate, onBack, onNext }: Step3Ass
                 onClick={() => handleDelete(a.id)}
                 disabled={deleteAssignment.isPending}
                 className="text-muted-foreground hover:text-destructive transition-colors"
-                aria-label="remove assignment"
+                aria-label={t('common.removeAssignment')}
               >
-                <Trash2 size={16} />
+                <Trash2 size={16} aria-hidden="true" />
               </button>
             )}
           </div>

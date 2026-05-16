@@ -34,7 +34,7 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted">
+    <div id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
       <Card className="w-full max-w-md p-8">
         <h1 className="text-xl font-semibold text-center">
           {t('auth.changePassword.title')}

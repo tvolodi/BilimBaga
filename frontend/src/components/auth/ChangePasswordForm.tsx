@@ -36,7 +36,7 @@ export function ChangePasswordForm({ onSubmit, isPending, error }: ChangePasswor
   function renderError() {
     if (mismatch) {
       return (
-        <p role="alert" className="text-sm text-destructive">
+        <p id="confirm-password-error" role="alert" className="text-sm text-destructive">
           {t('auth.changePassword.errors.mismatch')}
         </p>
       )
@@ -89,6 +89,8 @@ export function ChangePasswordForm({ onSubmit, isPending, error }: ChangePasswor
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
+          aria-describedby={mismatch ? 'confirm-password-error' : undefined}
+          aria-invalid={mismatch || undefined}
           required
         />
       </div>

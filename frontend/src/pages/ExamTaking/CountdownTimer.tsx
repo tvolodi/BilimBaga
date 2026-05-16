@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +22,7 @@ function formatTime(seconds: number): string {
 export function CountdownTimer({ remainingSeconds, totalSeconds, onExpire }: CountdownTimerProps) {
   const { t } = useTranslation()
   const expiredRef = useRef(false)
+  const [announcement, setAnnouncement] = useState('')
 
   const pct = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0
   const isCritical = pct <= 0.05
@@ -35,26 +36,40 @@ export function CountdownTimer({ remainingSeconds, totalSeconds, onExpire }: Cou
     }
   }, [remainingSeconds, onExpire])
 
+  // Announce at key thresholds for screen readers (AC-4)
+  useEffect(() => {
+    if (remainingSeconds === 300) setAnnouncement(t('session.timerFiveMinutes'))
+    else if (remainingSeconds === 60) setAnnouncement(t('session.timerOneMinute'))
+    else if (remainingSeconds <= 0) setAnnouncement(t('session.timerExpired'))
+    else setAnnouncement('')
+  }, [remainingSeconds, t])
+
   return (
-    <div
-      className={cn(
-        'font-mono text-sm font-semibold px-2 py-1 rounded',
-        isCritical
-          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-          : isWarning
-            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-            : 'bg-muted text-foreground',
-      )}
-      title={
-        isCritical
-          ? t('exam.taking.timer.critical')
-          : isWarning
-            ? t('exam.taking.timer.warning')
-            : undefined
-      }
-      aria-label={`${t('exam.taking.timer.warning')} ${formatTime(remainingSeconds)}`}
-    >
-      {formatTime(remainingSeconds)}
-    </div>
+    <>
+      {/* Screen reader live region — only speaks at key thresholds */}
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+      <div
+        aria-hidden="true"
+        className={cn(
+          'font-mono text-sm font-semibold px-2 py-1 rounded',
+          isCritical
+            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+            : isWarning
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+              : 'bg-muted text-foreground',
+        )}
+        title={
+          isCritical
+            ? t('exam.taking.timer.critical')
+            : isWarning
+              ? t('exam.taking.timer.warning')
+              : undefined
+        }
+      >
+        {formatTime(remainingSeconds)}
+      </div>
+    </>
   )
 }

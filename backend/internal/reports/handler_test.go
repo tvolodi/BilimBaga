@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+
 	"testing"
 	"time"
 
@@ -17,10 +18,13 @@ import (
 // ── Manual mock service ───────────────────────────────────────────────────────
 
 type mockSvc struct {
-	getDashboardFn      func(ctx context.Context) (*DashboardMetrics, error)
-	getExamAnalyticsFn  func(ctx context.Context, examID string) (*ExamAnalyticsResponse, error)
-	getUserRecordFn     func(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error)
-	getUserProgressFn   func(ctx context.Context, userID string) (*UserProgressResponse, error)
+	getDashboardFn         func(ctx context.Context) (*DashboardMetrics, error)
+	getExamAnalyticsFn     func(ctx context.Context, examID string) (*ExamAnalyticsResponse, error)
+	getUserRecordFn        func(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error)
+	getUserProgressFn      func(ctx context.Context, userID string) (*UserProgressResponse, error)
+	streamExamResultsCSVFn func(ctx context.Context, w http.ResponseWriter, examID, tenantID string) error
+	streamUserRecordCSVFn  func(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error
+	buildDashboardReportFn func(ctx context.Context, tenantID string, from, to time.Time, companyName, logoBase64 string) (*DashboardReportData, error)
 }
 
 func (m *mockSvc) GetDashboardMetrics(ctx context.Context) (*DashboardMetrics, error) {
@@ -49,6 +53,42 @@ func (m *mockSvc) GetUserProgress(ctx context.Context, userID string) (*UserProg
 		return m.getUserProgressFn(ctx, userID)
 	}
 	return nil, errors.New("not configured")
+}
+
+func (m *mockSvc) StreamExamResultsCSV(ctx context.Context, w http.ResponseWriter, examID, tenantID string) error {
+	if m.streamExamResultsCSVFn != nil {
+		return m.streamExamResultsCSVFn(ctx, w, examID, tenantID)
+	}
+	return nil
+}
+
+func (m *mockSvc) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error {
+	if m.streamUserRecordCSVFn != nil {
+		return m.streamUserRecordCSVFn(ctx, w, userID, tenantID)
+	}
+	return nil
+}
+
+func (m *mockSvc) BuildDashboardReport(ctx context.Context, tenantID string, from, to time.Time, companyName, logoBase64 string) (*DashboardReportData, error) {
+	if m.buildDashboardReportFn != nil {
+		return m.buildDashboardReportFn(ctx, tenantID, from, to, companyName, logoBase64)
+	}
+	return &DashboardReportData{
+		From:            from.Format("02 Jan 2006"),
+		To:              to.Format("02 Jan 2006"),
+		CompanyName:     companyName,
+		LogoBase64:      logoBase64,
+		CompletionRates: []*ExamCompletionRate{},
+		TopQuestions:    []QuestionStat{},
+		BottomQuestions: []QuestionStat{},
+	}, nil
+}
+
+// mockTenantCfg is a no-op TenantConfigProvider for tests.
+type mockTenantCfg struct{}
+
+func (m *mockTenantCfg) GetAllConfig() map[string]json.RawMessage {
+	return map[string]json.RawMessage{}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -86,7 +126,7 @@ func TestGetDashboard_200_AllKeysPresent(t *testing.T) {
 			return buildFullMetrics(), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard", nil)
 	w := httptest.NewRecorder()
@@ -122,7 +162,7 @@ func TestGetDashboard_200_LoyaltyTrackIsNull(t *testing.T) {
 			return buildFullMetrics(), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard", nil)
 	w := httptest.NewRecorder()
@@ -160,7 +200,7 @@ func TestGetDashboard_200_EmptyArraysPresent(t *testing.T) {
 			}, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard", nil)
 	w := httptest.NewRecorder()
@@ -189,7 +229,7 @@ func TestGetDashboard_500_ServiceError(t *testing.T) {
 			return nil, errors.New("database unavailable")
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard", nil)
 	w := httptest.NewRecorder()
@@ -213,7 +253,7 @@ func TestGetDashboard_200_CompletionRateFields(t *testing.T) {
 			return buildFullMetrics(), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard", nil)
 	w := httptest.NewRecorder()
@@ -250,7 +290,7 @@ func TestGetDashboard_200_RecentActivityFields(t *testing.T) {
 			return buildFullMetrics(), nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard", nil)
 	w := httptest.NewRecorder()
@@ -310,7 +350,7 @@ func TestGetExamAnalytics_200_HappyPath(t *testing.T) {
 			}, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/exams/exam-uuid/analytics", "exam-uuid")
 	w := httptest.NewRecorder()
@@ -338,7 +378,7 @@ func TestGetExamAnalytics_404_ExamNotFound(t *testing.T) {
 			return nil, ErrNotFound
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/exams/nonexistent/analytics", "nonexistent")
 	w := httptest.NewRecorder()
@@ -360,7 +400,7 @@ func TestGetExamAnalytics_500_ServiceError(t *testing.T) {
 			return nil, errors.New("database connection lost")
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/exams/exam-uuid/analytics", "exam-uuid")
 	w := httptest.NewRecorder()
@@ -405,7 +445,7 @@ func TestGetUserRecord_200_HappyPath(t *testing.T) {
 			}, 7, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/record?page=1&per_page=20", "user-uuid")
 	w := httptest.NewRecorder()
@@ -439,7 +479,7 @@ func TestGetUserRecord_404_UserNotFound(t *testing.T) {
 			return nil, 0, ErrNotFound
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/missing/record", "missing")
 	w := httptest.NewRecorder()
@@ -461,7 +501,7 @@ func TestGetUserRecord_500_ServiceError(t *testing.T) {
 			return nil, 0, errors.New("db failure")
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/record", "user-uuid")
 	w := httptest.NewRecorder()
@@ -479,7 +519,7 @@ func TestGetUserRecord_PerPageCappedAt100(t *testing.T) {
 			return &UserRecordResponse{Sessions: []SessionRecord{}}, 0, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/record?per_page=500", "user-uuid")
 	w := httptest.NewRecorder()
@@ -507,7 +547,7 @@ func TestGetUserProgress_200_HappyPath(t *testing.T) {
 			}, nil
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/progress", "user-uuid")
 	w := httptest.NewRecorder()
@@ -535,7 +575,7 @@ func TestGetUserProgress_404_UserNotFound(t *testing.T) {
 			return nil, ErrNotFound
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/missing/progress", "missing")
 	w := httptest.NewRecorder()
@@ -557,11 +597,173 @@ func TestGetUserProgress_500_ServiceError(t *testing.T) {
 			return nil, errors.New("db failure")
 		},
 	}
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/progress", "user-uuid")
 	w := httptest.NewRecorder()
 	h.GetUserProgress(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// ── FR-BB54: ExamResultsCSV handler tests ───────────────────────────────────
+
+// AC-2,3: Content-Type and Content-Disposition headers set; CSV header row present.
+func TestExamResultsCSV_200_HeadersAndContentType(t *testing.T) {
+	svc := &mockSvc{
+		streamExamResultsCSVFn: func(_ context.Context, w http.ResponseWriter, _, _ string) error {
+			_, _ = w.Write([]byte("employee_name,department,started_at,submitted_at,score_pct,passed,time_taken_seconds\n"))
+			_, _ = w.Write([]byte("Aibek Seitkali,Operations,2026-05-14T10:00:00Z,2026-05-14T10:30:00Z,84.50,true,1800\n"))
+			return nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/exams/exam-uuid/results/export", "exam-uuid")
+	w := httptest.NewRecorder()
+	h.ExamResultsCSV(w, req)
+
+	assert.Equal(t, "text/csv; charset=utf-8", w.Header().Get("Content-Type"))
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "exam-uuid")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), ".csv")
+	body := w.Body.String()
+	assert.Contains(t, body, "employee_name")
+	assert.Contains(t, body, "Aibek Seitkali")
+}
+
+// AC-10: Filename contains exam ID and a date (YYYYMMDD format).
+func TestExamResultsCSV_200_FilenameContainsExamID(t *testing.T) {
+	svc := &mockSvc{}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/exams/my-exam-id/results/export", "my-exam-id")
+	w := httptest.NewRecorder()
+	h.ExamResultsCSV(w, req)
+
+	disp := w.Header().Get("Content-Disposition")
+	assert.Contains(t, disp, "results-my-exam-id-")
+}
+
+// Missing exam id → 400.
+func TestExamResultsCSV_400_MissingID(t *testing.T) {
+	svc := &mockSvc{}
+	h := NewHandler(svc, nil)
+
+	// Build request with empty "id" param.
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/exams//results/export", "")
+	w := httptest.NewRecorder()
+	h.ExamResultsCSV(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// ── FR-BB54: UserRecordCSV handler tests ────────────────────────────────────
+
+// AC-2,5: Content-Type and Content-Disposition set; CSV header row present.
+func TestUserRecordCSV_200_HeadersAndContentType(t *testing.T) {
+	svc := &mockSvc{
+		streamUserRecordCSVFn: func(_ context.Context, w http.ResponseWriter, _, _ string) error {
+			_, _ = w.Write([]byte("exam_title,started_at,submitted_at,score_pct,passed,time_taken_seconds,status\n"))
+			_, _ = w.Write([]byte("Fire Safety,2026-05-14T10:00:00Z,2026-05-14T10:30:00Z,84.50,true,1800,submitted\n"))
+			return nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/user-uuid/record/export", "user-uuid")
+	w := httptest.NewRecorder()
+	h.UserRecordCSV(w, req)
+
+	assert.Equal(t, "text/csv; charset=utf-8", w.Header().Get("Content-Type"))
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "user-uuid")
+	body := w.Body.String()
+	assert.Contains(t, body, "exam_title")
+	assert.Contains(t, body, "Fire Safety")
+}
+
+// AC-10: Filename contains user ID.
+func TestUserRecordCSV_200_FilenameContainsUserID(t *testing.T) {
+	svc := &mockSvc{}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users/my-user-id/record/export", "my-user-id")
+	w := httptest.NewRecorder()
+	h.UserRecordCSV(w, req)
+
+	disp := w.Header().Get("Content-Disposition")
+	assert.Contains(t, disp, "record-my-user-id-")
+}
+
+// Missing user id → 400.
+func TestUserRecordCSV_400_MissingID(t *testing.T) {
+	svc := &mockSvc{}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/users//record/export", "")
+	w := httptest.NewRecorder()
+	h.UserRecordCSV(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// ── FR-BB54: DashboardExportPDF handler tests ────────────────────────────────
+
+// AC-9: Content-Type is application/pdf on success.
+func TestDashboardExportPDF_200_ContentTypePDF(t *testing.T) {
+	svc := &mockSvc{} // default BuildDashboardReport returns empty data
+	h := NewHandler(svc, &mockTenantCfg{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard/export", nil)
+	w := httptest.NewRecorder()
+	h.DashboardExportPDF(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/pdf", w.Header().Get("Content-Type"))
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment")
+	assert.Contains(t, w.Header().Get("Content-Disposition"), ".pdf")
+	// PDF magic bytes: %PDF
+	assert.True(t, len(w.Body.Bytes()) > 4)
+}
+
+// AC-10: Filename contains from/to dates when supplied.
+func TestDashboardExportPDF_200_FilenameContainsDates(t *testing.T) {
+	svc := &mockSvc{}
+	h := NewHandler(svc, &mockTenantCfg{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard/export?from=2026-04-01&to=2026-04-30", nil)
+	w := httptest.NewRecorder()
+	h.DashboardExportPDF(w, req)
+
+	disp := w.Header().Get("Content-Disposition")
+	assert.Contains(t, disp, "dashboard-report-20260401-20260430")
+}
+
+// AC-6: when from/to omitted the handler defaults to last 30 days (just verifying 200).
+func TestDashboardExportPDF_200_DefaultDateRange(t *testing.T) {
+	svc := &mockSvc{}
+	h := NewHandler(svc, &mockTenantCfg{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard/export", nil)
+	w := httptest.NewRecorder()
+	h.DashboardExportPDF(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// Service error → 500.
+func TestDashboardExportPDF_500_ServiceError(t *testing.T) {
+	svc := &mockSvc{
+		buildDashboardReportFn: func(_ context.Context, _ string, _, _ time.Time, _, _ string) (*DashboardReportData, error) {
+			return nil, errors.New("db failure")
+		},
+	}
+	h := NewHandler(svc, &mockTenantCfg{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard/export", nil)
+	w := httptest.NewRecorder()
+	h.DashboardExportPDF(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

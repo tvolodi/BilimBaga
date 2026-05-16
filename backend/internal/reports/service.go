@@ -2,8 +2,12 @@ package reports
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
+	"net/http"
+	"strconv"
 	"sync"
+	"time"
 )
 
 // Service defines the business logic for the reports domain.
@@ -20,6 +24,20 @@ type Service interface {
 
 	// GetUserProgress returns the three-track progress summary for one employee (FR-BB53).
 	GetUserProgress(ctx context.Context, userID string) (*UserProgressResponse, error)
+
+	// ── FR-BB54: Export API ───────────────────────────────────────────────────
+
+	// StreamExamResultsCSV writes a CSV of all session results for one exam
+	// directly to w using Go's encoding/csv (AC-2, AC-3, AC-4, AC-8, AC-10).
+	StreamExamResultsCSV(ctx context.Context, w http.ResponseWriter, examID, tenantID string) error
+
+	// StreamUserRecordCSV writes a CSV of all sessions for one user
+	// directly to w using Go's encoding/csv (AC-2, AC-5, AC-8, AC-10).
+	StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error
+
+	// BuildDashboardReport assembles DashboardReportData from the repository
+	// for a given date range and tenant, used by the PDF handler (AC-6, AC-7).
+	BuildDashboardReport(ctx context.Context, tenantID string, from, to time.Time, companyName, logoBase64 string) (*DashboardReportData, error)
 }
 
 type service struct {
@@ -290,6 +308,206 @@ func (s *service) GetUserProgress(ctx context.Context, userID string) (*UserProg
 		UserID:   info.ID,
 		FullName: info.FullName,
 		Tracks:   buildTrackProgress(activity, requiredExams),
+	}, nil
+}
+
+// ── FR-BB54: Export API ──────────────────────────────────────────────────────
+
+// StreamExamResultsCSV streams a CSV of all session results for one exam
+// directly to the http.ResponseWriter without buffering the full dataset (AC-8).
+// Headers and Content-Disposition are set by the handler before calling this.
+func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWriter, examID, tenantID string) error {
+	// Fetch ordered question list to build the dynamic header (AC-3).
+	questions, err := s.repo.GetExamQuestions(ctx, examID, tenantID)
+	if err != nil {
+		return fmt.Errorf("reports: StreamExamResultsCSV: get questions: %w", err)
+	}
+
+	// Build CSV header row.
+	header := []string{
+		"employee_name", "department", "started_at", "submitted_at",
+		"score_pct", "passed", "time_taken_seconds",
+	}
+	for i := range questions {
+		header = append(header, fmt.Sprintf("question_%d_score", i+1))
+	}
+
+	csvWriter := csv.NewWriter(w)
+	defer csvWriter.Flush()
+
+	if err := csvWriter.Write(header); err != nil {
+		return fmt.Errorf("reports: StreamExamResultsCSV: write header: %w", err)
+	}
+
+	// Stream session rows from the database cursor (AC-8).
+	rows, err := s.repo.StreamExamResultSessions(ctx, examID, tenantID)
+	if err != nil {
+		return fmt.Errorf("reports: StreamExamResultsCSV: stream sessions: %w", err)
+	}
+
+	// Collect session IDs to batch-fetch question scores.
+	type sessionMeta struct {
+		row ExamResultSessionRow
+	}
+	var sessions []sessionMeta
+	var sessionIDs []string
+
+	if rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var r ExamResultSessionRow
+			if err := rows.StructScan(&r); err != nil {
+				return fmt.Errorf("reports: StreamExamResultsCSV: scan: %w", err)
+			}
+			sessions = append(sessions, sessionMeta{row: r})
+			sessionIDs = append(sessionIDs, r.SessionID)
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("reports: StreamExamResultsCSV: rows: %w", err)
+		}
+	}
+
+	// Fetch per-question scores for all sessions.
+	qScores, err := s.repo.GetSessionQuestionScores(ctx, sessionIDs)
+	if err != nil {
+		return fmt.Errorf("reports: StreamExamResultsCSV: get scores: %w", err)
+	}
+
+	// Index scores by (sessionID, questionID) → score.
+	type scoreKey struct{ sessionID, questionID string }
+	scoreMap := make(map[scoreKey]*float64, len(qScores))
+	for _, qs := range qScores {
+		k := scoreKey{qs.SessionID, qs.QuestionID}
+		v := qs.Score
+		scoreMap[k] = v
+	}
+
+	// Write one row per session (AC-3, AC-4).
+	for _, sm := range sessions {
+		r := sm.row
+
+		scorePctStr := ""
+		if r.ScorePct != nil {
+			scorePctStr = strconv.FormatFloat(*r.ScorePct, 'f', 2, 64)
+		}
+		passedStr := ""
+		if r.Passed != nil {
+			passedStr = strconv.FormatBool(*r.Passed)
+		}
+		timeTakenStr := ""
+		if r.TimeTakenSeconds != nil {
+			timeTakenStr = strconv.Itoa(*r.TimeTakenSeconds)
+		}
+
+		record := []string{
+			r.EmployeeName,
+			r.Department,
+			r.StartedAt,
+			r.SubmittedAt,
+			scorePctStr,
+			passedStr,
+			timeTakenStr,
+		}
+
+		// Append one cell per question; empty if score not recorded (AC-4).
+		for _, q := range questions {
+			k := scoreKey{r.SessionID, q.QuestionID}
+			if score, ok := scoreMap[k]; ok && score != nil {
+				record = append(record, strconv.FormatFloat(*score, 'f', -1, 64))
+			} else {
+				record = append(record, "") // grading_pending → empty cell
+			}
+		}
+
+		if err := csvWriter.Write(record); err != nil {
+			return fmt.Errorf("reports: StreamExamResultsCSV: write row: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// StreamUserRecordCSV streams a CSV of all session history for one user
+// directly to the http.ResponseWriter without buffering (AC-5, AC-8).
+func (s *service) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error {
+	header := []string{
+		"exam_title", "started_at", "submitted_at",
+		"score_pct", "passed", "time_taken_seconds", "status",
+	}
+
+	csvWriter := csv.NewWriter(w)
+	defer csvWriter.Flush()
+
+	if err := csvWriter.Write(header); err != nil {
+		return fmt.Errorf("reports: StreamUserRecordCSV: write header: %w", err)
+	}
+
+	rows, err := s.repo.StreamUserRecordSessions(ctx, userID, tenantID)
+	if err != nil {
+		return fmt.Errorf("reports: StreamUserRecordCSV: stream sessions: %w", err)
+	}
+	if rows == nil {
+		return nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var r UserRecordCSVRow
+		if err := rows.StructScan(&r); err != nil {
+			return fmt.Errorf("reports: StreamUserRecordCSV: scan: %w", err)
+		}
+
+		scorePctStr := ""
+		if r.ScorePct != nil {
+			scorePctStr = strconv.FormatFloat(*r.ScorePct, 'f', 2, 64)
+		}
+		passedStr := ""
+		if r.Passed != nil {
+			passedStr = strconv.FormatBool(*r.Passed)
+		}
+		timeTakenStr := ""
+		if r.TimeTakenSeconds != nil {
+			timeTakenStr = strconv.Itoa(*r.TimeTakenSeconds)
+		}
+
+		record := []string{
+			r.ExamTitle,
+			r.StartedAt,
+			r.SubmittedAt,
+			scorePctStr,
+			passedStr,
+			timeTakenStr,
+			r.Status,
+		}
+
+		if err := csvWriter.Write(record); err != nil {
+			return fmt.Errorf("reports: StreamUserRecordCSV: write row: %w", err)
+		}
+	}
+
+	return rows.Err()
+}
+
+// BuildDashboardReport assembles DashboardReportData for the PDF export (AC-6, AC-7).
+func (s *service) BuildDashboardReport(ctx context.Context, tenantID string, from, to time.Time, companyName, logoBase64 string) (*DashboardReportData, error) {
+	completionRates, err := s.repo.GetDashboardCompletionRatesForRange(ctx, tenantID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("reports: BuildDashboardReport: completion rates: %w", err)
+	}
+
+	top, bottom, err := s.repo.GetTopBottomQuestions(ctx, tenantID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("reports: BuildDashboardReport: top/bottom questions: %w", err)
+	}
+
+	return &DashboardReportData{
+		From:            from.Format("02 Jan 2006"),
+		To:              to.Format("02 Jan 2006"),
+		CompanyName:     companyName,
+		LogoBase64:      logoBase64,
+		CompletionRates: completionRates,
+		TopQuestions:    top,
+		BottomQuestions: bottom,
 	}, nil
 }
 

@@ -226,6 +226,15 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
 				Get("/admin/users/{id}/progress", reportsHandler.GetUserProgress)
 
+			// Export API (FR-BB54) — examiner+ only.
+			// Static sub-paths registered before /{id} routes.
+			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+				Get("/admin/dashboard/export", reportsHandler.DashboardExportPDF)
+			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+				Get("/admin/exams/{id}/results/export", reportsHandler.ExamResultsCSV)
+			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+				Get("/admin/users/{id}/record/export", reportsHandler.UserRecordCSV)
+
 			// Manual grading queue (FR-BB42).
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading", sessionsHandler.HandleListGradingQueue)
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)

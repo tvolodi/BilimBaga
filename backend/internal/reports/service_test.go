@@ -3,9 +3,13 @@ package reports
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,20 +17,26 @@ import (
 // ── Manual mock repository ────────────────────────────────────────────────────
 
 type mockRepo struct {
-	getCompletionFn         func(ctx context.Context) ([]*ExamCompletionRate, error)
-	getOverdueFn            func(ctx context.Context) ([]*OverdueEmployee, error)
-	getRecentFn             func(ctx context.Context) ([]*RecentActivity, error)
-	getAvgScoreByTrack      func(ctx context.Context) (map[string]*float64, error)
-	getExamTitleFn          func(ctx context.Context, examID string) (string, error)
-	getScoreDistFn          func(ctx context.Context, examID string) ([]BucketCount, error)
-	getSummaryStatsFn       func(ctx context.Context, examID string) (*examSummaryRow, error)
-	getPerQuestionStatsFn   func(ctx context.Context, examID string) ([]questionStatRow, error)
-	getAnswerDistFn         func(ctx context.Context, examID string) ([]answerDistRow, error)
-	getUserInfoFn           func(ctx context.Context, userID string) (*userInfoRow, error)
-	getUserSessionHistoryFn func(ctx context.Context, userID string, limit, offset int) ([]SessionRecord, error)
-	getUserSessionCountFn   func(ctx context.Context, userID string) (int, error)
-	getUserTrackActivityFn  func(ctx context.Context, userID string) ([]TrackActivity, error)
-	getUserRequiredExamsFn  func(ctx context.Context, userID string) ([]ExamProgress, error)
+	getCompletionFn                      func(ctx context.Context) ([]*ExamCompletionRate, error)
+	getOverdueFn                         func(ctx context.Context) ([]*OverdueEmployee, error)
+	getRecentFn                          func(ctx context.Context) ([]*RecentActivity, error)
+	getAvgScoreByTrack                   func(ctx context.Context) (map[string]*float64, error)
+	getExamTitleFn                       func(ctx context.Context, examID string) (string, error)
+	getScoreDistFn                       func(ctx context.Context, examID string) ([]BucketCount, error)
+	getSummaryStatsFn                    func(ctx context.Context, examID string) (*examSummaryRow, error)
+	getPerQuestionStatsFn                func(ctx context.Context, examID string) ([]questionStatRow, error)
+	getAnswerDistFn                      func(ctx context.Context, examID string) ([]answerDistRow, error)
+	getUserInfoFn                        func(ctx context.Context, userID string) (*userInfoRow, error)
+	getUserSessionHistoryFn              func(ctx context.Context, userID string, limit, offset int) ([]SessionRecord, error)
+	getUserSessionCountFn                func(ctx context.Context, userID string) (int, error)
+	getUserTrackActivityFn               func(ctx context.Context, userID string) ([]TrackActivity, error)
+	getUserRequiredExamsFn               func(ctx context.Context, userID string) ([]ExamProgress, error)
+	getExamQuestionsFn                   func(ctx context.Context, examID, tenantID string) ([]ExamQuestion, error)
+	streamExamResultSessionsFn           func(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error)
+	getSessionQuestionScoresFn           func(ctx context.Context, sessionIDs []string) ([]QuestionScore, error)
+	streamUserRecordSessionsFn           func(ctx context.Context, userID, tenantID string) (*sqlx.Rows, error)
+	getDashboardCompletionRatesForRangeFn func(ctx context.Context, tenantID string, from, to time.Time) ([]*ExamCompletionRate, error)
+	getTopBottomQuestionsFn              func(ctx context.Context, tenantID string, from, to time.Time) ([]QuestionStat, []QuestionStat, error)
 }
 
 func (m *mockRepo) GetCompletionRateByExam(ctx context.Context) ([]*ExamCompletionRate, error) {
@@ -126,6 +136,48 @@ func (m *mockRepo) GetUserRequiredExams(ctx context.Context, userID string) ([]E
 		return m.getUserRequiredExamsFn(ctx, userID)
 	}
 	return []ExamProgress{}, nil
+}
+
+func (m *mockRepo) GetExamQuestions(ctx context.Context, examID, tenantID string) ([]ExamQuestion, error) {
+	if m.getExamQuestionsFn != nil {
+		return m.getExamQuestionsFn(ctx, examID, tenantID)
+	}
+	return []ExamQuestion{}, nil
+}
+
+func (m *mockRepo) StreamExamResultSessions(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error) {
+	if m.streamExamResultSessionsFn != nil {
+		return m.streamExamResultSessionsFn(ctx, examID, tenantID)
+	}
+	return nil, nil
+}
+
+func (m *mockRepo) GetSessionQuestionScores(ctx context.Context, sessionIDs []string) ([]QuestionScore, error) {
+	if m.getSessionQuestionScoresFn != nil {
+		return m.getSessionQuestionScoresFn(ctx, sessionIDs)
+	}
+	return []QuestionScore{}, nil
+}
+
+func (m *mockRepo) StreamUserRecordSessions(ctx context.Context, userID, tenantID string) (*sqlx.Rows, error) {
+	if m.streamUserRecordSessionsFn != nil {
+		return m.streamUserRecordSessionsFn(ctx, userID, tenantID)
+	}
+	return nil, nil
+}
+
+func (m *mockRepo) GetDashboardCompletionRatesForRange(ctx context.Context, tenantID string, from, to time.Time) ([]*ExamCompletionRate, error) {
+	if m.getDashboardCompletionRatesForRangeFn != nil {
+		return m.getDashboardCompletionRatesForRangeFn(ctx, tenantID, from, to)
+	}
+	return []*ExamCompletionRate{}, nil
+}
+
+func (m *mockRepo) GetTopBottomQuestions(ctx context.Context, tenantID string, from, to time.Time) ([]QuestionStat, []QuestionStat, error) {
+	if m.getTopBottomQuestionsFn != nil {
+		return m.getTopBottomQuestionsFn(ctx, tenantID, from, to)
+	}
+	return []QuestionStat{}, []QuestionStat{}, nil
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -638,4 +690,176 @@ func TestGetUserProgress_HappyPath(t *testing.T) {
 	assert.Equal(t, 0, safety.QuestionsAnswered)
 	assert.Nil(t, safety.LastActivity)
 	assert.Empty(t, safety.RequiredExams)
+}
+
+// ── FR-BB54: StreamExamResultsCSV service tests ──────────────────────────────
+
+// AC-3: header row contains the expected fixed columns.
+func TestStreamExamResultsCSV_HeaderRowPresent(t *testing.T) {
+	repo := &mockRepo{} // no questions, no sessions → just header written
+	svc := NewService(repo)
+
+	w := httptest.NewRecorder()
+	err := svc.StreamExamResultsCSV(context.Background(), w, "exam-uuid", "tenant-uuid")
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	assert.True(t, strings.HasPrefix(body, "employee_name,department,started_at,submitted_at,score_pct,passed,time_taken_seconds"),
+		"CSV must start with fixed header columns, got: %s", body)
+}
+
+// AC-3: dynamic question columns appended after fixed columns.
+func TestStreamExamResultsCSV_QuestionColumnsAppended(t *testing.T) {
+	repo := &mockRepo{
+		getExamQuestionsFn: func(_ context.Context, _, _ string) ([]ExamQuestion, error) {
+			return []ExamQuestion{
+				{QuestionID: "q1", Position: 1},
+				{QuestionID: "q2", Position: 2},
+			}, nil
+		},
+	}
+	svc := NewService(repo)
+
+	w := httptest.NewRecorder()
+	err := svc.StreamExamResultsCSV(context.Background(), w, "exam-uuid", "tenant-uuid")
+	require.NoError(t, err)
+
+	header := strings.Split(strings.Split(w.Body.String(), "\n")[0], ",")
+	assert.Equal(t, "question_1_score", header[7])
+	assert.Equal(t, "question_2_score", header[8])
+}
+
+// Repo error fetching questions → service returns error.
+func TestStreamExamResultsCSV_QuestionFetchError(t *testing.T) {
+	repo := &mockRepo{
+		getExamQuestionsFn: func(_ context.Context, _, _ string) ([]ExamQuestion, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	svc := NewService(repo)
+
+	w := httptest.NewRecorder()
+	err := svc.StreamExamResultsCSV(context.Background(), w, "exam-uuid", "tenant-uuid")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db error")
+}
+
+// Repo error streaming sessions → service returns error.
+func TestStreamExamResultsCSV_StreamSessionsError(t *testing.T) {
+	repo := &mockRepo{
+		streamExamResultSessionsFn: func(_ context.Context, _, _ string) (*sqlx.Rows, error) {
+			return nil, errors.New("stream error")
+		},
+	}
+	svc := NewService(repo)
+
+	w := httptest.NewRecorder()
+	err := svc.StreamExamResultsCSV(context.Background(), w, "exam-uuid", "tenant-uuid")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stream error")
+}
+
+// ── FR-BB54: StreamUserRecordCSV service tests ───────────────────────────────
+
+// AC-5: header row contains the expected columns.
+func TestStreamUserRecordCSV_HeaderRowPresent(t *testing.T) {
+	repo := &mockRepo{} // no sessions → just header
+	svc := NewService(repo)
+
+	w := httptest.NewRecorder()
+	err := svc.StreamUserRecordCSV(context.Background(), w, "user-uuid", "tenant-uuid")
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	assert.True(t, strings.HasPrefix(body, "exam_title,started_at,submitted_at,score_pct,passed,time_taken_seconds,status"),
+		"CSV must start with correct header, got: %s", body)
+}
+
+// Repo error streaming sessions → service returns error.
+func TestStreamUserRecordCSV_StreamError(t *testing.T) {
+	repo := &mockRepo{
+		streamUserRecordSessionsFn: func(_ context.Context, _, _ string) (*sqlx.Rows, error) {
+			return nil, errors.New("stream error")
+		},
+	}
+	svc := NewService(repo)
+
+	w := httptest.NewRecorder()
+	err := svc.StreamUserRecordCSV(context.Background(), w, "user-uuid", "tenant-uuid")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stream error")
+}
+
+// ── FR-BB54: BuildDashboardReport service tests ──────────────────────────────
+
+// AC-6,7: happy path assembles DashboardReportData correctly.
+func TestBuildDashboardReport_HappyPath(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 23, 59, 59, 0, time.UTC)
+
+	cr := 0.87
+	repo := &mockRepo{
+		getDashboardCompletionRatesForRangeFn: func(_ context.Context, _ string, _, _ time.Time) ([]*ExamCompletionRate, error) {
+			return []*ExamCompletionRate{
+				{ExamID: "e1", Title: "Fire Safety", AssignedCount: 150, CompletedCount: 112, PassedCount: 98},
+			}, nil
+		},
+		getTopBottomQuestionsFn: func(_ context.Context, _ string, _, _ time.Time) ([]QuestionStat, []QuestionStat, error) {
+			top := []QuestionStat{{QuestionID: "q1", StemPreview: "Top question", CorrectRate: &cr}}
+			bot := []QuestionStat{{QuestionID: "q2", StemPreview: "Bottom question", CorrectRate: &cr}}
+			return top, bot, nil
+		},
+	}
+	svc := NewService(repo)
+
+	data, err := svc.BuildDashboardReport(context.Background(), "tenant-uuid", from, to, "Acme Corp", "")
+	require.NoError(t, err)
+	require.NotNil(t, data)
+
+	assert.Equal(t, "Acme Corp", data.CompanyName)
+	require.Len(t, data.CompletionRates, 1)
+	assert.Equal(t, "Fire Safety", data.CompletionRates[0].Title)
+	require.Len(t, data.TopQuestions, 1)
+	assert.Equal(t, "Top question", data.TopQuestions[0].StemPreview)
+	require.Len(t, data.BottomQuestions, 1)
+	assert.Equal(t, "Bottom question", data.BottomQuestions[0].StemPreview)
+}
+
+// AC-6: completion rates error → BuildDashboardReport returns error.
+func TestBuildDashboardReport_CompletionRatesError(t *testing.T) {
+	repo := &mockRepo{
+		getDashboardCompletionRatesForRangeFn: func(_ context.Context, _ string, _, _ time.Time) ([]*ExamCompletionRate, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	svc := NewService(repo)
+
+	_, err := svc.BuildDashboardReport(context.Background(), "tenant-uuid",
+		time.Now().Add(-24*time.Hour), time.Now(), "", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db error")
+}
+
+// AC-7: top/bottom questions error → BuildDashboardReport returns error.
+func TestBuildDashboardReport_TopBottomError(t *testing.T) {
+	repo := &mockRepo{
+		getTopBottomQuestionsFn: func(_ context.Context, _ string, _, _ time.Time) ([]QuestionStat, []QuestionStat, error) {
+			return nil, nil, errors.New("questions error")
+		},
+	}
+	svc := NewService(repo)
+
+	_, err := svc.BuildDashboardReport(context.Background(), "tenant-uuid",
+		time.Now().Add(-24*time.Hour), time.Now(), "", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "questions error")
+}
+
+// Verify http.ResponseWriter is accepted (compile-time check for interface compatibility).
+func TestStreamExamResultsCSV_AcceptsResponseWriter(t *testing.T) {
+	repo := &mockRepo{}
+	svc := NewService(repo)
+	var w http.ResponseWriter = httptest.NewRecorder()
+	// Must not panic — interface compatibility confirmed.
+	_ = svc.StreamExamResultsCSV(context.Background(), w, "e", "t")
 }

@@ -57,7 +57,7 @@
 | FR-BB51 | Dashboard-metrics-API | Dashboard Metrics API | Draft |
 | FR-BB52 | Per-exam-analytics-API | Per-Exam Analytics API | Draft |
 | FR-BB53 | Per-employee-record-API | Per-Employee Record API | Draft |
-| FR-BB54 | Export-API | Export API | Draft |
+| FR-BB54 | Export-API | Export API | Implemented |
 | FR-BB55 | Audit-log-viewer | Audit Log Viewer | Draft |
 | FR-BB56 | Frontend-admin-dashboard | Frontend: Admin Dashboard | Draft |
 | FR-BB57 | Frontend-per-exam-analytics | Frontend: Per-Exam Analytics | Draft |

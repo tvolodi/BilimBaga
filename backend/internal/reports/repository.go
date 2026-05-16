@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // Repository defines all read-only persistence operations for the reports domain.
@@ -76,6 +77,34 @@ type Repository interface {
 	// count.  Exam track is inferred from the lowest-sort_order question rule
 	// category (AC-9).
 	GetUserRequiredExams(ctx context.Context, userID string) ([]ExamProgress, error)
+
+	// ── FR-BB54: Export API ───────────────────────────────────────────────────
+
+	// GetExamQuestions returns the ordered list of unique questions for sessions
+	// of an exam, used to build the dynamic CSV header (AC-3).
+	GetExamQuestions(ctx context.Context, examID, tenantID string) ([]ExamQuestion, error)
+
+	// StreamExamResultSessions returns all submitted/grading_pending sessions for
+	// one exam scoped to the given tenant (AC-3, AC-8). The caller must close the
+	// returned *sqlx.Rows.
+	StreamExamResultSessions(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error)
+
+	// GetSessionQuestionScores returns per-question scores for the given session
+	// IDs (AC-3, AC-4).
+	GetSessionQuestionScores(ctx context.Context, sessionIDs []string) ([]QuestionScore, error)
+
+	// StreamUserRecordSessions returns all non-in_progress sessions for one user
+	// scoped to the given tenant (AC-5, AC-8). The caller must close the returned
+	// *sqlx.Rows.
+	StreamUserRecordSessions(ctx context.Context, userID, tenantID string) (*sqlx.Rows, error)
+
+	// GetDashboardCompletionRatesForRange returns per-exam completion stats within
+	// the given date range for the PDF export (AC-7).
+	GetDashboardCompletionRatesForRange(ctx context.Context, tenantID string, from, to time.Time) ([]*ExamCompletionRate, error)
+
+	// GetTopBottomQuestions returns top 5 and bottom 5 questions by correct_rate
+	// across all exams in the range for the PDF export (AC-7).
+	GetTopBottomQuestions(ctx context.Context, tenantID string, from, to time.Time) (top []QuestionStat, bottom []QuestionStat, err error)
 }
 
 type postgresRepository struct {
@@ -706,4 +735,262 @@ GROUP BY e.id, e.title, exam_track.track`
 		result = []ExamProgress{}
 	}
 	return result, nil
+}
+
+// ── FR-BB54: Export API ──────────────────────────────────────────────────────
+
+// GetExamQuestions returns the ordered distinct questions that appeared in
+// completed sessions of an exam, used to build the dynamic CSV header.
+func (r *postgresRepository) GetExamQuestions(ctx context.Context, examID, tenantID string) ([]ExamQuestion, error) {
+	const q = `
+SELECT
+  sq.question_id,
+  ROW_NUMBER() OVER (ORDER BY MIN(sq.question_id)) AS position
+FROM session_questions sq
+JOIN exam_sessions es ON es.id = sq.session_id
+WHERE es.exam_id = $1
+  AND es.tenant_id = $2
+  AND es.status IN ('submitted', 'grading_pending')
+GROUP BY sq.question_id
+ORDER BY position`
+
+	var result []ExamQuestion
+	if err := r.db.SelectContext(ctx, &result, q, examID, tenantID); err != nil {
+		return nil, fmt.Errorf("reports: GetExamQuestions: %w", err)
+	}
+	return result, nil
+}
+
+// StreamExamResultSessions returns an open *sqlx.Rows cursor over
+// submitted/grading_pending sessions for one exam scoped to the tenant.
+// The caller is responsible for closing the rows.
+func (r *postgresRepository) StreamExamResultSessions(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error) {
+	const q = `
+SELECT
+  u.full_name                                                                AS employee_name,
+  COALESCE(d.name, '')                                                       AS department,
+  TO_CHAR(es.started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')  AS started_at,
+  TO_CHAR(es.submitted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
+  es.score_pct,
+  es.passed,
+  EXTRACT(EPOCH FROM (es.submitted_at - es.started_at))::INT                AS time_taken_seconds,
+  es.id                                                                      AS session_id
+FROM exam_sessions es
+JOIN users u ON u.id = es.user_id
+LEFT JOIN departments d ON d.id = u.department_id
+WHERE es.exam_id = $1
+  AND es.tenant_id = $2
+  AND es.status IN ('submitted', 'grading_pending')
+ORDER BY es.started_at`
+
+	rows, err := r.db.QueryxContext(ctx, q, examID, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: StreamExamResultSessions: %w", err)
+	}
+	return rows, nil
+}
+
+// GetSessionQuestionScores returns per-question scores for a batch of session IDs.
+func (r *postgresRepository) GetSessionQuestionScores(ctx context.Context, sessionIDs []string) ([]QuestionScore, error) {
+	if len(sessionIDs) == 0 {
+		return nil, nil
+	}
+	// Use lib/pq array to pass session IDs as a PostgreSQL UUID array.
+	q := `
+SELECT session_id, question_id, score
+FROM session_question_scores
+WHERE session_id = ANY($1::UUID[])`
+
+	rows, err := r.db.QueryxContext(ctx, q, pq.Array(sessionIDs))
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetSessionQuestionScores: %w", err)
+	}
+	defer rows.Close()
+
+	var result []QuestionScore
+	for rows.Next() {
+		var qs QuestionScore
+		if err := rows.StructScan(&qs); err != nil {
+			return nil, fmt.Errorf("reports: GetSessionQuestionScores: scan: %w", err)
+		}
+		result = append(result, qs)
+	}
+	return result, rows.Err()
+}
+
+// StreamUserRecordSessions returns an open *sqlx.Rows cursor over all
+// non-in_progress sessions for one user scoped to the tenant.
+// The caller is responsible for closing the rows.
+func (r *postgresRepository) StreamUserRecordSessions(ctx context.Context, userID, tenantID string) (*sqlx.Rows, error) {
+	const q = `
+SELECT
+  e.title                                                                     AS exam_title,
+  TO_CHAR(es.started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')   AS started_at,
+  TO_CHAR(es.submitted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
+  es.score_pct,
+  es.passed,
+  EXTRACT(EPOCH FROM (es.submitted_at - es.started_at))::INT                 AS time_taken_seconds,
+  es.status
+FROM exam_sessions es
+JOIN exams e ON e.id = es.exam_id
+WHERE es.user_id = $1
+  AND es.tenant_id = $2
+  AND es.status != 'in_progress'
+ORDER BY es.started_at DESC`
+
+	rows, err := r.db.QueryxContext(ctx, q, userID, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("reports: StreamUserRecordSessions: %w", err)
+	}
+	return rows, nil
+}
+
+// GetDashboardCompletionRatesForRange returns completion stats per exam within
+// the given UTC date range (inclusive), scoped to the tenant.
+func (r *postgresRepository) GetDashboardCompletionRatesForRange(ctx context.Context, tenantID string, from, to time.Time) ([]*ExamCompletionRate, error) {
+	const q = `
+WITH RECURSIVE dept_tree(id, root_id) AS (
+    SELECT d.id, d.id AS root_id FROM departments d
+    UNION ALL
+    SELECT d.id, dt.root_id FROM departments d JOIN dept_tree dt ON d.parent_id = dt.id
+),
+all_users AS (
+    SELECT u.id AS user_id, u.department_id FROM users u WHERE u.status = 'active'
+),
+resolved_assignments AS (
+    SELECT ea.exam_id, ea.assignee_id AS user_id
+    FROM exam_assignments ea WHERE ea.assignee_type = 'user'
+    UNION
+    SELECT ea.exam_id, au.user_id
+    FROM exam_assignments ea
+    JOIN dept_tree dt ON dt.root_id = ea.assignee_id
+    JOIN all_users au ON au.department_id = dt.id
+    WHERE ea.assignee_type = 'department'
+    UNION
+    SELECT ea.exam_id, au.user_id
+    FROM exam_assignments ea CROSS JOIN all_users au
+    WHERE ea.assignee_type = 'all'
+)
+SELECT
+  e.id                                                                           AS exam_id,
+  e.title,
+  COUNT(DISTINCT ra.user_id)                                                     AS assigned_count,
+  COUNT(DISTINCT CASE WHEN es.status IN ('submitted','grading_pending') THEN ra.user_id END)
+                                                                                 AS completed_count,
+  COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)                 AS passed_count
+FROM exams e
+JOIN resolved_assignments ra ON ra.exam_id = e.id
+LEFT JOIN exam_sessions es
+  ON es.exam_id = e.id
+  AND es.user_id = ra.user_id
+  AND es.submitted_at BETWEEN $2 AND $3
+WHERE e.tenant_id = $1
+  AND e.status = 'active'
+GROUP BY e.id, e.title
+ORDER BY e.title`
+
+	rows, err := r.db.QueryxContext(ctx, q, tenantID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("reports: GetDashboardCompletionRatesForRange: %w", err)
+	}
+	defer rows.Close()
+
+	type crRow struct {
+		ExamID         string `db:"exam_id"`
+		Title          string `db:"title"`
+		AssignedCount  int    `db:"assigned_count"`
+		CompletedCount int    `db:"completed_count"`
+		PassedCount    int    `db:"passed_count"`
+	}
+
+	var result []*ExamCompletionRate
+	for rows.Next() {
+		var row crRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, fmt.Errorf("reports: GetDashboardCompletionRatesForRange: scan: %w", err)
+		}
+		result = append(result, &ExamCompletionRate{
+			ExamID:         row.ExamID,
+			Title:          row.Title,
+			AssignedCount:  row.AssignedCount,
+			CompletedCount: row.CompletedCount,
+			PassedCount:    row.PassedCount,
+		})
+	}
+	if result == nil {
+		result = []*ExamCompletionRate{}
+	}
+	return result, rows.Err()
+}
+
+// GetTopBottomQuestions returns the top 5 and bottom 5 questions by correct_rate
+// across all exams in the date range, scoped to the tenant.
+func (r *postgresRepository) GetTopBottomQuestions(ctx context.Context, tenantID string, from, to time.Time) ([]QuestionStat, []QuestionStat, error) {
+	const q = `
+WITH question_rates AS (
+  SELECT
+    q.id                                                                AS question_id,
+    LEFT(qt.stem, 120)                                                  AS stem_preview,
+    ROUND(
+      COUNT(sqs.question_id) FILTER (WHERE sqs.score = sqs.max_score)::DECIMAL
+      / NULLIF(COUNT(sqs.question_id), 0), 4
+    )                                                                   AS correct_rate
+  FROM exam_sessions es
+  JOIN session_question_scores sqs ON sqs.session_id = es.id
+  JOIN questions q                  ON q.id = sqs.question_id
+  JOIN question_translations qt     ON qt.question_id = q.id AND qt.locale = q.default_locale
+  WHERE es.tenant_id = $1
+    AND es.status IN ('submitted', 'grading_pending')
+    AND es.submitted_at BETWEEN $2 AND $3
+  GROUP BY q.id, qt.stem
+),
+ranked AS (
+  SELECT *, ROW_NUMBER() OVER (ORDER BY correct_rate DESC NULLS LAST) AS top_rank,
+            ROW_NUMBER() OVER (ORDER BY correct_rate ASC  NULLS LAST) AS bot_rank
+  FROM question_rates
+)
+SELECT question_id, stem_preview, correct_rate,
+       CASE WHEN top_rank <= 5 THEN 'top' ELSE 'bottom' END AS bucket
+FROM ranked
+WHERE top_rank <= 5 OR bot_rank <= 5
+ORDER BY bucket DESC, correct_rate DESC`
+
+	type qRateRow struct {
+		QuestionID  string   `db:"question_id"`
+		StemPreview string   `db:"stem_preview"`
+		CorrectRate *float64 `db:"correct_rate"`
+		Bucket      string   `db:"bucket"`
+	}
+
+	rows, err := r.db.QueryxContext(ctx, q, tenantID, from, to)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reports: GetTopBottomQuestions: %w", err)
+	}
+	defer rows.Close()
+
+	var top, bottom []QuestionStat
+	for rows.Next() {
+		var row qRateRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, nil, fmt.Errorf("reports: GetTopBottomQuestions: scan: %w", err)
+		}
+		qs := QuestionStat{
+			QuestionID:         row.QuestionID,
+			StemPreview:        row.StemPreview,
+			CorrectRate:        row.CorrectRate,
+			AnswerDistribution: []AnswerOptionCount{},
+		}
+		if row.Bucket == "top" {
+			top = append(top, qs)
+		} else {
+			bottom = append(bottom, qs)
+		}
+	}
+	if top == nil {
+		top = []QuestionStat{}
+	}
+	if bottom == nil {
+		bottom = []QuestionStat{}
+	}
+	return top, bottom, rows.Err()
 }

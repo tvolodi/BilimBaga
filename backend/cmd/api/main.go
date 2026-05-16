@@ -160,10 +160,10 @@ func main() {
 	certsSvc := certificates.NewService(certsRepo, tenantSvc)
 	certHandler := certificates.NewHandler(certsSvc, cfg.APIBaseURL)
 
-	// Wire up dashboard metrics (FR-BB51).
+	// Wire up dashboard metrics (FR-BB51) and export API (FR-BB54).
 	reportsRepo := reports.NewRepository(db)
 	reportsSvc := reports.NewService(reportsRepo)
-	reportsHandler := reports.NewHandler(reportsSvc)
+	reportsHandler := reports.NewHandler(reportsSvc, tenantSvc)
 
 	r := router.New(tenantHandler, authHandler, deptHandler, usersHandler, auditHandler, categoriesHandler, tagsHandler, questionsHandler, translationsHandler, examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler, cfg.JWTSecret, rbacCache)
 

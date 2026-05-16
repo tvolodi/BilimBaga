@@ -91,6 +91,68 @@ type AnswerOptionCount struct {
 	SelectCount int    `json:"select_count"`
 }
 
+// ── FR-BB54: Export API ──────────────────────────────────────────────────────
+
+// ExamResultRow is one data row in the exam results CSV export (AC-3).
+// QuestionScores maps question position (1-indexed) to the score value (nil = empty cell, AC-4).
+type ExamResultRow struct {
+	EmployeeName     string
+	Department       string
+	StartedAt        string
+	SubmittedAt      string
+	ScorePct         string
+	Passed           string
+	TimeTakenSeconds string
+	QuestionScores   []*float64 // nil = grading_pending, empty cell in CSV (AC-4)
+}
+
+// ExamQuestion is minimal question metadata for building CSV column headers.
+type ExamQuestion struct {
+	QuestionID string `db:"question_id"`
+	Position   int    `db:"position"`
+}
+
+// ExamResultSessionRow is an intermediate scan result from the exam results streaming query.
+type ExamResultSessionRow struct {
+	SessionID        string   `db:"session_id"`
+	EmployeeName     string   `db:"employee_name"`
+	Department       string   `db:"department"`
+	StartedAt        string   `db:"started_at"`
+	SubmittedAt      string   `db:"submitted_at"`
+	ScorePct         *float64 `db:"score_pct"`
+	Passed           *bool    `db:"passed"`
+	TimeTakenSeconds *int     `db:"time_taken_seconds"`
+}
+
+// UserRecordCSVRow is one data row in the user record CSV export (AC-5).
+type UserRecordCSVRow struct {
+	ExamTitle        string   `db:"exam_title"`
+	StartedAt        string   `db:"started_at"`
+	SubmittedAt      string   `db:"submitted_at"`
+	ScorePct         *float64 `db:"score_pct"`
+	Passed           *bool    `db:"passed"`
+	TimeTakenSeconds *int     `db:"time_taken_seconds"`
+	Status           string   `db:"status"`
+}
+
+// QuestionScore is a per-question score record fetched for CSV columns.
+type QuestionScore struct {
+	SessionID  string   `db:"session_id"`
+	QuestionID string   `db:"question_id"`
+	Score      *float64 `db:"score"`
+}
+
+// DashboardReportData is the structured input to GenerateDashboardPDF (AC-7).
+type DashboardReportData struct {
+	From            string
+	To              string
+	CompanyName     string
+	LogoBase64      string
+	CompletionRates []*ExamCompletionRate
+	TopQuestions    []QuestionStat
+	BottomQuestions []QuestionStat
+}
+
 // ── FR-BB53: Per-Employee Record & Progress ──────────────────────────────────
 
 // SessionRecord is one row in an employee's exam session history.

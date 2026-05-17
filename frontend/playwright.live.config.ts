@@ -12,11 +12,11 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const STORAGE_STATE = path.join(__dirname, '.auth', 'admin.json')
+const ADMIN_STORAGE_STATE = path.join(__dirname, '.auth', 'admin.json')
+const EMPLOYEE_STORAGE_STATE = path.join(__dirname, '.auth', 'employee.json')
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: '**/full-walkthrough.spec.ts',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
@@ -34,12 +34,32 @@ export default defineConfig({
     video: 'on',
     actionTimeout: 15_000,
     navigationTimeout: 20_000,
-    storageState: STORAGE_STATE,
   },
   projects: [
     {
-      name: 'chromium-live',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+      name: 'chromium-live-admin',
+      testMatch: [
+        '**/full-walkthrough.spec.ts',
+        '**/admin-grading.spec.ts',
+      ],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        storageState: ADMIN_STORAGE_STATE,
+      },
+    },
+    {
+      name: 'chromium-live-employee',
+      testMatch: [
+        '**/employee-portal.spec.ts',
+        '**/exam-taking.spec.ts',
+        '**/exam-result.spec.ts',
+      ],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        storageState: EMPLOYEE_STORAGE_STATE,
+      },
     },
   ],
 })

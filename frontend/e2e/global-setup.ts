@@ -2,6 +2,7 @@ import { chromium } from '@playwright/test'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+import { seedEmployeeFixtures } from './fixtures/seed'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_DIR = path.join(__dirname, '..', '.auth')
@@ -67,4 +68,7 @@ export default async function globalSetup() {
   fs.writeFileSync(TOKEN_PATH, accessToken, 'utf8')
 
   await browser.close()
+
+  // Seed employee fixtures (creates employee user, exams, sessions).
+  await seedEmployeeFixtures(accessToken)
 }

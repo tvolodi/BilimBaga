@@ -68,6 +68,7 @@
 | FR-BB64 | Security-hardening | Security Hardening | Draft |
 | FR-BB65 | Performance | Performance | Draft |
 | FR-BB66 | Observability | Observability | Implemented |
+| FR-BB67 | e2e-coverage-employee-portal-exam-taking-grading | E2E Coverage: Employee Portal, Exam Taking, Result & Grading Flows | implemented |
 | FR-BB71 | Question-generation-assist | Question Generation Assist | implemented |
 | FR-BB72 | Adaptive-difficulty | Adaptive Difficulty | Implemented |
 | FR-BB73 | Short-text-auto-grading | Short-Text Auto-Grading | Draft |

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -16,8 +16,11 @@ interface ApiResponse<T> {
   error: null | { code: string; message: string }
 }
 
-async function apiFetch<T>(url: string): Promise<T> {
-  const res = await fetch(url)
+async function apiFetch<T>(url: string, token?: string | null): Promise<T> {
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     throw new Error(body.error.message)
@@ -31,8 +34,10 @@ async function apiFetch<T>(url: string): Promise<T> {
 // ---- Hooks ------------------------------------------------------------------
 
 export function useDepartments() {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<Department[], Error>({
     queryKey: ['departments'],
-    queryFn: () => apiFetch<Department[]>('/api/v1/departments'),
+    queryFn: () => apiFetch<Department[]>('/api/v1/departments', token),
   })
 }

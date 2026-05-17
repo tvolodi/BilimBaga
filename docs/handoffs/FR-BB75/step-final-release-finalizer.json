@@ -1,0 +1,31 @@
+﻿{
+  "run_id": "FR-BB75",
+  "pipeline": "A",
+  "commit_hash": "4a0115f3999b4c31ad4577c8127f20939ab94e2a",
+  "commit_message": "feat(ai): add loyalty profile narrative endpoint (FR-BB75)",
+  "files_committed": [
+    "backend/internal/ai/handler.go",
+    "backend/internal/ai/handler_test.go",
+    "backend/internal/ai/model.go",
+    "backend/internal/ai/prompt.go",
+    "backend/internal/ai/repository.go",
+    "backend/internal/ai/service.go",
+    "backend/internal/ai/service_test.go",
+    "backend/internal/reports/model.go",
+    "backend/internal/reports/repository.go",
+    "backend/internal/router/router.go",
+    "docs/requirements/FR-BB75.Loyalty-profile-narrative.md",
+    "docs/requirements/README.md",
+    "frontend/e2e/loyalty-narrative.spec.ts",
+    "frontend/src/api/ai.ts",
+    "frontend/src/api/employees.ts",
+    "frontend/src/components/ui/card.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/pages/admin/EmployeeRecordPage.tsx",
+    "frontend/src/pages/admin/__tests__/AIInsightsCard.test.tsx"
+  ],
+  "inner_report_path": "docs/issue-reports/FR-BB75-INNER-REPORT.md",
+  "status": "success"
+}

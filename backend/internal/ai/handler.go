@@ -110,7 +110,9 @@ func (h *Handler) HandleGetInsights(w http.ResponseWriter, r *http.Request) {
 //
 // AC-1: Returns 400 NOT_A_LOYALTY_SESSION when session is not loyalty-track.
 // AC-2: JWT auth + role ≥ department_admin enforced at router level.
-//       Department access check enforced in service layer.
+//
+//	Department access check enforced in service layer.
+//
 // AC-6: Anthropic errors → 503 AI_UNAVAILABLE.
 func (h *Handler) GetLoyaltyNarrative(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())

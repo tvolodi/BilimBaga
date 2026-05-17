@@ -46,8 +46,13 @@ interface ApiResponse<T> {
   error: null | { code: string; message: string }
 }
 
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options)
+async function apiFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+  const res = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
+  })
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     throw new Error(body.error.message)
@@ -61,17 +66,21 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 // ---- Hooks ------------------------------------------------------------------
 
 export function usePortalExams() {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<PortalExam[], Error>({
     queryKey: ['portal', 'exams'],
-    queryFn: () => apiFetch<PortalExam[]>('/api/v1/portal/exams'),
+    queryFn: () => apiFetch<PortalExam[]>('/api/v1/portal/exams', token),
     refetchInterval: 30_000,
   })
 }
 
 export function usePortalExam(examId: string | undefined) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<PortalExamDetail, Error>({
     queryKey: ['portal', 'exams', examId],
-    queryFn: () => apiFetch<PortalExamDetail>(`/api/v1/portal/exams/${examId}`),
+    queryFn: () => apiFetch<PortalExamDetail>(`/api/v1/portal/exams/${examId}`, token),
     staleTime: Infinity,
     enabled: !!examId,
   })
@@ -80,10 +89,12 @@ export function usePortalExam(examId: string | undefined) {
 export function useCreateSession(examId: string) {
   const queryClient = useQueryClient()
   return useMutation<CreateSessionResponse, Error, void>({
-    mutationFn: () =>
-      apiFetch<CreateSessionResponse>(`/api/v1/portal/exams/${examId}/sessions`, {
+    mutationFn: () => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<CreateSessionResponse>(`/api/v1/portal/exams/${examId}/sessions`, token, {
         method: 'POST',
-      }),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal', 'exams'] })
     },

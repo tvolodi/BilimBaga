@@ -76,8 +76,13 @@ interface ApiResponse<T> {
   error: null | { code: string; message: string }
 }
 
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options)
+async function apiFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+  const res = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
+  })
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     throw new Error(body.error.message)
@@ -102,36 +107,44 @@ function buildQuery(filters: UsersFilters): string {
 // ---- Hooks ------------------------------------------------------------------
 
 export function useUsers(filters: UsersFilters = {}) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<UsersListResponse, Error>({
     queryKey: ['users', filters],
-    queryFn: () => apiFetch<UsersListResponse>(`/api/v1/users${buildQuery(filters)}`),
+    queryFn: () => apiFetch<UsersListResponse>(`/api/v1/users${buildQuery(filters)}`, token),
   })
 }
 
 export function useUser(id: string) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<User, Error>({
     queryKey: ['users', id],
-    queryFn: () => apiFetch<User>(`/api/v1/users/${id}`),
+    queryFn: () => apiFetch<User>(`/api/v1/users/${id}`, token),
     enabled: !!id,
   })
 }
 
 export function useMe() {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<User, Error>({
     queryKey: ['users', 'me'],
-    queryFn: () => apiFetch<User>('/api/v1/users/me'),
+    queryFn: () => apiFetch<User>('/api/v1/users/me', token),
   })
 }
 
 export function useCreateUser() {
   const queryClient = useQueryClient()
   return useMutation<CreateUserResponse, Error, CreateUserRequest>({
-    mutationFn: (body) =>
-      apiFetch<CreateUserResponse>('/api/v1/users', {
+    mutationFn: (body) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<CreateUserResponse>('/api/v1/users', token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
     },
@@ -141,12 +154,14 @@ export function useCreateUser() {
 export function useUpdateUser(id: string) {
   const queryClient = useQueryClient()
   return useMutation<User, Error, UpdateUserRequest>({
-    mutationFn: (body) =>
-      apiFetch<User>(`/api/v1/users/${id}`, {
+    mutationFn: (body) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<User>(`/api/v1/users/${id}`, token, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
     },
@@ -156,8 +171,10 @@ export function useUpdateUser(id: string) {
 export function useDeactivateUser(id: string) {
   const queryClient = useQueryClient()
   return useMutation<Record<string, never>, Error, void>({
-    mutationFn: () =>
-      apiFetch<Record<string, never>>(`/api/v1/users/${id}/deactivate`, { method: 'POST' }),
+    mutationFn: () => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<Record<string, never>>(`/api/v1/users/${id}/deactivate`, token, { method: 'POST' })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
     },
@@ -165,9 +182,12 @@ export function useDeactivateUser(id: string) {
 }
 
 export function useResetPassword(id: string) {
+  const qc = useQueryClient()
   return useMutation<ResetPasswordResponse, Error, void>({
-    mutationFn: () =>
-      apiFetch<ResetPasswordResponse>(`/api/v1/users/${id}/reset-password`, { method: 'POST' }),
+    mutationFn: () => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<ResetPasswordResponse>(`/api/v1/users/${id}/reset-password`, token, { method: 'POST' })
+    },
   })
 }
 
@@ -175,10 +195,11 @@ export function useImportUsers() {
   const queryClient = useQueryClient()
   return useMutation<ImportPreview, Error, { file: File; commit: boolean }>({
     mutationFn: ({ file, commit }) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
       const form = new FormData()
       form.append('file', file)
       const url = `/api/v1/users/import${commit ? '?commit=true' : ''}`
-      return apiFetch<ImportPreview>(url, { method: 'POST', body: form })
+      return apiFetch<ImportPreview>(url, token, { method: 'POST', body: form })
     },
     onSuccess: (_data, variables) => {
       if (variables.commit) {

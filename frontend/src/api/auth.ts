@@ -97,11 +97,37 @@ export function useLogout() {
   })
 }
 
+const E2E_TOKEN_KEY = '__e2e_access_token__'
+
 export function useRefreshToken() {
   const qc = useQueryClient()
   return useQuery<string | null, Error>({
     queryKey: ['auth', 'accessToken'],
     queryFn: async () => {
+      // E2E: if a token was seeded into localStorage by global-setup, use it directly.
+      // The token stays in localStorage so subsequent page navigations within the same
+      // test run can reuse it without hitting the auth rate limit on /auth/refresh.
+      const seeded = localStorage.getItem(E2E_TOKEN_KEY)
+      if (seeded) {
+        const claims = decodeJwtPayload(seeded)
+        // Validate the token is not expired before using it.
+        const exp = claims?.exp as number | undefined
+        if (exp && exp * 1000 > Date.now()) {
+          if (claims) {
+            qc.setQueryData(['auth', 'currentUser'], {
+              id: (claims.sub as string) ?? '',
+              email: (claims.email as string) ?? '',
+              role: (claims.role as string) ?? '',
+              full_name: '',
+              force_password_change: false,
+            })
+          }
+          return seeded
+        }
+        // Token expired — remove and fall through to refresh.
+        localStorage.removeItem(E2E_TOKEN_KEY)
+      }
+
       try {
         const res = await fetch('/api/v1/auth/refresh', {
           method: 'POST',

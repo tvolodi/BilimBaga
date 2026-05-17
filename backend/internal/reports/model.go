@@ -58,15 +58,15 @@ type TrackScores struct {
 
 // ExamAnalyticsResponse is the top-level response for GET /api/v1/admin/exams/{id}/analytics.
 type ExamAnalyticsResponse struct {
-	ExamID             string          `json:"exam_id"`
-	ExamTitle          string          `json:"exam_title"`
-	ScoreDistribution  []BucketCount   `json:"score_distribution"`
-	PassRate           float64         `json:"pass_rate"`
-	AvgScore           *float64        `json:"avg_score"`
-	MedianScore        *float64        `json:"median_score"`
-	TotalAttempts      int             `json:"total_attempts"`
-	UniqueParticipants int             `json:"unique_participants"`
-	PerQuestionStats   []QuestionStat  `json:"per_question_stats"`
+	ExamID             string         `json:"exam_id"`
+	ExamTitle          string         `json:"exam_title"`
+	ScoreDistribution  []BucketCount  `json:"score_distribution"`
+	PassRate           float64        `json:"pass_rate"`
+	AvgScore           *float64       `json:"avg_score"`
+	MedianScore        *float64       `json:"median_score"`
+	TotalAttempts      int            `json:"total_attempts"`
+	UniqueParticipants int            `json:"unique_participants"`
+	PerQuestionStats   []QuestionStat `json:"per_question_stats"`
 }
 
 // BucketCount holds the session count for one score-distribution bucket.
@@ -77,11 +77,11 @@ type BucketCount struct {
 
 // QuestionStat holds per-question analytics data.
 type QuestionStat struct {
-	QuestionID          string              `json:"question_id"`
-	StemPreview         string              `json:"stem_preview"`
-	CorrectRate         *float64            `json:"correct_rate"`
-	AvgTimeSeconds      *float64            `json:"avg_time_seconds"`
-	AnswerDistribution  []AnswerOptionCount  `json:"answer_distribution"`
+	QuestionID         string              `json:"question_id"`
+	StemPreview        string              `json:"stem_preview"`
+	CorrectRate        *float64            `json:"correct_rate"`
+	AvgTimeSeconds     *float64            `json:"avg_time_seconds"`
+	AnswerDistribution []AnswerOptionCount `json:"answer_distribution"`
 }
 
 // AnswerOptionCount holds the selection count for one answer option.
@@ -157,17 +157,17 @@ type DashboardReportData struct {
 
 // SessionRecord is one row in an employee's exam session history.
 type SessionRecord struct {
-	SessionID        string     `json:"session_id" db:"session_id"`
-	ExamID           string     `json:"exam_id" db:"exam_id"`
-	ExamTitle        string     `json:"exam_title" db:"exam_title"`
-	StartedAt        time.Time  `json:"started_at" db:"started_at"`
-	SubmittedAt      *time.Time `json:"submitted_at" db:"submitted_at"`
-	ScorePct         *float64   `json:"score_pct" db:"score_pct"`
-	Passed           *bool      `json:"passed" db:"passed"`
-	TimeTakenSeconds *int       `json:"time_taken_seconds" db:"time_taken_seconds"`
-	Status           string     `json:"status" db:"status"`
-	CertificateID    *string    `json:"certificate_id" db:"certificate_id"`
-	ExamCategoryTrack *string   `json:"exam_category_track" db:"exam_category_track"`
+	SessionID         string     `json:"session_id" db:"session_id"`
+	ExamID            string     `json:"exam_id" db:"exam_id"`
+	ExamTitle         string     `json:"exam_title" db:"exam_title"`
+	StartedAt         time.Time  `json:"started_at" db:"started_at"`
+	SubmittedAt       *time.Time `json:"submitted_at" db:"submitted_at"`
+	ScorePct          *float64   `json:"score_pct" db:"score_pct"`
+	Passed            *bool      `json:"passed" db:"passed"`
+	TimeTakenSeconds  *int       `json:"time_taken_seconds" db:"time_taken_seconds"`
+	Status            string     `json:"status" db:"status"`
+	CertificateID     *string    `json:"certificate_id" db:"certificate_id"`
+	ExamCategoryTrack *string    `json:"exam_category_track" db:"exam_category_track"`
 }
 
 // TrackActivity holds the question count and last activity timestamp for one

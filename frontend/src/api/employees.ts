@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -64,16 +64,22 @@ interface ApiResponse<T> {
   error: null | { code: string; message: string }
 }
 
-async function fetchPaginated<T>(url: string): Promise<PaginatedResult<T>> {
-  const res = await fetch(url, { credentials: 'include' })
+async function fetchPaginated<T>(url: string, token?: string | null): Promise<PaginatedResult<T>> {
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
   const body: ApiPaginatedResponse<T> = await res.json()
   if (body.error) throw new Error(body.error.message)
   if (!res.ok) throw new Error(`Request failed: ${res.status}`)
   return { data: body.data, meta: body.meta }
 }
 
-async function apiFetch<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: 'include' })
+async function apiFetch<T>(url: string, token?: string | null): Promise<T> {
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
   const body: ApiResponse<T> = await res.json()
   if (body.error) throw new Error(body.error.message)
   if (!res.ok) throw new Error(`Request failed: ${res.status}`)
@@ -83,20 +89,25 @@ async function apiFetch<T>(url: string): Promise<T> {
 // ---- Hooks ------------------------------------------------------------------
 
 export function useEmployeeRecord(userId: string, page: number) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery({
     queryKey: ['employee-record', userId, page],
     queryFn: () =>
       fetchPaginated<EmployeeRecordData>(
         `/api/v1/admin/users/${userId}/record?page=${page}&per_page=20`,
+        token,
       ),
     placeholderData: keepPreviousData,
   })
 }
 
 export function useEmployeeProgress(userId: string) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery({
     queryKey: ['employee-progress', userId],
-    queryFn: () => apiFetch<EmployeeProgress>(`/api/v1/admin/users/${userId}/progress`),
+    queryFn: () => apiFetch<EmployeeProgress>(`/api/v1/admin/users/${userId}/progress`, token),
     staleTime: 5 * 60 * 1000,
   })
 }

@@ -14,6 +14,11 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
+frontend/playwright-report-live/
+frontend/test-results/
+frontend/.auth/
+e2e-results.json
+screenshots/
 
 # Docker
 *.log

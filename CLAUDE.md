@@ -183,6 +183,7 @@ Each subagent is a separate `Agent` tool call. You pass the subagent's full inst
 | "Fix bug...", "Error when...", stack trace, broken behavior | B | Issue Resolution |
 | "Update docs...", "Add requirement doc..." | C | Requirement Development → Release Finalizer |
 | "Configure...", "Set up env...", Docker, migrations, CORS | Infra | Infrastructure Configuration → Release Finalizer |
+| "Run E2E tests", "Test visually", "/e2e-repair", "test everything" | E2E | E2E Repair Loop |
 
 ### Pipeline A — Feature Development
 
@@ -217,6 +218,21 @@ Step 1  Spawn: Infrastructure Configuration
 Step 2  Spawn: Release Finalizer
 ```
 
+### Pipeline E2E — Visual Walkthrough Repair
+
+**Trigger**: "run E2E tests", "test everything visually", `/e2e-repair`
+
+**Prerequisite**: `make dev` must be running. If not, spawn Infrastructure Configuration to start it first.
+
+```
+Step 1  Spawn: E2E Repair Loop
+        ├── Runs npm run test:e2e:live and parses e2e-results.json
+        ├── For each failing test: writes ISS-{NNN}-e2e-failure.md
+        ├── Spawns Issue Resolution for each failure (groups same-root-cause failures)
+        ├── After each fix batch: re-runs the suite
+        └── Loops until all 22 tests pass OR 3 retries per test (then escalates)
+```
+
 ### Subagent prompt sources
 
 | Subagent | Prompt file |
@@ -229,6 +245,7 @@ Step 2  Spawn: Release Finalizer
 | Test Runner | `.claude/commands/test-run-error-resolution.md` |
 | Code Reviewer | `.claude/commands/code-review.md` |
 | Release Finalizer | `.claude/commands/release-preparation.md` |
+| E2E Repair Loop | `.claude/commands/e2e-repair.md` |
 
 ### State tracking
 

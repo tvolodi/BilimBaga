@@ -23,6 +23,10 @@ handoffs:
     agent: Infrastructure Configuration
     prompt: Handle the infrastructure or configuration change.
     send: true
+  - label: E2E Repair Loop
+    agent: e2e-repair
+    prompt: Run the full visual E2E walkthrough, diagnose failures, and drive Issue Resolution until all tests pass.
+    send: true
 ---
 
 # Orchestrator Agent
@@ -66,6 +70,7 @@ When a subagent reports an **unrelated blocker** (broken Go package, failing unr
 | "Fix bug...", "Error when...", stack trace, broken behavior, "ISS-xxx" | B | Issue Resolution |
 | "Update docs...", "Documentation..." | C | Requirement Development |
 | "Configure...", "Set up env...", Docker, migrations, CORS | Infra | Infrastructure Configuration |
+| "Run E2E tests", "Run walkthrough", "/e2e-repair", "test everything visually" | E2E | E2E Repair Loop |
 
 ---
 
@@ -110,6 +115,33 @@ Step 2  Release Finalizer       → git commit
 ```
 Step 1  Infrastructure Configuration → env, Docker, migrations, CORS, source code
 Step 2  Release Finalizer            → git commit
+```
+
+---
+
+## Pipeline E2E: Visual Walkthrough Repair
+
+**Trigger**: user says "run E2E tests", "test everything visually", `/e2e-repair`, or any request to run the full walkthrough and fix failures.
+
+**Prerequisite check**: Confirm `make dev` is running before spawning the subagent. If not, spawn Infrastructure Configuration to start it first.
+
+```
+Step 1  E2E Repair Loop
+        ├── Runs: npm run test:e2e:live (in frontend/)
+        ├── Parses: e2e-results.json for failures
+        ├── For each failure: writes ISS-{NNN}-e2e-failure.md → spawns Issue Resolution
+        ├── After each Issue Resolution batch: re-runs the suite
+        └── Loops until: all 22 tests pass OR retry cap hit (3 per test)
+        → on cap hit for a test: ESCALATE that test to user, continue others
+```
+
+**Subagent prompt source**: `.claude/commands/e2e-repair.md`
+
+**State fields** (add to the yaml tracking block):
+```yaml
+e2e_iteration: 0          # increments each full suite run
+e2e_failing_tests: []     # list of test titles still failing
+e2e_iss_ids: []           # ISS IDs opened this session
 ```
 
 ---

@@ -61,7 +61,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-2">
         {NAV_ITEMS.map(({ key, icon: Icon, path, labelKey, end }) => (
           <NavLink
             key={key}

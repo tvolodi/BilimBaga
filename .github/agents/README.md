@@ -38,6 +38,7 @@ Tier 2: Subagents (10 agents)
 ├── issue-resolution.agent.md              ← Root cause analysis + bug fix
 ├── infrastructure-configuration.agent.md  ← Env, Docker, migrations, CORS
 ├── 06-release-finalizer.agent.md          ← Git commit + inner report
+├── e2e-repair.agent.md                     ← Visual E2E walkthrough repair loop
 ├── explore.agent.md                        ← Read-only codebase exploration (subagent only)
 └── functions/                              ← Reusable workflow atoms
     ├── ANALYZE_CONTEXT.md
@@ -92,6 +93,19 @@ Step 2  Release Finalizer            → git commit
 
 **Trigger**: "Configure...", "Set up env...", "Change Docker...", "Run migration..."
 
+### Pipeline E2E: Visual Walkthrough Repair
+
+```
+Step 1  E2E Repair Loop
+        ├── npm run test:e2e:live  → parses e2e-results.json
+        ├── Failing test → ISS-{NNN}-e2e-failure.md → Issue Resolution
+        ├── After fixes: re-run suite
+        └── Loop until all 22 tests pass (retry cap: 3 per test → escalate)
+```
+
+**Trigger**: "Run E2E tests", "test everything visually", "@e2e-repair"
+**Prerequisite**: `make dev` must be running (DB + backend :8080 + Vite :5173)
+
 ---
 
 ## Handoff File Convention
@@ -145,3 +159,4 @@ Reusable workflow atoms in `functions/`:
 | "Fix bug..." / stack trace | Pipeline B → Issue Resolution |
 | "Update docs..." | Pipeline C → Requirement Development |
 | "Configure..." / "Set up env..." | Pipeline Infra → Infrastructure Configuration |
+| "Run E2E tests" / "test everything" / "@e2e-repair" | Pipeline E2E → E2E Repair Loop |

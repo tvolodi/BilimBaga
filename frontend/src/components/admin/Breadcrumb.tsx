@@ -1,22 +1,34 @@
-import { Component, type ReactNode, type ErrorInfo } from 'react'
-import { useMatches, Link } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 
-interface BreadcrumbHandle {
-  breadcrumb?: string
+const ROUTE_LABELS: Record<string, string> = {
+  dashboard: 'Dashboard',
+  users: 'Users',
+  departments: 'Departments',
+  questions: 'Questions',
+  categories: 'Categories',
+  tags: 'Tags',
+  exams: 'Exams',
+  grading: 'Grading',
+  audit: 'Audit Log',
+  settings: 'Settings',
+  branding: 'Branding',
+  new: 'New',
+  edit: 'Edit',
+  record: 'Record',
+  analytics: 'Analytics',
 }
 
-function BreadcrumbContent() {
-  const matches = useMatches()
+export function Breadcrumb() {
+  const { pathname } = useLocation()
+  const segments = pathname.replace(/^\/admin\/?/, '').split('/').filter(Boolean)
 
-  const crumbs = matches
-    .filter((m) => Boolean((m.handle as BreadcrumbHandle | null)?.breadcrumb))
-    .map((m) => ({
-      pathname: m.pathname,
-      label: (m.handle as BreadcrumbHandle).breadcrumb as string,
-    }))
+  if (segments.length === 0) return null
 
-  if (crumbs.length === 0) return null
+  const crumbs = segments.map((seg, i) => ({
+    label: ROUTE_LABELS[seg] ?? seg,
+    pathname: '/admin/' + segments.slice(0, i + 1).join('/'),
+  }))
 
   return (
     <nav aria-label="breadcrumb" className="flex items-center gap-1 text-sm text-gray-500 mb-4">
@@ -33,33 +45,5 @@ function BreadcrumbContent() {
         </span>
       ))}
     </nav>
-  )
-}
-
-class BreadcrumbBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: ReactNode }) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError(_err: Error) {
-    return { hasError: true }
-  }
-
-  componentDidCatch(_err: Error, _info: ErrorInfo) {
-    // useMatches throws when not in a data router — this is expected with BrowserRouter
-  }
-
-  render() {
-    if (this.state.hasError) return null
-    return this.props.children
-  }
-}
-
-export function Breadcrumb() {
-  return (
-    <BreadcrumbBoundary>
-      <BreadcrumbContent />
-    </BreadcrumbBoundary>
   )
 }

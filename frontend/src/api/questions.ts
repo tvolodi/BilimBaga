@@ -166,8 +166,13 @@ interface ApiResponse<T> {
   error: null | { code: string; message: string }
 }
 
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options)
+async function apiFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+  const res = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
+  })
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     throw new Error(body.error.message)
@@ -198,36 +203,44 @@ function buildQuestionsQuery(filters: QuestionFilters): string {
 // ---- Hooks ------------------------------------------------------------------
 
 export function useQuestions(filters: QuestionFilters = {}) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<QuestionListResponse, Error>({
     queryKey: ['questions', filters],
     queryFn: () =>
-      apiFetch<QuestionListResponse>(`/api/v1/questions${buildQuestionsQuery(filters)}`),
+      apiFetch<QuestionListResponse>(`/api/v1/questions${buildQuestionsQuery(filters)}`, token),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   })
 }
 
 export function useCategories() {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<Category[], Error>({
     queryKey: ['categories'],
-    queryFn: () => apiFetch<Category[]>('/api/v1/categories'),
+    queryFn: () => apiFetch<Category[]>('/api/v1/categories', token),
     staleTime: 300_000,
   })
 }
 
 export function useTags() {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<Tag[], Error>({
     queryKey: ['tags'],
-    queryFn: () => apiFetch<Tag[]>('/api/v1/tags'),
+    queryFn: () => apiFetch<Tag[]>('/api/v1/tags', token),
     staleTime: 300_000,
   })
 }
 
 export function useQuestionVersions(id: string) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<QuestionVersion[], Error>({
     queryKey: ['questions', id, 'versions'],
     queryFn: () =>
-      apiFetch<QuestionVersion[]>(`/api/v1/questions/${id}/versions`),
+      apiFetch<QuestionVersion[]>(`/api/v1/questions/${id}/versions`, token),
     staleTime: 0,
     enabled: !!id,
   })
@@ -241,12 +254,14 @@ export function useTransitionStatus() {
     { id: string; target_status: string },
     { previousQueries: [readonly unknown[], unknown][] }
   >({
-    mutationFn: ({ id, target_status }) =>
-      apiFetch<void>(`/api/v1/questions/${id}/status`, {
+    mutationFn: ({ id, target_status }) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<void>(`/api/v1/questions/${id}/status`, token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_status }),
-      }),
+      })
+    },
     onMutate: async ({ id, target_status }) => {
       await queryClient.cancelQueries({ queryKey: ['questions'] })
       const previousQueries = queryClient.getQueriesData<QuestionListResponse>({
@@ -284,8 +299,10 @@ export function useTransitionStatus() {
 export function useDeleteQuestion() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, string>({
-    mutationFn: (id) =>
-      apiFetch<void>(`/api/v1/questions/${id}`, { method: 'DELETE' }),
+    mutationFn: (id) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<void>(`/api/v1/questions/${id}`, token, { method: 'DELETE' })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] })
     },
@@ -293,12 +310,15 @@ export function useDeleteQuestion() {
 }
 
 export function useImportQuestions() {
+  const qc = useQueryClient()
   return useMutation<ImportDryRunResult, Error, { file: File; dryRun: boolean }>({
     mutationFn: ({ file, dryRun }) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       const formData = new FormData()
       formData.append('file', file)
       return apiFetch<ImportDryRunResult>(
         `/api/v1/questions/import${dryRun ? '?dry_run=true' : ''}`,
+        token,
         { method: 'POST', body: formData },
       )
     },
@@ -306,9 +326,11 @@ export function useImportQuestions() {
 }
 
 export function useQuestion(id: string | null) {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<QuestionDetail, Error>({
     queryKey: ['questions', id],
-    queryFn: () => apiFetch<QuestionDetail>(`/api/v1/questions/${id}`),
+    queryFn: () => apiFetch<QuestionDetail>(`/api/v1/questions/${id}`, token),
     enabled: id !== null && id !== undefined && id !== '',
     staleTime: 0,
   })
@@ -317,12 +339,14 @@ export function useQuestion(id: string | null) {
 export function useCreateQuestion() {
   const queryClient = useQueryClient()
   return useMutation<QuestionDetail, Error, QuestionCreatePayload>({
-    mutationFn: (payload) =>
-      apiFetch<QuestionDetail>('/api/v1/questions', {
+    mutationFn: (payload) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<QuestionDetail>('/api/v1/questions', token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      }),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] })
     },
@@ -332,12 +356,14 @@ export function useCreateQuestion() {
 export function useUpdateQuestion() {
   const queryClient = useQueryClient()
   return useMutation<QuestionDetail, Error, { id: string; payload: QuestionUpdatePayload }>({
-    mutationFn: ({ id, payload }) =>
-      apiFetch<QuestionDetail>(`/api/v1/questions/${id}`, {
+    mutationFn: ({ id, payload }) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<QuestionDetail>(`/api/v1/questions/${id}`, token, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      }),
+      })
+    },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['questions', id] })
       queryClient.invalidateQueries({ queryKey: ['questions'] })
@@ -353,12 +379,14 @@ export function useUpdateQuestionStatus() {
     { id: string; target_status: string },
     { previousDetail: QuestionDetail | undefined }
   >({
-    mutationFn: ({ id, target_status }) =>
-      apiFetch<void>(`/api/v1/questions/${id}/status`, {
+    mutationFn: ({ id, target_status }) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<void>(`/api/v1/questions/${id}/status`, token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_status }),
-      }),
+      })
+    },
     onMutate: async ({ id, target_status }) => {
       await queryClient.cancelQueries({ queryKey: ['questions', id] })
       const previousDetail = queryClient.getQueryData<QuestionDetail>(['questions', id])
@@ -383,12 +411,14 @@ export function useUpdateQuestionStatus() {
 export function useCreateTag() {
   const queryClient = useQueryClient()
   return useMutation<Tag, Error, { name: string }>({
-    mutationFn: (payload) =>
-      apiFetch<Tag>('/api/v1/tags', {
+    mutationFn: (payload) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<Tag>('/api/v1/tags', token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      }),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tags'] })
     },

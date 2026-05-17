@@ -15,6 +15,7 @@ import { LoginPage } from '@/pages/auth/LoginPage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
 import { EmployeePortal } from '@/pages/EmployeePortal'
 import { MyResultsPage } from '@/pages/portal/MyResultsPage'
+import { ExamResultRedirectPage } from '@/pages/portal/ExamResultRedirectPage'
 import { ExamTakingPage } from '@/pages/ExamTaking'
 import { ResultPage } from '@/pages/ResultPage'
 
@@ -223,6 +224,14 @@ function AppRoutes() {
           }
         />
       </Route>
+      <Route
+        path="/portal/exams/:examId/result"
+        element={
+          <RequireRole roles={['employee']}>
+            <ExamResultRedirectPage />
+          </RequireRole>
+        }
+      />
       <Route
         path="/portal/sessions/:sessionId/result"
         element={

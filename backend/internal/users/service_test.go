@@ -165,6 +165,14 @@ func (m *mockRepo) GetRoleNameByID(_ context.Context, roleID string) (string, er
 	return name, nil
 }
 
+func (m *mockRepo) ListRoles(_ context.Context) ([]RoleRow, error) {
+	rows := make([]RoleRow, 0, len(m.roleByID))
+	for id, name := range m.roleByID {
+		rows = append(rows, RoleRow{ID: id, Name: name})
+	}
+	return rows, nil
+}
+
 // helpers
 func strPtr(s string) *string { return &s }
 

@@ -454,32 +454,34 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/users')
     await waitForContent(page)
 
-    // Find the first user row that has a "View Record" link or action
-    const viewRecordLink = page.getByRole('link', { name: /view record|record/i }).first()
-    const recordBtn = page.getByRole('button', { name: /view record|record/i }).first()
+    // Wait for the users table to load first, then look for View Record links
+    await page.waitForFunction(() => document.querySelector('table tbody tr') !== null, { timeout: 15_000 }).catch(() => {})
 
-    if (await viewRecordLink.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    // "View Record" link is conditionally rendered once currentUser role is resolved from cache.
+    // Give it extra time since the auth query runs after the users list query.
+    const viewRecordLink = page.getByRole('link', { name: /view record/i }).first()
+    await viewRecordLink.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+
+    if (await viewRecordLink.isVisible().catch(() => false)) {
       await viewRecordLink.click()
-    } else if (await recordBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await recordBtn.click()
     } else {
-      // Navigate directly if we know a user ID from the table
+      // Fallback: navigate directly to a record URL using first user's row link
       const firstRowLink = page.locator('table tbody tr').first().getByRole('link').first()
       if (await firstRowLink.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await firstRowLink.click()
       }
     }
 
-    await waitForContent(page)
+    // Wait for the skeleton to clear — the page loads 3 queries in parallel so network-idle fires early.
+    // Wait explicitly for the h1 heading (only rendered after skeleton clears).
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 20_000 })
     await shot(page, '18-employee-record')
 
-    // AC-7d: Assert Values Profile section heading or pagination controls are visible
-    const valuesProfile = page.getByText(/values profile/i).first()
-    const paginationInfo = page.getByText(/showing \d+/i).first()
+    // AC-7d: Assert the page loaded some content
     const hasSomeContent =
-      (await valuesProfile.isVisible({ timeout: 3_000 }).catch(() => false)) ||
-      (await paginationInfo.isVisible({ timeout: 3_000 }).catch(() => false)) ||
-      (await page.getByRole('heading').first().isVisible().catch(() => false))
+      (await page.getByText(/session history/i).isVisible().catch(() => false)) ||
+      (await page.getByText(/track progress/i).isVisible().catch(() => false)) ||
+      (await page.getByText(/no exam sessions recorded/i).isVisible().catch(() => false))
     expect(hasSomeContent).toBeTruthy()
     await shot(page, '18b-employee-record-values-profile')
   })

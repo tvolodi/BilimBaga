@@ -112,9 +112,6 @@ export function AIGenerateDialog({ open, onClose, onSuccess }: AIGenerateDialogP
   const qc = useQueryClient()
   const user = qc.getQueryData<CurrentUser>(['auth', 'currentUser'])
 
-  // Only examiner+ can see/use this dialog.
-  if (!user || !isExaminerOrAbove(user.role)) return null
-
   const { data: rawCategories } = useCategories()
   const categories = rawCategories ? flattenCategories(rawCategories) : []
 
@@ -133,6 +130,9 @@ export function AIGenerateDialog({ open, onClose, onSuccess }: AIGenerateDialogP
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const [confirmProgress, setConfirmProgress] = useState<number | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  // Only examiner+ can see/use this dialog — render nothing if unauthorized.
+  if (!user || !isExaminerOrAbove(user.role)) return null
 
   const hasDrafts = drafts.length > 0
 

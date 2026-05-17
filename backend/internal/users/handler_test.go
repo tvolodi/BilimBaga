@@ -29,6 +29,7 @@ type mockUserService struct {
 	deactivateFn func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
 	resetPwdFn   func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
 	importFn     func(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
+	listRolesFn  func(ctx context.Context) ([]RoleRow, error)
 }
 
 func (m *mockUserService) ListUsers(ctx context.Context, callerRole, callerDeptID string, f ListFilters) (*ListResult, error) {
@@ -54,6 +55,12 @@ func (m *mockUserService) ResetPassword(ctx context.Context, id, callerRole, cal
 }
 func (m *mockUserService) ImportUsers(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error) {
 	return m.importFn(ctx, rows, commit, callerRole, callerDeptID, callerUserID, ip)
+}
+func (m *mockUserService) ListRoles(ctx context.Context) ([]RoleRow, error) {
+	if m.listRolesFn != nil {
+		return m.listRolesFn(ctx)
+	}
+	return []RoleRow{}, nil
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

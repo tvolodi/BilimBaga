@@ -47,7 +47,7 @@ export function ResultActions({
         </Button>
       )}
       <Button variant="ghost" onClick={() => navigate('/portal')}>
-        {t('result.back_to_portal')}
+        {t('exam.taking.result.backToPortal')}
       </Button>
     </div>
   )

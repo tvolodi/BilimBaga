@@ -92,6 +92,16 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": u, "error": nil})
 }
 
+// ListRoles handles GET /api/v1/users/roles.
+func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
+	roles, err := h.svc.ListRoles(r.Context())
+	if err != nil {
+		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list roles")
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": roles, "error": nil})
+}
+
 // CreateUser handles POST /api/v1/users.
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req CreateRequest

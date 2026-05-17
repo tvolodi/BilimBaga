@@ -1,0 +1,29 @@
+{
+  "run_id": "FR-BB67",
+  "pipeline": "A",
+  "requirement_doc": "docs/requirements/FR-BB67-e2e-coverage-employee-portal-exam-taking-grading.md",
+  "files_changed": [
+    "frontend/e2e/fixtures/seed.ts",
+    "frontend/e2e/global-setup.ts",
+    "frontend/playwright.live.config.ts",
+    "frontend/e2e/employee-portal.spec.ts",
+    "frontend/e2e/exam-taking.spec.ts",
+    "frontend/e2e/exam-result.spec.ts",
+    "frontend/e2e/admin-grading.spec.ts",
+    "frontend/e2e/full-walkthrough.spec.ts"
+  ],
+  "acceptance_criteria": [
+    "AC-1: seed.ts exports seedEmployeeFixtures() — creates employee user, mixed-type exam (5 question types), short-text exam with submitted session, saves employee JWT to .auth/employee.json",
+    "AC-2: playwright.live.config.ts splits into two projects — chromium-live-admin (full-walkthrough + admin-grading) and chromium-live-employee (employee-portal + exam-taking + exam-result)",
+    "AC-3: employee-portal.spec.ts contains 8 tests covering portal load, empty state, start modal open/cancel/confirm, continue CTA, view result CTA, my results page",
+    "AC-4: exam-taking.spec.ts contains 11 tests covering top bar/navigator, all 5 question input types, flag/unflag, navigator jump, finish→review screen, submit happy path, tab-switch modal",
+    "AC-5: exam-result.spec.ts contains 5 tests covering passed/failed/pending result screens, result detail page, back to portal navigation",
+    "AC-6: admin-grading.spec.ts contains 7 tests covering empty queue, session row+navigation, question display+nav, score validation, feedback textarea, submit all grades, pagination",
+    "AC-7: full-walkthrough.spec.ts has 5 targeted patches: (a) test 09 asserts Save Draft button; (b) test 13 hard-asserts From/To date inputs and Export CSV button; (c) test 16 removes /reports skip; (d) test 18 asserts Values Profile or pagination; (e) test 20 asserts heading on analytics page",
+    "AC-8: All 58 tests designed to pass against a live make dev stack",
+    "AC-9: TypeScript compiles cleanly with npx tsc --noEmit (exit 0)",
+    "AC-10: Screenshots taken at key interaction points using shot() helper in all new spec files"
+  ],
+  "typescript_compilation": "PASS",
+  "notes": "No Go files changed. No migrations. Frontend-only. The e2e/ directory is outside tsconfig.json include scope (only covers src/) — Playwright handles e2e TypeScript transpilation itself. Direct type-check of e2e files with esnext module settings also passes (exit 0)."
+}

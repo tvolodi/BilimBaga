@@ -635,11 +635,10 @@ SELECT
   EXTRACT(EPOCH FROM (es.submitted_at - es.started_at))::INT AS time_taken_seconds,
   es.status,
   c.id AS certificate_id,
-  cat.track AS exam_category_track
+  NULL::text AS exam_category_track
 FROM exam_sessions es
 JOIN exams e ON e.id = es.exam_id
 LEFT JOIN certificates c ON c.session_id = es.id
-LEFT JOIN categories cat ON cat.id = e.category_id
 WHERE es.user_id = $1
   AND es.status != 'in_progress'
 ORDER BY es.started_at DESC

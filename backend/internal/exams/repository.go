@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // Repository defines all persistence operations for the exams domain.
@@ -663,12 +664,7 @@ func (r *postgresRepository) DeleteAssignment(ctx context.Context, id string) er
 // all stats until that migration is applied. The LEFT JOINs are safe with missing data.
 func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examID string) ([]*AssignmentDetail, error) {
 	const q = `
-	WITH RECURSIVE dept_tree(id) AS (
-	    SELECT id FROM departments WHERE id = ea.assignee_id
-	    UNION ALL
-	    SELECT d.id FROM departments d JOIN dept_tree dt ON d.parent_id = dt.id
-	),
-	assignment_base AS (
+	WITH assignment_base AS (
 	    SELECT
 	        ea.id,
 	        ea.assignee_type,
@@ -846,5 +842,6 @@ func (r *postgresRepository) listAssignmentsNoSessions(ctx context.Context, exam
 
 // isUniqueViolation detects PostgreSQL unique-constraint errors (SQLSTATE 23505).
 func isUniqueViolation(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "23505")
+	var pgErr *pq.Error
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

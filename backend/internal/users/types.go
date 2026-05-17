@@ -26,6 +26,12 @@ type User struct {
 	CreatedAt           time.Time `db:"created_at"           json:"created_at"`
 }
 
+// RoleRow is a minimal role record returned by the list-roles endpoint.
+type RoleRow struct {
+	ID   string `db:"id"   json:"id"`
+	Name string `db:"name" json:"name"`
+}
+
 // ListFilters holds the query parameters for the paginated list endpoint.
 type ListFilters struct {
 	DepartmentID *string

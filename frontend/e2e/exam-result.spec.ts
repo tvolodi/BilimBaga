@@ -82,13 +82,14 @@ test.describe('Exam Result', () => {
       await waitForContent(page)
       await shot(page, 'er-01-result-screen')
 
-      // One of: passed/failed/pending text should be visible
-      const hasResult = await page
-        .getByText(/passed|failed|being reviewed/i)
+      // One of: passed/failed/pending state should be visible
+      // Use CSS class locator to avoid getByText ancestor ambiguity
+      const hasBanner = await page
+        .locator('.border-green-500, .border-red-500, .border-yellow-400')
         .first()
         .isVisible({ timeout: 10_000 })
         .catch(() => false)
-      expect(hasResult).toBeTruthy()
+      expect(hasBanner).toBeTruthy()
 
       // Back to portal button should exist
       await expect(page.getByRole('button', { name: /back to my exams/i })).toBeVisible()

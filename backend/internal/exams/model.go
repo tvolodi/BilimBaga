@@ -22,52 +22,52 @@ var (
 
 // Exam is the core configuration row.
 type Exam struct {
-	ID                 string     `db:"id"`
-	Title              string     `db:"title"`
-	Description        *string    `db:"description"`
-	Status             string     `db:"status"`
-	TimeLimitMinutes   int        `db:"time_limit_minutes"`
-	PassingScorePct    float64    `db:"passing_score_pct"`
-	MaxAttempts        int        `db:"max_attempts"`
-	AvailableFrom      *time.Time `db:"available_from"`
-	AvailableUntil     *time.Time `db:"available_until"`
-	ShuffleQuestions   bool       `db:"shuffle_questions"`
-	ShuffleOptions     bool       `db:"shuffle_options"`
-	ShowAnswers        string     `db:"show_answers"`
-	OnTabSwitch        string     `db:"on_tab_switch"`
-	CertificateEnabled bool       `db:"certificate_enabled"`
-	Adaptive           bool       `db:"adaptive"`
-	CreatedBy          string     `db:"created_by"`
-	CreatedAt          time.Time  `db:"created_at"`
-	UpdatedAt          time.Time  `db:"updated_at"`
+	ID                 string     `db:"id"                  json:"id"`
+	Title              string     `db:"title"               json:"title"`
+	Description        *string    `db:"description"         json:"description"`
+	Status             string     `db:"status"              json:"status"`
+	TimeLimitMinutes   int        `db:"time_limit_minutes"  json:"time_limit_minutes"`
+	PassingScorePct    float64    `db:"passing_score_pct"   json:"passing_score_pct"`
+	MaxAttempts        int        `db:"max_attempts"        json:"max_attempts"`
+	AvailableFrom      *time.Time `db:"available_from"      json:"available_from"`
+	AvailableUntil     *time.Time `db:"available_until"     json:"available_until"`
+	ShuffleQuestions   bool       `db:"shuffle_questions"   json:"shuffle_questions"`
+	ShuffleOptions     bool       `db:"shuffle_options"     json:"shuffle_options"`
+	ShowAnswers        string     `db:"show_answers"        json:"show_answers"`
+	OnTabSwitch        string     `db:"on_tab_switch"       json:"on_tab_switch"`
+	CertificateEnabled bool       `db:"certificate_enabled" json:"certificate_enabled"`
+	Adaptive           bool       `db:"adaptive"            json:"adaptive"`
+	CreatedBy          string     `db:"created_by"          json:"created_by"`
+	CreatedAt          time.Time  `db:"created_at"          json:"created_at"`
+	UpdatedAt          time.Time  `db:"updated_at"          json:"updated_at"`
 }
 
 // ExamSection is an optional grouping of question rules within an exam.
 type ExamSection struct {
-	ID        string `db:"id"`
-	ExamID    string `db:"exam_id"`
-	Title     *string `db:"title"`
-	SortOrder int    `db:"sort_order"`
+	ID        string  `db:"id"         json:"id"`
+	ExamID    string  `db:"exam_id"    json:"exam_id"`
+	Title     *string `db:"title"      json:"title"`
+	SortOrder int     `db:"sort_order" json:"sort_order"`
 }
 
 // ExamQuestionRule describes how questions are selected for a section or the whole exam.
 type ExamQuestionRule struct {
-	ID         string   `db:"id"`
-	ExamID     string   `db:"exam_id"`
-	SectionID  *string  `db:"section_id"`
-	Mode       string   `db:"mode"`
-	CategoryID *string  `db:"category_id"`
-	TagIDs     []byte   `db:"tag_ids"` // raw JSONB
-	Difficulty *string  `db:"difficulty"`
-	Count      int      `db:"count"`
-	SortOrder  int      `db:"sort_order"`
+	ID         string   `db:"id"          json:"id"`
+	ExamID     string   `db:"exam_id"     json:"exam_id"`
+	SectionID  *string  `db:"section_id"  json:"section_id"`
+	Mode       string   `db:"mode"        json:"mode"`
+	CategoryID *string  `db:"category_id" json:"category_id"`
+	TagIDs     []byte   `db:"tag_ids"     json:"tag_ids"` // raw JSONB
+	Difficulty *string  `db:"difficulty"  json:"difficulty"`
+	Count      int      `db:"count"       json:"count"`
+	SortOrder  int      `db:"sort_order"  json:"sort_order"`
 }
 
 // ExamManualQuestion links a specific question to a manual rule.
 type ExamManualQuestion struct {
-	RuleID     string `db:"rule_id"`
-	QuestionID string `db:"question_id"`
-	SortOrder  int    `db:"sort_order"`
+	RuleID     string `db:"rule_id"     json:"rule_id"`
+	QuestionID string `db:"question_id" json:"question_id"`
+	SortOrder  int    `db:"sort_order"  json:"sort_order"`
 }
 
 // ExamFilter holds parameters for the paginated exam list.

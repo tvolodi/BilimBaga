@@ -305,6 +305,12 @@ func (s *service) CreateRule(ctx context.Context, examID string, input QuestionR
 	if err != nil {
 		return nil, fmt.Errorf("exams: CreateRule: %w", err)
 	}
+	// Persist manual questions if provided alongside the rule.
+	if input.Mode == "manual" && len(input.Questions) > 0 {
+		if err := s.repo.SetManualQuestions(ctx, rule.ID, input.Questions); err != nil {
+			return nil, fmt.Errorf("exams: CreateRule: set manual questions: %w", err)
+		}
+	}
 	return rule, nil
 }
 

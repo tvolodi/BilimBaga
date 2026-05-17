@@ -227,7 +227,7 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 
 		// AC-7: shuffle_options — use same rng, keyed by question index.
 		detail := details[q.id]
-		if cfg.ShuffleOptions && detail.Type != "short_text" {
+		if cfg.ShuffleOptions && !isShortText(detail.Type) {
 			rng.Shuffle(len(optIDs), func(a, b int) { optIDs[a], optIDs[b] = optIDs[b], optIDs[a] })
 		}
 
@@ -280,7 +280,7 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 	for i, r := range resolved {
 		detail := details[r.questionID]
 		var opts []SessionOptionResponse
-		if detail.Type != "short_text" {
+		if !isShortText(detail.Type) {
 			opts = make([]SessionOptionResponse, len(r.optionsOrder))
 			for j, optID := range r.optionsOrder {
 				opts[j] = SessionOptionResponse{ID: optID, Text: optTexts[optID]}
@@ -350,11 +350,11 @@ func (s *service) SaveAnswer(ctx context.Context, sessionID, questionID, userID 
 
 	// Validate answer format per question type (Notes section).
 	switch questionType {
-	case "short_text":
+	case "short_text", "shorttext":
 		if len(input.SelectedOptionIDs) > 0 {
 			return nil, ErrInvalidAnswerFormat
 		}
-	case "single_choice", "true_false":
+	case "single_choice", "single", "true_false", "truefalse":
 		if len(input.SelectedOptionIDs) > 1 {
 			return nil, ErrInvalidAnswerFormat
 		}
@@ -450,7 +450,7 @@ func (s *service) GetSessionState(ctx context.Context, sessionID, userID string)
 	for i, sq := range sqRows {
 		detail := details[sq.QuestionID]
 		var opts []SessionOptionResponse
-		if detail.Type != "short_text" {
+		if !isShortText(detail.Type) {
 			opts = make([]SessionOptionResponse, len(optOrders[i].optIDs))
 			for j, optID := range optOrders[i].optIDs {
 				opts[j] = SessionOptionResponse{ID: optID, Text: optTexts[optID]}
@@ -675,7 +675,7 @@ func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow,
 			// Build employee answer texts.
 			var empAnswer []string
 			if ar, ok := answerRows[b.QuestionID]; ok {
-				if b.QuestionType == "short_text" {
+				if isShortText(b.QuestionType) {
 					if ar.TextAnswer != nil {
 						empAnswer = []string{*ar.TextAnswer}
 					}
@@ -936,9 +936,14 @@ func (s *service) SelectNextAdaptiveQuestion(ctx context.Context, sessionID, use
 	}, nil
 }
 
+// isShortText returns true for both DB type "shorttext" and canonical "short_text".
+func isShortText(qType string) bool {
+	return qType == "short_text" || qType == "shorttext"
+}
+
 // buildOptions constructs the option list for a question response, omitting options for short_text.
 func buildOptions(qType string, optIDs []string, optTexts map[string]string) []SessionOptionResponse {
-	if qType == "short_text" {
+	if isShortText(qType) {
 		return []SessionOptionResponse{}
 	}
 	opts := make([]SessionOptionResponse, len(optIDs))

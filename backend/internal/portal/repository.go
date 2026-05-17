@@ -57,7 +57,7 @@ func NewRepository(db *sqlx.DB) Repository {
 // When the same exam has multiple assignments the outer query picks the earliest deadline.
 const assignmentCTE = `
 WITH RECURSIVE dept_tree(id) AS (
-    SELECT $2::uuid AS id
+    SELECT NULLIF($2, '')::uuid AS id
     UNION ALL
     SELECT d.parent_id FROM departments d JOIN dept_tree dt ON d.id = dt.id WHERE d.parent_id IS NOT NULL
 ),

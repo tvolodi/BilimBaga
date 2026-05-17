@@ -23,7 +23,9 @@ export function QuestionDisplay({
   const renderInput = () => {
     switch (question.type) {
       case 'single_choice':
+      case 'single':
       case 'true_false':
+      case 'truefalse':
         return (
           <SingleChoiceInput
             options={question.options}
@@ -32,6 +34,7 @@ export function QuestionDisplay({
           />
         )
       case 'multiple_choice':
+      case 'multiple':
         return (
           <MultipleChoiceInput
             options={question.options}
@@ -48,6 +51,7 @@ export function QuestionDisplay({
           />
         )
       case 'short_text':
+      case 'shorttext':
         return (
           <ShortTextInput
             value={savedAnswer?.text_answer ?? ''}

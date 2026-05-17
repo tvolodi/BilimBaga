@@ -92,6 +92,9 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			// User management.
 			// GetMe is available to every authenticated user — no extra permission required.
 			r.Get("/users/me", usersHandler.GetMe)
+			// Roles lookup — static sub-path, must come before /{id} routes.
+			r.With(rbac.RequirePermission(rbacCache, "users", "read")).
+				Get("/users/roles", usersHandler.ListRoles)
 			// Import is a static sub-path; must be registered before /{id} routes.
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/import", usersHandler.ImportUsers)

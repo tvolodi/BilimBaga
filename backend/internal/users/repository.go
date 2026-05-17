@@ -22,6 +22,7 @@ type Repository interface {
 	GetDepartmentIDByName(ctx context.Context, name string) (string, error)
 	GetRoleIDByName(ctx context.Context, name string) (string, error)
 	GetRoleNameByID(ctx context.Context, roleID string) (string, error)
+	ListRoles(ctx context.Context) ([]RoleRow, error)
 }
 
 type pgRepository struct {
@@ -200,6 +201,16 @@ func (r *pgRepository) GetDepartmentIDByName(ctx context.Context, name string) (
 		return "", fmt.Errorf("users.GetDepartmentIDByName: %w", err)
 	}
 	return id, nil
+}
+
+// ListRoles returns all roles ordered by name.
+func (r *pgRepository) ListRoles(ctx context.Context) ([]RoleRow, error) {
+	const q = `SELECT id, name FROM roles ORDER BY name`
+	var rows []RoleRow
+	if err := r.db.SelectContext(ctx, &rows, q); err != nil {
+		return nil, fmt.Errorf("users.ListRoles: %w", err)
+	}
+	return rows, nil
 }
 
 // GetRoleIDByName resolves a role name to its UUID.

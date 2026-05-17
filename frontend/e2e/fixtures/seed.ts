@@ -65,29 +65,88 @@ async function login(email: string, pass: string): Promise<string | null> {
 interface UserData {
   id: string
   email: string
+  temporary_password?: string
 }
 
-async function createEmployee(adminToken: string): Promise<void> {
-  // Try login first (idempotency)
+interface RoleData {
+  id: string
+  name: string
+}
+
+async function getEmployeeRoleId(adminToken: string): Promise<string> {
+  const res = await apiGet<RoleData[]>(`${BASE}/api/v1/users/roles`, adminToken)
+  if (!res.ok || !res.data) throw new Error('[seed] Failed to fetch roles')
+  const role = res.data.find((r) => r.name === 'employee')
+  if (!role) throw new Error('[seed] employee role not found')
+  return role.id
+}
+
+interface ResetPasswordData {
+  temporary_password: string
+}
+
+async function setEmployeeKnownPassword(adminToken: string, employeeId: string): Promise<void> {
+  const reset = await apiPost<ResetPasswordData>(
+    `${BASE}/api/v1/users/${employeeId}/reset-password`,
+    {},
+    adminToken,
+  )
+  if (!reset.ok || !reset.data?.temporary_password) {
+    throw new Error('[seed] Failed to reset employee password')
+  }
+  const tempPassword = reset.data.temporary_password
+  const empToken = await login('employee@bilimbaga.local', tempPassword)
+  if (!empToken) throw new Error('[seed] Could not login with reset temp password')
+  const changed = await apiPost<unknown>(
+    `${BASE}/api/v1/auth/change-password`,
+    { current_password: tempPassword, new_password: 'Employee1234!' },
+    empToken,
+  )
+  if (!changed.ok) throw new Error(`[seed] Failed to change employee password: ${changed.error}`)
+}
+
+// Returns the password to use for login (always 'Employee1234!' after setup).
+async function createEmployee(adminToken: string): Promise<string> {
+  // Try login first (idempotency — user already exists with known password)
   const token = await login('employee@bilimbaga.local', 'Employee1234!')
   if (token) {
-    console.log('[seed] Employee already exists — skipping creation')
-    return
+    console.log('[seed] Employee already exists with known password — skipping creation')
+    return 'Employee1234!'
   }
   console.log('[seed] Creating employee user…')
+  const roleId = await getEmployeeRoleId(adminToken)
   const result = await apiPost<UserData>(
     `${BASE}/api/v1/users`,
     {
       email: 'employee@bilimbaga.local',
-      password: 'Employee1234!',
       full_name: 'E2E Employee',
-      role: 'employee',
+      role_id: roleId,
     },
     adminToken,
   )
-  if (!result.ok && result.error !== 'DUPLICATE_EMAIL') {
+  if (!result.ok) {
+    if (result.error === 'DUPLICATE_EMAIL') {
+      // User exists but password is unknown — reset via admin then set to known value.
+      console.log('[seed] Employee exists with unknown password — resetting via admin…')
+      const employeeId = await findUserByEmail(adminToken, 'employee@bilimbaga.local')
+      if (!employeeId) throw new Error('[seed] Could not find existing employee user')
+      await setEmployeeKnownPassword(adminToken, employeeId)
+      return 'Employee1234!'
+    }
     throw new Error(`Failed to create employee user: ${result.error}`)
   }
+  const tempPassword = result.data?.temporary_password
+  if (!tempPassword) throw new Error('[seed] No temporary_password in create response')
+  // Change password to the known test password so tests are repeatable.
+  const empToken = await login('employee@bilimbaga.local', tempPassword)
+  if (!empToken) throw new Error('[seed] Could not login with temporary password')
+  const changed = await apiPost<unknown>(
+    `${BASE}/api/v1/auth/change-password`,
+    { current_password: tempPassword, new_password: 'Employee1234!' },
+    empToken,
+  )
+  if (!changed.ok) throw new Error(`[seed] Failed to change employee password: ${changed.error}`)
+  return 'Employee1234!'
 }
 
 interface ExamData {
@@ -111,12 +170,30 @@ interface QuestionData {
   id: string
 }
 
+interface CategoryItem {
+  id: string
+  name: string
+}
+
+let cachedCategoryId: string | null = null
+
+async function getFirstCategoryId(adminToken: string): Promise<string> {
+  if (cachedCategoryId) return cachedCategoryId
+  const res = await apiGet<CategoryItem[]>(`${BASE}/api/v1/categories`, adminToken)
+  if (!res.ok || !res.data || res.data.length === 0) {
+    throw new Error('[seed] No categories found — cannot create questions')
+  }
+  cachedCategoryId = res.data[0].id
+  return cachedCategoryId
+}
+
 async function createQuestion(
   adminToken: string,
   type: string,
   stem: string,
   options?: Array<{ text: string; is_correct: boolean }>,
 ): Promise<string> {
+  const categoryId = await getFirstCategoryId(adminToken)
   const translations: Record<string, { stem: string; explanation: string }> = {
     en: { stem, explanation: '' },
   }
@@ -155,6 +232,7 @@ async function createQuestion(
     `${BASE}/api/v1/questions`,
     {
       type,
+      category_id: categoryId,
       difficulty: 'easy',
       default_locale: 'en',
       translations,
@@ -165,7 +243,41 @@ async function createQuestion(
   if (!result.ok || !result.data?.id) {
     throw new Error(`Failed to create ${type} question: ${result.error}`)
   }
-  return result.data.id
+  const questionId = result.data.id
+  await activateQuestion(adminToken, questionId)
+  return questionId
+}
+
+async function activateQuestion(adminToken: string, questionId: string): Promise<void> {
+  // draft → review
+  const toReview = await apiPost<unknown>(
+    `${BASE}/api/v1/questions/${questionId}/status`,
+    { status: 'review' },
+    adminToken,
+  )
+  if (!toReview.ok) {
+    throw new Error(`Failed to transition question ${questionId} to review: ${toReview.error}`)
+  }
+  // review → active
+  const toActive = await apiPost<unknown>(
+    `${BASE}/api/v1/questions/${questionId}/status`,
+    { status: 'active' },
+    adminToken,
+  )
+  if (!toActive.ok) {
+    throw new Error(`Failed to activate question ${questionId}: ${toActive.error}`)
+  }
+}
+
+interface ExamDetailData {
+  id: string
+  rules: Array<{ id: string }>
+}
+
+async function getExamRuleCount(adminToken: string, examId: string): Promise<number> {
+  const res = await apiGet<ExamDetailData>(`${BASE}/api/v1/exams/${examId}`, adminToken)
+  if (!res.ok || !res.data) return 0
+  return res.data.rules?.length ?? 0
 }
 
 interface RuleData {
@@ -192,13 +304,26 @@ interface AssignmentData {
   id: string
 }
 
-async function assignExam(adminToken: string, examId: string, userId: string): Promise<void> {
-  const result = await apiPost<AssignmentData>(
+async function isAlreadyAssigned(adminToken: string, examId: string, userId: string): Promise<boolean> {
+  const res = await apiGet<Array<{ assignee_id: string | null }>>(
     `${BASE}/api/v1/exams/${examId}/assignments`,
+    adminToken,
+  )
+  if (!res.ok || !res.data) return false
+  return res.data.some((a) => a.assignee_id === userId)
+}
+
+async function assignExam(adminToken: string, examId: string, userId: string): Promise<void> {
+  if (await isAlreadyAssigned(adminToken, examId, userId)) {
+    console.log('[seed] Exam already assigned to employee — skipping')
+    return
+  }
+  const result = await apiPost<AssignmentData>(
+    `${BASE}/api/v1/exams/${examId}/assign`,
     { assignee_type: 'user', assignee_id: userId, deadline: null },
     adminToken,
   )
-  if (!result.ok && result.error !== 'ASSIGNMENT_ALREADY_EXISTS' && result.error !== 'assignmentAlreadyExists') {
+  if (!result.ok && result.error !== 'ASSIGNMENT_ALREADY_EXISTS') {
     throw new Error(`Failed to assign exam: ${result.error}`)
   }
 }
@@ -209,7 +334,7 @@ async function publishExam(adminToken: string, examId: string): Promise<void> {
     {},
     adminToken,
   )
-  if (!result.ok && result.error !== 'examNotDraft') {
+  if (!result.ok && result.error !== 'EXAM_NOT_DRAFT') {
     throw new Error(`Failed to publish exam: ${result.error}`)
   }
 }
@@ -226,7 +351,7 @@ async function createExam(adminToken: string, title: string, onTabSwitch: string
       description: 'E2E test exam — created by seed fixture',
       time_limit_minutes: 60,
       passing_score_pct: 70,
-      max_attempts: 5,
+      max_attempts: 99,
       available_from: null,
       available_until: null,
       shuffle_questions: false,
@@ -242,6 +367,7 @@ async function createExam(adminToken: string, title: string, onTabSwitch: string
   }
   return result.data.id
 }
+
 
 interface UserListResponse {
   items: Array<{ id: string; email: string }>
@@ -261,23 +387,75 @@ interface SessionData {
   session_id: string
 }
 
+interface SessionStateData {
+  session_id: string
+  questions: unknown[]
+}
+
+async function getSession(employeeToken: string, sessionId: string): Promise<SessionStateData | null> {
+  const res = await apiGet<SessionStateData>(`${BASE}/api/v1/portal/sessions/${sessionId}`, employeeToken)
+  if (!res.ok) return null
+  return res.data
+}
+
+async function getOpenSessionId(employeeToken: string, examId: string): Promise<string | null> {
+  const res = await apiGet<{ open_session_id: string | null }[]>(`${BASE}/api/v1/portal/exams`, employeeToken)
+  if (!res.ok || !res.data) return null
+  const exams = res.data as Array<{ id: string; open_session_id: string | null }>
+  const exam = exams.find((e) => e.id === examId)
+  return exam?.open_session_id ?? null
+}
+
+async function submitSession(employeeToken: string, sessionId: string): Promise<void> {
+  const result = await apiPost<unknown>(
+    `${BASE}/api/v1/portal/sessions/${sessionId}/submit`,
+    {},
+    employeeToken,
+  )
+  if (!result.ok) {
+    throw new Error(`Failed to submit session: ${result.error}`)
+  }
+}
+
 async function startSession(employeeToken: string, examId: string): Promise<string | null> {
-  const result = await apiPost<SessionData>(`${BASE}/api/v1/sessions`, { exam_id: examId }, employeeToken)
+  const result = await apiPost<SessionData>(
+    `${BASE}/api/v1/portal/exams/${examId}/sessions`,
+    {},
+    employeeToken,
+  )
   if (!result.ok) {
     if (result.error === 'sessionAlreadyOpen' || result.error === 'SESSION_ALREADY_OPEN') {
+      // Check if the open session has questions — if not, submit it and create fresh
+      const openSessionId = await getOpenSessionId(employeeToken, examId)
+      if (openSessionId) {
+        const state = await getSession(employeeToken, openSessionId)
+        if (state && state.questions.length === 0) {
+          console.log('[seed] Open session has 0 questions (stale from before rules were added) — submitting and creating fresh session')
+          await submitSession(employeeToken, openSessionId).catch(() => {
+            console.log('[seed] Could not submit stale session (may already be expired/submitted)')
+          })
+          // Try starting a fresh session
+          const retry = await apiPost<SessionData>(
+            `${BASE}/api/v1/portal/exams/${examId}/sessions`,
+            {},
+            employeeToken,
+          )
+          if (retry.ok && retry.data?.session_id) {
+            console.log('[seed] Fresh session created after submitting stale one')
+            return retry.data.session_id
+          }
+        }
+      }
       console.log('[seed] Session already open for this exam — skipping session creation')
+      return openSessionId
+    }
+    if (result.error === 'ATTEMPTS_EXHAUSTED' || result.error === 'MAX_ATTEMPTS_REACHED') {
+      console.log('[seed] Max attempts exhausted for this exam — skipping session creation')
       return null
     }
     throw new Error(`Failed to start session: ${result.error}`)
   }
   return result.data?.session_id ?? null
-}
-
-async function submitSession(employeeToken: string, sessionId: string): Promise<void> {
-  const result = await apiPost<unknown>(`${BASE}/api/v1/sessions/${sessionId}/submit`, {}, employeeToken)
-  if (!result.ok) {
-    throw new Error(`Failed to submit session: ${result.error}`)
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -289,11 +467,11 @@ export async function seedEmployeeFixtures(adminToken: string): Promise<void> {
 
   if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true })
 
-  // 1. Ensure employee user exists
-  await createEmployee(adminToken)
+  // 1. Ensure employee user exists; returns the password to use for login
+  const employeePassword = await createEmployee(adminToken)
 
   // 2. Login as employee to get token
-  const employeeToken = await login('employee@bilimbaga.local', 'Employee1234!')
+  const employeeToken = await login('employee@bilimbaga.local', employeePassword)
   if (!employeeToken) {
     throw new Error('[seed] Failed to login as employee after creation')
   }
@@ -314,8 +492,14 @@ export async function seedEmployeeFixtures(adminToken: string): Promise<void> {
   if (!mixedExamId) {
     console.log('[seed] Creating E2E Mixed Exam…')
     mixedExamId = await createExam(adminToken, 'E2E Mixed Exam', 'warn')
+  } else {
+    console.log('[seed] E2E Mixed Exam already exists')
+  }
 
-    // Create one question per type
+  // Add question rules if missing (idempotent: only adds when exam has 0 rules)
+  const mixedRuleCount = await getExamRuleCount(adminToken, mixedExamId)
+  if (mixedRuleCount === 0) {
+    console.log('[seed] E2E Mixed Exam has no rules — adding questions…')
     const singleId = await createQuestion(adminToken, 'single', 'E2E Single Choice Question?', [
       { text: 'Correct Answer', is_correct: true },
       { text: 'Wrong Answer', is_correct: false },
@@ -341,19 +525,39 @@ export async function seedEmployeeFixtures(adminToken: string): Promise<void> {
 
     console.log('[seed] E2E Mixed Exam questions added')
   } else {
-    console.log('[seed] E2E Mixed Exam already exists, skipping question creation')
+    console.log(`[seed] E2E Mixed Exam already has ${mixedRuleCount} rules — skipping question creation`)
   }
 
-  await assignExam(adminToken, mixedExamId, employeeId)
   await publishExam(adminToken, mixedExamId)
-  console.log('[seed] E2E Mixed Exam assigned and published')
+  await assignExam(adminToken, mixedExamId, employeeId)
+  console.log('[seed] E2E Mixed Exam published and assigned')
+
+  // 4b. Repair stale Mixed Exam session: if an in_progress session with 0 questions
+  // exists (e.g., from a previous seed run before rules were added), submit it so
+  // exam-taking tests can create a fresh session with proper questions.
+  const mixedOpenId = await getOpenSessionId(employeeToken, mixedExamId)
+  if (mixedOpenId) {
+    const mixedState = await getSession(employeeToken, mixedOpenId)
+    if (mixedState && mixedState.questions.length === 0) {
+      console.log('[seed] Mixed Exam has stale session with 0 questions — force-submitting it')
+      await submitSession(employeeToken, mixedOpenId).catch((e) => {
+        console.log('[seed] Could not submit stale Mixed Exam session:', e)
+      })
+    }
+  }
 
   // 5. Create or find "E2E ShortText Exam" (for grading queue tests)
   let shortTextExamId = await findExam(adminToken, 'E2E ShortText Exam')
   if (!shortTextExamId) {
     console.log('[seed] Creating E2E ShortText Exam…')
     shortTextExamId = await createExam(adminToken, 'E2E ShortText Exam', 'log')
+  } else {
+    console.log('[seed] E2E ShortText Exam already exists')
+  }
 
+  const shortTextRuleCount = await getExamRuleCount(adminToken, shortTextExamId)
+  if (shortTextRuleCount === 0) {
+    console.log('[seed] E2E ShortText Exam has no rules — adding question…')
     const shortTextId2 = await createQuestion(
       adminToken,
       'shorttext',
@@ -362,12 +566,12 @@ export async function seedEmployeeFixtures(adminToken: string): Promise<void> {
     await addRule(adminToken, shortTextExamId, shortTextId2, 1)
     console.log('[seed] E2E ShortText Exam question added')
   } else {
-    console.log('[seed] E2E ShortText Exam already exists, skipping question creation')
+    console.log(`[seed] E2E ShortText Exam already has ${shortTextRuleCount} rules — skipping`)
   }
 
-  await assignExam(adminToken, shortTextExamId, employeeId)
   await publishExam(adminToken, shortTextExamId)
-  console.log('[seed] E2E ShortText Exam assigned and published')
+  await assignExam(adminToken, shortTextExamId, employeeId)
+  console.log('[seed] E2E ShortText Exam published and assigned')
 
   // 6. Start and submit a session for the ShortText Exam (so it appears in grading queue)
   const sessionId = await startSession(employeeToken, shortTextExamId)

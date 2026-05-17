@@ -28,6 +28,7 @@ type Service interface {
 	DeactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
 	ResetPassword(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
 	ImportUsers(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
+	ListRoles(ctx context.Context) ([]RoleRow, error)
 }
 
 type service struct {
@@ -375,6 +376,11 @@ func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole st
 		return ErrForbidden
 	}
 	return nil
+}
+
+// ListRoles returns all roles from the database.
+func (s *service) ListRoles(ctx context.Context) ([]RoleRow, error) {
+	return s.repo.ListRoles(ctx)
 }
 
 // generateTempPassword generates a cryptographically secure 10-character password

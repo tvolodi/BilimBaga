@@ -302,7 +302,7 @@ FROM exams WHERE id = $1`
 func (r *postgresRepository) IsAssigned(ctx context.Context, examID, userID, deptID string) (bool, error) {
 	const q = `
 WITH RECURSIVE dept_tree(id) AS (
-    SELECT $3::uuid AS id
+    SELECT NULLIF($3, '')::uuid AS id
     UNION ALL
     SELECT d.parent_id FROM departments d JOIN dept_tree dt ON d.id = dt.id WHERE d.parent_id IS NOT NULL
 )
@@ -311,7 +311,7 @@ SELECT EXISTS (
     WHERE ea.exam_id = $1
       AND (
            (ea.assignee_type = 'user' AND ea.assignee_id = $2)
-        OR (ea.assignee_type = 'department' AND ea.assignee_id IN (SELECT id FROM dept_tree))
+        OR (ea.assignee_type = 'department' AND ea.assignee_id IN (SELECT id FROM dept_tree WHERE id IS NOT NULL))
         OR (ea.assignee_type = 'all')
       )
 )`
@@ -922,7 +922,7 @@ WITH ranked AS (
         es.id                     AS session_id,
         es.exam_id,
         e.title                   AS exam_title,
-        e.show_answers_mode,
+        e.show_answers            AS show_answers_mode,
         es.user_id,
         es.status,
         es.score_pct,
@@ -981,18 +981,19 @@ FROM ranked WHERE session_id = $1`
 func (r *postgresRepository) GetSectionScores(ctx context.Context, sessionID string) ([]SectionScore, error) {
 	const q = `
 SELECT
-    sqs.rule_id::text                          AS section_id,
-    COALESCE(eqr.label, '')                    AS title,
+    sq.rule_id::text                           AS section_id,
+    COALESCE(es.title, '')                     AS title,
     ROUND(
-        100.0 * SUM(sqs.points_earned) / NULLIF(SUM(sqs.max_points), 0),
+        100.0 * SUM(sqs.score) / NULLIF(SUM(sqs.max_score), 0),
         2
     )                                          AS score_pct
 FROM session_question_scores sqs
 JOIN session_questions sq ON sq.session_id = sqs.session_id AND sq.question_id = sqs.question_id
 LEFT JOIN exam_question_rules eqr ON eqr.id = sq.rule_id
+LEFT JOIN exam_sections es ON es.id = eqr.section_id
 WHERE sqs.session_id = $1
   AND sq.rule_id IS NOT NULL
-GROUP BY sqs.rule_id, eqr.label
+GROUP BY sq.rule_id, es.title
 ORDER BY MIN(sq.sort_order)`
 
 	type row struct {
@@ -1029,8 +1030,8 @@ SELECT
     sqs.question_id,
     q.type                              AS question_type,
     COALESCE(qt.stem, '')               AS stem,
-    sqs.points_earned,
-    sqs.max_points,
+    sqs.score           AS points_earned,
+    sqs.max_score       AS max_points,
     qt.explanation
 FROM session_question_scores sqs
 JOIN session_questions sq   ON sq.session_id = sqs.session_id AND sq.question_id = sqs.question_id

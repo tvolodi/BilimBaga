@@ -34,29 +34,35 @@ const ADMIN_NEW_PASS = process.env.E2E_ADMIN_NEW_PASS ?? 'E2eAdmin2024!'
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Log in and handle the optional force_password_change redirect. */
+/**
+ * Log in and handle the optional force_password_change redirect.
+ * Throws immediately if auth fails (redirected to /login) so every test
+ * that calls this gets a clear failure rather than silently running unauthenticated.
+ */
 async function loginAsAdmin(page: Page) {
-  // The global setup seeds an access token into sessionStorage so the app restores auth
+  // The global setup seeds an access token into localStorage so the app restores auth
   // without needing a fresh login call (avoids hitting the 10 req/min auth rate limit).
   await page.goto('/admin/dashboard')
-  await expect(page).toHaveURL(/\/(admin|portal)/, { timeout: 15_000 })
+  // Must land on an admin route — if redirected to /login the token was not seeded.
+  await expect(page).toHaveURL(/\/admin/, { timeout: 15_000 })
+  const url = page.url()
+  if (url.includes('/login')) {
+    throw new Error(
+      `loginAsAdmin: auth failed — redirected to ${url}. ` +
+      'Check that global-setup seeded __e2e_access_token__ into localStorage.',
+    )
+  }
 }
 
 async function handleForcePasswordChange(page: Page) {
   await expect(page).toHaveURL(/\/change-password/, { timeout: 10_000 })
   await page.screenshot({ path: 'screenshots/00-change-password.png', fullPage: true })
 
-  // Fill current password and the new one
-  const inputs = page.getByRole('textbox')
-  // ChangePasswordForm: current_password, new_password, confirm
-  const labels = page.locator('label')
-  // Use label-based queries to be robust
   await page.getByLabel(/current password/i).fill(ADMIN_PASS)
   await page.getByLabel(/^new password/i).fill(ADMIN_NEW_PASS)
   await page.getByLabel(/confirm/i).fill(ADMIN_NEW_PASS)
   await page.getByRole('button', { name: /change|save|submit/i }).click()
 
-  // After successful change we may land on /admin — if back to login, re-login
   await page.waitForURL(/\/(admin|login)/, { timeout: 15_000 })
   if (page.url().includes('/login')) {
     await page.getByRole('textbox', { name: /email/i }).fill(ADMIN_EMAIL)
@@ -71,11 +77,11 @@ async function shot(page: Page, name: string) {
 }
 
 async function waitForContent(page: Page) {
-  // Generic: wait for spinner to disappear
+  // Wait for spinner to disappear
   await page.waitForFunction(() => !document.querySelector('[aria-label="loading"], .animate-spin'), {
     timeout: 10_000,
   }).catch(() => { /* spinner may not exist — that's fine */ })
-  // Small settle buffer for React Query renders
+  // Settle buffer for React Query renders
   await page.waitForLoadState('networkidle').catch(() => {})
 }
 
@@ -85,10 +91,6 @@ async function waitForContent(page: Page) {
 
 test.describe('Full application walkthrough', () => {
   test.setTimeout(300_000) // 5-minute budget for the entire suite
-
-  // Shared login state — storage state is NOT used because we want a clean
-  // session per spec to avoid cookie bleed; instead we log in once per
-  // describe block via beforeAll.
 
   test('01 — Login screen renders correctly', async ({ page }) => {
     await page.goto('/login')
@@ -114,9 +116,13 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/dashboard')
     await waitForContent(page)
 
-    await expect(page.getByRole('navigation', { name: /main navigation/i })).toBeVisible()
-    // Dashboard has at least one heading or KPI card
-    await expect(page.locator('h1, [data-testid="kpi-card"], .text-xl').first()).toBeVisible()
+    // Must render the dashboard heading — not an error or loading state
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page.locator('body')).not.toContainText(/load error/i)
+
+    // Sidebar navigation must be present
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+
     await shot(page, '03-dashboard')
   })
 
@@ -125,19 +131,18 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/users')
     await waitForContent(page)
 
+    // Table must be present on a working users page
     await expect(page.getByRole('table')).toBeVisible()
     await shot(page, '04-users-list')
 
-    // Open "Create user" drawer
-    const createBtn = page.getByRole('button', { name: /create user|add user|invite/i })
-    if (await createBtn.isVisible()) {
-      await createBtn.click()
-      await expect(page.getByRole('dialog, [data-radix-dialog-content]').or(
-        page.locator('[role=dialog]')
-      ).first()).toBeVisible({ timeout: 5_000 })
-      await shot(page, '04b-users-create-drawer')
-      await page.keyboard.press('Escape')
-    }
+    // "New User" button must exist and open a drawer
+    const createBtn = page.getByRole('button', { name: /new user|create user|add user/i })
+    await expect(createBtn).toBeVisible()
+    await createBtn.click()
+    // The drawer uses a custom Sheet (plain div, not role=dialog) — detect via its heading
+    await expect(page.getByRole('heading', { name: /create user/i })).toBeVisible({ timeout: 5_000 })
+    await shot(page, '04b-users-create-drawer')
+    await page.keyboard.press('Escape')
   })
 
   test('05 — Departments page — renders list and add form', async ({ page }) => {
@@ -145,14 +150,12 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/departments')
     await waitForContent(page)
 
-    await shot(page, '05-departments')
+    // Departments is currently a "coming soon" stub — heading must be visible
+    await expect(page.getByRole('heading')).toBeVisible()
+    // Must not crash
+    await expect(page.locator('body')).not.toContainText(/unexpected error|something went wrong/i)
 
-    const addBtn = page.getByRole('button', { name: /add department|create|new/i })
-    if (await addBtn.isVisible()) {
-      await addBtn.click()
-      await shot(page, '05b-departments-add-form')
-      await page.keyboard.press('Escape')
-    }
+    await shot(page, '05-departments')
   })
 
   test('06 — Categories page — tree and create modal', async ({ page }) => {
@@ -162,17 +165,17 @@ test.describe('Full application walkthrough', () => {
 
     await shot(page, '06-categories')
 
-    const addBtn = page.getByRole('button', { name: /add category|create category|new/i })
-    if (await addBtn.isVisible()) {
-      await addBtn.click()
-      await expect(page.getByRole('dialog').first()).toBeVisible({ timeout: 5_000 })
-      await shot(page, '06b-category-create-modal')
-      // Fill the name field
-      const nameField = page.getByRole('dialog').getByRole('textbox').first()
-      await nameField.fill('E2E Test Category')
-      await shot(page, '06c-category-create-filled')
-      await page.keyboard.press('Escape')
-    }
+    // The "New Category" button is required for super_admin
+    const addBtn = page.getByRole('button', { name: /new category|add category|create category/i })
+    await expect(addBtn).toBeVisible()
+    await addBtn.click()
+    await expect(page.getByRole('dialog').first()).toBeVisible({ timeout: 5_000 })
+    await shot(page, '06b-category-create-modal')
+    // Fill the name field
+    const nameField = page.getByRole('dialog').getByRole('textbox').first()
+    await nameField.fill('E2E Test Category')
+    await shot(page, '06c-category-create-filled')
+    await page.keyboard.press('Escape')
   })
 
   test('07 — Tags page — list, create, rename, delete UI', async ({ page }) => {
@@ -182,16 +185,15 @@ test.describe('Full application walkthrough', () => {
 
     await shot(page, '07-tags')
 
-    // Create tag
-    const createBtn = page.getByRole('button', { name: /create tag|add tag|new tag/i })
-    if (await createBtn.isVisible()) {
-      await createBtn.click()
-      await expect(page.getByRole('dialog').first()).toBeVisible({ timeout: 5_000 })
-      const input = page.getByRole('dialog').getByRole('textbox').first()
-      await input.fill('E2E-Tag')
-      await shot(page, '07b-tag-create-dialog')
-      await page.keyboard.press('Escape')
-    }
+    // "New Tag" button is required for super_admin
+    const createBtn = page.getByRole('button', { name: /new tag|create tag|add tag/i })
+    await expect(createBtn).toBeVisible()
+    await createBtn.click()
+    await expect(page.getByRole('dialog').first()).toBeVisible({ timeout: 5_000 })
+    const input = page.getByRole('dialog').getByRole('textbox').first()
+    await input.fill('E2E-Tag')
+    await shot(page, '07b-tag-create-dialog')
+    await page.keyboard.press('Escape')
   })
 
   test('08 — Question bank — list, filters, pagination', async ({ page }) => {
@@ -201,20 +203,16 @@ test.describe('Full application walkthrough', () => {
 
     await shot(page, '08-question-bank')
 
-    // Filter controls should be present
-    const searchInput = page.getByPlaceholder(/search|find/i)
-    if (await searchInput.isVisible()) {
-      await searchInput.fill('test')
-      await page.waitForTimeout(500)
-      await shot(page, '08b-question-bank-filtered')
-      await searchInput.clear()
-    }
+    // Search input and new question button must exist on a working question bank
+    const searchInput = page.getByPlaceholder(/search questions/i)
+    await expect(searchInput).toBeVisible()
+    const newBtn = page.getByRole('button', { name: /new question/i })
+    await expect(newBtn).toBeVisible()
 
-    // "New question" button
-    const newBtn = page.getByRole('button', { name: /new question|create question|add question/i })
-    if (await newBtn.isVisible()) {
-      await expect(newBtn).toBeEnabled()
-    }
+    await searchInput.fill('test')
+    await page.waitForTimeout(500)
+    await shot(page, '08b-question-bank-filtered')
+    await searchInput.clear()
   })
 
   test('09 — Question editor — new question form (all question types)', async ({ page }) => {
@@ -224,30 +222,30 @@ test.describe('Full application walkthrough', () => {
 
     await shot(page, '09-question-editor-new')
 
-    // Type selector — switch through all types
-    const typeSelect = page.getByLabel(/question type|type/i)
-    if (await typeSelect.isVisible()) {
-      for (const qtype of ['single', 'multiple', 'truefalse', 'shorttext', 'likert']) {
-        await typeSelect.selectOption(qtype)
-        await page.waitForTimeout(300)
-        await shot(page, `09-question-type-${qtype}`)
-      }
-      // Reset to single choice
-      await typeSelect.selectOption('single')
+    // Core form fields must all be present
+    // "Question Type" and "Difficulty" labels have no htmlFor — scope to main content area
+    await expect(page.locator('main').getByText('Question Type').first()).toBeVisible()
+    await expect(page.locator('main').getByText('Difficulty').first()).toBeVisible()
+
+    // Stem textarea is labeled "Question Stem" via a <Label> without htmlFor —
+    // locate via placeholder which is always present
+    const stemField = page.getByPlaceholder(/enter the question text/i)
+    await expect(stemField).toBeVisible()
+
+    // Find the type selector: it's the <select> whose option values are the question types.
+    // Use a :has() filter to find the select that contains the "single" option.
+    const typeSelect = page.locator('select').filter({ has: page.locator('option[value="single"]') })
+    await expect(typeSelect).toBeVisible()
+    for (const qtype of ['single', 'multiple', 'truefalse', 'shorttext', 'likert']) {
+      await typeSelect.selectOption(qtype)
+      await page.waitForTimeout(300)
+      await shot(page, `09-question-type-${qtype}`)
     }
+    // Reset to single choice
+    await typeSelect.selectOption('single')
 
     // Fill English stem
-    const stemField = page.getByLabel(/question stem|stem|question text/i).first()
-    if (await stemField.isVisible()) {
-      await stemField.fill('What is the capital of Kazakhstan?')
-    }
-
-    // Difficulty selector
-    const diffSelect = page.getByLabel(/difficulty/i)
-    if (await diffSelect.isVisible()) {
-      await diffSelect.selectOption('medium')
-    }
-
+    await stemField.fill('What is the capital of Kazakhstan?')
     await shot(page, '09b-question-editor-filled')
   })
 
@@ -258,14 +256,13 @@ test.describe('Full application walkthrough', () => {
 
     await shot(page, '10-exams-list')
 
-    // Create exam button navigates to wizard
-    const createBtn = page.getByRole('button', { name: /create exam|new exam|add exam/i })
-    if (await createBtn.isVisible()) {
-      await createBtn.click()
-      await expect(page).toHaveURL(/\/exams\/new/, { timeout: 10_000 })
-      await shot(page, '10b-exam-wizard-redirect')
-      await page.goBack()
-    }
+    // "Create Exam" link/button must be present on a working exams page
+    const createExamLink = page.getByRole('link', { name: /create exam/i })
+    await expect(createExamLink).toBeVisible()
+    await createExamLink.click()
+    await expect(page).toHaveURL(/\/exams\/new/, { timeout: 10_000 })
+    await shot(page, '10b-exam-wizard-redirect')
+    await page.goBack()
   })
 
   test('11 — Exam wizard — Step 1 Basic Settings', async ({ page }) => {
@@ -275,19 +272,22 @@ test.describe('Full application walkthrough', () => {
 
     await shot(page, '11-exam-wizard-step1')
 
-    // Fill required fields
+    // Title field is required
     const titleField = page.getByLabel(/exam title|title/i)
     await expect(titleField).toBeVisible()
     await titleField.fill('E2E Walkthrough Exam')
 
     const timeLimitField = page.getByLabel(/time limit/i)
-    if (await timeLimitField.isVisible()) await timeLimitField.fill('30')
+    await expect(timeLimitField).toBeVisible()
+    await timeLimitField.fill('30')
 
     const passingField = page.getByLabel(/passing score/i)
-    if (await passingField.isVisible()) await passingField.fill('70')
+    await expect(passingField).toBeVisible()
+    await passingField.fill('70')
 
     const attemptsField = page.getByLabel(/max attempts/i)
-    if (await attemptsField.isVisible()) await attemptsField.fill('2')
+    await expect(attemptsField).toBeVisible()
+    await attemptsField.fill('2')
 
     await shot(page, '11b-exam-wizard-step1-filled')
 
@@ -313,7 +313,8 @@ test.describe('Full application walkthrough', () => {
     await waitForContent(page)
 
     await shot(page, '12-grading-queue')
-    // Page renders without crashing — no empty-state crash
+    // Page must render without crashing and show a heading
+    await expect(page.getByRole('heading')).toBeVisible()
     await expect(page.locator('body')).not.toContainText(/error|crash|undefined/i)
   })
 
@@ -339,26 +340,22 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/settings/branding')
     await waitForContent(page)
 
+    // Wait for FullPageSpinner to clear (tenant config must load before form renders)
+    await page.waitForSelector('#branding-app-name', { timeout: 15_000 })
     await shot(page, '14-branding-settings')
 
-    // Color picker field should be visible (wait up to 10s for branding form to load)
-    const colorInput = page.locator('input[type=color], input[type=text]').first()
-    const colorInputVisible = await colorInput.isVisible({ timeout: 10_000 }).catch(() => false)
-    if (!colorInputVisible) {
-      // Branding form may not have loaded — skip the interaction checks but don't fail
-      await shot(page, '14-branding-no-form')
-    } else {
-      await expect(colorInput).toBeVisible()
+    // App name input must be present — if absent, the branding form failed to load
+    const appNameField = page.locator('#branding-app-name')
+    await expect(appNameField).toBeVisible()
 
-      // App name field
-      const appNameField = page.getByLabel(/app name/i)
-      if (await appNameField.isVisible()) {
-        await appNameField.fill('BilimBaga E2E')
-        await shot(page, '14b-branding-filled')
-        // Revert
-        await appNameField.fill('BilimBaga')
-      }
-    }
+    // A primary colour input must also exist
+    const colorInput = page.locator('input[type=color], input[type=text]').first()
+    await expect(colorInput).toBeVisible()
+
+    await appNameField.fill('BilimBaga E2E')
+    await shot(page, '14b-branding-filled')
+    // Revert
+    await appNameField.fill('BilimBaga')
   })
 
   test('15 — Admin dashboard AI Insights card', async ({ page }) => {
@@ -380,7 +377,7 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/dashboard')
     await waitForContent(page)
 
-    const nav = page.getByRole('navigation', { name: /main navigation/i })
+    const nav = page.getByRole('navigation', { name: 'Main navigation' })
     await expect(nav).toBeVisible({ timeout: 15_000 })
 
     // Collect all links in the sidebar
@@ -411,29 +408,26 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/users')
     await waitForContent(page)
 
-    const createBtn = page.getByRole('button', { name: /create user|add user|invite/i })
-    if (!(await createBtn.isVisible())) {
-      test.skip()
-      return
-    }
+    // "New User" button must be present — if it isn't, the page is broken
+    const createBtn = page.getByRole('button', { name: /new user|create user|add user/i })
+    await expect(createBtn).toBeVisible()
 
     await createBtn.click()
-    const drawer = page.locator('[role=dialog]').first()
-    await expect(drawer).toBeVisible({ timeout: 5_000 })
+    // Sheet drawer has no role=dialog — detect via its heading
+    await expect(page.getByRole('heading', { name: /create user/i })).toBeVisible({ timeout: 5_000 })
 
     // Submit empty form — expect validation errors
-    await drawer.getByRole('button', { name: /create|save|submit/i }).click()
+    await page.getByRole('button', { name: /^create$/i }).click()
     await shot(page, '17-user-create-validation')
 
-    // Fill valid data
-    const emailField = drawer.getByLabel(/email/i)
-    if (await emailField.isVisible()) {
-      await emailField.fill('e2e-user@bilimbaga.local')
-    }
-    const nameField = drawer.getByLabel(/full name|name/i)
-    if (await nameField.isVisible()) {
-      await nameField.fill('E2E Test User')
-    }
+    // Fill valid data — email and full name inputs use placeholders (no htmlFor on labels)
+    const emailField = page.getByPlaceholder(/user@example.com|email/i)
+    await expect(emailField).toBeVisible()
+    await emailField.fill('e2e-user@bilimbaga.local')
+
+    const nameField = page.getByPlaceholder(/full name/i)
+    await expect(nameField).toBeVisible()
+    await nameField.fill('E2E Test User')
 
     await shot(page, '17b-user-create-filled')
     await page.keyboard.press('Escape')
@@ -444,7 +438,7 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/admin/users')
     await waitForContent(page)
 
-    // Find the first user row that has a "View record" link or action
+    // Find the first user row that has a "View Record" link or action
     const viewRecordLink = page.getByRole('link', { name: /view record|record/i }).first()
     const recordBtn = page.getByRole('button', { name: /view record|record/i }).first()
 
@@ -525,7 +519,7 @@ test.describe('Full application walkthrough', () => {
       await waitForContent(page)
     }
 
-    // Filter out known benign errors (e.g. ResizeObserver, browser extensions, axe-core a11y, network status codes)
+    // Filter out known benign errors (browser extensions, network status codes, axe-core)
     const realErrors = consoleErrors.filter(
       (e) =>
         !e.includes('ResizeObserver') &&
@@ -548,8 +542,6 @@ test.describe('Full application walkthrough', () => {
 
     await shot(page, '22-last-screen-audit')
 
-    // Warn but don't fail — console errors are advisory in this walkthrough
-    // Change to expect(realErrors).toHaveLength(0) to make it blocking
-    expect(realErrors.length).toBeLessThan(10)
+    expect(realErrors).toHaveLength(0)
   })
 })

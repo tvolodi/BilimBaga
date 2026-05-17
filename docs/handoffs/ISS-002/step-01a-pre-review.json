@@ -1,0 +1,10 @@
+{
+  "run_id": "ISS-002",
+  "pipeline": "B",
+  "issue_id": "ISS-002",
+  "root_cause_summary": "The full-walkthrough E2E test had systematic false-positive passes due to: (1) optional if(isVisible) guards wrapping required UI interactions, (2) dashboard assertion matching error-state text, (3) console-error threshold allowing 9 real errors, (4) loginAsAdmin not asserting the final URL, and (5) incorrect element selectors for Sheet drawers (no role=dialog) and unlabeled Select elements.",
+  "files_changed": [
+    "frontend/e2e/full-walkthrough.spec.ts"
+  ],
+  "test_results": "22 passed, 0 failed — full E2E suite run against live stack"
+}

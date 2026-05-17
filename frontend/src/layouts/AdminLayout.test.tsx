@@ -25,7 +25,7 @@ vi.mock('@/api/users', () => ({
   useMe: vi.fn(),
 }))
 
-// Mock Breadcrumb — it uses useMatches() which behaves differently in MemoryRouter
+// Mock Breadcrumb to keep the test isolated from router-specific hooks
 vi.mock('@/components/admin/Breadcrumb', () => ({
   Breadcrumb: () => null,
 }))

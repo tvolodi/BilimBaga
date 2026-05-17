@@ -1,0 +1,13 @@
+{
+  "run_id": "ISS-001-2026-05-17",
+  "pipeline": "B",
+  "issue_id": "ISS-001",
+  "files_changed": [
+    "frontend/src/layouts/AdminLayout.test.tsx"
+  ],
+  "root_cause_summary": "The Docker nginx container was serving a stale frontend dist bundle built before the Breadcrumb component was fixed. The old Breadcrumb called useMatches() from react-router v7, which requires DataRouterStateContext (only available via createBrowserRouter + RouterProvider). The app uses BrowserRouter which does not provide this context. The fix was already in source (Breadcrumb uses useLocation); the container was rebuilt to serve the correct bundle. The only source change in this issue is updating a stale test comment in AdminLayout.test.tsx.",
+  "test_results": {
+    "frontend": "176 passed, 0 failed, 32 test files",
+    "i18n_check": "657 locale keys present in all 3 locales"
+  }
+}

@@ -100,7 +100,7 @@ function ActionsMenu({ tag, onRename, onDelete }: ActionsMenuProps) {
 export function TagsPage() {
   const { t } = useTranslation()
   const { data: me } = useMe()
-  const { data: tags = [], isLoading, isError } = useTags()
+  const { data: tags = [] as Tag[], isLoading, isError } = useTags()
   const deleteMutation = useDeleteTag()
 
   const canManage = MANAGE_ROLES.has(me?.role_name ?? '')

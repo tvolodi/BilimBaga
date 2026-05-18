@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from './apiFetch'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -28,40 +29,13 @@ export interface CategoryUpdate {
   clear_parent?: boolean
 }
 
-// ---- API helpers ------------------------------------------------------------
-
-interface ApiResponse<T> {
-  data: T
-  error: null | { code: string; message: string; details?: Record<string, unknown> }
-}
-
-export interface ApiError {
-  code: string
-  message: string
-  details?: Record<string, unknown>
-}
-
-export async function categoriesFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options)
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) {
-    const err = new Error(body.error.message) as Error & { code: string; details?: Record<string, unknown> }
-    err.code = body.error.code
-    err.details = body.error.details
-    throw err
-  }
-  if (!res.ok) {
-    throw new Error(`Request failed: ${res.status}`)
-  }
-  return body.data
-}
-
 // ---- Hooks ------------------------------------------------------------------
 
 export function useCategories() {
+  const qc = useQueryClient()
   return useQuery({
     queryKey: ['categories'],
-    queryFn: async () => categoriesFetch<CategoryNode[]>('/api/v1/categories'),
+    queryFn: () => apiFetch<CategoryNode[]>(qc, '/api/v1/categories'),
     staleTime: 300_000,
   })
 }
@@ -70,7 +44,7 @@ export function useCreateCategory() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: CategoryCreate) =>
-      categoriesFetch<CategoryNode>('/api/v1/categories', {
+      apiFetch<CategoryNode>(qc, '/api/v1/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -83,7 +57,7 @@ export function useUpdateCategory() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: CategoryUpdate }) =>
-      categoriesFetch<CategoryNode>(`/api/v1/categories/${id}`, {
+      apiFetch<CategoryNode>(qc, `/api/v1/categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -96,7 +70,7 @@ export function useDeleteCategory() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) =>
-      categoriesFetch<void>(`/api/v1/categories/${id}`, { method: 'DELETE' }),
+      apiFetch<void>(qc, `/api/v1/categories/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
   })
 }

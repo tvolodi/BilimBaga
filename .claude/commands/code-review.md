@@ -50,6 +50,8 @@ Any unimplemented AC → immediate FAIL.
 |----------|-------|
 | Critical | No API keys or secrets in frontend code |
 | Critical | No direct fetch calls in components — all via React Query hooks and API client functions |
+| Critical | Every `src/api/{domain}.ts` file uses `apiFetch` from `src/api/apiFetch.ts` for all requests — no custom fetch wrappers that bypass auth. A custom wrapper that omits the Authorization header silently passes E2E tests (storageState warms the cache as a side effect) but fails in production with 401. |
+| Critical | Every new API module has an E2E test asserting `Authorization: Bearer ...` is present on the wire via `page.waitForRequest` |
 | High | All API calls go through `frontend/src/api/{domain}.ts` |
 | High | React Query used for all server state |
 | High | All new user-visible strings in `src/locales/en.json`, `kk.json`, `ru.json` |

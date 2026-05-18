@@ -6,6 +6,14 @@ async function waitForContent(page: import('@playwright/test').Page) {
 }
 
 test.describe('Tags page', () => {
+  test('GET /api/v1/tags carries Authorization header', async ({ page }) => {
+    const [request] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/v1/tags')),
+      page.goto('/admin/tags'),
+    ])
+    expect(request.headers()['authorization']).toMatch(/^Bearer /)
+  })
+
   test('displays tags from the real API', async ({ page }) => {
     await page.goto('/admin/tags')
     await waitForContent(page)

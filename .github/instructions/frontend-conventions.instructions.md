@@ -17,30 +17,69 @@ applyTo: "frontend/**"
 
 ## API Calls
 
-All API calls go through `frontend/src/api/{domain}.ts`:
+All API calls go through `frontend/src/api/{domain}.ts`.
+
+### ⛔ Authorization — mandatory rule
+
+Every API module **must** use `apiFetch` from `src/api/apiFetch.ts` for all requests.
+**Never** write a custom fetch wrapper in an API module. `apiFetch` is the single place
+that reads the JWT from the React Query cache and attaches `Authorization: Bearer <token>`.
+A custom wrapper that omits this will silently work in E2E tests (where `storageState`
+warms the cache as a side effect) but fail in production with 401.
 
 ```typescript
-// WRONG — raw fetch in a component
+// ⛔ WRONG — custom fetch wrapper, no auth header
+async function myFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, options)   // no Authorization header!
+  ...
+}
+
+// ⛔ WRONG — raw fetch in a component
 useEffect(() => {
   fetch('/api/v1/users').then(...)
 }, [])
 
-// RIGHT — React Query hook wrapping an API function
-// 1. Define in src/api/users.ts:
-export const usersApi = {
-  list: async (params: ListParams): Promise<PaginatedUsers> => {
-    const res = await fetch(`/api/v1/users?${toQueryString(params)}`)
-    if (!res.ok) throw await res.json()
-    return res.json()
-  }
+// ✅ RIGHT — use apiFetch, which attaches the token from the query cache
+import { apiFetch } from './apiFetch'
+
+export function useCategories() {
+  const qc = useQueryClient()
+  return useQuery({
+    queryKey: ['categories'],
+    queryFn: () => apiFetch<CategoryNode[]>(qc, '/api/v1/categories'),
+  })
 }
 
-// 2. Use in a component:
-const { data, isLoading, error } = useQuery({
-  queryKey: ['users', params],
-  queryFn: () => usersApi.list(params),
+export function useCreateCategory() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CategoryCreate) =>
+      apiFetch<CategoryNode>(qc, '/api/v1/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  })
+}
+```
+
+### E2E test requirement for every new API module
+
+Every new `src/api/{domain}.ts` file must have a corresponding E2E test that asserts
+the Authorization header is present on the wire:
+
+```typescript
+test('GET /api/v1/{domain} carries Authorization header', async ({ page }) => {
+  const [request] = await Promise.all([
+    page.waitForRequest(req => req.url().includes('/api/v1/{domain}')),
+    page.goto('/admin/{domain}'),
+  ])
+  expect(request.headers()['authorization']).toMatch(/^Bearer /)
 })
 ```
+
+This test catches any regression where a fetch bypasses `apiFetch`.
 
 - React Query for ALL server state — no manual `useEffect` fetch loops.
 - Mutations via `useMutation`; always call `queryClient.invalidateQueries(...)` after success.

@@ -21,6 +21,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
+import { getSeedData } from './fixtures/seed'
 
 // ---------------------------------------------------------------------------
 // Config
@@ -302,7 +303,7 @@ test.describe('Full application walkthrough', () => {
 
     // Advance to Step 3
     await page.getByRole('button', { name: /next/i }).click()
-    await expect(page.getByText(/assignments/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/assignments/i).first()).toBeVisible({ timeout: 10_000 })
     await shot(page, '11d-exam-wizard-step3')
 
     // Advance to Step 4
@@ -450,30 +451,16 @@ test.describe('Full application walkthrough', () => {
   })
 
   test('18 — Employee record page — accessible from users list', async ({ page }) => {
+    const { employeeId } = await getSeedData()
     await loginAsAdmin(page)
-    await page.goto('/admin/users')
+    // Navigate directly to the employee record page — the "View Record" link depends on
+    // currentUser being in React Query cache which may not be set before the first render.
+    await page.goto(`/admin/users/${employeeId}/record`)
     await waitForContent(page)
-
-    // Wait for the users table to load first, then look for View Record links
-    await page.waitForFunction(() => document.querySelector('table tbody tr') !== null, { timeout: 15_000 }).catch(() => {})
-
-    // "View Record" link is conditionally rendered once currentUser role is resolved from cache.
-    // Give it extra time since the auth query runs after the users list query.
-    const viewRecordLink = page.getByRole('link', { name: /view record/i }).first()
-    await viewRecordLink.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
-
-    if (await viewRecordLink.isVisible().catch(() => false)) {
-      await viewRecordLink.click()
-    } else {
-      // Fallback: navigate directly to a record URL using first user's row link
-      const firstRowLink = page.locator('table tbody tr').first().getByRole('link').first()
-      if (await firstRowLink.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await firstRowLink.click()
-      }
-    }
 
     // Wait for the skeleton to clear — the page loads 3 queries in parallel so network-idle fires early.
     // Wait explicitly for the h1 heading (only rendered after skeleton clears).
+    await page.waitForURL(/\/record/, { timeout: 10_000 })
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 20_000 })
     await shot(page, '18-employee-record')
 

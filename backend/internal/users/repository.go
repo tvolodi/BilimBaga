@@ -113,7 +113,7 @@ func (r *pgRepository) Create(ctx context.Context, email, fullName, passwordHash
 	const q = `
 		INSERT INTO users (email, password_hash, full_name, department_id, role_id, force_password_change)
 		VALUES ($1, $2, $3, $4, $5, true)
-		RETURNING id, email, full_name, department_id, role_id, status, force_password_change, created_at`
+		RETURNING id, email, full_name, department_id, role_id, status, force_password_change`
 
 	type row struct {
 		ID                  string  `db:"id"`

@@ -41,6 +41,19 @@ export default defineConfig({
       testMatch: [
         '**/full-walkthrough.spec.ts',
         '**/admin-grading.spec.ts',
+        '**/auth.spec.ts',
+        '**/categories.spec.ts',
+        '**/tags.spec.ts',
+        '**/branding.spec.ts',
+        '**/question-bank.spec.ts',
+        '**/question-editor.spec.ts',
+        '**/question-management.spec.ts',
+        '**/exam-wizard.spec.ts',
+        '**/exam-lifecycle.spec.ts',
+        '**/user-management.spec.ts',
+        '**/accessibility.spec.ts',
+        '**/loyalty-narrative.spec.ts',
+        '**/grading/ai-grading.spec.ts',
       ],
       use: {
         ...devices['Desktop Chrome'],
@@ -54,6 +67,7 @@ export default defineConfig({
         '**/employee-portal.spec.ts',
         '**/exam-taking.spec.ts',
         '**/exam-result.spec.ts',
+        '**/my-results.spec.ts',
       ],
       use: {
         ...devices['Desktop Chrome'],

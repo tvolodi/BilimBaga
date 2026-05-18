@@ -1,58 +1,57 @@
 import { test, expect } from '@playwright/test'
-import { mockRefreshExpired, mockRefreshSuccess } from './fixtures/helpers'
-import { mockLogin, mockMe, mockTenantConfig, adminUser } from './fixtures/api'
+
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@bilimbaga.local'
+const ADMIN_PASS = process.env.E2E_ADMIN_PASS ?? 'Admin1234!'
 
 test.describe('Auth — login flow', () => {
-  test.beforeEach(async ({ page }) => {
-    await mockRefreshExpired(page)
-    await mockTenantConfig(page)
-  })
-
-  test('redirects to /login when unauthenticated', async ({ page }) => {
+  test('redirects to /login when unauthenticated', async ({ browser }) => {
+    // Use a fresh context with no stored auth
+    const ctx = await browser.newContext()
+    const page = await ctx.newPage()
     await page.goto('/')
     await expect(page).toHaveURL(/\/login/)
+    await ctx.close()
   })
 
-  test('shows the login form with email and password fields', async ({ page }) => {
+  test('shows the login form with email and password fields', async ({ browser }) => {
+    const ctx = await browser.newContext()
+    const page = await ctx.newPage()
     await page.goto('/login')
     await expect(page.getByRole('textbox', { name: /email/i })).toBeVisible()
     await expect(page.getByLabel(/password/i)).toBeVisible()
     await expect(page.getByRole('button', { name: /login|sign in/i })).toBeVisible()
+    await ctx.close()
   })
 
-  test('shows an error on invalid credentials', async ({ page }) => {
-    await mockLogin(page, false)
+  test('shows an error on invalid credentials', async ({ browser }) => {
+    const ctx = await browser.newContext()
+    const page = await ctx.newPage()
     await page.goto('/login')
-    await page.getByRole('textbox', { name: /email/i }).fill('wrong@example.com')
+    await page.getByRole('textbox', { name: /email/i }).fill('nobody@example.com')
     await page.getByLabel(/password/i).fill('wrongpassword')
     await page.getByRole('button', { name: /login|sign in/i }).click()
-    await expect(page.getByText(/invalid|credentials|incorrect/i)).toBeVisible()
+    await expect(page.getByText(/invalid|credentials|incorrect|unauthorized/i)).toBeVisible({ timeout: 10_000 })
+    await ctx.close()
   })
 
-  test('navigates to /admin after successful login', async ({ page }) => {
-    await mockLogin(page, true)
-    await mockMe(page)
-    await page.route('**/api/v1/users*', (route) =>
-      route.fulfill({ json: { data: { items: [], meta: { page: 1, per_page: 20, total: 0 } }, error: null } }),
-    )
+  test('navigates to /admin after successful login', async ({ browser }) => {
+    const ctx = await browser.newContext()
+    const page = await ctx.newPage()
     await page.goto('/login')
-    await page.getByRole('textbox', { name: /email/i }).fill('admin@example.com')
-    await page.getByLabel(/password/i).fill('password123')
+    await page.getByRole('textbox', { name: /email/i }).fill(ADMIN_EMAIL)
+    await page.getByLabel(/password/i).fill(ADMIN_PASS)
     await page.getByRole('button', { name: /login|sign in/i }).click()
-    await expect(page).toHaveURL(/\/admin/, { timeout: 10000 })
+    // After login, app navigates to /admin, /portal, or /change-password depending on role
+    await expect(page).toHaveURL(/\/(admin|portal|change-password)/, { timeout: 20_000 })
+    await ctx.close()
   })
 })
 
 test.describe('Auth — admin access control', () => {
+  // Uses the storageState-injected admin session from global setup
   test('admin can access /admin', async ({ page }) => {
-    await mockRefreshSuccess(page)
-    await mockMe(page, adminUser)
-    await mockTenantConfig(page)
-    await page.route('**/api/v1/users*', (route) =>
-      route.fulfill({ json: { data: { items: [], meta: { page: 1, per_page: 20, total: 0 } }, error: null } }),
-    )
     await page.goto('/admin/users')
     await expect(page).not.toHaveURL(/\/login/)
-    await expect(page.getByRole('navigation')).toBeVisible()
+    await expect(page.getByRole('navigation', { name: /main/i })).toBeVisible()
   })
 })

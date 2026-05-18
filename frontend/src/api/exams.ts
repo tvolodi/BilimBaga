@@ -152,8 +152,13 @@ interface ApiResponse<T> {
   error: ApiErrorBody | null
 }
 
-async function examsFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options)
+async function examsFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+  const res = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: { ...authHeader, ...options?.headers },
+  })
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     throw new ExamApiError(
@@ -173,6 +178,7 @@ async function examsFetch<T>(url: string, options?: RequestInit): Promise<T> {
 // ---- Exam list & detail hooks -----------------------------------------------
 
 export function useExams(filters: { page?: number; per_page?: number; status?: string; search?: string } = {}) {
+  const qc = useQueryClient()
   const params = new URLSearchParams()
   if (filters.page) params.set('page', String(filters.page))
   if (filters.per_page) params.set('per_page', String(filters.per_page))
@@ -182,15 +188,22 @@ export function useExams(filters: { page?: number; per_page?: number; status?: s
 
   return useQuery<ExamListResponse, ExamApiError>({
     queryKey: ['exams', filters],
-    queryFn: () => examsFetch<ExamListResponse>(`/api/v1/exams${qs ? `?${qs}` : ''}`),
-    staleTime: 5 * 60 * 1000, // AC-6: 5 minutes — exam list is stable
+    queryFn: () => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<ExamListResponse>(`/api/v1/exams${qs ? `?${qs}` : ''}`, token)
+    },
+    staleTime: 5 * 60 * 1000,
   })
 }
 
 export function useExam(id: string | null | undefined) {
+  const qc = useQueryClient()
   return useQuery<ExamDetail, ExamApiError>({
     queryKey: ['exams', id],
-    queryFn: () => examsFetch<ExamDetail>(`/api/v1/exams/${id}`),
+    queryFn: () => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<ExamDetail>(`/api/v1/exams/${id}`, token)
+    },
     enabled: !!id,
     staleTime: 30_000,
   })
@@ -201,12 +214,14 @@ export function useExam(id: string | null | undefined) {
 export function useCreateExam() {
   const qc = useQueryClient()
   return useMutation<ExamDetail, ExamApiError, CreateExamPayload>({
-    mutationFn: (body) =>
-      examsFetch<ExamDetail>('/api/v1/exams', {
+    mutationFn: (body) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<ExamDetail>('/api/v1/exams', token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams'] }),
   })
 }
@@ -214,12 +229,14 @@ export function useCreateExam() {
 export function useUpdateExam(id: string) {
   const qc = useQueryClient()
   return useMutation<ExamDetail, ExamApiError, CreateExamPayload>({
-    mutationFn: (body) =>
-      examsFetch<ExamDetail>(`/api/v1/exams/${id}`, {
+    mutationFn: (body) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<ExamDetail>(`/api/v1/exams/${id}`, token, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exams'] })
       qc.invalidateQueries({ queryKey: ['exams', id] })
@@ -230,8 +247,10 @@ export function useUpdateExam(id: string) {
 export function usePublishExam(id: string) {
   const qc = useQueryClient()
   return useMutation<ExamDetail, ExamApiError, void>({
-    mutationFn: () =>
-      examsFetch<ExamDetail>(`/api/v1/exams/${id}/publish`, { method: 'POST' }),
+    mutationFn: () => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<ExamDetail>(`/api/v1/exams/${id}/publish`, token, { method: 'POST' })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exams'] })
       qc.invalidateQueries({ queryKey: ['exams', id] })
@@ -244,12 +263,14 @@ export function usePublishExam(id: string) {
 export function useAddSection(examId: string) {
   const qc = useQueryClient()
   return useMutation<SectionDetail, ExamApiError, { title?: string; sort_order: number }>({
-    mutationFn: (body) =>
-      examsFetch<SectionDetail>(`/api/v1/exams/${examId}/sections`, {
+    mutationFn: (body) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<SectionDetail>(`/api/v1/exams/${examId}/sections`, token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId] }),
   })
 }
@@ -259,12 +280,14 @@ export function useAddSection(examId: string) {
 export function useAddRule(examId: string) {
   const qc = useQueryClient()
   return useMutation<QuestionRuleDetail, ExamApiError, QuestionRulePayload>({
-    mutationFn: (body) =>
-      examsFetch<QuestionRuleDetail>(`/api/v1/exams/${examId}/rules`, {
+    mutationFn: (body) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<QuestionRuleDetail>(`/api/v1/exams/${examId}/rules`, token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId] }),
   })
 }
@@ -272,12 +295,14 @@ export function useAddRule(examId: string) {
 export function useUpdateRule(examId: string) {
   const qc = useQueryClient()
   return useMutation<QuestionRuleDetail, ExamApiError, { ruleId: string; body: QuestionRulePayload }>({
-    mutationFn: ({ ruleId, body }) =>
-      examsFetch<QuestionRuleDetail>(`/api/v1/exams/${examId}/rules/${ruleId}`, {
+    mutationFn: ({ ruleId, body }) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<QuestionRuleDetail>(`/api/v1/exams/${examId}/rules/${ruleId}`, token, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId] }),
   })
 }
@@ -285,8 +310,10 @@ export function useUpdateRule(examId: string) {
 export function useDeleteRule(examId: string) {
   const qc = useQueryClient()
   return useMutation<void, ExamApiError, string>({
-    mutationFn: (ruleId) =>
-      examsFetch<void>(`/api/v1/exams/${examId}/rules/${ruleId}`, { method: 'DELETE' }),
+    mutationFn: (ruleId) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<void>(`/api/v1/exams/${examId}/rules/${ruleId}`, token, { method: 'DELETE' })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId] }),
   })
 }
@@ -298,12 +325,14 @@ export function useSetRuleQuestions(examId: string) {
     ExamApiError,
     { ruleId: string; questions: Array<{ question_id: string; sort_order: number }> }
   >({
-    mutationFn: ({ ruleId, questions }) =>
-      examsFetch<void>(`/api/v1/exams/${examId}/rules/${ruleId}/questions`, {
+    mutationFn: ({ ruleId, questions }) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<void>(`/api/v1/exams/${examId}/rules/${ruleId}/questions`, token, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questions }),
-      }),
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId] }),
   })
 }
@@ -311,9 +340,13 @@ export function useSetRuleQuestions(examId: string) {
 // ---- Assignment hooks -------------------------------------------------------
 
 export function useExamAssignments(examId: string | null | undefined) {
+  const qc = useQueryClient()
   return useQuery<ExamAssignment[], ExamApiError>({
     queryKey: ['exams', examId, 'assignments'],
-    queryFn: () => examsFetch<ExamAssignment[]>(`/api/v1/exams/${examId}/assignments`),
+    queryFn: () => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<ExamAssignment[]>(`/api/v1/exams/${examId}/assignments`, token)
+    },
     enabled: !!examId,
     staleTime: 30_000,
   })
@@ -322,12 +355,14 @@ export function useExamAssignments(examId: string | null | undefined) {
 export function useAddAssignment(examId: string) {
   const qc = useQueryClient()
   return useMutation<ExamAssignment, ExamApiError, AddAssignmentPayload>({
-    mutationFn: (body) =>
-      examsFetch<ExamAssignment>(`/api/v1/exams/${examId}/assign`, {
+    mutationFn: (body) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<ExamAssignment>(`/api/v1/exams/${examId}/assign`, token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }),
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId, 'assignments'] }),
   })
 }
@@ -335,8 +370,10 @@ export function useAddAssignment(examId: string) {
 export function useDeleteAssignment(examId: string) {
   const qc = useQueryClient()
   return useMutation<void, ExamApiError, string>({
-    mutationFn: (assignmentId) =>
-      examsFetch<void>(`/api/v1/exams/${examId}/assign/${assignmentId}`, { method: 'DELETE' }),
+    mutationFn: (assignmentId) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<void>(`/api/v1/exams/${examId}/assign/${assignmentId}`, token, { method: 'DELETE' })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId, 'assignments'] }),
   })
 }

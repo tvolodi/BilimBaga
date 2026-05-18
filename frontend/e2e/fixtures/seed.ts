@@ -459,6 +459,148 @@ async function startSession(employeeToken: string, examId: string): Promise<stri
 }
 
 // ---------------------------------------------------------------------------
+// Per-test helpers — create & clean up isolated data for destructive tests
+// ---------------------------------------------------------------------------
+
+export interface TestUser {
+  id: string
+  email: string
+  password: string
+  token: string
+}
+
+export async function createTestUser(
+  adminToken: string,
+  emailPrefix: string,
+  _roleName = 'employee',
+): Promise<TestUser> {
+  const roleId = await getEmployeeRoleId(adminToken)
+  const email = `${emailPrefix}-${Date.now()}@e2e-test.local`
+  const res = await apiPost<UserData & { temporary_password: string }>(
+    `${BASE}/api/v1/users`,
+    { email, full_name: `Test ${emailPrefix}`, role_id: roleId },
+    adminToken,
+  )
+  if (!res.ok || !res.data?.id) throw new Error(`createTestUser failed: ${res.error}`)
+  // Return the temp password directly — avoids login calls that can hit the auth rate limit.
+  // Tests that need to authenticate as this user should call login() themselves.
+  return { id: res.data.id, email, password: res.data.temporary_password ?? '', token: '' }
+}
+
+export async function deleteTestUser(adminToken: string, userId: string): Promise<void> {
+  await fetch(`${BASE}/api/v1/users/${userId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` },
+  })
+}
+
+export interface TestQuestion {
+  id: string
+  stem: string
+}
+
+export async function createTestQuestion(
+  adminToken: string,
+  stem: string,
+  type = 'single',
+  activate = false,
+): Promise<TestQuestion> {
+  const categoryId = await getFirstCategoryId(adminToken)
+  const translations: Record<string, { stem: string; explanation: string }> = {
+    en: { stem, explanation: '' },
+  }
+  let answer_options: Array<{
+    sort_order: number
+    is_correct: boolean
+    likert_weight: number | null
+    likert_polarity: string | null
+    translations: Record<string, { body: string }>
+  }> = [
+    { sort_order: 1, is_correct: true, likert_weight: null, likert_polarity: null, translations: { en: { body: 'Option A' } } },
+    { sort_order: 2, is_correct: false, likert_weight: null, likert_polarity: null, translations: { en: { body: 'Option B' } } },
+  ]
+  const result = await apiPost<QuestionData>(
+    `${BASE}/api/v1/questions`,
+    { type, category_id: categoryId, difficulty: 'easy', default_locale: 'en', translations, answer_options },
+    adminToken,
+  )
+  if (!result.ok || !result.data?.id) throw new Error(`createTestQuestion failed: ${result.error}`)
+  const id = result.data.id
+  if (activate) await activateQuestion(adminToken, id)
+  return { id, stem }
+}
+
+export async function deleteTestQuestion(adminToken: string, questionId: string): Promise<void> {
+  await fetch(`${BASE}/api/v1/questions/${questionId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` },
+  })
+}
+
+export interface TestExam {
+  id: string
+  title: string
+}
+
+export async function createTestExam(
+  adminToken: string,
+  title: string,
+  questionId?: string,
+): Promise<TestExam> {
+  const examId = await createExam(adminToken, title, 'log')
+  if (questionId) {
+    await addRule(adminToken, examId, questionId, 1)
+    await publishExam(adminToken, examId)
+  }
+  return { id: examId, title }
+}
+
+export async function deleteTestExam(adminToken: string, examId: string): Promise<void> {
+  await fetch(`${BASE}/api/v1/exams/${examId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` },
+  })
+}
+
+export interface SeedData {
+  adminToken: string
+  employeeId: string
+  mixedExamId: string
+  shortTextExamId: string
+}
+
+let cachedSeedData: SeedData | null = null
+
+export async function getSeedData(): Promise<SeedData> {
+  if (cachedSeedData) return cachedSeedData
+  const AUTH_DIR_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '.auth')
+  const tokenPath = path.join(AUTH_DIR_PATH, 'token.txt')
+  if (!fs.existsSync(tokenPath)) throw new Error('getSeedData: .auth/token.txt not found — run global setup first')
+  let adminToken = fs.readFileSync(tokenPath, 'utf8').trim()
+
+  // Token from global-setup may have expired (15-min JWT). Re-login if lookup fails.
+  let employeeId = await findUserByEmail(adminToken, 'employee@bilimbaga.local')
+  if (!employeeId) {
+    const refreshed = await login(
+      process.env.E2E_ADMIN_EMAIL ?? 'admin@bilimbaga.local',
+      process.env.E2E_ADMIN_PASS ?? 'Admin1234!',
+    )
+    if (!refreshed) throw new Error('getSeedData: admin re-login failed')
+    adminToken = refreshed
+    fs.writeFileSync(tokenPath, adminToken, 'utf8')
+    employeeId = await findUserByEmail(adminToken, 'employee@bilimbaga.local')
+    if (!employeeId) throw new Error('getSeedData: employee user not found after re-login')
+  }
+
+  const mixedExamId = await findExam(adminToken, 'E2E Mixed Exam')
+  if (!mixedExamId) throw new Error('getSeedData: E2E Mixed Exam not found')
+  const shortTextExamId = await findExam(adminToken, 'E2E ShortText Exam')
+  if (!shortTextExamId) throw new Error('getSeedData: E2E ShortText Exam not found')
+  cachedSeedData = { adminToken, employeeId, mixedExamId, shortTextExamId }
+  return cachedSeedData
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 

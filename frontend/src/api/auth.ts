@@ -137,6 +137,9 @@ export function useRefreshToken() {
         const json = await res.json()
         if (json.error || !json.data) return null
         const accessToken = json.data.access_token as string
+        // Persist the new token so subsequent page navigations (fresh JS contexts)
+        // can use it directly without triggering another refresh / token rotation.
+        try { localStorage.setItem(E2E_TOKEN_KEY, accessToken) } catch { /* ignore */ }
         // Reconstruct minimal user info from JWT claims (refresh response has no user object)
         const claims = decodeJwtPayload(accessToken)
         if (claims) {

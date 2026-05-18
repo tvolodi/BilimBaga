@@ -261,3 +261,17 @@ func TestStatusSelection_NoShortTextGoesAutoSubmitted(t *testing.T) {
 	}
 	assert.Equal(t, "auto_submitted", newStatus)
 }
+
+// ── ISS-004: audit INSERT must not reference e.tenant_id (exams has no such column) ──
+func TestAuditQueryUsesLiteralTenantID(t *testing.T) {
+	// The constant auditQ in processOneExpiredSession must use a VALUES clause with
+	// a literal 'public' tenant_id rather than a SELECT from exams, because the
+	// exams table has no tenant_id column (ISS-004).
+	const auditQ = `
+INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
+VALUES ('public', NULL, 'session.auto_submit', 'exam_session', $1, '', $2::jsonb)`
+
+	assert.NotContains(t, auditQ, "e.tenant_id", "audit query must not reference exams.tenant_id")
+	assert.NotContains(t, auditQ, "FROM exams", "audit query must not join exams table")
+	assert.Contains(t, auditQ, "'public'", "audit query must supply literal tenant_id")
+}

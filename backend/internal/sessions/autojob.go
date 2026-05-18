@@ -190,9 +190,8 @@ WHERE id = $1 AND status = 'in_progress'`
 	})
 	const auditQ = `
 INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
-SELECT e.tenant_id, NULL, 'session.auto_submit', 'exam_session', $1, '', $2::jsonb
-FROM exams e WHERE e.id = $3`
-	if _, err := tx.ExecContext(ctx, auditQ, sess.ID, string(meta), sess.ExamID); err != nil {
+VALUES ('public', NULL, 'session.auto_submit', 'exam_session', $1, '', $2::jsonb)`
+	if _, err := tx.ExecContext(ctx, auditQ, sess.ID, string(meta)); err != nil {
 		// Log but don't abort — the session state transition already happened.
 		logger.Error("auto-submit: audit log write failed", "session_id", sess.ID, "err", err)
 	}

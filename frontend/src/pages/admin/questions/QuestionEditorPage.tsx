@@ -755,8 +755,12 @@ export function QuestionEditorPage() {
       return
     }
 
-    // Create mode
-    const defaultLocale = 'en'
+    // Create mode — use the active locale tab as the default_locale so the backend
+    // validates the stem the user actually filled in (not always 'en').
+    const defaultLocale: Locale =
+      form.translations[activeLocale]?.stem?.trim()
+        ? activeLocale
+        : (LOCALES.find((l) => form.translations[l]?.stem?.trim()) ?? activeLocale)
     try {
       const createTranslations: Record<string, { stem: string; explanation?: string }> = {}
       for (const loc of LOCALES) {

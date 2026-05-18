@@ -184,3 +184,51 @@ describe('QuestionEditorPage — create payload shape (ISS-005)', () => {
     }
   })
 })
+
+// ISS-006 regression: default_locale must match the locale where the user entered text
+describe('QuestionEditorPage — default_locale follows active locale (ISS-006)', () => {
+  it('POSTs default_locale matching the locale tab where the stem was typed', async () => {
+    let capturedBody: unknown = null
+
+    server.use(
+      http.post('/api/v1/questions', async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json({
+          data: { ...sampleQuestion, id: 'new-q-ru' },
+          error: null,
+        })
+      }),
+    )
+
+    const Wrapper = createWrapper('/admin/questions/new')
+    render(
+      <Wrapper>
+        <QuestionEditorPage />
+      </Wrapper>,
+    )
+
+    await waitFor(() => screen.getByRole('button', { name: /save draft/i }))
+
+    // Switch to the RU locale tab
+    const ruTab = screen.getByRole('button', { name: /ru/i })
+    fireEvent.click(ruTab)
+
+    // Type a stem in the now-active RU locale textarea
+    const stemTextarea = document.querySelector('textarea') as HTMLTextAreaElement
+    fireEvent.change(stemTextarea, { target: { value: 'Первая планета от Солнца' } })
+
+    // Save draft
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+    await waitFor(() => expect(capturedBody).not.toBeNull(), { timeout: 3000 })
+
+    const body = capturedBody as Record<string, unknown>
+
+    // default_locale must be 'ru', not 'en', because the user typed in the RU tab
+    expect(body.default_locale).toBe('ru')
+
+    // translations.ru.stem must be non-empty
+    const translations = body.translations as Record<string, { stem: string }>
+    expect(translations['ru']?.stem).toBe('Первая планета от Солнца')
+  })
+})

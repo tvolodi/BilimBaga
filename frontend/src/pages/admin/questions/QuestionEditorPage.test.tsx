@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
@@ -131,5 +131,56 @@ describe('QuestionEditorPage — edit existing question', () => {
     await waitFor(() => screen.getByDisplayValue('What is H2O?'))
     expect(screen.getByDisplayValue('Water')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Fire')).toBeInTheDocument()
+  })
+})
+
+// ISS-005 regression: create payload must send nested translations, not flat stem/body
+describe('QuestionEditorPage — create payload shape (ISS-005)', () => {
+  it('POSTs translations map with stem/text — not flat stem/body — when saving a new question', async () => {
+    let capturedBody: unknown = null
+
+    server.use(
+      http.post('/api/v1/questions', async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json({
+          data: { ...sampleQuestion, id: 'new-q' },
+          error: null,
+        })
+      }),
+    )
+
+    const Wrapper = createWrapper('/admin/questions/new')
+    render(
+      <Wrapper>
+        <QuestionEditorPage />
+      </Wrapper>,
+    )
+
+    // Wait for Save Draft button to appear
+    await waitFor(() => screen.getByRole('button', { name: /save draft/i }))
+
+    // Click Save Draft immediately — handleSaveDraft calls the API without client-side validation
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+    await waitFor(() => expect(capturedBody).not.toBeNull(), { timeout: 3000 })
+
+    const body = capturedBody as Record<string, unknown>
+
+    // Must NOT have flat stem field at root level
+    expect(body).not.toHaveProperty('stem')
+    // Must have nested translations map
+    expect(body).toHaveProperty('translations')
+    expect(typeof body.translations).toBe('object')
+
+    // Answer options must NOT have flat body field; must have nested translations with text
+    if (Array.isArray(body.answer_options) && body.answer_options.length > 0) {
+      const opt = body.answer_options[0] as Record<string, unknown>
+      expect(opt).not.toHaveProperty('body')
+      expect(opt).toHaveProperty('translations')
+      const optTr = opt.translations as Record<string, unknown>
+      const firstLocale = Object.values(optTr)[0] as Record<string, unknown>
+      expect(firstLocale).toHaveProperty('text')
+      expect(firstLocale).not.toHaveProperty('body')
+    }
   })
 })

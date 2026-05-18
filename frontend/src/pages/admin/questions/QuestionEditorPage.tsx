@@ -729,9 +729,8 @@ export function QuestionEditorPage() {
         is_correct: o.is_correct,
         likert_weight: o.likert_weight ?? undefined,
         likert_polarity: o.likert_polarity ?? undefined,
-        body: o.translations['en']?.body ?? '',
         translations: Object.fromEntries(
-          LOCALES.map((l) => [l, { body: o.translations[l]?.body ?? '' }]),
+          LOCALES.map((l) => [l, { text: o.translations[l]?.body ?? '' }]),
         ),
       })),
       tag_ids: f.tag_ids,
@@ -759,15 +758,26 @@ export function QuestionEditorPage() {
     // Create mode
     const defaultLocale = 'en'
     try {
+      const createTranslations: Record<string, { stem: string; explanation?: string }> = {}
+      for (const loc of LOCALES) {
+        if (form.translations[loc]?.stem || form.translations[loc]?.explanation) {
+          createTranslations[loc] = {
+            stem: form.translations[loc].stem,
+            ...(form.translations[loc].explanation ? { explanation: form.translations[loc].explanation } : {}),
+          }
+        }
+      }
+      if (!createTranslations[defaultLocale]) {
+        createTranslations[defaultLocale] = { stem: form.translations[defaultLocale]?.stem ?? '' }
+      }
       const created = await createQuestion.mutateAsync({
         type: form.type,
         difficulty: form.difficulty,
         category_id: form.category_id,
         default_locale: defaultLocale,
-        stem: form.translations[defaultLocale]?.stem ?? '',
-        explanation: form.translations[defaultLocale]?.explanation || undefined,
         auto_grade: form.type === 'shorttext' ? form.auto_grade : undefined,
         model_answer: form.type === 'shorttext' ? (form.model_answer || null) : undefined,
+        translations: createTranslations,
         answer_options:
           form.type !== 'shorttext'
             ? form.answer_options.map((o) => ({
@@ -775,7 +785,9 @@ export function QuestionEditorPage() {
                 is_correct: o.is_correct,
                 likert_weight: o.likert_weight ?? undefined,
                 likert_polarity: o.likert_polarity ?? undefined,
-                body: o.translations[defaultLocale]?.body ?? '',
+                translations: Object.fromEntries(
+                  LOCALES.map((l) => [l, { text: o.translations[l]?.body ?? '' }]),
+                ),
               }))
             : undefined,
         tag_ids: form.tag_ids.length > 0 ? form.tag_ids : undefined,

@@ -102,10 +102,9 @@ export interface QuestionCreatePayload {
   difficulty: string
   category_id: string
   default_locale: string
-  stem: string
-  explanation?: string
   auto_grade?: boolean
   model_answer?: string | null
+  translations: Record<string, { stem: string; explanation?: string }>
   answer_options?: AnswerOptionCreatePayload[]
   tag_ids?: string[]
 }
@@ -115,7 +114,7 @@ export interface AnswerOptionCreatePayload {
   is_correct: boolean
   likert_weight?: number
   likert_polarity?: string
-  body: string
+  translations: Record<string, { text: string }>
 }
 
 export interface QuestionUpdatePayload {

@@ -212,12 +212,11 @@ export function AIGenerateDialog({ open, onClose, onSuccess }: AIGenerateDialogP
           difficulty: draft.difficulty,
           category_id: categoryId,
           default_locale: 'en',
-          stem: draft.stem,
-          explanation: draft.explanation,
+          translations: { en: { stem: draft.stem, explanation: draft.explanation } },
           answer_options: draft.options.map((opt, idx) => ({
             sort_order: idx,
             is_correct: opt.is_correct,
-            body: opt.text,
+            translations: { en: { text: opt.text } },
           })),
           tag_ids: [],
         })

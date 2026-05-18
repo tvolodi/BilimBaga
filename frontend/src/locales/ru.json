@@ -331,6 +331,8 @@
       "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Пароль",
+      "showPassword": "Показать пароль",
+      "hidePassword": "Скрыть пароль",
       "submitButton": "Войти",
       "errors": {
         "INVALID_CREDENTIALS": "Неверный email или пароль.",

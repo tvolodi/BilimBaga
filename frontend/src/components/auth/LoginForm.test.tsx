@@ -9,7 +9,8 @@ describe('LoginForm', () => {
   it('renders email, password fields and submit button', () => {
     render(<LoginForm onSubmit={noop} isPending={false} error={null} />)
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /email/i })).toBeInTheDocument()
+    expect(document.getElementById('password')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
@@ -20,7 +21,7 @@ describe('LoginForm', () => {
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: 'user@example.com' },
     })
-    fireEvent.change(screen.getByLabelText(/password/i), {
+    fireEvent.change(document.getElementById('password')!, {
       target: { value: 'secret123' },
     })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
@@ -80,6 +81,19 @@ describe('LoginForm', () => {
 
   it('disables submit button while pending', () => {
     render(<LoginForm onSubmit={noop} isPending={true} error={null} />)
-    expect(screen.getByRole('button')).toBeDisabled()
+    expect(screen.getByRole('button', { name: /…/ })).toBeDisabled()
+  })
+
+  it('toggles password visibility when eye icon is clicked', () => {
+    render(<LoginForm onSubmit={noop} isPending={false} error={null} />)
+    const passwordInput = document.getElementById('password')!
+    expect(passwordInput).toHaveAttribute('type', 'password')
+
+    const toggleBtn = screen.getByRole('button', { name: /show password/i })
+    fireEvent.click(toggleBtn)
+    expect(passwordInput).toHaveAttribute('type', 'text')
+
+    fireEvent.click(screen.getByRole('button', { name: /hide password/i }))
+    expect(passwordInput).toHaveAttribute('type', 'password')
   })
 })

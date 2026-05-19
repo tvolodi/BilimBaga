@@ -229,18 +229,33 @@ test.describe('Exam Taking', () => {
       }
 
       await expect(targetCb).toBeVisible()
+      const wasChecked = await targetCb.isChecked()
+
+      // Toggle once — state should flip
       await targetCb.click()
-      await expect(targetCb).toBeChecked()
+      if (wasChecked) {
+        await expect(targetCb).not.toBeChecked()
+      } else {
+        await expect(targetCb).toBeChecked()
+      }
       await shot(page, 'et-03-multiple-choice-one-selected')
 
-      // Click it again to uncheck — verifies toggle
+      // Toggle back
       await targetCb.click()
-      await expect(targetCb).not.toBeChecked()
+      if (wasChecked) {
+        await expect(targetCb).toBeChecked()
+      } else {
+        await expect(targetCb).not.toBeChecked()
+      }
       await shot(page, 'et-03-multiple-choice-one-unchecked')
 
-      // Click it once more to leave it checked (clean state)
+      // Toggle once more — leave in opposite of initial state
       await targetCb.click()
-      await expect(targetCb).toBeChecked()
+      if (wasChecked) {
+        await expect(targetCb).not.toBeChecked()
+      } else {
+        await expect(targetCb).toBeChecked()
+      }
       await shot(page, 'et-03-multiple-choice-two-selected')
       void targetIdx // suppress unused warning
     } else {

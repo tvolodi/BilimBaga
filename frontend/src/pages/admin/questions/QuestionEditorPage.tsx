@@ -136,7 +136,7 @@ function detailToForm(q: QuestionDetail): FormState {
       explanation: q.translations[loc]?.explanation ?? '',
     }
   }
-  const answer_options: LocalAnswerOption[] = q.answer_options.map((opt) => ({
+  const answer_options: LocalAnswerOption[] = (q.answer_options ?? []).map((opt) => ({
     tempId: opt.id,
     id: opt.id,
     sort_order: opt.sort_order,
@@ -151,7 +151,7 @@ function detailToForm(q: QuestionDetail): FormState {
     type: q.type,
     difficulty: q.difficulty,
     category_id: q.category_id,
-    tag_ids: q.tag_ids,
+    tag_ids: q.tag_ids ?? [],
     model_answer: q.model_answer ?? '',
     auto_grade: q.auto_grade ?? false,
     translations,
@@ -356,10 +356,10 @@ function TagCombobox({ tagIds, onTagIdsChange }: TagComboboxProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const selectedTags = allTags.filter((tag) => tagIds.includes(tag.id))
+  const selectedTags = allTags.filter((tag) => (tagIds ?? []).includes(tag.id))
   const filtered = allTags.filter(
     (tag) =>
-      !tagIds.includes(tag.id) &&
+      !(tagIds ?? []).includes(tag.id) &&
       tag.name.toLowerCase().includes(inputValue.toLowerCase()),
   )
 

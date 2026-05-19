@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
+import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 
 export function PortalLayout() {
   const { t } = useTranslation()
@@ -16,13 +17,16 @@ export function PortalLayout() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-background sticky top-0 z-10">
-        <nav className="max-w-7xl mx-auto flex px-6" aria-label="Portal navigation">
-          <NavLink to="/portal" end className={tabClass}>
-            {t('portal.tab_exams', 'My Exams')}
-          </NavLink>
-          <NavLink to="/portal/results" className={tabClass}>
-            {t('portal.tab_results', 'My Results')}
-          </NavLink>
+        <nav className="max-w-7xl mx-auto flex justify-between items-center px-6" aria-label="Portal navigation">
+          <div className="flex">
+            <NavLink to="/portal" end className={tabClass}>
+              {t('portal.tab_exams', 'My Exams')}
+            </NavLink>
+            <NavLink to="/portal/results" className={tabClass}>
+              {t('portal.tab_results', 'My Results')}
+            </NavLink>
+          </div>
+          <LocaleSwitcher />
         </nav>
       </div>
       <main id="main-content" tabIndex={-1} className="outline-none">

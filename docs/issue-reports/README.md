@@ -14,3 +14,4 @@
 | [ISS-010](ISS-010-exam-wizard-step3-save-errors.md) | Exam wizard step 3 — sections URL empty ID, assignment 422, i18n type label | high | frontend, backend | exams | resolved | 2026-05-19 |
 | [ISS-011](ISS-011-exam-publish-422.md) | Publish exam returns 422 — "0 available" because questions are in draft status | medium | frontend | exams | resolved | 2026-05-19 |
 | [ISS-012](ISS-012-question-status-400-wrong-json-key.md) | Question status transition returns 400 — frontend sends wrong JSON key | high | frontend | questions | resolved | 2026-05-19 |
+| [ISS-013](ISS-013-question-edit-option-text-blank.md) | Question edit page shows blank answer option text (пусто) for all locales | high | frontend | questions | resolved | 2026-05-19 |

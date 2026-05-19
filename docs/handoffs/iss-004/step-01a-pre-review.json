@@ -1,0 +1,11 @@
+{
+  "run_id": "iss-004",
+  "pipeline": "B",
+  "issue": "ISS-004",
+  "root_cause": "autojob.go audit INSERT used a subquery SELECT e.tenant_id FROM exams WHERE e.id = $3, but the exams table has no tenant_id column. The audit_log.tenant_id is always 'public' in Phase 1 (set by TenantContext middleware). The background job has no HTTP request context, so the tenant ID must be supplied as a literal.",
+  "files_changed": [
+    "backend/internal/sessions/autojob.go",
+    "backend/internal/sessions/autojob_test.go",
+    "docs/issue-reports/ISS-004-autojob-audit-exams-no-tenant.md"
+  ]
+}

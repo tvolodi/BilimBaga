@@ -1,0 +1,37 @@
+{
+  "run_id": "iss-005",
+  "requirement": "docs/requirements/FR-BB113.Frontend-department-management.md",
+  "pipeline": "A",
+  "changed_files": [
+    "frontend/src/api/departments.ts",
+    "frontend/src/pages/admin/departments/DepartmentsPage.tsx",
+    "frontend/src/pages/admin/departments/DepartmentsPage.test.tsx",
+    "frontend/src/pages/admin/departments/DepartmentCreateModal.tsx",
+    "frontend/src/pages/admin/departments/DepartmentCreateModal.test.tsx",
+    "frontend/src/pages/admin/departments/DepartmentRenameModal.tsx",
+    "frontend/src/pages/admin/departments/DepartmentRenameModal.test.tsx",
+    "frontend/src/pages/admin/departments/DepartmentDeleteConfirm.tsx",
+    "frontend/src/pages/admin/departments/DepartmentDeleteConfirm.test.tsx",
+    "frontend/src/components/admin/DepartmentTree.tsx",
+    "frontend/src/components/admin/DepartmentTreeNode.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json"
+  ],
+  "acceptance_criteria": [
+    "AC-1: Route /admin/departments renders department tree with name, child count badge, actions menu",
+    "AC-2: Tree supports collapse/expand at every level; state persists in component state",
+    "AC-3: New Department button opens modal; submit calls POST /api/v1/departments; success invalidates query",
+    "AC-4: Row actions menu has Add Child, Rename, Delete",
+    "AC-5: 409 on delete surfaces DEPARTMENT_NOT_EMPTY / DEPARTMENT_HAS_CHILDREN as notifications",
+    "AC-6: 409 DUPLICATE_NAME on create/rename shows inline field error",
+    "AC-7: Action menu hidden for non-super_admin users",
+    "AC-8: All strings from i18n departments.* namespace",
+    "AC-9: DepartmentsPage.tsx replaced in-place, route unchanged",
+    "AC-10: useDepartments query key ['departments'] reused by UserCreateDrawer",
+    "AC-11: DepartmentsPage.test.tsx + 3 modal test files with passing tests"
+  ],
+  "test_results": {
+    "frontend": "35 test files, 196 tests — all pass"
+  }
+}

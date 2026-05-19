@@ -1,0 +1,15 @@
+{
+  "run_id": "iss-003",
+  "pipeline": "B",
+  "issue": "ISS-003",
+  "root_cause": "LoginForm.tsx rendered <Input type='password'> with no toggle mechanism. Users had no way to reveal what they had typed, causing login failures from undetected typos.",
+  "files_changed": [
+    "frontend/src/components/auth/LoginForm.tsx",
+    "frontend/src/components/auth/LoginForm.test.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json"
+  ],
+  "test_results": "177 passed, 0 failed across 32 test files",
+  "migration_applied": false
+}

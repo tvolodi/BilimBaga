@@ -1,0 +1,22 @@
+{
+  "issue_id": "ISS-005",
+  "run_id": "ISS-005",
+  "is_recurring": false,
+  "root_cause": "QuestionCreatePayload in frontend/src/api/questions.ts defined flat top-level `stem`/`explanation` fields and AnswerOptionCreatePayload defined flat `body`. The backend createQuestionReq expects `translations: map[locale]translationReq` (with stem/explanation per locale) and answer option `translations: map[locale]answerTranslationReq` (with text per locale). Because the frontend sent `stem` at root level, `req.Translations` was nil, failing validateCreateRequest's stem-required check. The update path also sent `body` in option translations instead of `text`.",
+  "affected_layer": "frontend",
+  "affected_files": [
+    "frontend/src/api/questions.ts",
+    "frontend/src/pages/admin/questions/QuestionEditorPage.tsx"
+  ],
+  "fix_description": "Updated QuestionCreatePayload to use `translations: Record<string, { stem, explanation? }>` instead of flat `stem`/`explanation`. Updated AnswerOptionCreatePayload to use `translations: Record<string, { text }>` instead of `body`. Updated handleSaveDraft (create mode) to build the correct nested translations payload. Updated buildUpdatePayload to use `text` (not `body`) in answer option locale translations.",
+  "files_changed": [
+    "frontend/src/api/questions.ts",
+    "frontend/src/pages/admin/questions/QuestionEditorPage.tsx",
+    "frontend/src/pages/admin/questions/QuestionEditorPage.test.tsx",
+    "docs/issue-reports/ISS-005-question-create-422-payload-mismatch.md",
+    "docs/issue-reports/README.md"
+  ],
+  "migration_applied": false,
+  "regression_test_added": true,
+  "regression_test_path": "frontend/src/pages/admin/questions/QuestionEditorPage.test.tsx"
+}

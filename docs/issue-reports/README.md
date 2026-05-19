@@ -18,3 +18,4 @@
 | [ISS-014](ISS-014-axe-accessibility-violations-admin.md) | Axe violations — missing main landmark, h1, region, skip-link on admin/auth pages | medium | frontend | auth | resolved | 2026-05-19 |
 | [ISS-015](ISS-015-auth-token-expiry-publish-button-ux.md) | Access token expiry causes cascading 401s; publish button not disabled after validation failure | high | frontend | auth, exams | resolved | 2026-05-19 |
 | [ISS-016](ISS-016-save-button-archives-active-question.md) | Save on active question archives it — frontend stays on stale URL, subsequent saves fail | high | frontend, backend | questions | resolved | 2026-05-19 |
+| [ISS-017](ISS-017-question-tags-not-saved.md) | Question tag field cleared after save — tags not persisted | high | backend | questions | resolved | 2026-05-19 |

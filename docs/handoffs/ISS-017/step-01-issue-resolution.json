@@ -1,0 +1,25 @@
+{
+  "issue_id": "ISS-017",
+  "run_id": "ISS-017",
+  "is_recurring": false,
+  "root_cause": "QuestionDetail.Tags field serialised as json:\"tags\" but frontend QuestionDetail interface expected key tag_ids. detailToForm always read q.tag_ids which was undefined, resetting tags to [] on every refetch after save.",
+  "affected_layer": "backend",
+  "affected_files": [
+    "backend/internal/questions/model.go",
+    "backend/internal/questions/repository.go",
+    "backend/internal/questions/service_test.go",
+    "backend/internal/questions/handler_test.go"
+  ],
+  "fix_description": "Renamed Tags field in QuestionDetail to TagIDs with json tag \\\"tag_ids\\\" so the backend response key matches what the frontend expects. Updated all struct literals that assigned to the old Tags field. No frontend changes needed — it already reads q.tag_ids correctly.",
+  "files_changed": [
+    "backend/internal/questions/model.go",
+    "backend/internal/questions/repository.go",
+    "backend/internal/questions/service_test.go",
+    "backend/internal/questions/handler_test.go",
+    "docs/issue-reports/ISS-017-question-tags-not-saved.md",
+    "docs/issue-reports/README.md"
+  ],
+  "migration_applied": false,
+  "regression_test_added": true,
+  "regression_test_path": "backend/internal/questions/handler_test.go::TestQHandlerGet_ResponseContainsTagIDs"
+}

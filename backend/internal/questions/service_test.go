@@ -140,7 +140,7 @@ func (m *mockRepository) CreateFull(_ context.Context, input CreateQuestionFullI
 		Version:       1,
 		Translations:  map[string]TranslationDetail{},
 		AnswerOptions: []AnswerOptionDetail{},
-		Tags:          input.TagIDs,
+		TagIDs:        input.TagIDs,
 	}
 	return detail, nil
 }
@@ -165,7 +165,7 @@ func (m *mockRepository) GetWithDetails(_ context.Context, id string) (*Question
 		ParentID:      q.ParentID,
 		Translations:  map[string]TranslationDetail{},
 		AnswerOptions: []AnswerOptionDetail{},
-		Tags:          []string{},
+		TagIDs:        []string{},
 	}, nil
 }
 
@@ -396,6 +396,7 @@ func TestTransitionStatus_ValidTransitions(t *testing.T) {
 		{"draft", "review"},
 		{"review", "active"},
 		{"active", "archived"},
+		{"archived", "draft"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.from+"->"+tc.to, func(t *testing.T) {
@@ -437,7 +438,6 @@ func TestTransitionStatus_InvalidTransitions(t *testing.T) {
 		{"review", "draft"},
 		{"active", "draft"},
 		{"archived", "active"},
-		{"archived", "draft"},
 	}
 	for _, tc := range invalidCases {
 		t.Run(tc.from+"->"+tc.to, func(t *testing.T) {

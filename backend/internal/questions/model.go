@@ -140,7 +140,7 @@ type QuestionDetail struct {
 	LocaleCoverage []string                     `json:"locale_coverage"`
 	Translations   map[string]TranslationDetail `json:"translations"`
 	AnswerOptions  []AnswerOptionDetail         `json:"answer_options"`
-	Tags           []string                     `json:"tags"`
+	TagIDs         []string                     `json:"tag_ids"`
 	CreatedBy      string                       `json:"created_by"`
 	CreatedAt      time.Time                    `json:"created_at"`
 	UpdatedAt      time.Time                    `json:"updated_at"`

@@ -167,7 +167,7 @@ func sampleDetail(id string) *QuestionDetail {
 			"kk": {Stem: "Question stem"},
 		},
 		AnswerOptions: []AnswerOptionDetail{},
-		Tags:          []string{},
+		TagIDs:        []string{},
 		CreatedBy:     "actor-1",
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -299,6 +299,41 @@ func TestQHandlerGet_Returns200(t *testing.T) {
 	h.Get(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// ISS-017: ensure the GET detail response uses "tag_ids" (not "tags") so the
+// frontend can populate the tag field after save.
+func TestQHandlerGet_ResponseContainsTagIDs(t *testing.T) {
+	tagID := "tag-uuid-1"
+	svc := &mockQService{
+		getWithDetailsFn: func(_ context.Context, id string) (*QuestionDetail, error) {
+			d := sampleDetail(id)
+			d.TagIDs = []string{tagID}
+			return d, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/questions/q-1", nil)
+	req = withQChiParam(req, "id", "q-1")
+	w := httptest.NewRecorder()
+	h.Get(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	raw, _ := decodeQEnvelope(t, w)
+
+	var detail map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(raw, &detail))
+
+	// Must have "tag_ids" key, not "tags".
+	tagIDsRaw, hasTagIDs := detail["tag_ids"]
+	_, hasTagsKey := detail["tags"]
+	assert.True(t, hasTagIDs, "response must contain 'tag_ids' field")
+	assert.False(t, hasTagsKey, "response must NOT contain a 'tags' field on QuestionDetail")
+
+	var ids []string
+	require.NoError(t, json.Unmarshal(tagIDsRaw, &ids))
+	assert.Equal(t, []string{tagID}, ids)
 }
 
 func TestQHandlerGet_NotFound_Returns404(t *testing.T) {

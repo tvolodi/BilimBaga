@@ -10,3 +10,5 @@
 | [ISS-006](ISS-006-question-save-422.md) | New question save returns 422 when form filled in non-English locale | high | frontend | questions | resolved | 2026-05-18 |
 | [ISS-007](ISS-007-e2e-locale-selector-mismatch.md) | E2E locale selector mismatch | medium | frontend | auth | resolved | 2026-05-18 |
 | [ISS-008](ISS-008-e2e-seeddata-pagination-editor-navigation.md) | getSeedData pagination miss + question-editor unreliable navigation | high | frontend | questions | resolved | 2026-05-19 |
+| [ISS-009](ISS-009-e2e-token-injection-checkbox-toggle.md) | E2E token injection + checkbox toggle | medium | frontend | auth | resolved | 2026-05-19 |
+| [ISS-010](ISS-010-exam-wizard-step3-save-errors.md) | Exam wizard step 3 — sections URL empty ID, assignment 422, i18n type label | high | frontend, backend | exams | resolved | 2026-05-19 |

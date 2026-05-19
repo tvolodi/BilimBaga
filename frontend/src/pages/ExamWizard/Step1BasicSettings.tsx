@@ -151,7 +151,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
 
   const createExam = useCreateExam()
   const updateExam = useUpdateExam(exam?.id ?? '')
-  const addSection = useAddSection(exam?.id ?? '')
+  const addSection = useAddSection()
 
   const isPending = createExam.isPending || updateExam.isPending
 
@@ -197,7 +197,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
         // Create a default section for rules
         let sectionId: string | null = null
         try {
-          const section = await addSection.mutateAsync({ sort_order: 0 })
+          const section = await addSection.mutateAsync({ examId: created.id, sort_order: 0 })
           sectionId = section.id
         } catch {
           // Section creation is best-effort; rules can exist without a section

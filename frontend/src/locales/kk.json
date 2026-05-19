@@ -508,6 +508,7 @@
       "count": "Сұрақ саны"
     },
     "assignment": {
+      "typeLabel": "Тапсырма түрі",
       "type": {
         "user": "Пайдаланушы",
         "department": "Бөлім",

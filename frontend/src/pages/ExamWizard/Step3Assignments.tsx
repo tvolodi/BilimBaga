@@ -160,7 +160,7 @@ export function Step3Assignments({ examId, canMutate, onBack, onNext }: Step3Ass
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Assignee type */}
                 <div className="space-y-1">
-                  <Label>{t('exam.assignment.type')}</Label>
+                  <Label>{t('exam.assignment.typeLabel')}</Label>
                   <Select
                     value={pending.assignee_type}
                     onChange={(e) =>

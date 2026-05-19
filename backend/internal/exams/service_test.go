@@ -906,7 +906,7 @@ func TestCreateAssignment_ExamNotFound(t *testing.T) {
 
 func TestCreateAssignment_ExamNotActive_Returns422(t *testing.T) {
 	repo := newMockRepo()
-	seedExam(repo, "exam-1", "draft")
+	seedExam(repo, "exam-1", "archived")
 	svc := NewService(repo)
 	_, err := svc.CreateAssignment(context.Background(), CreateAssignmentInput{
 		ExamID:       "exam-1",
@@ -915,6 +915,20 @@ func TestCreateAssignment_ExamNotActive_Returns422(t *testing.T) {
 		CallerRole:   "super_admin",
 	})
 	assert.ErrorIs(t, err, ErrNotActive)
+}
+
+func TestCreateAssignment_DraftExam_Succeeds(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	a, err := svc.CreateAssignment(context.Background(), CreateAssignmentInput{
+		ExamID:       "exam-1",
+		AssigneeType: "all",
+		AssignedBy:   "admin-1",
+		CallerRole:   "super_admin",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "exam-1", a.ExamID)
 }
 
 func TestCreateAssignment_Success_User(t *testing.T) {

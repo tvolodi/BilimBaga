@@ -362,7 +362,7 @@ func (s *service) CreateAssignment(ctx context.Context, input CreateAssignmentIn
 	if err != nil {
 		return nil, fmt.Errorf("exams: CreateAssignment: %w", err)
 	}
-	if exam.Status != "active" {
+	if exam.Status != "active" && exam.Status != "draft" {
 		return nil, ErrNotActive
 	}
 

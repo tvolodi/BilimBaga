@@ -508,6 +508,7 @@
       "count": "Question count"
     },
     "assignment": {
+      "typeLabel": "Assignment type",
       "type": {
         "user": "User",
         "department": "Department",

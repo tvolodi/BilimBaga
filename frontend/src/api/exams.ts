@@ -260,10 +260,10 @@ export function usePublishExam(id: string) {
 
 // ---- Section hooks ----------------------------------------------------------
 
-export function useAddSection(examId: string) {
+export function useAddSection() {
   const qc = useQueryClient()
-  return useMutation<SectionDetail, ExamApiError, { title?: string; sort_order: number }>({
-    mutationFn: (body) => {
+  return useMutation<SectionDetail, ExamApiError, { examId: string; title?: string; sort_order: number }>({
+    mutationFn: ({ examId, ...body }) => {
       const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       return examsFetch<SectionDetail>(`/api/v1/exams/${examId}/sections`, token, {
         method: 'POST',
@@ -271,7 +271,7 @@ export function useAddSection(examId: string) {
         body: JSON.stringify(body),
       })
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId] }),
+    onSuccess: (_, { examId }) => qc.invalidateQueries({ queryKey: ['exams', examId] }),
   })
 }
 

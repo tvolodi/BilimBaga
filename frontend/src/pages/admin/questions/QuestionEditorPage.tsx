@@ -578,15 +578,21 @@ export function QuestionEditorPage() {
     if (!id || !dirtyRef.current) return
     setAutoSaveStatus('saving')
     try {
-      await updateQuestion.mutateAsync({ id, payload: buildUpdatePayload(form) })
+      const updated = await updateQuestion.mutateAsync({ id, payload: buildUpdatePayload(form) })
       setIsDirty(false)
       setAutoSaveStatus('saved')
+      // Active questions create a new version (new ID). Navigate so the page
+      // stays on the live question instead of the now-archived original.
+      if (updated.id !== id) {
+        navigate(`/admin/questions/${updated.id}/edit`, { replace: true })
+        return
+      }
       setTimeout(() => setAutoSaveStatus('idle'), 3000)
     } catch {
       setAutoSaveStatus('error')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, form])
+  }, [id, form, navigate])
 
   useEffect(() => {
     if (!isEditMode) return
@@ -744,9 +750,15 @@ export function QuestionEditorPage() {
       if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
       setAutoSaveStatus('saving')
       try {
-        await updateQuestion.mutateAsync({ id, payload: buildUpdatePayload(form) })
+        const updated = await updateQuestion.mutateAsync({ id, payload: buildUpdatePayload(form) })
         setIsDirty(false)
         setAutoSaveStatus('saved')
+        // Active questions create a new version (new ID). Navigate so the page
+        // stays on the live question instead of the now-archived original.
+        if (updated.id !== id) {
+          navigate(`/admin/questions/${updated.id}/edit`, { replace: true })
+          return
+        }
         setTimeout(() => setAutoSaveStatus('idle'), 3000)
       } catch (err) {
         setAutoSaveStatus('error')
@@ -891,6 +903,16 @@ export function QuestionEditorPage() {
             disabled={updateStatus.isPending}
           >
             {t('questionEditor.action.archive')}
+          </Button>
+        )}
+        {currentStatus === 'archived' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleStatusTransition('draft')}
+            disabled={updateStatus.isPending}
+          >
+            {t('questionEditor.action.restoreToDraft')}
           </Button>
         )}
 

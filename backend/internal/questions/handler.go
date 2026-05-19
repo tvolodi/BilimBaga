@@ -355,6 +355,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusBadRequest, "INVALID_FIELD_FOR_TYPE", "auto_grade and model_answer are only valid for shorttext questions")
 			return
 		}
+		if errors.Is(err, ErrInvalidInput) {
+			api.WriteError(w, http.StatusUnprocessableEntity, "ERR_INVALID_STATUS", "question status does not allow updates")
+			return
+		}
 		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to update question")
 		return
 	}

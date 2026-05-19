@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -355,6 +356,24 @@ func TestQHandlerUpdate_NotFound_Returns404(t *testing.T) {
 	h.Update(w, req)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestQHandlerUpdate_ArchivedQuestion_Returns422(t *testing.T) {
+	svc := &mockQService{
+		updateFn: func(_ context.Context, _ string, _ UpdateQuestionInput) (*Question, error) {
+			return nil, fmt.Errorf("questions: UpdateQuestion: %w: question is archived", ErrInvalidInput)
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	body := `{"category_id":"cat-1","difficulty":"medium","translations":{},"answer_options":[]}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/questions/archived-q", strings.NewReader(body))
+	req = withQAuthCtx(req, "actor-1")
+	req = withQChiParam(req, "id", "archived-q")
+	w := httptest.NewRecorder()
+	h.Update(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 }
 
 // ── TransitionStatus ──────────────────────────────────────────────────────────

@@ -363,8 +363,13 @@ export function useUpdateQuestion() {
         body: JSON.stringify(payload),
       })
     },
-    onSuccess: (_, { id }) => {
+    onSuccess: (result, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['questions', id] })
+      // When an active question is updated a new version is created with a different ID.
+      // Invalidate the new question's cache so it is fresh when navigating to it.
+      if (result?.id && result.id !== id) {
+        queryClient.invalidateQueries({ queryKey: ['questions', result.id] })
+      }
       queryClient.invalidateQueries({ queryKey: ['questions'] })
     },
   })

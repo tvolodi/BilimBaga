@@ -903,5 +903,31 @@
       "label": "Archived",
       "short": "Archived"
     }
+  },
+  "departments": {
+    "title": "Departments",
+    "actions": {
+      "new": "New Department",
+      "addChild": "Add Child",
+      "rename": "Rename",
+      "delete": "Delete"
+    },
+    "form": {
+      "name": "Name",
+      "parent": "Parent Department",
+      "parentTopLevel": "(Top level)"
+    },
+    "deleteConfirm": {
+      "title": "Delete Department",
+      "description": "This action cannot be undone. All users in this department must be reassigned first."
+    },
+    "errors": {
+      "duplicateName": "A department with this name already exists at this level",
+      "notEmpty": "Cannot delete: department has users assigned",
+      "hasChildren": "Cannot delete: department has child departments",
+      "parentNotFound": "Selected parent department no longer exists"
+    },
+    "empty": "No departments yet. Click \"New Department\" to get started.",
+    "children": "children"
   }
 }

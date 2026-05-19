@@ -5,6 +5,7 @@ package ratelimit
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,16 @@ import (
 )
 
 const retryAfterSeconds = 60
+
+// disabled returns true when the DISABLE_RATE_LIMIT env variable is set to "true" or "1".
+// This is intended for E2E test environments only.
+func disabled() bool {
+	v := os.Getenv("DISABLE_RATE_LIMIT")
+	return v == "true" || v == "1"
+}
+
+// noopMiddleware passes the request straight through without limiting.
+func noopMiddleware(next http.Handler) http.Handler { return next }
 
 // rateLimitedResponse is the standard error envelope returned on 429 responses.
 type rateLimitedResponse struct {
@@ -41,6 +52,9 @@ func limitHandler(w http.ResponseWriter, r *http.Request) {
 // AuthLimiter returns a middleware that allows 10 requests per minute per IP.
 // It is intended for authentication endpoints.
 func AuthLimiter() func(http.Handler) http.Handler {
+	if disabled() {
+		return func(next http.Handler) http.Handler { return noopMiddleware(next) }
+	}
 	return httprate.Limit(
 		10,
 		time.Minute,
@@ -52,6 +66,9 @@ func AuthLimiter() func(http.Handler) http.Handler {
 // GlobalLimiter returns a middleware that allows 300 requests per minute per IP.
 // It is intended for all general API endpoints.
 func GlobalLimiter() func(http.Handler) http.Handler {
+	if disabled() {
+		return func(next http.Handler) http.Handler { return noopMiddleware(next) }
+	}
 	return httprate.Limit(
 		300,
 		time.Minute,

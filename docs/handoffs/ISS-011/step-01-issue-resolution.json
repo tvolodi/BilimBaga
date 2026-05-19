@@ -1,0 +1,27 @@
+{
+  "issue_id": "ISS-011",
+  "run_id": "ISS-011",
+  "is_recurring": false,
+  "root_cause": "CountAvailableForRule filters q.status = 'active'. Questions are created in 'draft' status by default. Users who haven't transitioned questions through draft → review → active will always see 0 available when trying to publish an exam with random rules. The backend validation is correct (consistent with session question selection), but the error message gives no actionable guidance.",
+  "affected_layer": "frontend",
+  "affected_files": [
+    "frontend/src/pages/ExamWizard/Step4Review.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json",
+    "backend/internal/exams/service_test.go"
+  ],
+  "fix_description": "Added a descriptive hint paragraph in Step4Review.tsx under the unsatisfied-rules list that is shown when any rule reports available=0. Hint explains that only 'active' questions count and directs users to the Question Bank. Added i18n keys in all 3 locales. Added regression test TestPublish_ZeroAvailableActiveQuestions_ReturnsValidationError.",
+  "files_changed": [
+    "frontend/src/pages/ExamWizard/Step4Review.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json",
+    "backend/internal/exams/service_test.go",
+    "docs/issue-reports/ISS-011-exam-publish-422.md",
+    "docs/issue-reports/README.md"
+  ],
+  "migration_applied": false,
+  "regression_test_added": true,
+  "regression_test_path": "backend/internal/exams/service_test.go::TestPublish_ZeroAvailableActiveQuestions_ReturnsValidationError"
+}

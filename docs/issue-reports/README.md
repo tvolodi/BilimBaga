@@ -12,3 +12,4 @@
 | [ISS-008](ISS-008-e2e-seeddata-pagination-editor-navigation.md) | getSeedData pagination miss + question-editor unreliable navigation | high | frontend | questions | resolved | 2026-05-19 |
 | [ISS-009](ISS-009-e2e-token-injection-checkbox-toggle.md) | E2E token injection + checkbox toggle | medium | frontend | auth | resolved | 2026-05-19 |
 | [ISS-010](ISS-010-exam-wizard-step3-save-errors.md) | Exam wizard step 3 — sections URL empty ID, assignment 422, i18n type label | high | frontend, backend | exams | resolved | 2026-05-19 |
+| [ISS-011](ISS-011-exam-publish-422.md) | Publish exam returns 422 — "0 available" because questions are in draft status | medium | frontend | exams | resolved | 2026-05-19 |

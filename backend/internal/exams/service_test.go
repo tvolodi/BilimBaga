@@ -857,6 +857,36 @@ func TestPublish_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotFound)
 }
 
+// ISS-011: CountAvailableForRule returns 0 (all matching questions are in draft/review status,
+// not active) → Publish must return PublishValidationError with Available=0 in the detail.
+func TestPublish_ZeroAvailableActiveQuestions_ReturnsValidationError(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	diff := "medium"
+	repo.rules["rule-1"] = &ExamQuestionRule{
+		ID:         "rule-1",
+		ExamID:     "exam-1",
+		Mode:       "random",
+		Count:      1,
+		Difficulty: &diff,
+	}
+	// Simulate: questions exist but are all in 'draft' status — CountAvailableForRule
+	// (which filters status='active') returns 0.
+	repo.countAvailableForRuleFn = func(_ context.Context, _ *ExamQuestionRule) (int, error) {
+		return 0, nil
+	}
+	svc := NewService(repo)
+	_, err := svc.Publish(context.Background(), "exam-1")
+	require.Error(t, err)
+	var pve *PublishValidationError
+	require.ErrorAs(t, err, &pve)
+	require.Len(t, pve.Details, 1)
+	assert.Equal(t, "rule-1", pve.Details[0].RuleID)
+	assert.Equal(t, 1, pve.Details[0].Required)
+	assert.Equal(t, 0, pve.Details[0].Available)
+	assert.Equal(t, "medium", pve.Details[0].Filter["difficulty"])
+}
+
 // ── Archive ───────────────────────────────────────────────────────────────────
 
 func TestArchive_DraftExam_Succeeds(t *testing.T) {

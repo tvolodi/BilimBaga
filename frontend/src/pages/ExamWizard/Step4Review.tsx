@@ -103,6 +103,9 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
               </li>
             ))}
           </ul>
+          {unsatisfiedRules.some((r) => r.available === 0) && (
+            <p className="text-xs mt-1 opacity-80">{t('exam.wizard.validationWarningHint')}</p>
+          )}
         </div>
       )}
 

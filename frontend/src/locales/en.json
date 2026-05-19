@@ -469,6 +469,7 @@
         "publishConfirm": "Publishing this exam will make it available to assigned users. This cannot be undone. Are you sure?"
       },
       "validationWarning": "Some question rules cannot be satisfied. Fix them before publishing.",
+      "validationWarningHint": "Only questions with 'active' status are counted. Open the Question Bank and approve your questions before publishing.",
       "publish": "Publish",
       "publishing": "Publishing…",
       "next": "Next",

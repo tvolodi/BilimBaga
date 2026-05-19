@@ -258,7 +258,7 @@ export function useTransitionStatus() {
       return apiFetch<void>(`/api/v1/questions/${id}/status`, token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_status }),
+        body: JSON.stringify({ status: target_status }),
       })
     },
     onMutate: async ({ id, target_status }) => {
@@ -383,7 +383,7 @@ export function useUpdateQuestionStatus() {
       return apiFetch<void>(`/api/v1/questions/${id}/status`, token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_status }),
+        body: JSON.stringify({ status: target_status }),
       })
     },
     onMutate: async ({ id, target_status }) => {

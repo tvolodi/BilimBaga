@@ -407,6 +407,20 @@ func TestQHandlerTransitionStatus_MissingStatus_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+// ISS-012 regression: sending "target_status" (wrong key) must still return 400.
+// The backend contract uses "status" — unknown JSON keys are silently ignored.
+func TestQHandlerTransitionStatus_WrongFieldNameKey_Returns400(t *testing.T) {
+	h := NewHandler(&mockQService{}, nil)
+
+	body := `{"target_status":"review"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/q-1/status", strings.NewReader(body))
+	req = withQChiParam(req, "id", "q-1")
+	w := httptest.NewRecorder()
+	h.TransitionStatus(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 // ── Delete ────────────────────────────────────────────────────────────────────
 
 func TestQHandlerDelete_Returns204(t *testing.T) {

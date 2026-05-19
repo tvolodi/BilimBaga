@@ -1,13 +1,13 @@
 ---
 id: ISS-015
 title: Access token expiry causes cascading 401s; publish button not disabled after validation failure
-status: open
+status: resolved
 severity: high
 layer: frontend
 module: auth, exams
 tags: [401, TOKEN_EXPIRED, useRefreshToken, staleTime, refetchInterval, publish, unsatisfiedRules]
 created: 2026-05-19
-resolved: null
+resolved: 2026-05-19
 recurrence_count: 1
 related_issues: [ISS-011]
 regression_test: null
@@ -82,9 +82,9 @@ existing `useLogin` test in `auth.test.tsx` continues to pass, confirming no reg
 the login/token-cache path. The publish-button UX fix is a UI change with no service logic.
 
 ## Resolution Results
-- Tests: pending
+- Tests: 198 frontend tests passed, all backend packages passed
 - Migration applied: no
-- Build clean: pending
+- Build clean: yes
 
 ## Recurrence Log
 | Date | Trigger | Action Taken |

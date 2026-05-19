@@ -42,6 +42,9 @@ type Service interface {
 	CreateAssignment(ctx context.Context, input CreateAssignmentInput) (*ExamAssignment, error)
 	DeleteAssignment(ctx context.Context, examID, assignmentID string, callerRole, callerDeptID string) error
 	ListAssignments(ctx context.Context, examID string) ([]*AssignmentDetail, error)
+
+	// GetEligibleCounts returns eligible question counts per rule for an exam (FR-BB315).
+	GetEligibleCounts(ctx context.Context, examID string) ([]RuleEligibleCount, error)
 }
 
 type service struct {
@@ -439,3 +442,33 @@ func (s *service) ListAssignments(ctx context.Context, examID string) ([]*Assign
 
 // now is a variable so tests can override it.
 var now = func() time.Time { return time.Now().UTC() }
+
+// GetEligibleCounts returns the number of eligible (active, matching) questions
+// for each rule defined on the given exam (FR-BB315).
+func (s *service) GetEligibleCounts(ctx context.Context, examID string) ([]RuleEligibleCount, error) {
+	// Verify exam exists.
+	if _, err := s.repo.GetByID(ctx, examID); err != nil {
+		return nil, fmt.Errorf("exams: GetEligibleCounts: %w", err)
+	}
+
+	rules, err := s.repo.ListRulesForExam(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("exams: GetEligibleCounts: list rules: %w", err)
+	}
+
+	counts := make([]RuleEligibleCount, 0, len(rules))
+	for _, rule := range rules {
+		var eligible int
+		switch rule.Mode {
+		case "manual":
+			eligible, err = s.repo.CountAvailableForManualRule(ctx, rule.ID)
+		default:
+			eligible, err = s.repo.CountAvailableForRule(ctx, rule)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("exams: GetEligibleCounts: rule %s: %w", rule.ID, err)
+		}
+		counts = append(counts, RuleEligibleCount{RuleID: rule.ID, Eligible: eligible})
+	}
+	return counts, nil
+}

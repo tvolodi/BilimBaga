@@ -388,7 +388,8 @@
       "save": "Save",
       "submitForReview": "Submit for Review",
       "approve": "Approve",
-      "archive": "Archive"
+      "archive": "Archive",
+      "restoreToDraft": "Restore to Draft"
     },
     "autosave": {
       "saving": "Saving…",
@@ -466,7 +467,13 @@
       },
       "step4": {
         "title": "Review & Publish",
-        "publishConfirm": "Publishing this exam will make it available to assigned users. This cannot be undone. Are you sure?"
+        "publishConfirm": "Publishing this exam will make it available to assigned users. This cannot be undone. Are you sure?",
+        "eligibleCount": "eligible",
+        "eligibleCountLoading": "Checking availability…",
+        "eligibleCountError": "Could not load counts",
+        "ruleStatusOk": "Sufficient",
+        "ruleStatusInsufficient": "Insufficient",
+        "ruleStatusNone": "No matching questions"
       },
       "validationWarning": "Some question rules cannot be satisfied. Fix them before publishing.",
       "validationWarningHint": "Only questions with 'active' status are counted. Open the Question Bank and approve your questions before publishing.",

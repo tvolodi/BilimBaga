@@ -277,3 +277,14 @@ type CreateAssignmentInput struct {
 	CallerRole   string
 	CallerDeptID string
 }
+
+// RuleEligibleCount holds the eligible question count for a single question rule.
+type RuleEligibleCount struct {
+	RuleID   string `json:"rule_id"`
+	Eligible int    `json:"eligible"`
+}
+
+// GetEligibleCountsResponse is the data envelope for GET /exams/{id}/rules/eligible-counts.
+type GetEligibleCountsResponse struct {
+	Counts []RuleEligibleCount `json:"counts"`
+}

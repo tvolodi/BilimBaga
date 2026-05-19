@@ -36,6 +36,7 @@ type mockRepo struct {
 	getRuleByIDFn               func(ctx context.Context, id string) (*ExamQuestionRule, error)
 	listRulesForExamFn          func(ctx context.Context, examID string) ([]*ExamQuestionRule, error)
 	countAvailableForRuleFn     func(ctx context.Context, rule *ExamQuestionRule) (int, error)
+	countAvailableForManualRuleFn func(ctx context.Context, ruleID string) (int, error)
 	createAssignmentFn          func(ctx context.Context, a *ExamAssignment) error
 	getAssignmentByIDFn              func(ctx context.Context, id string) (*ExamAssignment, error)
 	deleteAssignmentFn               func(ctx context.Context, id string) error
@@ -250,6 +251,13 @@ func (m *mockRepo) ListRulesForExam(ctx context.Context, examID string) ([]*Exam
 func (m *mockRepo) CountAvailableForRule(ctx context.Context, rule *ExamQuestionRule) (int, error) {
 	if m.countAvailableForRuleFn != nil {
 		return m.countAvailableForRuleFn(ctx, rule)
+	}
+	return 100, nil
+}
+
+func (m *mockRepo) CountAvailableForManualRule(ctx context.Context, ruleID string) (int, error) {
+	if m.countAvailableForManualRuleFn != nil {
+		return m.countAvailableForManualRuleFn(ctx, ruleID)
 	}
 	return 100, nil
 }
@@ -1171,3 +1179,74 @@ func TestListAssignments_ReturnsAssignments(t *testing.T) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 func strPtr(s string) *string { return &s }
+
+// ── GetEligibleCounts (FR-BB315) ─────────────────────────────────────────────
+
+func TestGetEligibleCounts_ExamNotFound(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	_, err := svc.GetEligibleCounts(context.Background(), "nonexistent")
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestGetEligibleCounts_ZeroRules(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	counts, err := svc.GetEligibleCounts(context.Background(), "exam-1")
+	require.NoError(t, err)
+	assert.Empty(t, counts)
+}
+
+func TestGetEligibleCounts_RandomRules(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "random", Count: 5}
+	repo.rules["rule-2"] = &ExamQuestionRule{ID: "rule-2", ExamID: "exam-1", Mode: "random", Count: 10}
+	repo.countAvailableForRuleFn = func(ctx context.Context, rule *ExamQuestionRule) (int, error) {
+		if rule.ID == "rule-1" {
+			return 8, nil
+		}
+		return 3, nil
+	}
+	svc := NewService(repo)
+	counts, err := svc.GetEligibleCounts(context.Background(), "exam-1")
+	require.NoError(t, err)
+	require.Len(t, counts, 2)
+	byID := map[string]int{}
+	for _, c := range counts {
+		byID[c.RuleID] = c.Eligible
+	}
+	assert.Equal(t, 8, byID["rule-1"])
+	assert.Equal(t, 3, byID["rule-2"])
+}
+
+func TestGetEligibleCounts_ManualRule(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 3}
+	repo.countAvailableForManualRuleFn = func(ctx context.Context, ruleID string) (int, error) {
+		assert.Equal(t, "rule-1", ruleID)
+		return 2, nil
+	}
+	svc := NewService(repo)
+	counts, err := svc.GetEligibleCounts(context.Background(), "exam-1")
+	require.NoError(t, err)
+	require.Len(t, counts, 1)
+	assert.Equal(t, "rule-1", counts[0].RuleID)
+	assert.Equal(t, 2, counts[0].Eligible)
+}
+
+func TestGetEligibleCounts_ZeroEligible(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "random", Count: 5}
+	repo.countAvailableForRuleFn = func(_ context.Context, _ *ExamQuestionRule) (int, error) {
+		return 0, nil
+	}
+	svc := NewService(repo)
+	counts, err := svc.GetEligibleCounts(context.Background(), "exam-1")
+	require.NoError(t, err)
+	require.Len(t, counts, 1)
+	assert.Equal(t, 0, counts[0].Eligible)
+}

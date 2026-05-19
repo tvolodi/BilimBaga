@@ -52,6 +52,9 @@ type Repository interface {
 	// CountAvailableForRule counts active questions matching the rule's filters.
 	CountAvailableForRule(ctx context.Context, rule *ExamQuestionRule) (int, error)
 
+	// CountAvailableForManualRule counts active questions linked to a manual rule.
+	CountAvailableForManualRule(ctx context.Context, ruleID string) (int, error)
+
 	// Assignments (FR-BB33)
 	CreateAssignment(ctx context.Context, a *ExamAssignment) error
 	GetAssignmentByID(ctx context.Context, id string) (*ExamAssignment, error)
@@ -573,6 +576,19 @@ func (r *postgresRepository) CountAvailableForRule(ctx context.Context, rule *Ex
 	var count int
 	if err := r.db.QueryRowContext(ctx, q, args...).Scan(&count); err != nil {
 		return 0, fmt.Errorf("exams: CountAvailableForRule: %w", err)
+	}
+	return count, nil
+}
+
+func (r *postgresRepository) CountAvailableForManualRule(ctx context.Context, ruleID string) (int, error) {
+	const q = `
+		SELECT COUNT(*)
+		FROM exam_manual_questions emq
+		JOIN questions q ON q.id = emq.question_id
+		WHERE emq.rule_id = $1 AND q.status = 'active'`
+	var count int
+	if err := r.db.QueryRowContext(ctx, q, ruleID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("exams: CountAvailableForManualRule: %w", err)
 	}
 	return count, nil
 }

@@ -213,6 +213,8 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Delete("/exams/{id}/assign/{assignmentId}", examsHandler.Unassign)
 			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).
 				Get("/exams/{id}/assignments", examsHandler.ListAssignments)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).
+				Get("/exams/{id}/rules/eligible-counts", examsHandler.GetEligibleCounts)
 
 			// Employee exam portal (FR-BB34) — any authenticated user.
 			r.Get("/portal/exams", portalHandler.ListMyExams)

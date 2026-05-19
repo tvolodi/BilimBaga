@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useExam, usePublishExam, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
+import { useExam, usePublishExam, useEligibleCounts, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -37,6 +38,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
   const { t } = useTranslation()
   const { data: exam, isLoading } = useExam(examId)
   const publishExam = usePublishExam(examId)
+  const { data: eligibleData, isLoading: eligibleLoading, isError: eligibleError } = useEligibleCounts(examId)
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [successBanner, setSuccessBanner] = useState(false)
@@ -161,12 +163,42 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           <p className="text-sm text-muted-foreground">—</p>
         ) : (
           <ul className="space-y-1">
-            {exam.rules.map((r, i) => (
-              <li key={r.id} className="text-sm">
-                Rule {i + 1}: {r.mode}, {r.count} questions
-                {r.difficulty && `, ${r.difficulty}`}
-              </li>
-            ))}
+            {exam.rules.map((r, i) => {
+              const countEntry = eligibleData?.counts.find((c) => c.rule_id === r.id)
+              const eligible = countEntry?.eligible
+              let badge: React.ReactNode = null
+              if (eligibleLoading) {
+                badge = <Loader2 className="inline h-3 w-3 animate-spin ml-2 text-muted-foreground" />
+              } else if (eligibleError) {
+                badge = (
+                  <span className="inline-flex items-center gap-1 ml-2 text-xs text-destructive">
+                    <AlertTriangle className="h-3 w-3" />
+                    {t('exam.wizard.step4.eligibleCountError')}
+                  </span>
+                )
+              } else if (eligible !== undefined) {
+                const badgeClass =
+                  eligible >= r.count
+                    ? 'bg-green-100 text-green-800'
+                    : eligible > 0
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-red-100 text-red-800'
+                badge = (
+                  <Badge className={`ml-2 text-xs ${badgeClass}`}>
+                    {eligible} {t('exam.wizard.step4.eligibleCount')}
+                  </Badge>
+                )
+              }
+              return (
+                <li key={r.id} className="text-sm flex items-center">
+                  <span>
+                    Rule {i + 1}: {r.mode}, {r.count} questions
+                    {r.difficulty && `, ${r.difficulty}`}
+                  </span>
+                  {badge}
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

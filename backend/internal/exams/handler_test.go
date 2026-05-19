@@ -36,6 +36,7 @@ type mockSvc struct {
 	createAssignmentFn   func(ctx context.Context, input CreateAssignmentInput) (*ExamAssignment, error)
 	deleteAssignmentFn   func(ctx context.Context, examID, assignmentID, callerRole, callerDeptID string) error
 	listAssignmentsFn    func(ctx context.Context, examID string) ([]*AssignmentDetail, error)
+	getEligibleCountsFn  func(ctx context.Context, examID string) ([]RuleEligibleCount, error)
 }
 
 func (m *mockSvc) CreateExam(ctx context.Context, input CreateExamInput) (*Exam, error) {
@@ -153,6 +154,12 @@ func (m *mockSvc) ListAssignments(ctx context.Context, examID string) ([]*Assign
 		return m.listAssignmentsFn(ctx, examID)
 	}
 	return []*AssignmentDetail{}, nil
+}
+func (m *mockSvc) GetEligibleCounts(ctx context.Context, examID string) ([]RuleEligibleCount, error) {
+	if m.getEligibleCountsFn != nil {
+		return m.getEligibleCountsFn(ctx, examID)
+	}
+	return []RuleEligibleCount{}, nil
 }
 
 // ── Response helpers ─────────────────────────────────────────────────────────
@@ -883,4 +890,37 @@ func TestArchive_AlreadyArchived_Returns409(t *testing.T) {
 	h.Archive(w, req)
 	assert.Equal(t, http.StatusConflict, w.Code)
 	assert.Equal(t, "ERR_INVALID_TRANSITION", decode(t, w).Error.Code)
+}
+
+// ── GetEligibleCounts handler tests (FR-BB315) ────────────────────────────────
+
+func TestGetEligibleCountsHandler_ReturnsCountsJSON(t *testing.T) {
+	h := newHandler(&mockSvc{
+		getEligibleCountsFn: func(_ context.Context, examID string) ([]RuleEligibleCount, error) {
+			return []RuleEligibleCount{
+				{RuleID: "rule-1", Eligible: 5},
+				{RuleID: "rule-2", Eligible: 0},
+			}, nil
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodGet, "/api/v1/exams/exam-1/rules/eligible-counts", nil), "id", "exam-1")
+	h.GetEligibleCounts(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	env := decode(t, w)
+	require.Nil(t, env.Error)
+	require.Contains(t, string(env.Data), "counts")
+}
+
+func TestGetEligibleCountsHandler_ExamNotFound_Returns404(t *testing.T) {
+	h := newHandler(&mockSvc{
+		getEligibleCountsFn: func(_ context.Context, _ string) ([]RuleEligibleCount, error) {
+			return nil, ErrNotFound
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodGet, "/api/v1/exams/nope/rules/eligible-counts", nil), "id", "nope")
+	h.GetEligibleCounts(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "EXAM_NOT_FOUND", decode(t, w).Error.Code)
 }

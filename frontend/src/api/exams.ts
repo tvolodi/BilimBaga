@@ -377,3 +377,26 @@ export function useDeleteAssignment(examId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId, 'assignments'] }),
   })
 }
+
+// ---- Eligible counts hook (FR-BB315) ----------------------------------------
+
+export interface RuleEligibleCount {
+  rule_id: string
+  eligible: number
+}
+
+export function useEligibleCounts(examId: string) {
+  const qc = useQueryClient()
+  return useQuery<{ counts: RuleEligibleCount[] }, ExamApiError>({
+    queryKey: ['exams', examId, 'eligibleCounts'],
+    queryFn: () => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<{ counts: RuleEligibleCount[] }>(
+        `/api/v1/exams/${examId}/rules/eligible-counts`,
+        token,
+      )
+    },
+    enabled: !!examId,
+    staleTime: 0,
+  })
+}

@@ -791,3 +791,21 @@ func (h *Handler) SetManualQuestions(w http.ResponseWriter, r *http.Request) {
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]int{"count": len(questions)}, "error": nil})
 }
+
+// GetEligibleCounts returns the eligible question count for each rule of an exam (FR-BB315).
+func (h *Handler) GetEligibleCounts(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	counts, err := h.svc.GetEligibleCounts(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			api.WriteError(w, http.StatusNotFound, "EXAM_NOT_FOUND", "exam not found")
+			return
+		}
+		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to get eligible counts")
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"data":  GetEligibleCountsResponse{Counts: counts},
+		"error": nil,
+	})
+}

@@ -28,7 +28,7 @@ const sampleQuestion = {
       is_correct: true,
       likert_weight: null,
       likert_polarity: null,
-      translations: { en: { body: 'Water' } },
+      translations: { en: { text: 'Water' } },
     },
     {
       id: 'opt-2',
@@ -36,7 +36,7 @@ const sampleQuestion = {
       is_correct: false,
       likert_weight: null,
       likert_polarity: null,
-      translations: { en: { body: 'Fire' } },
+      translations: { en: { text: 'Fire' } },
     },
   ],
   tags: [],

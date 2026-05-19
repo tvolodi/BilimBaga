@@ -144,7 +144,7 @@ function detailToForm(q: QuestionDetail): FormState {
     likert_weight: opt.likert_weight,
     likert_polarity: opt.likert_polarity,
     translations: Object.fromEntries(
-      LOCALES.map((l) => [l, { body: opt.translations[l]?.body ?? '' }]),
+      LOCALES.map((l) => [l, { body: opt.translations[l]?.text ?? '' }]),
     ),
   }))
   return {

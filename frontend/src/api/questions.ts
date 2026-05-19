@@ -63,7 +63,7 @@ export interface QuestionTranslation {
 }
 
 export interface AnswerOptionTranslation {
-  body: string
+  text: string
 }
 
 export interface AnswerOption {

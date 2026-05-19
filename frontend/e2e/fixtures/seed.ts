@@ -18,6 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_DIR = path.join(__dirname, '..', '..', '.auth')
 export const EMPLOYEE_STORAGE_STATE = path.join(AUTH_DIR, 'employee.json')
 const EMPLOYEE_TOKEN_PATH = path.join(AUTH_DIR, 'employee-token.txt')
+const EMPLOYEE_ID_PATH = path.join(AUTH_DIR, 'employee-id.txt')
 
 const BASE = 'http://localhost:8080'
 
@@ -160,10 +161,16 @@ interface ExamListResponse {
 }
 
 async function findExam(adminToken: string, title: string): Promise<string | null> {
-  const res = await apiGet<ExamListResponse>(`${BASE}/api/v1/exams?per_page=100`, adminToken)
-  if (!res.ok || !res.data) return null
-  const found = res.data.items.find((e) => e.title === title)
-  return found?.id ?? null
+  let page = 1
+  while (true) {
+    const res = await apiGet<ExamListResponse>(`${BASE}/api/v1/exams?per_page=100&page=${page}`, adminToken)
+    if (!res.ok || !res.data) return null
+    const found = res.data.items.find((e) => e.title === title)
+    if (found) return found.id
+    const { total } = res.data.meta
+    if (page * 100 >= total) return null
+    page++
+  }
 }
 
 interface QuestionData {
@@ -374,13 +381,19 @@ interface UserListResponse {
 }
 
 async function findUserByEmail(adminToken: string, email: string): Promise<string | null> {
-  const res = await apiGet<UserListResponse>(
-    `${BASE}/api/v1/users?per_page=200`,
-    adminToken,
-  )
-  if (!res.ok || !res.data) return null
-  const found = res.data.items.find((u) => u.email === email)
-  return found?.id ?? null
+  let page = 1
+  while (true) {
+    const res = await apiGet<UserListResponse>(
+      `${BASE}/api/v1/users?per_page=100&page=${page}`,
+      adminToken,
+    )
+    if (!res.ok || !res.data) return null
+    const found = res.data.items.find((u) => u.email === email)
+    if (found) return found.id
+    const { total } = res.data.meta
+    if (page * 100 >= total) return null
+    page++
+  }
 }
 
 interface SessionData {
@@ -575,12 +588,16 @@ export async function getSeedData(): Promise<SeedData> {
   if (cachedSeedData) return cachedSeedData
   const AUTH_DIR_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '.auth')
   const tokenPath = path.join(AUTH_DIR_PATH, 'token.txt')
+  const employeeIdPath = path.join(AUTH_DIR_PATH, 'employee-id.txt')
   if (!fs.existsSync(tokenPath)) throw new Error('getSeedData: .auth/token.txt not found — run global setup first')
+  if (!fs.existsSync(employeeIdPath)) throw new Error('getSeedData: .auth/employee-id.txt not found — run global setup first')
   let adminToken = fs.readFileSync(tokenPath, 'utf8').trim()
+  const employeeId = fs.readFileSync(employeeIdPath, 'utf8').trim()
+  if (!employeeId) throw new Error('getSeedData: employee-id.txt is empty')
 
-  // Token from global-setup may have expired (15-min JWT). Re-login if lookup fails.
-  let employeeId = await findUserByEmail(adminToken, 'employee@bilimbaga.local')
-  if (!employeeId) {
+  // Token from global-setup may have expired (15-min JWT). Re-login if token check fails.
+  const tokenCheckOk = await findUserByEmail(adminToken, 'employee@bilimbaga.local').then(id => id !== null).catch(() => false)
+  if (!tokenCheckOk) {
     const refreshed = await login(
       process.env.E2E_ADMIN_EMAIL ?? 'admin@bilimbaga.local',
       process.env.E2E_ADMIN_PASS ?? 'Admin1234!',
@@ -588,8 +605,6 @@ export async function getSeedData(): Promise<SeedData> {
     if (!refreshed) throw new Error('getSeedData: admin re-login failed')
     adminToken = refreshed
     fs.writeFileSync(tokenPath, adminToken, 'utf8')
-    employeeId = await findUserByEmail(adminToken, 'employee@bilimbaga.local')
-    if (!employeeId) throw new Error('getSeedData: employee user not found after re-login')
   }
 
   const mixedExamId = await findExam(adminToken, 'E2E Mixed Exam')
@@ -628,6 +643,7 @@ export async function seedEmployeeFixtures(adminToken: string): Promise<void> {
     throw new Error('[seed] Could not find employee user ID')
   }
   console.log('[seed] Employee user ID:', employeeId)
+  fs.writeFileSync(EMPLOYEE_ID_PATH, employeeId, 'utf8')
 
   // 4. Create or find "E2E Mixed Exam"
   let mixedExamId = await findExam(adminToken, 'E2E Mixed Exam')
@@ -722,14 +738,44 @@ export async function seedEmployeeFixtures(adminToken: string): Promise<void> {
     console.log('[seed] ShortText session submitted — will appear in grading queue')
   }
 
-  // 7. Save employee storage state (mirrors global-setup.ts pattern)
+  // 7. Save employee storage state — do a real browser-based login so the
+  //    HTTP-only refresh cookie is captured in the storageState. Without the
+  //    cookie the token cannot be refreshed when it expires during the test run.
   const browser = await chromium.launch()
   const context = await browser.newContext({ baseURL: 'http://localhost:5173' })
   const page = await context.newPage()
   await page.goto('http://localhost:5173/login')
+
+  // Browser-fetch login with credentials:include to set the refresh cookie.
+  const browserLoginResult = await page.evaluate(
+    async ({ email, pass }: { email: string; pass: string }) => {
+      const r = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass }),
+        credentials: 'include',
+      })
+      const json = await r.json()
+      return { ok: r.ok, token: (json.data as { access_token?: string })?.access_token ?? null }
+    },
+    { email: 'employee@bilimbaga.local', pass: employeePassword },
+  )
+
+  // Use the freshly-issued token if available; fall back to node-fetched one.
+  const finalToken = browserLoginResult.ok && browserLoginResult.token
+    ? browserLoginResult.token
+    : employeeToken
+  if (!browserLoginResult.ok) {
+    console.warn('[seed] Browser-based employee login failed — falling back to node token')
+  }
+
   await page.evaluate((token: string) => {
     localStorage.setItem('__e2e_access_token__', token)
-  }, employeeToken)
+  }, finalToken)
+  // Set RU locale for the E2E run.
+  await page.evaluate(() => {
+    localStorage.setItem('i18n-lang', 'ru')
+  })
   await context.storageState({ path: EMPLOYEE_STORAGE_STATE })
   await browser.close()
 

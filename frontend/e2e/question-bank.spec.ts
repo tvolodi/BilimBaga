@@ -16,13 +16,13 @@ test.describe('Question Bank page', () => {
   test('shows the New Question button', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    await expect(page.getByRole('button', { name: /new question/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /новый вопрос|new question/i })).toBeVisible()
   })
 
   test('navigates to question editor on New Question click', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    await page.getByRole('button', { name: /new question/i }).click()
+    await page.getByRole('button', { name: /новый вопрос|new question/i }).click()
     await expect(page).toHaveURL(/\/admin\/questions\/new/)
   })
 
@@ -41,7 +41,7 @@ test.describe('Question Bank page', () => {
   test('search input filters questions without crashing', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    const searchInput = page.getByPlaceholder(/search/i)
+    const searchInput = page.getByPlaceholder(/поиск|search/i)
     await expect(searchInput).toBeVisible()
     await searchInput.fill('E2E')
     await page.waitForTimeout(500)
@@ -52,7 +52,7 @@ test.describe('Question Bank page', () => {
   test('shows empty state when search matches nothing', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    const searchInput = page.getByPlaceholder(/search/i)
+    const searchInput = page.getByPlaceholder(/поиск|search/i)
     await searchInput.fill('ZZZNOMATCHXXX')
     await page.waitForTimeout(600)
     // Either shows empty state text or zero rows — no crash
@@ -63,7 +63,7 @@ test.describe('Question Bank page', () => {
   test('shows Import and AI Generate buttons', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    await expect(page.getByRole('button', { name: /import/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /generate|ai/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /импорт|import/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /генерация ИИ|генерация|generate|ai/i })).toBeVisible()
   })
 })

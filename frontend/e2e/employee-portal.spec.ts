@@ -45,7 +45,7 @@ async function waitForPortalCards(page: Page) {
     .waitForFunction(() => {
       const hasSkeleton = document.querySelector('.animate-pulse') !== null
       const hasCards = document.querySelector('.rounded-lg.border.bg-card') !== null
-      const hasEmpty = document.body.textContent?.includes('No exams assigned') ?? false
+      const hasEmpty = (document.body.textContent?.includes('No exams assigned') ?? false) || (document.body.textContent?.includes('\u041d\u0435\u0442 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u043d\u044b\u0445 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u043e\u0432') ?? false)
       return !hasSkeleton && (hasCards || hasEmpty)
     }, { timeout: 20_000 })
     .catch(() => {})
@@ -63,7 +63,7 @@ test.describe('Employee Portal', () => {
     await waitForPortalCards(page)
 
     // Portal title heading must be present
-    await expect(page.getByRole('heading', { name: /my exams/i })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: /\u043c\u043e\u0438 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u044b|my exams/i })).toBeVisible({ timeout: 10_000 })
     await shot(page, 'ep-01-portal-loads')
 
     // At least one exam card should be visible — shadcn Card renders as div.rounded-lg.border
@@ -79,11 +79,11 @@ test.describe('Employee Portal', () => {
     await waitForPortalCards(page)
 
     const isEmpty = await page
-      .getByText(/no exams assigned/i)
+      .getByText(/\u043d\u0435\u0442 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u043d\u044b\u0445 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u043e\u0432|no exams assigned/i)
       .isVisible()
       .catch(() => false)
     if (isEmpty) {
-      await expect(page.getByText(/no exams assigned/i)).toBeVisible()
+      await expect(page.getByText(/\u043d\u0435\u0442 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u043d\u044b\u0445 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u043e\u0432|no exams assigned/i)).toBeVisible()
       await shot(page, 'ep-02-portal-empty')
     } else {
       // Exams are present — acceptable, seeded exams exist
@@ -97,7 +97,7 @@ test.describe('Employee Portal', () => {
     await waitForPortalCards(page)
 
     // Find any "Start exam" button on any card (exam must be not_started)
-    const startBtn = page.getByRole('button', { name: /start exam/i }).first()
+    const startBtn = page.getByRole('button', { name: /\u043d\u0430\u0447\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c\u0435\u043d|start exam/i }).first()
     const isStartAvailable = await startBtn.isVisible({ timeout: 5_000 }).catch(() => false)
 
     if (!isStartAvailable) {
@@ -111,7 +111,7 @@ test.describe('Employee Portal', () => {
 
     // Modal must be visible
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByText(/start exam/i).first()).toBeVisible()
+    await expect(page.getByText(/\u043d\u0430\u0447\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c\u0435\u043d|start exam/i).first()).toBeVisible()
     await shot(page, 'ep-03-start-exam-modal')
   })
 
@@ -119,7 +119,7 @@ test.describe('Employee Portal', () => {
     await loginAsEmployee(page)
     await waitForPortalCards(page)
 
-    const startBtn = page.getByRole('button', { name: /start exam/i }).first()
+    const startBtn = page.getByRole('button', { name: /\u043d\u0430\u0447\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c\u0435\u043d|start exam/i }).first()
     const isStartAvailable = await startBtn.isVisible({ timeout: 5_000 }).catch(() => false)
 
     if (!isStartAvailable) {
@@ -133,7 +133,7 @@ test.describe('Employee Portal', () => {
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
 
     // Click Cancel
-    const cancelBtn = page.getByRole('button', { name: /cancel/i })
+    const cancelBtn = page.getByRole('button', { name: /\u043e\u0442\u043c\u0435\u043d\u0430|cancel/i })
     await expect(cancelBtn).toBeVisible()
     await cancelBtn.click()
 
@@ -148,12 +148,12 @@ test.describe('Employee Portal', () => {
     await waitForPortalCards(page)
 
     // Look for a "Start exam" button — works when exam is not_started
-    const startBtn = page.getByRole('button', { name: /start exam/i }).first()
+    const startBtn = page.getByRole('button', { name: /\u043d\u0430\u0447\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c\u0435\u043d|start exam/i }).first()
     const isStartAvailable = await startBtn.isVisible({ timeout: 5_000 }).catch(() => false)
 
     if (!isStartAvailable) {
       // Exam already in_progress from previous run — verify Continue navigates instead
-      const continueBtn = page.getByRole('button', { name: /^continue$/i }).first()
+      const continueBtn = page.getByRole('button', { name: /^\u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c$|^continue$/i }).first()
       if (await continueBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await continueBtn.click()
         await expect(page).toHaveURL(/\/portal\/sessions\//, { timeout: 20_000 })
@@ -170,7 +170,7 @@ test.describe('Employee Portal', () => {
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
 
     // Click Begin exam (the confirm button)
-    const confirmBtn = page.getByRole('button', { name: /begin exam/i })
+    const confirmBtn = page.getByRole('button', { name: /\u043d\u0430\u0447\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c\u0435\u043d|begin exam/i }).last()
     await expect(confirmBtn).toBeVisible()
     await confirmBtn.click()
 
@@ -184,7 +184,7 @@ test.describe('Employee Portal', () => {
     await waitForPortalCards(page)
 
     // Look for a "Continue" button (in_progress exam card)
-    const continueBtn = page.getByRole('button', { name: /^continue$/i }).first()
+    const continueBtn = page.getByRole('button', { name: /^\u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c$|^continue$/i }).first()
     if (await continueBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await continueBtn.click()
       await expect(page).toHaveURL(/\/portal\/sessions\//, { timeout: 15_000 })
@@ -229,7 +229,7 @@ test.describe('Employee Portal', () => {
       .catch(() => {})
 
     // Heading must be visible
-    await expect(page.getByRole('heading', { name: /my results/i })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: /\u043c\u043e\u0438 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b|my results/i })).toBeVisible({ timeout: 10_000 })
     await shot(page, 'ep-08-my-results')
 
     // Either a table (with results) or the empty state must be visible

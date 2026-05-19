@@ -42,7 +42,7 @@ test.describe('Exam Lifecycle — Status Badges in List', () => {
     // The E2E Mixed Exam is published/active — its row should show an active badge
     const activeRow = page.locator('table tbody tr').filter({ hasText: 'E2E Mixed Exam' })
     if (await activeRow.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await expect(activeRow.getByText(/active/i)).toBeVisible()
+      await expect(activeRow.getByText(/\u0430\u043a\u0442\u0438\u0432\u0435\u043d|active/i)).toBeVisible()
     } else {
       test.info().annotations.push({ type: 'note', description: 'E2E Mixed Exam row not on this page — may be paginated' })
     }
@@ -56,7 +56,7 @@ test.describe('Exam Lifecycle — Status Badges in List', () => {
     await waitForContent(page)
     const row = page.locator('table tbody tr').filter({ hasText: exam.title })
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await expect(row.getByText(/draft/i).last()).toBeVisible()
+      await expect(row.getByText(/\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a|draft/i).last()).toBeVisible()
     } else {
       test.info().annotations.push({ type: 'note', description: 'Draft exam row not visible on this page — may be paginated' })
     }
@@ -98,7 +98,7 @@ test.describe('Exam Lifecycle — Archive via API', () => {
     await waitForContent(page)
     const row = page.locator('table tbody tr').filter({ hasText: exam.title })
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await expect(row.getByText(/archived/i)).toBeVisible()
+      await expect(row.getByText(/\u0432 \u0430\u0440\u0445\u0438\u0432\u0435|archived/i)).toBeVisible()
     } else {
       test.info().annotations.push({ type: 'note', description: 'Archived exam row not visible on this page' })
     }
@@ -117,8 +117,8 @@ test.describe('Exam Lifecycle — Edit existing exam', () => {
     const { mixedExamId } = await getSeedData()
     await page.goto(`/admin/exams/${mixedExamId}/edit`)
     await waitForContent(page)
-    await expect(page.getByText(/Edit Exam|Basic Settings/i).first()).toBeVisible({ timeout: 10_000 })
-    const titleField = page.getByLabel(/exam title/i)
+    await expect(page.getByText(/\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c|\u043e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438|Edit Exam|Basic Settings/i).first()).toBeVisible({ timeout: 10_000 })
+    const titleField = page.getByLabel(/\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u0430|exam title/i)
     if (await titleField.isVisible({ timeout: 3_000 }).catch(() => false)) {
       const value = await titleField.inputValue()
       expect(value.length).toBeGreaterThan(0)
@@ -134,7 +134,7 @@ test.describe('Exam Lifecycle — Edit existing exam', () => {
       return
     }
     // Click first edit link
-    const editLink = page.getByRole('link', { name: /edit/i }).first()
+    const editLink = page.getByRole('link', { name: /\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c|edit/i }).first()
     if (!(await editLink.isVisible({ timeout: 3_000 }).catch(() => false))) {
       // Try SVG icon links
       const svgLinks = page.getByRole('link').filter({ has: page.locator('svg') })
@@ -149,7 +149,7 @@ test.describe('Exam Lifecycle — Edit existing exam', () => {
     }
     await expect(page).toHaveURL(/\/admin\/exams\/.+\/edit/, { timeout: 10_000 })
     await waitForContent(page)
-    await expect(page.getByText(/Basic Settings|Edit Exam/i).first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/основные настройки|редактировать экзам|basic settings|edit exam/i).first()).toBeVisible({ timeout: 10_000 })
   })
 })
 
@@ -167,8 +167,8 @@ test.describe('Exam Lifecycle — Full status flow', () => {
     await expect(page.locator('body')).not.toContainText(/unexpected error/i)
 
     // Check that "active" badge exists (from E2E Mixed Exam) and "draft" exists
-    const hasActive = await page.getByText(/active/i).isVisible({ timeout: 3_000 }).catch(() => false)
-    const hasDraft = await page.getByText(/draft/i).isVisible({ timeout: 3_000 }).catch(() => false)
+    const hasActive = await page.getByText(/\u0430\u043a\u0442\u0438\u0432\u0435\u043d|active/i).isVisible({ timeout: 3_000 }).catch(() => false)
+    const hasDraft = await page.getByText(/\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a|draft/i).isVisible({ timeout: 3_000 }).catch(() => false)
     if (!hasActive && !hasDraft) {
       test.info().annotations.push({ type: 'note', description: 'Neither active nor draft badges visible on current page' })
     }

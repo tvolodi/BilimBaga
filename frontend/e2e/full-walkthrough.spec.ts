@@ -96,17 +96,17 @@ test.describe('Full application walkthrough', () => {
   test('01 — Login screen renders correctly', async ({ page }) => {
     await page.goto('/login')
     await expect(page.getByRole('textbox', { name: /email/i })).toBeVisible()
-    await expect(page.getByLabel(/password/i)).toBeVisible()
-    await expect(page.getByRole('button', { name: /login|sign in/i })).toBeVisible()
+    await expect(page.getByLabel(/пароль|password/i).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /войти|login|sign in/i })).toBeVisible()
     await shot(page, '01-login')
   })
 
   test('02 — Invalid credentials shows error', async ({ page }) => {
     await page.goto('/login')
     await page.getByRole('textbox', { name: /email/i }).fill('nobody@example.com')
-    await page.getByLabel(/password/i).fill('wrongpassword')
-    await page.getByRole('button', { name: /login|sign in/i }).click()
-    await expect(page.getByText(/invalid|credentials|incorrect|unauthorized/i)).toBeVisible({
+    await page.getByLabel(/пароль|password/i).first().fill('wrongpassword')
+    await page.getByRole('button', { name: /войти|login|sign in/i }).click()
+    await expect(page.getByText(/неверный|invalid|credentials|incorrect|unauthorized/i)).toBeVisible({
       timeout: 10_000,
     })
     await shot(page, '02-login-error')
@@ -137,11 +137,11 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '04-users-list')
 
     // "New User" button must exist and open a drawer
-    const createBtn = page.getByRole('button', { name: /new user|create user|add user/i })
+    const createBtn = page.getByRole('button', { name: /новый пользователь|new user|create user|add user/i })
     await expect(createBtn).toBeVisible()
     await createBtn.click()
     // The drawer uses a custom Sheet (plain div, not role=dialog) — detect via its heading
-    await expect(page.getByRole('heading', { name: /create user/i })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('heading', { name: /создать пользователя|create user/i })).toBeVisible({ timeout: 5_000 })
     await shot(page, '04b-users-create-drawer')
     await page.keyboard.press('Escape')
   })
@@ -167,7 +167,7 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '06-categories')
 
     // The "New Category" button is required for super_admin
-    const addBtn = page.getByRole('button', { name: /new category|add category|create category/i })
+    const addBtn = page.getByRole('button', { name: /новая категория|new category|add category|create category/i })
     await expect(addBtn).toBeVisible()
     await addBtn.click()
     await expect(page.getByRole('dialog').first()).toBeVisible({ timeout: 5_000 })
@@ -187,7 +187,7 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '07-tags')
 
     // "New Tag" button is required for super_admin
-    const createBtn = page.getByRole('button', { name: /new tag|create tag|add tag/i })
+    const createBtn = page.getByRole('button', { name: /новый тег|new tag|create tag|add tag/i })
     await expect(createBtn).toBeVisible()
     await createBtn.click()
     await expect(page.getByRole('dialog').first()).toBeVisible({ timeout: 5_000 })
@@ -205,9 +205,9 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '08-question-bank')
 
     // Search input and new question button must exist on a working question bank
-    const searchInput = page.getByPlaceholder(/search questions/i)
+    const searchInput = page.getByPlaceholder(/поиск вопросов|search questions/i)
     await expect(searchInput).toBeVisible()
-    const newBtn = page.getByRole('button', { name: /new question/i })
+    const newBtn = page.getByRole('button', { name: /новый вопрос|new question/i })
     await expect(newBtn).toBeVisible()
 
     await searchInput.fill('test')
@@ -225,12 +225,12 @@ test.describe('Full application walkthrough', () => {
 
     // Core form fields must all be present
     // "Question Type" and "Difficulty" labels have no htmlFor — scope to main content area
-    await expect(page.locator('main').getByText('Question Type').first()).toBeVisible()
-    await expect(page.locator('main').getByText('Difficulty').first()).toBeVisible()
+    await expect(page.locator('main').getByText(/Тип вопроса|Question Type/i).first()).toBeVisible()
+    await expect(page.locator('main').getByText(/Сложность|Difficulty/i).first()).toBeVisible()
 
     // Stem textarea is labeled "Question Stem" via a <Label> without htmlFor —
     // locate via placeholder which is always present
-    const stemField = page.getByPlaceholder(/enter the question text/i)
+    const stemField = page.getByPlaceholder(/введите текст вопроса|enter the question text/i)
     await expect(stemField).toBeVisible()
 
     // Find the type selector: it's the <select> whose option values are the question types.
@@ -250,7 +250,7 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '09b-question-editor-filled')
 
     // AC-7a: Assert Save Draft button is visible
-    await expect(page.getByRole('button', { name: /save draft/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /сохранить черновик|save draft/i })).toBeVisible()
     await shot(page, '09c-save-draft-button')
   })
 
@@ -262,7 +262,7 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '10-exams-list')
 
     // "Create Exam" link/button must be present on a working exams page
-    const createExamLink = page.getByRole('link', { name: /create exam/i })
+    const createExamLink = page.getByRole('link', { name: /создать экзамен|create exam/i })
     await expect(createExamLink).toBeVisible()
     await createExamLink.click()
     await expect(page).toHaveURL(/\/exams\/new/, { timeout: 10_000 })
@@ -278,37 +278,37 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '11-exam-wizard-step1')
 
     // Title field is required
-    const titleField = page.getByLabel(/exam title|title/i)
+    const titleField = page.getByLabel(/название экзамена|exam title|title/i)
     await expect(titleField).toBeVisible()
     await titleField.fill('E2E Walkthrough Exam')
 
-    const timeLimitField = page.getByLabel(/time limit/i)
+    const timeLimitField = page.getByLabel(/лимит времени|time limit/i)
     await expect(timeLimitField).toBeVisible()
     await timeLimitField.fill('30')
 
-    const passingField = page.getByLabel(/passing score/i)
+    const passingField = page.getByLabel(/проходной балл|passing score/i)
     await expect(passingField).toBeVisible()
     await passingField.fill('70')
 
-    const attemptsField = page.getByLabel(/max attempts/i)
+    const attemptsField = page.getByLabel(/макс.*попыток|max attempts/i)
     await expect(attemptsField).toBeVisible()
     await attemptsField.fill('2')
 
     await shot(page, '11b-exam-wizard-step1-filled')
 
     // Advance to Step 2
-    await page.getByRole('button', { name: /next/i }).click()
-    await expect(page.getByText(/question rules/i)).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: /далее|next/i }).click()
+    await expect(page.getByText(/правила вопросов|question rules/i)).toBeVisible({ timeout: 10_000 })
     await shot(page, '11c-exam-wizard-step2')
 
     // Advance to Step 3
-    await page.getByRole('button', { name: /next/i }).click()
-    await expect(page.getByText(/assignments/i).first()).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: /далее|next/i }).click()
+    await expect(page.getByText(/назначения|assignments/i).first()).toBeVisible({ timeout: 10_000 })
     await shot(page, '11d-exam-wizard-step3')
 
     // Advance to Step 4
-    await page.getByRole('button', { name: /next/i }).click()
-    await expect(page.getByText(/review|publish/i).first()).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: /далее|next/i }).click()
+    await expect(page.getByText(/обзор и публикация|review|publish/i).first()).toBeVisible({ timeout: 10_000 })
     await shot(page, '11e-exam-wizard-step4')
   })
 
@@ -338,7 +338,7 @@ test.describe('Full application walkthrough', () => {
     const toInput = page.locator('input[type="datetime-local"]').nth(1)
     await expect(toInput).toBeVisible({ timeout: 5_000 })
 
-    const exportCsvBtn = page.getByRole('button', { name: /export.*csv|export to csv/i })
+    const exportCsvBtn = page.getByRole('button', { name: /экспорт в csv|экспорт csv|export.*csv|export to csv/i })
     await expect(exportCsvBtn).toBeVisible({ timeout: 5_000 })
 
     await shot(page, '13b-audit-log-filters-present')
@@ -426,15 +426,15 @@ test.describe('Full application walkthrough', () => {
     await waitForContent(page)
 
     // "New User" button must be present — if it isn't, the page is broken
-    const createBtn = page.getByRole('button', { name: /new user|create user|add user/i })
+    const createBtn = page.getByRole('button', { name: /новый пользователь|new user|create user|add user/i })
     await expect(createBtn).toBeVisible()
 
     await createBtn.click()
     // Sheet drawer has no role=dialog — detect via its heading
-    await expect(page.getByRole('heading', { name: /create user/i })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('heading', { name: /создать пользователя|create user/i })).toBeVisible({ timeout: 5_000 })
 
     // Submit empty form — expect validation errors
-    await page.getByRole('button', { name: /^create$/i }).click()
+    await page.getByRole('button', { name: /^создать$|^create$/i }).click()
     await shot(page, '17-user-create-validation')
 
     // Fill valid data — email and full name inputs use placeholders (no htmlFor on labels)
@@ -442,7 +442,7 @@ test.describe('Full application walkthrough', () => {
     await expect(emailField).toBeVisible()
     await emailField.fill('e2e-user@bilimbaga.local')
 
-    const nameField = page.getByPlaceholder(/full name/i)
+    const nameField = page.getByPlaceholder(/введите полное имя|full name/i)
     await expect(nameField).toBeVisible()
     await nameField.fill('E2E Test User')
 
@@ -466,9 +466,9 @@ test.describe('Full application walkthrough', () => {
 
     // AC-7d: Assert the page loaded some content
     const hasSomeContent =
-      (await page.getByText(/session history/i).isVisible().catch(() => false)) ||
-      (await page.getByText(/track progress/i).isVisible().catch(() => false)) ||
-      (await page.getByText(/no exam sessions recorded/i).isVisible().catch(() => false))
+      (await page.getByText(/история сессий|session history/i).isVisible().catch(() => false)) ||
+      (await page.getByText(/прогресс по направлениям|track progress/i).isVisible().catch(() => false)) ||
+      (await page.getByText(/у этого сотрудника нет записей|no exam sessions recorded/i).isVisible().catch(() => false))
     expect(hasSomeContent).toBeTruthy()
     await shot(page, '18b-employee-record-values-profile')
   })
@@ -478,8 +478,8 @@ test.describe('Full application walkthrough', () => {
     await page.goto('/change-password')
     await waitForContent(page)
 
-    await expect(page.getByLabel(/current password/i)).toBeVisible()
-    await expect(page.getByLabel(/^new password/i)).toBeVisible()
+    await expect(page.getByLabel(/текущий пароль|current password/i)).toBeVisible()
+    await expect(page.getByLabel(/^новый пароль|^new password/i)).toBeVisible()
     await shot(page, '19-change-password')
   })
 

@@ -25,20 +25,20 @@ test.describe('Categories page', () => {
   test('shows the New Category button for admin', async ({ page }) => {
     await page.goto('/admin/categories')
     await waitForContent(page)
-    await expect(page.getByRole('button', { name: /new category|add category|create category/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /новая категория|new category|add category|create category/i })).toBeVisible()
   })
 
   test('opens the create modal when New Category is clicked', async ({ page }) => {
     await page.goto('/admin/categories')
     await waitForContent(page)
-    await page.getByRole('button', { name: /new category|add category|create category/i }).click()
+    await page.getByRole('button', { name: /\u043d\u043e\u0432\u0430\u044f \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f|new category|add category|create category/i }).click()
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
   })
 
   test('create modal has a name input field', async ({ page }) => {
     await page.goto('/admin/categories')
     await waitForContent(page)
-    await page.getByRole('button', { name: /new category|add category|create category/i }).click()
+    await page.getByRole('button', { name: /\u043d\u043e\u0432\u0430\u044f \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f|new category|add category|create category/i }).click()
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
     const nameInput = page.getByRole('dialog').getByRole('textbox').first()
     await expect(nameInput).toBeVisible()

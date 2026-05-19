@@ -23,21 +23,26 @@ test.describe('Branding settings page', () => {
   test('save button is present', async ({ page }) => {
     await page.goto('/admin/settings/branding')
     await page.waitForSelector('#branding-app-name', { timeout: 15_000 })
-    await expect(page.getByRole('button', { name: /save/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /сохранить|save/i })).toBeVisible()
   })
 
   test('can update app name and save', async ({ page }) => {
     await page.goto('/admin/settings/branding')
+    await waitForContent(page)
     await page.waitForSelector('#branding-app-name', { timeout: 15_000 })
     const appName = page.locator('#branding-app-name')
     const originalValue = await appName.inputValue()
     // Use a value distinct from the current DB value to guarantee onChange fires
     const testValue = originalValue === 'BilimBaga Test' ? 'BilimBaga Alt' : 'BilimBaga Test'
-    const saveBtn = page.getByRole('button', { name: /save/i })
+    const saveBtn = page.getByRole('button', { name: /сохранить|save/i })
     await appName.fill(testValue)
+    await page.waitForTimeout(300)
     await expect(saveBtn).toBeEnabled({ timeout: 5_000 })
     await saveBtn.click()
     await expect(page.locator('body')).not.toContainText(/unexpected error|save failed/i)
+    // Wait for save mutation to complete before filling restore value
+    await page.waitForLoadState('networkidle').catch(() => {})
+    await page.waitForTimeout(300)
     // Restore to a known-clean value different from testValue
     const restoreValue = originalValue && originalValue !== testValue ? originalValue : 'BilimBaga'
     await appName.fill(restoreValue)

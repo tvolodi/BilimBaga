@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Exam Taking E2E tests — 11 tests
  *
  * Requires: make dev running, employee storage state seeded by global-setup.ts
@@ -36,7 +36,7 @@ async function waitForPortalReady(page: Page) {
     .waitForFunction(() => {
       const hasSkeleton = document.querySelector('.animate-pulse') !== null
       const hasCards = document.querySelector('.rounded-lg.border.bg-card') !== null
-      const hasEmpty = document.body.textContent?.includes('No exams assigned') ?? false
+      const hasEmpty = (document.body.textContent?.includes('No exams assigned') ?? false) || (document.body.textContent?.includes('\u041d\u0435\u0442 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u043d\u044b\u0445 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u043e\u0432') ?? false)
       // Done if: no skeleton AND (cards loaded OR empty state)
       return !hasSkeleton && (hasCards || hasEmpty)
     }, { timeout: 20_000 })
@@ -53,7 +53,7 @@ async function startExamSession(page: Page): Promise<string> {
   await waitForPortalReady(page)
 
   // Confirm portal heading is visible
-  await expect(page.getByRole('heading', { name: /my exams/i })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: /\u043c\u043e\u0438 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u044b|my exams/i })).toBeVisible({ timeout: 15_000 })
 
   // Look for the "E2E Mixed Exam" card specifically, then find its CTA button
   const mixedExamCard = page.locator('.rounded-lg.border.bg-card').filter({
@@ -64,7 +64,7 @@ async function startExamSession(page: Page): Promise<string> {
   await expect(mixedExamCard).toBeVisible({ timeout: 15_000 })
 
   // "Continue" button means in_progress — navigate directly to existing session
-  const continueBtn = mixedExamCard.getByRole('button', { name: /^continue$/i })
+  const continueBtn = mixedExamCard.getByRole('button', { name: /^\u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c$|^continue$/i })
   if (await continueBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await continueBtn.click()
     await expect(page).toHaveURL(/\/portal\/sessions\//, { timeout: 20_000 })
@@ -72,12 +72,12 @@ async function startExamSession(page: Page): Promise<string> {
   }
 
   // "Start exam" button means not_started — open modal and confirm
-  const startBtn = mixedExamCard.getByRole('button', { name: /start exam/i })
+  const startBtn = mixedExamCard.getByRole('button', { name: /\u043d\u0430\u0447\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c\u0435\u043d|start exam/i })
   if (await startBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await startBtn.click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible({ timeout: 5_000 })
-    const confirmBtn = page.getByRole('button', { name: /begin exam/i })
+    const confirmBtn = page.getByRole('button', { name: /\u043d\u0430\u0447\u0430\u0442\u044c \u044d\u043a\u0437\u0430\u043c\u0435\u043d|begin exam/i }).last()
     await expect(confirmBtn).toBeVisible()
     await confirmBtn.click()
     await expect(page).toHaveURL(/\/portal\/sessions\//, { timeout: 20_000 })
@@ -149,7 +149,7 @@ test.describe('Exam Taking', () => {
     await expect(timer).toBeVisible({ timeout: 10_000 })
 
     // Progress indicator: "0 / N answered" or "N answered"
-    const progress = page.locator('header').getByText(/\d+ \/ \d+ answered|\d+ answered/i).first()
+    const progress = page.locator('header').getByText(/\d+ \/ \d+ отвечено|\d+ отвечено|\d+ \/ \d+ answered|\d+ answered/i).first()
     await expect(progress).toBeVisible({ timeout: 5_000 })
 
     // QuestionNavigator grid: buttons numbered 1..N in the sidebar
@@ -190,7 +190,7 @@ test.describe('Exam Taking', () => {
     await shot(page, 'et-02-single-choice-selected')
 
     // SaveIndicator should show "Saving…" then "Saved ✓" — wait for saved state
-    await expect(page.getByText(/saved|saving/i).first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText(/\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e|\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435|saved|saving/i).first()).toBeVisible({ timeout: 8_000 })
     await shot(page, 'et-02-single-choice-saved')
   })
 
@@ -307,7 +307,7 @@ test.describe('Exam Taking', () => {
     // ShortText renders a <textarea> with placeholder
     const textarea = page.locator('main textarea').first()
     await expect(textarea).toBeVisible({ timeout: 10_000 })
-    await expect(textarea).toHaveAttribute('placeholder', /type your answer here/i)
+    await expect(textarea).toHaveAttribute('placeholder', /введите ваш ответ здесь|type your answer here/i)
 
     // Use a unique value to guarantee the change triggers onChange even if previous answer was the same
     const uniqueAnswer = `E2E short text answer — ${Date.now()}`
@@ -317,7 +317,7 @@ test.describe('Exam Taking', () => {
 
     // Wait for debounce (800ms) + SaveIndicator to appear
     await page.waitForTimeout(1_200)
-    await expect(page.getByText(/saving|saved/i).first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText(/сохранен|saving|saved/i).first()).toBeVisible({ timeout: 8_000 })
     await shot(page, 'et-06-shorttext-saved')
   })
 
@@ -378,19 +378,19 @@ test.describe('Exam Taking', () => {
     await waitForContent(page)
 
     // Click "Finish exam" button
-    const finishBtn = page.getByRole('button', { name: /finish exam/i })
+    const finishBtn = page.getByRole('button', { name: /завершить экзамен|finish exam/i })
     await expect(finishBtn).toBeVisible({ timeout: 10_000 })
     await finishBtn.click()
 
     // FinishReviewScreen should render
-    await expect(page.getByRole('heading', { name: /review before submitting/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /проверка перед отправкой|review before submitting/i })).toBeVisible({
       timeout: 10_000,
     })
     await shot(page, 'et-09-review-screen')
 
     // Go Back and Submit Anyway buttons must be visible
-    await expect(page.getByRole('button', { name: /go back/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /submit anyway/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /вернуться назад|go back/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /всё равно отправить|submit anyway/i })).toBeVisible()
     await shot(page, 'et-09-review-buttons')
   })
 
@@ -399,29 +399,29 @@ test.describe('Exam Taking', () => {
     await waitForContent(page)
 
     // Navigate to review screen
-    const finishBtn = page.getByRole('button', { name: /finish exam/i })
+    const finishBtn = page.getByRole('button', { name: /завершить экзамен|finish exam/i })
     await expect(finishBtn).toBeVisible({ timeout: 10_000 })
     await finishBtn.click()
 
-    await expect(page.getByRole('heading', { name: /review before submitting/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /проверка перед отправкой|review before submitting/i })).toBeVisible({
       timeout: 10_000,
     })
 
     // Click "Submit anyway"
-    await page.getByRole('button', { name: /submit anyway/i }).click()
+    await page.getByRole('button', { name: /всё равно отправить|submit anyway/i }).click()
 
     // SubmitConfirmModal should open with correct content
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByText(/submit exam/i).first()).toBeVisible()
-    await expect(page.getByText(/once submitted/i)).toBeVisible()
+    await expect(page.getByText(/сдать экзамен|submit exam/i).first()).toBeVisible()
+    await expect(page.getByText(/после отправки|once submitted/i)).toBeVisible()
     await shot(page, 'et-10-submit-confirm-modal')
 
     // Verify the Submit and Cancel buttons are present
-    const submitBtn = page.getByRole('dialog').getByRole('button', { name: /^submit$/i })
+    const submitBtn = page.getByRole('dialog').getByRole('button', { name: /^отправить$|^submit$/i })
     await expect(submitBtn).toBeVisible()
 
     // Cancel instead of submitting — leave the session open for test 11
-    const cancelBtn = page.getByRole('dialog').getByRole('button', { name: /cancel/i })
+    const cancelBtn = page.getByRole('dialog').getByRole('button', { name: /отмена|cancel/i })
     await expect(cancelBtn).toBeVisible()
     await cancelBtn.click()
 
@@ -453,11 +453,11 @@ test.describe('Exam Taking', () => {
     await expect(dialog).toBeVisible({ timeout: 8_000 })
 
     // Title contains "Warning"
-    await expect(page.getByText(/warning/i).first()).toBeVisible()
+    await expect(page.getByText(/предупреждение|warning/i).first()).toBeVisible()
     await shot(page, 'et-11-tab-switch-warning-modal')
 
     // Close the modal — the close button uses t('common.cancel') = "Cancel"
-    const closeBtn = page.getByRole('dialog').getByRole('button', { name: /cancel/i })
+    const closeBtn = page.getByRole('dialog').getByRole('button', { name: /отмена|cancel/i })
     await expect(closeBtn).toBeVisible()
     await closeBtn.click()
 

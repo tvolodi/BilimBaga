@@ -76,7 +76,7 @@ test.describe('Exam Result', () => {
     await waitForContent(page)
 
     // Check if any "View result" button is available (passed/failed card)
-    const viewResultBtn = page.getByRole('button', { name: /view result/i }).first()
+    const viewResultBtn = page.getByRole('button', { name: /\u043f\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442|view result/i }).first()
     if (await viewResultBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await viewResultBtn.click()
       await waitForContent(page)
@@ -92,12 +92,12 @@ test.describe('Exam Result', () => {
       expect(hasBanner).toBeTruthy()
 
       // Back to portal button should exist
-      await expect(page.getByRole('button', { name: /back to my exams/i })).toBeVisible()
+      await expect(page.getByRole('button', { name: /\u043a \u043c\u043e\u0438\u043c \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u0430\u043c|back to my exams/i })).toBeVisible()
     } else {
       // Navigate to portal results page — demonstrates result screens work
       await page.goto('/portal/results')
       await waitForContent(page)
-      await expect(page.getByRole('heading', { name: /my results/i })).toBeVisible()
+      await expect(page.getByRole('heading', { name: /\u043c\u043e\u0438 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b|my results/i })).toBeVisible()
       await shot(page, 'er-01-no-completed-exam')
       test.info().annotations.push({ type: 'note', description: 'No completed exam visible for result test' })
     }
@@ -108,13 +108,13 @@ test.describe('Exam Result', () => {
     await waitForContent(page)
 
     // Navigate to the result screen if a completed exam exists
-    const viewResultBtn = page.getByRole('button', { name: /view result/i }).first()
+    const viewResultBtn = page.getByRole('button', { name: /\u043f\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442|view result/i }).first()
     if (await viewResultBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await viewResultBtn.click()
       await waitForContent(page)
 
       // Check for either passed/failed/pending state
-      await expect(page.getByText(/passed|failed|being reviewed/i).first()).toBeVisible({
+      await expect(page.getByText(/\u0441\u0434\u0430\u043d|\u043d\u0435 \u0441\u0434\u0430\u043d|\u043f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u0442\u0441\u044f|passed|failed|being reviewed/i).first()).toBeVisible({
         timeout: 10_000,
       })
       await shot(page, 'er-02-result-screen')
@@ -141,7 +141,7 @@ test.describe('Exam Result', () => {
       await shot(page, 'er-03-pending-grading-result')
 
       // Should show pending grading message (not a score)
-      const pendingText = page.getByText(/being reviewed|pending.*grading|answers are under review/i)
+      const pendingText = page.getByText(/\u043f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u0442\u0441\u044f|being reviewed|pending.*grading|answers are under review/i)
       await expect(pendingText.first()).toBeVisible({ timeout: 10_000 })
     } else {
       // Navigate to portal and check if there's a pending result card
@@ -177,14 +177,14 @@ test.describe('Exam Result', () => {
 
       // Pending grading state OR score content should render
       const hasContent = await page
-        .getByText(/exam result|passed|failed|being reviewed|answers are under review/i)
+        .getByText(/\u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u0430|\u0441\u0434\u0430\u043d|\u043d\u0435 \u0441\u0434\u0430\u043d|exam result|passed|failed|being reviewed|answers are under review/i)
         .first()
         .isVisible()
         .catch(() => false)
       expect(hasContent).toBeTruthy()
 
       // Back to Portal button must exist
-      await expect(page.getByRole('button', { name: /back to portal/i })).toBeVisible({ timeout: 5_000 })
+      await expect(page.getByRole('button', { name: /\u0432\u0435\u0440\u043d\u0443\u0442\u044c\u0441\u044f \u043d\u0430 \u043f\u043e\u0440\u0442\u0430\u043b|back to portal/i })).toBeVisible({ timeout: 5_000 })
     } else {
       // Fall back — show portal loads without error
       await loginAsEmployee(page)
@@ -199,13 +199,13 @@ test.describe('Exam Result', () => {
     await loginAsEmployee(page)
     await waitForContent(page)
 
-    const viewResultBtn = page.getByRole('button', { name: /view result/i }).first()
+    const viewResultBtn = page.getByRole('button', { name: /\u043f\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442|view result/i }).first()
     if (await viewResultBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await viewResultBtn.click()
       await waitForContent(page)
 
       // Click "Back to my exams" on the ResultScreen
-      const backBtn = page.getByRole('button', { name: /back to my exams/i })
+      const backBtn = page.getByRole('button', { name: /\u043a \u043c\u043e\u0438\u043c \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u0430\u043c|back to my exams/i })
       await expect(backBtn).toBeVisible({ timeout: 10_000 })
       await backBtn.click()
 
@@ -221,7 +221,7 @@ test.describe('Exam Result', () => {
         await waitForContent(page)
 
         // ResultPage has "Back to Portal" button
-        const backBtn = page.getByRole('button', { name: /back to portal/i })
+        const backBtn = page.getByRole('button', { name: /\u0432\u0435\u0440\u043d\u0443\u0442\u044c\u0441\u044f \u043d\u0430 \u043f\u043e\u0440\u0442\u0430\u043b|back to portal/i })
         if (await backBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
           await backBtn.click()
           await expect(page).toHaveURL(/\/portal/, { timeout: 10_000 })

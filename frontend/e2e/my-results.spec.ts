@@ -12,7 +12,7 @@ test.describe('My Results — Employee Portal (FR-BB46)', () => {
   test('shows My Results tab and navigates to /portal/results', async ({ page }) => {
     await page.goto('/portal')
     await waitForContent(page)
-    const resultsLink = page.getByRole('link', { name: /my results/i })
+    const resultsLink = page.getByRole('link', { name: /\u043c\u043e\u0438 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b|my results/i })
     await expect(resultsLink).toBeVisible({ timeout: 10_000 })
     await resultsLink.click()
     await expect(page).toHaveURL(/\/portal\/results/)
@@ -24,7 +24,7 @@ test.describe('My Results — Employee Portal (FR-BB46)', () => {
     await expect(page.locator('body')).not.toContainText(/unexpected error|something went wrong/i)
     // Page has either a results table or an empty state
     const hasTable = await page.getByRole('table').isVisible().catch(() => false)
-    const hasEmptyState = await page.getByText(/no.*exam|no results/i).isVisible().catch(() => false)
+    const hasEmptyState = await page.getByText(/\u043d\u0435\u0442.*\u044d\u043a\u0437\u0430\u043c|no.*exam|no results/i).isVisible().catch(() => false)
     expect(hasTable || hasEmptyState || true).toBeTruthy()
   })
 
@@ -65,7 +65,7 @@ test.describe('My Results — Employee Portal (FR-BB46)', () => {
       test.info().annotations.push({ type: 'note', description: 'No results table' })
       return
     }
-    const hasBadge = await page.getByText(/passed|failed/i).isVisible({ timeout: 3_000 }).catch(() => false)
+    const hasBadge = await page.getByText(/\u0441\u0434\u0430\u043d|\u043d\u0435 \u0441\u0434\u0430\u043d|passed|failed/i).isVisible({ timeout: 3_000 }).catch(() => false)
     if (!hasBadge) {
       test.info().annotations.push({ type: 'note', description: 'No Passed/Failed badge — sessions may be pending grading' })
     }
@@ -74,7 +74,7 @@ test.describe('My Results — Employee Portal (FR-BB46)', () => {
   test('My Exams tab navigates back to /portal', async ({ page }) => {
     await page.goto('/portal/results')
     await waitForContent(page)
-    const myExamsLink = page.getByRole('link', { name: /my exams/i })
+    const myExamsLink = page.getByRole('link', { name: /\u043c\u043e\u0438 \u044d\u043a\u0437\u0430\u043c\u0435\u043d\u044b|my exams/i })
     if (!(await myExamsLink.isVisible({ timeout: 5_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No My Exams link visible' })
       return

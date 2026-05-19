@@ -16,21 +16,21 @@ function typeSelect(page: import('@playwright/test').Page) {
   return page.locator('select').filter({ has: page.locator('option[value="shorttext"]') })
 }
 
-const MODEL_ANSWER_PLACEHOLDER = /enter the expected answer for ai comparison/i
+const MODEL_ANSWER_PLACEHOLDER = /\u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043e\u0436\u0438\u0434\u0430\u0435\u043c\u044b\u0439 \u043e\u0442\u0432\u0435\u0442|enter the expected answer for ai comparison/i
 
 test.describe('FR-BB73 — Auto-Grading: Question Editor', () => {
   test('does NOT show auto-grading section for non-shorttext question type', async ({ page }) => {
     await page.goto('/admin/questions/new')
     await waitForContent(page)
     // Default type is 'single' — auto-grading section should be absent
-    await expect(page.getByText(/auto.grading/i)).not.toBeVisible()
+    await expect(page.getByText(/\u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u043e\u0446\u0435\u043d\u0438\u0432\u0430\u043d\u0438\u0435|auto.grading/i)).not.toBeVisible()
   })
 
   test('shows auto-grading section when type is switched to shorttext', async ({ page }) => {
     await page.goto('/admin/questions/new')
     await waitForContent(page)
     await typeSelect(page).selectOption('shorttext')
-    await expect(page.getByText(/auto.grading/i).first()).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText(/\u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u043e\u0446\u0435\u043d\u0438\u0432\u0430\u043d\u0438\u0435|auto.grading/i).first()).toBeVisible({ timeout: 3_000 })
   })
 
   test('auto_grade checkbox is disabled when model_answer is empty', async ({ page }) => {
@@ -87,7 +87,7 @@ test.describe('FR-BB73 — Auto-Grading: Grading Queue UI', () => {
   test('grading queue page renders without error', async ({ page }) => {
     await page.goto('/admin/grading')
     await waitForContent(page)
-    await expect(page.getByRole('heading', { name: /manual grading queue/i })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: /\u043e\u0447\u0435\u0440\u0435\u0434\u044c \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u043e\u0446\u0435\u043d\u0438\u0432\u0430\u043d\u0438\u044f|manual grading queue/i })).toBeVisible({ timeout: 10_000 })
     await expect(page.locator('body')).not.toContainText(/unexpected error|crash/i)
   })
 
@@ -106,9 +106,9 @@ test.describe('FR-BB73 — Auto-Grading: Grading Queue UI', () => {
       await waitForContent(page)
       await expect(page).toHaveURL(/\/admin\/grading\//, { timeout: 10_000 })
       // If session has AI-graded questions, the badge appears; if not, test passes without assertion
-      const hasAiBadge = await page.getByText(/ai graded/i).isVisible({ timeout: 3_000 }).catch(() => false)
+      const hasAiBadge = await page.getByText(/\u043e\u0446\u0435\u043d\u0435\u043d\u043e \u0418\u0418|ai graded/i).isVisible({ timeout: 3_000 }).catch(() => false)
       if (hasAiBadge) {
-        await expect(page.getByText(/ai graded/i)).toBeVisible()
+        await expect(page.getByText(/\u043e\u0446\u0435\u043d\u0435\u043d\u043e \u0418\u0418|ai graded/i)).toBeVisible()
       } else {
         test.info().annotations.push({ type: 'note', description: 'Session has no AI-graded questions — AI badge test skipped' })
       }
@@ -130,12 +130,12 @@ test.describe('FR-BB73 — Auto-Grading: Grading Queue UI', () => {
         await firstRow.click()
       }
       await waitForContent(page)
-      const showBtn = page.getByText(/show ai reasoning/i)
+      const showBtn = page.getByText(/\u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u043e\u0431\u043e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u0435|show ai reasoning/i)
       if (await showBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await showBtn.click()
-        await expect(page.getByText(/hide ai reasoning/i)).toBeVisible()
-        await page.getByText(/hide ai reasoning/i).click()
-        await expect(page.getByText(/show ai reasoning/i)).toBeVisible()
+        await expect(page.getByText(/\u0441\u043a\u0440\u044b\u0442\u044c \u043e\u0431\u043e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u0435|hide ai reasoning/i)).toBeVisible()
+        await page.getByText(/\u0441\u043a\u0440\u044b\u0442\u044c \u043e\u0431\u043e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u0435|hide ai reasoning/i).click()
+        await expect(page.getByText(/\u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u043e\u0431\u043e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u0435|show ai reasoning/i)).toBeVisible()
       } else {
         test.info().annotations.push({ type: 'note', description: 'No AI reasoning toggle visible — session may not have AI-graded questions' })
       }

@@ -29,13 +29,13 @@ test.describe('Tags page', () => {
   test('shows New Tag button for admin', async ({ page }) => {
     await page.goto('/admin/tags')
     await waitForContent(page)
-    await expect(page.getByRole('button', { name: /new tag|create tag|add tag/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /новый тег|new tag|create tag|add tag/i })).toBeVisible()
   })
 
   test('opens create dialog when New Tag is clicked', async ({ page }) => {
     await page.goto('/admin/tags')
     await waitForContent(page)
-    await page.getByRole('button', { name: /new tag|create tag|add tag/i }).click()
+    await page.getByRole('button', { name: /\u043d\u043e\u0432\u044b\u0439 \u0442\u0435\u0433|new tag|create tag|add tag/i }).click()
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
     const input = page.getByRole('dialog').getByRole('textbox').first()
     await expect(input).toBeVisible()
@@ -44,7 +44,7 @@ test.describe('Tags page', () => {
   test('create tag — type name and cancel without saving', async ({ page }) => {
     await page.goto('/admin/tags')
     await waitForContent(page)
-    await page.getByRole('button', { name: /new tag|create tag|add tag/i }).click()
+    await page.getByRole('button', { name: /\u043d\u043e\u0432\u044b\u0439 \u0442\u0435\u0433|new tag|create tag|add tag/i }).click()
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
     const input = page.getByRole('dialog').getByRole('textbox').first()
     await input.fill('E2E-Tag-Test')

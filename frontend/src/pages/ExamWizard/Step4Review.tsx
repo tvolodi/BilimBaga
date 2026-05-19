@@ -106,6 +106,13 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           {unsatisfiedRules.some((r) => r.available === 0) && (
             <p className="text-xs mt-1 opacity-80">{t('exam.wizard.validationWarningHint')}</p>
           )}
+          <button
+            type="button"
+            className="text-xs underline mt-1 text-amber-700 hover:text-amber-900"
+            onClick={() => setUnsatisfiedRules(null)}
+          >
+            {t('exam.wizard.retryPublish')}
+          </button>
         </div>
       )}
 
@@ -170,7 +177,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           {t('exam.wizard.back')}
         </Button>
         {!isPublished && (
-          <Button type="button" onClick={() => setConfirmOpen(true)} disabled={publishExam.isPending}>
+          <Button type="button" onClick={() => setConfirmOpen(true)} disabled={publishExam.isPending || !!unsatisfiedRules}>
             {publishExam.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

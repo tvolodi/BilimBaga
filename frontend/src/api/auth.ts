@@ -110,9 +110,11 @@ export function useRefreshToken() {
       const seeded = localStorage.getItem(E2E_TOKEN_KEY)
       if (seeded) {
         const claims = decodeJwtPayload(seeded)
-        // Validate the token is not expired before using it.
+        // Use the cached token only when it has more than 65 seconds of lifetime left.
+        // The 65-second buffer ensures that when refetchInterval fires 60 s before expiry,
+        // queryFn falls through to /auth/refresh instead of serving the soon-to-expire token.
         const exp = claims?.exp as number | undefined
-        if (exp && exp * 1000 > Date.now()) {
+        if (exp && exp * 1000 > Date.now() + 65_000) {
           if (claims) {
             qc.setQueryData(['auth', 'currentUser'], {
               id: (claims.sub as string) ?? '',
@@ -158,5 +160,20 @@ export function useRefreshToken() {
     },
     staleTime: Infinity,
     retry: false,
+    // Proactively refresh the access token 60 seconds before it expires so that
+    // mid-session API calls never hit a TOKEN_EXPIRED 401.  The wider localStorage
+    // buffer (65 s) above guarantees that queryFn actually calls /auth/refresh when
+    // this interval fires, rather than returning the still-cached stale token.
+    refetchInterval: (query) => {
+      const token = query.state.data
+      if (!token) return false
+      const claims = decodeJwtPayload(token)
+      if (!claims || typeof claims.exp !== 'number') return false
+      const exp = (claims.exp as number) * 1000   // seconds → ms
+      const refreshAt = exp - 60_000              // 60 s before expiry
+      const now = Date.now()
+      return refreshAt > now ? refreshAt - now : 0
+    },
+    refetchIntervalInBackground: true,
   })
 }

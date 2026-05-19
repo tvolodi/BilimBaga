@@ -470,6 +470,7 @@
       },
       "validationWarning": "Some question rules cannot be satisfied. Fix them before publishing.",
       "validationWarningHint": "Only questions with 'active' status are counted. Open the Question Bank and approve your questions before publishing.",
+      "retryPublish": "I have fixed the issues — try publishing again",
       "publish": "Publish",
       "publishing": "Publishing…",
       "next": "Next",

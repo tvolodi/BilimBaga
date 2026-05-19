@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
-import { useUpdateUser, type User, type UpdateUserRequest } from '@/api/users'
+import { useUpdateUser, useRoles, type User, type UpdateUserRequest } from '@/api/users'
+import { useDepartments } from '@/api/departments'
 
 interface UserEditDrawerProps {
   user: User | null
@@ -13,6 +15,8 @@ interface UserEditDrawerProps {
 export function UserEditDrawer({ user, onClose }: UserEditDrawerProps) {
   const { t } = useTranslation()
   const updateUser = useUpdateUser(user?.id ?? '')
+  const { data: departments = [] } = useDepartments()
+  const { data: roles = [] } = useRoles()
 
   const [form, setForm] = useState<UpdateUserRequest>({
     full_name: '',
@@ -61,22 +65,30 @@ export function UserEditDrawer({ user, onClose }: UserEditDrawerProps) {
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('users.form.department_label')}</label>
-            <Input
-              placeholder={t('users.form.department_placeholder')}
+            <Select
               value={form.department_id ?? ''}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, department_id: e.target.value || null }))
               }
-            />
+            >
+              <option value="">{t('users.form.department_placeholder')}</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('users.form.role_label')}</label>
-            <Input
-              placeholder={t('users.form.role_placeholder')}
+            <Select
               value={form.role_id}
               onChange={(e) => setForm((prev) => ({ ...prev, role_id: e.target.value }))}
               required
-            />
+            >
+              <option value="">{t('users.form.role_placeholder')}</option>
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </Select>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <SheetFooter>

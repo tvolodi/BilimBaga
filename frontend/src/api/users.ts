@@ -61,6 +61,11 @@ export interface ImportPreview {
   errors: ImportRowResult[]
 }
 
+export interface RoleRow {
+  id: string
+  name: string
+}
+
 export interface UsersFilters {
   department_id?: string
   role_id?: string
@@ -188,6 +193,15 @@ export function useResetPassword(id: string) {
       const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       return apiFetch<ResetPasswordResponse>(`/api/v1/users/${id}/reset-password`, token, { method: 'POST' })
     },
+  })
+}
+
+export function useRoles() {
+  const qc = useQueryClient()
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+  return useQuery<RoleRow[], Error>({
+    queryKey: ['users', 'roles'],
+    queryFn: () => apiFetch<RoleRow[]>('/api/v1/users/roles', token),
   })
 }
 

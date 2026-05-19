@@ -35,9 +35,9 @@ export function ResultPage() {
 
   if (resultError || !result) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background outline-none">
         <p className="text-destructive text-sm">{t('common.loadError')}</p>
-      </div>
+      </main>
     )
   }
 
@@ -50,7 +50,7 @@ export function ResultPage() {
   const certificateEnabled = exam?.certificate_enabled ?? false
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-background flex items-center justify-center p-6 outline-none">
       <div className="w-full max-w-2xl space-y-6">
         {/* Title */}
         <div className="text-center">
@@ -99,6 +99,6 @@ export function ResultPage() {
           examId={result.exam_id}
         />
       </div>
-    </div>
+    </main>
   )
 }

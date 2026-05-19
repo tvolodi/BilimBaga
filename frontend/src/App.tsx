@@ -81,7 +81,13 @@ const queryClient = new QueryClient()
 
 function AppRoutes() {
   const { isLoading } = useRefreshToken()
-  if (isLoading) return <FullPageSpinner />
+  if (isLoading)
+    return (
+      <main id="main-content" tabIndex={-1} className="outline-none">
+        <h1 className="sr-only">Loading</h1>
+        <FullPageSpinner />
+      </main>
+    )
 
   return (
     <Routes>

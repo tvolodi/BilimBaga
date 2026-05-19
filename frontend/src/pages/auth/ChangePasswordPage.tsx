@@ -34,7 +34,7 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <div id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
       <Card className="w-full max-w-md p-8">
         <h1 className="text-xl font-semibold text-center">
           {t('auth.changePassword.title')}
@@ -45,6 +45,6 @@ export function ChangePasswordPage() {
           error={changePassword.error as ApiError | null}
         />
       </Card>
-    </div>
+    </main>
   )
 }

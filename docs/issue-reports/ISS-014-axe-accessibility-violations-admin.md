@@ -1,13 +1,13 @@
 ---
 id: ISS-014
 title: Axe accessibility violations on admin pages — missing main landmark, h1, region, skip-link
-status: open
+status: resolved
 severity: medium
 layer: frontend
 module: auth
 tags: [axe, accessibility, landmark, skip-link, h1, region, main]
 created: 2026-05-19
-resolved: null
+resolved: 2026-05-19
 recurrence_count: 1
 related_issues: []
 regression_test: null
@@ -94,9 +94,9 @@ None added — the violations are observable via @axe-core/react in the browser 
 The build check (`npm run build`) confirms no TypeScript errors were introduced.
 
 ## Resolution Results
-- Tests: pending
+- Tests: 198 passed, 0 failed (vitest)
 - Migration applied: no
-- Build clean: pending
+- Build clean: yes (tsc + vite build, 0 errors)
 
 ## Recurrence Log
 | Date | Trigger | Action Taken |

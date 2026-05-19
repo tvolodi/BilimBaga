@@ -15,3 +15,4 @@
 | [ISS-011](ISS-011-exam-publish-422.md) | Publish exam returns 422 — "0 available" because questions are in draft status | medium | frontend | exams | resolved | 2026-05-19 |
 | [ISS-012](ISS-012-question-status-400-wrong-json-key.md) | Question status transition returns 400 — frontend sends wrong JSON key | high | frontend | questions | resolved | 2026-05-19 |
 | [ISS-013](ISS-013-question-edit-option-text-blank.md) | Question edit page shows blank answer option text (пусто) for all locales | high | frontend | questions | resolved | 2026-05-19 |
+| [ISS-014](ISS-014-axe-accessibility-violations-admin.md) | Axe violations — missing main landmark, h1, region, skip-link on admin/auth pages | medium | frontend | auth | resolved | 2026-05-19 |

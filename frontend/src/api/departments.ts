@@ -52,3 +52,14 @@ export function useDeleteDepartment() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['departments'] }),
   })
 }
+
+export function findDepartmentById(nodes: Department[], id: string): Department | undefined {
+  for (const node of nodes) {
+    if (node.id === id) return node
+    if (node.children?.length) {
+      const found = findDepartmentById(node.children, id)
+      if (found) return found
+    }
+  }
+  return undefined
+}

@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
+import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
 import { useCreateUser, useRoles, type CreateUserRequest, type CreateUserResponse } from '@/api/users'
-import { useDepartments } from '@/api/departments'
 
 interface UserCreateDrawerProps {
   open: boolean
@@ -16,7 +16,6 @@ interface UserCreateDrawerProps {
 export function UserCreateDrawer({ open, onClose, onCreated }: UserCreateDrawerProps) {
   const { t } = useTranslation()
   const createUser = useCreateUser()
-  const { data: departments = [] } = useDepartments()
   const { data: roles = [] } = useRoles()
 
   const [form, setForm] = useState<CreateUserRequest>({
@@ -73,17 +72,12 @@ export function UserCreateDrawer({ open, onClose, onCreated }: UserCreateDrawerP
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('users.form.department_label')}</label>
-            <Select
-              value={form.department_id ?? ''}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, department_id: e.target.value || null }))
-              }
-            >
-              <option value="">{t('users.form.department_placeholder')}</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </Select>
+            <DepartmentTreeSelect
+              value={form.department_id}
+              onChange={(id) => setForm((prev) => ({ ...prev, department_id: id }))}
+              placeholder={t('users.form.department_placeholder')}
+              disabled={createUser.isPending}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('users.form.role_label')}</label>

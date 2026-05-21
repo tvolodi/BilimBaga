@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
+import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
 import { useUsers, useResetPassword, type User, type UsersFilters } from '@/api/users'
 import { UserCreateDrawer } from './UserCreateDrawer'
 import { UserEditDrawer } from './UserEditDrawer'
@@ -88,6 +89,14 @@ export function UsersListPage() {
           <option value="active">{t('users.status.active')}</option>
           <option value="inactive">{t('users.status.inactive')}</option>
         </Select>
+        <div className="w-64">
+          <DepartmentTreeSelect
+            value={filters.department_id ?? null}
+            onChange={(id) => setFilter('department_id', id ?? '')}
+            placeholder={t('users.filters.department')}
+            clearable
+          />
+        </div>
       </div>
 
       {/* Table */}

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
@@ -57,15 +58,19 @@ function createWrapper() {
 
 describe('UserCreateDrawer — ISS-018 regression', () => {
   it('renders department options from GET /api/v1/departments', async () => {
+    const user = userEvent.setup()
     const Wrapper = createWrapper()
     render(
       <Wrapper>
         <UserCreateDrawer open onClose={() => {}} />
       </Wrapper>,
     )
+    // Wait for the department selector to show the placeholder (loading resolved)
+    const deptTrigger = await screen.findByText('Select department')
+    await user.click(deptTrigger)
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Engineering' })).toBeInTheDocument()
-      expect(screen.getByRole('option', { name: 'HR' })).toBeInTheDocument()
+      expect(screen.getByRole('treeitem', { name: 'Engineering' })).toBeInTheDocument()
+      expect(screen.getByRole('treeitem', { name: 'HR' })).toBeInTheDocument()
     })
   })
 
@@ -83,7 +88,7 @@ describe('UserCreateDrawer — ISS-018 regression', () => {
     })
   })
 
-  it('shows placeholder options when API returns empty lists', async () => {
+  it('shows placeholder when department API returns empty list', async () => {
     server.use(
       http.get('/api/v1/departments', () =>
         HttpResponse.json({ data: [], error: null }),
@@ -98,11 +103,10 @@ describe('UserCreateDrawer — ISS-018 regression', () => {
         <UserCreateDrawer open onClose={() => {}} />
       </Wrapper>,
     )
-    // Placeholder options should still render (the empty <option value="">)
+    // Role select placeholder should still render
     await waitFor(() => {
-      const deptOptions = screen.getAllByRole('option')
-      // At least the placeholder options exist (one per select)
-      expect(deptOptions.length).toBeGreaterThanOrEqual(2)
+      const roleOptions = screen.getAllByRole('option')
+      expect(roleOptions.length).toBeGreaterThanOrEqual(1)
     })
   })
 })

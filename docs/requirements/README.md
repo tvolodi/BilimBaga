@@ -76,6 +76,7 @@
 | FR-BB75 | Loyalty-profile-narrative | Loyalty Profile Narrative | Implemented |
 | FR-BB315 | exam-step4-eligible-question-counts | Exam Step 4: Eligible Question Counts per Rule | draft |
 | FR-BB316 | FR-BB316-portal-locale-switcher | Portal Locale Switcher | draft |
+| FR-BB317 | department-treeview | Department Treeview Selector | Draft |
 
 ## Status Values
 

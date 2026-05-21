@@ -939,5 +939,14 @@
     },
     "empty": "No departments yet. Click \"New Department\" to get started.",
     "children": "children"
+  },
+  "departmentTree": {
+    "placeholder": "Select department",
+    "search": "Search departments...",
+    "loading": "Loading departments...",
+    "empty": "No departments found",
+    "error": "Failed to load departments",
+    "retry": "Retry",
+    "clearSelection": "Clear selection"
   }
 }

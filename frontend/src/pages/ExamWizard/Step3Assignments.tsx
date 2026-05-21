@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
 import { useUsers } from '@/api/users'
-import { useDepartments } from '@/api/departments'
+import { useDepartments, findDepartmentById } from '@/api/departments'
 import {
   useExamAssignments,
   useAddAssignment,
@@ -60,7 +61,7 @@ export function Step3Assignments({ examId, canMutate, onBack, onNext }: Step3Ass
       return user ? user.full_name : (a.assignee_id ?? '—')
     }
     if (a.assignee_type === 'department') {
-      const dept = departments.find((d) => d.id === a.assignee_id)
+      const dept = a.assignee_id ? findDepartmentById(departments, a.assignee_id) : undefined
       return dept ? dept.name : (a.assignee_id ?? '—')
     }
     return '—'
@@ -198,15 +199,12 @@ export function Step3Assignments({ examId, canMutate, onBack, onNext }: Step3Ass
                 {pending.assignee_type === 'department' && (
                   <div className="space-y-1">
                     <Label>{t('exam.assignment.type.department')}</Label>
-                    <Select
-                      value={pending.assignee_id}
-                      onChange={(e) => setPending((p) => ({ ...p, assignee_id: e.target.value }))}
-                    >
-                      <option value="">—</option>
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </Select>
+                    <DepartmentTreeSelect
+                      value={pending.assignee_id || null}
+                      onChange={(id) => setPending((p) => ({ ...p, assignee_id: id ?? '' }))}
+                      placeholder={t('departmentTree.placeholder')}
+                      disabled={addAssignment.isPending}
+                    />
                   </div>
                 )}
               </div>

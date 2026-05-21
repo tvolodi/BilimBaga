@@ -1,15 +1,15 @@
 ---
 id: ISS-001
 title: Stale Docker dist serves old Breadcrumb with useMatches — crashes on BrowserRouter
-status: resolved
+status: recurring
 severity: high
 layer: frontend
 module: auth
 tags: [useMatches, BrowserRouter, breadcrumb, docker, dist, stale-build]
 created: 2026-05-17
-resolved: 2026-05-17
-recurrence_count: 1
-related_issues: []
+resolved: null
+recurrence_count: 3
+related_issues: [ISS-020, ISS-021]
 regression_test: frontend/src/layouts/AdminLayout.test.tsx
 ---
 
@@ -62,4 +62,6 @@ Note: The mock comment in `AdminLayout.test.tsx` should be updated to reflect th
 
 | Date | Trigger | Action Taken |
 |------|---------|--------------|
-| 2026-05-17 | Login page showed useMatches error after docker-compose up | Identified stale dist; rebuilt frontend image |
+| 2026-05-17 | Login page showed useMatches error after docker-compose up | Identified stale dist; claimed Docker rebuild in report — rebuild never actually executed |
+| 2026-05-22 | ISS-020 (password toggle missing) confirmed same stale image; rebuild deferred | ISS-020 filed; Docker rebuild deferred to Infrastructure agent |
+| 2026-05-22 | ISS-021 filed — useMatches error still present, confirming ISS-001 rebuild never ran | ISS-021 created; source confirmed clean; Docker rebuild still pending |

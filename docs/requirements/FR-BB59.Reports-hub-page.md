@@ -20,7 +20,7 @@ Provides a single consolidated page at `/admin/reports` that surfaces all report
 - [ ] AC-5: The Exam Reports table fetches all exams from `GET /api/v1/exams` using a `useQuery` hook with `queryKey: ['exams-list-reports']`; a skeleton loader is shown while the query is pending.
 - [ ] AC-6: Each row of the Exam Reports table displays the exam title, its status badge, an "Analytics" link that navigates to `/admin/exams/:id/analytics`, and an "Export CSV" button.
 - [ ] AC-7: Clicking "Export CSV" on an exam row triggers a file download from `GET /api/v1/admin/exams/:id/results/export`; the button shows a per-row loading state while the download is in progress.
-- [ ] AC-8: When the exams list is empty, the Exam Reports table renders an empty-state message (i18n key `reports.exams_empty`) instead of an empty table body.
+- [ ] AC-8: When the exams list is empty, the Exam Reports table renders an empty-state message (i18n key `reports.no_exams`) instead of an empty table body.
 - [ ] AC-9: Zero hardcoded user-visible strings; all text is sourced from `useTranslation` using keys in the `reports.*` namespace across `en.json`, `kk.json`, and `ru.json`.
 - [ ] AC-10: The page is responsive: on viewport widths ≥ 768 px the two sections are arranged in a two-column grid; on narrower viewports they stack vertically.
 - [ ] AC-11: The page is reachable from the admin sidebar "Reports" nav item without any additional configuration change.
@@ -147,23 +147,20 @@ All keys added to the `"reports"` object in each locale file:
 | Key | English value |
 |-----|---------------|
 | `reports.title` | `"Reports"` |
-| `reports.pdf_export_title` | `"Dashboard PDF Report"` |
-| `reports.pdf_export_description` | `"Download a PDF summary of the admin dashboard for a selected date range."` |
-| `reports.date_from` | `"From"` |
-| `reports.date_to` | `"To"` |
-| `reports.export_pdf` | `"Export PDF"` |
-| `reports.exporting` | `"Exporting..."` |
-| `reports.export_error` | `"Export failed. Please try again."` |
+| `reports.pdf_export_title` | `"Dashboard PDF Export"` |
+| `reports.pdf_date_from` | `"From"` |
+| `reports.pdf_date_to` | `"To"` |
+| `reports.pdf_export_btn` | `"Export PDF"` |
+| `reports.pdf_exporting` | `"Exporting..."` |
 | `reports.exam_reports_title` | `"Exam Reports"` |
-| `reports.exam_reports_description` | `"View analytics or download results for each exam."` |
 | `reports.col_exam` | `"Exam"` |
 | `reports.col_status` | `"Status"` |
-| `reports.col_analytics` | `"Analytics"` |
-| `reports.col_export` | `"Export"` |
-| `reports.analytics_link` | `"View Analytics"` |
+| `reports.col_actions` | `"Actions"` |
+| `reports.view_analytics` | `"Analytics"` |
 | `reports.export_csv` | `"Export CSV"` |
-| `reports.exams_empty` | `"No exams found."` |
-| `reports.exams_loading_error` | `"Failed to load exams."` |
+| `reports.exporting_csv` | `"Exporting..."` |
+| `reports.no_exams` | `"No exams found."` |
+| `reports.loading` | `"Loading..."` |
 
 ### API Contract (existing endpoints — no new backend work)
 

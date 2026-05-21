@@ -1,0 +1,22 @@
+{
+  "issue_id": "ISS-019",
+  "run_id": "ISS-019",
+  "is_recurring": false,
+  "root_cause": "['auth', 'currentUser'] is written to the React Query cache via qc.setQueryData() but no useQuery hook ever subscribes to this key. TanStack Query v5 garbage-collects cache entries with no active observers after gcTime (default 5 minutes). RequireRole and RequireSuperAdmin read this entry synchronously via qc.getQueryData(); after the GC fires (~5 min after login), the read returns undefined, causing !user to be true and triggering a Navigate to='/login' redirect on any route re-render.",
+  "affected_layer": "frontend",
+  "affected_files": [
+    "frontend/src/components/RequireRole.tsx",
+    "frontend/src/components/RequireSuperAdmin.tsx"
+  ],
+  "fix_description": "Removed the dependency on ['auth', 'currentUser'] in both RequireRole and RequireSuperAdmin. Instead, the role is decoded directly from the access token (JWT) using a local jwtRole() helper that base64-decodes the payload section. The access token is kept alive by the useRefreshToken useQuery subscription and is never GC'd while the app is running.",
+  "files_changed": [
+    "frontend/src/components/RequireRole.tsx",
+    "frontend/src/components/RequireSuperAdmin.tsx",
+    "frontend/src/components/RequireRole.test.tsx",
+    "docs/issue-reports/ISS-019-requirerole-currentuser-gc-redirect.md",
+    "docs/issue-reports/README.md"
+  ],
+  "migration_applied": false,
+  "regression_test_added": true,
+  "regression_test_path": "frontend/src/components/RequireRole.test.tsx"
+}

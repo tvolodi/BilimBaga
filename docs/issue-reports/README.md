@@ -20,3 +20,4 @@
 | [ISS-016](ISS-016-save-button-archives-active-question.md) | Save on active question archives it — frontend stays on stale URL, subsequent saves fail | high | frontend, backend | questions | resolved | 2026-05-19 |
 | [ISS-017](ISS-017-question-tags-not-saved.md) | Question tag field cleared after save — tags not persisted | high | backend | questions | resolved | 2026-05-19 |
 | [ISS-018](ISS-018-create-user-no-department-role-options.md) | Create/Edit User drawers show no Department or Role options | high | frontend | users | resolved | 2026-05-19 |
+| [ISS-019](ISS-019-requirerole-currentuser-gc-redirect.md) | RequireRole redirects to /login after ~5 min — currentUser GC'd from React Query cache | high | frontend | auth | resolved | 2026-05-21 |

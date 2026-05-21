@@ -528,6 +528,13 @@
     },
     "publishSuccess": "Exam published successfully",
     "saveSuccess": "Exam saved",
+    "unpublish": {
+      "button": "Unpublish",
+      "confirm": "Revert to Draft?",
+      "confirmDetail": "This will revert the exam to Draft status. Employees will no longer see it until you publish it again. Completed results will not be affected.",
+      "success": "Exam reverted to draft.",
+      "errorActiveSessions": "Cannot unpublish: there are active exam sessions in progress."
+    },
     "error": {
       "required": "is required",
       "range": "must be between {{min}} and {{max}}",
@@ -948,5 +955,22 @@
     "error": "Failed to load departments",
     "retry": "Retry",
     "clearSelection": "Clear selection"
+  },
+  "reports": {
+    "title": "Reports",
+    "pdf_export_title": "Dashboard PDF Export",
+    "pdf_date_from": "From",
+    "pdf_date_to": "To",
+    "pdf_export_btn": "Export PDF",
+    "pdf_exporting": "Exporting...",
+    "exam_reports_title": "Exam Reports",
+    "col_exam": "Exam",
+    "col_status": "Status",
+    "col_actions": "Actions",
+    "view_analytics": "Analytics",
+    "export_csv": "Export CSV",
+    "exporting_csv": "Exporting...",
+    "no_exams": "No exams found.",
+    "loading": "Loading..."
   }
 }

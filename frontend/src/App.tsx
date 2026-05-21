@@ -76,6 +76,9 @@ const ExamsListPage = lazy(() =>
 const ExamAnalyticsPage = lazy(() =>
   import('@/pages/admin/ExamAnalyticsPage').then((m) => ({ default: m.ExamAnalyticsPage })),
 )
+const ReportsPage = lazy(() =>
+  import('@/pages/admin/ReportsPage').then((m) => ({ default: m.ReportsPage })),
+)
 
 const queryClient = new QueryClient()
 
@@ -226,6 +229,14 @@ function AppRoutes() {
           element={
             <RequireRole roles={['super_admin', 'hr_admin', 'examiner']}>
               <AuditLogPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="reports"
+          element={
+            <RequireRole roles={['super_admin', 'examiner', 'hr_admin']}>
+              <ReportsPage />
             </RequireRole>
           }
         />

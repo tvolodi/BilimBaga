@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Plus, BarChart2, Pencil } from 'lucide-react'
-import { useExams } from '@/api/exams'
+import { useExams, useUnpublishExam, type ExamApiError } from '@/api/exams'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -24,9 +24,20 @@ function StatusBadge({ status }: { status: 'draft' | 'active' | 'archived' }) {
 export function ExamsListPage() {
   const { t } = useTranslation()
   const [page, setPage] = useState(1)
+  const [unpublishError, setUnpublishError] = useState<string | null>(null)
   const { data, isLoading, isError } = useExams({ page, per_page: 20 })
+  const unpublishMutation = useUnpublishExam()
 
   const totalPages = data ? Math.ceil(data.meta.total / data.meta.per_page) : 1
+
+  function handleUnpublish(examId: string) {
+    setUnpublishError(null)
+    unpublishMutation.mutate(examId, {
+      onError: (err: ExamApiError) => {
+        setUnpublishError(err.message)
+      },
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -53,6 +64,11 @@ export function ExamsListPage() {
       {/* Error */}
       {isError && (
         <p className="text-sm text-destructive">{t('common.loadError')}</p>
+      )}
+
+      {/* Unpublish error */}
+      {unpublishError && (
+        <p className="text-sm text-destructive">{unpublishError}</p>
       )}
 
       {/* Table */}
@@ -111,6 +127,16 @@ export function ExamsListPage() {
                           {t('exam_analytics.title')}
                         </Button>
                       </Link>
+                      {exam.status === 'active' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUnpublish(exam.id)}
+                          disabled={unpublishMutation.isPending}
+                        >
+                          {t('exam.unpublish.button')}
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

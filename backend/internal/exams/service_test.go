@@ -42,6 +42,7 @@ type mockRepo struct {
 	deleteAssignmentFn               func(ctx context.Context, id string) error
 	listAssignmentsWithStatsFn       func(ctx context.Context, examID string) ([]*AssignmentDetail, error)
 	countQuestionsPerDifficultyFn    func(ctx context.Context, rule *ExamQuestionRule, difficulty string) (int, error)
+	countActiveSessionsForExamFn     func(ctx context.Context, examID string) (int, error)
 }
 
 func newMockRepo() *mockRepo {
@@ -323,6 +324,13 @@ func (m *mockRepo) ListAssignmentsWithStats(ctx context.Context, examID string) 
 		out = []*AssignmentDetail{}
 	}
 	return out, nil
+}
+
+func (m *mockRepo) CountActiveSessionsForExam(ctx context.Context, examID string) (int, error) {
+	if m.countActiveSessionsForExamFn != nil {
+		return m.countActiveSessionsForExamFn(ctx, examID)
+	}
+	return 0, nil
 }
 
 // ── Helper ───────────────────────────────────────────────────────────────────
@@ -1249,4 +1257,41 @@ func TestGetEligibleCounts_ZeroEligible(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, counts, 1)
 	assert.Equal(t, 0, counts[0].Eligible)
+}
+
+// ── UnpublishExam service tests (FR-BB318) ────────────────────────────────────
+
+func TestUnpublishExam_Success_ReturnsDraft(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "active")
+	svc := NewService(repo)
+	exam, err := svc.UnpublishExam(context.Background(), "exam-1")
+	require.NoError(t, err)
+	assert.Equal(t, "draft", exam.Status)
+}
+
+func TestUnpublishExam_NotFound_ReturnsErrNotFound(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	_, err := svc.UnpublishExam(context.Background(), "missing")
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestUnpublishExam_NotActive_ReturnsErrNotActive(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	_, err := svc.UnpublishExam(context.Background(), "exam-1")
+	assert.ErrorIs(t, err, ErrNotActive)
+}
+
+func TestUnpublishExam_ActiveSessionsExist_ReturnsErrActiveSessionsExist(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "active")
+	repo.countActiveSessionsForExamFn = func(_ context.Context, _ string) (int, error) {
+		return 2, nil
+	}
+	svc := NewService(repo)
+	_, err := svc.UnpublishExam(context.Background(), "exam-1")
+	assert.ErrorIs(t, err, ErrActiveSessionsExist)
 }

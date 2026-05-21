@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,6 +26,7 @@ type mockSvc struct {
 	transitionStatusFn   func(ctx context.Context, id, newStatus string) (*Exam, error)
 	publishFn            func(ctx context.Context, id string) (*Exam, error)
 	archiveFn            func(ctx context.Context, id string) (*Exam, error)
+	unpublishExamFn      func(ctx context.Context, id string) (*Exam, error)
 	deleteExamFn         func(ctx context.Context, id string) error
 	createSectionFn      func(ctx context.Context, examID string, input SectionInput) (*ExamSection, error)
 	updateSectionFn      func(ctx context.Context, examID, sectionID string, input SectionInput) (*ExamSection, error)
@@ -80,6 +82,12 @@ func (m *mockSvc) Archive(ctx context.Context, id string) (*Exam, error) {
 		return m.archiveFn(ctx, id)
 	}
 	return &Exam{ID: id, Status: "archived"}, nil
+}
+func (m *mockSvc) UnpublishExam(ctx context.Context, id string) (*Exam, error) {
+	if m.unpublishExamFn != nil {
+		return m.unpublishExamFn(ctx, id)
+	}
+	return &Exam{ID: id, Status: "draft"}, nil
 }
 func (m *mockSvc) DeleteExam(ctx context.Context, id string) error {
 	if m.deleteExamFn != nil {
@@ -923,4 +931,70 @@ func TestGetEligibleCountsHandler_ExamNotFound_Returns404(t *testing.T) {
 	h.GetEligibleCounts(w, req)
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Equal(t, "EXAM_NOT_FOUND", decode(t, w).Error.Code)
+}
+
+// ── Unpublish handler tests (FR-BB318) ────────────────────────────────────────
+
+func TestUnpublish_Success_Returns200WithDraftStatus(t *testing.T) {
+	h := newHandler(&mockSvc{
+		unpublishExamFn: func(_ context.Context, id string) (*Exam, error) {
+			return &Exam{ID: id, Status: "draft"}, nil
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/unpublish", nil), "id", "exam-1")
+	h.Unpublish(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	env := decode(t, w)
+	assert.Nil(t, env.Error)
+	var data map[string]string
+	require.NoError(t, json.Unmarshal(env.Data, &data))
+	assert.Equal(t, "draft", data["status"])
+	assert.Equal(t, "exam-1", data["id"])
+}
+
+func TestUnpublish_NotFound_Returns404(t *testing.T) {
+	h := newHandler(&mockSvc{
+		unpublishExamFn: func(_ context.Context, _ string) (*Exam, error) {
+			return nil, ErrNotFound
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/nope/unpublish", nil), "id", "nope")
+	h.Unpublish(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "ERR_NOT_FOUND", decode(t, w).Error.Code)
+}
+
+func TestUnpublish_NotActive_Returns409WithERRInvalidTransition(t *testing.T) {
+	h := newHandler(&mockSvc{
+		unpublishExamFn: func(_ context.Context, _ string) (*Exam, error) {
+			return nil, errors.New("wrapped: " + ErrNotActive.Error())
+		},
+	})
+	// Use real ErrNotActive so errors.Is works
+	h2 := newHandler(&mockSvc{
+		unpublishExamFn: func(_ context.Context, _ string) (*Exam, error) {
+			return nil, fmt.Errorf("ctx: %w", ErrNotActive)
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/unpublish", nil), "id", "exam-1")
+	h2.Unpublish(w, req)
+	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Equal(t, "ERR_INVALID_TRANSITION", decode(t, w).Error.Code)
+	_ = h // suppress unused warning
+}
+
+func TestUnpublish_ActiveSessions_Returns409WithERRActiveSessions(t *testing.T) {
+	h := newHandler(&mockSvc{
+		unpublishExamFn: func(_ context.Context, _ string) (*Exam, error) {
+			return nil, ErrActiveSessionsExist
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/unpublish", nil), "id", "exam-1")
+	h.Unpublish(w, req)
+	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Equal(t, "ERR_ACTIVE_SESSIONS", decode(t, w).Error.Code)
 }

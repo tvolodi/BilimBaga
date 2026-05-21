@@ -18,6 +18,7 @@ var (
 	ErrForbidden                       = errors.New("forbidden")
 	ErrDeadlineInPast                  = errors.New("deadline must be in the future")
 	ErrInsufficientAdaptiveQuestions   = errors.New("insufficient questions per difficulty for adaptive exam")
+	ErrActiveSessionsExist             = errors.New("exam has active in-progress sessions")
 )
 
 // Exam is the core configuration row.

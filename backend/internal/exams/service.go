@@ -29,6 +29,9 @@ type Service interface {
 	Archive(ctx context.Context, id string) (*Exam, error)
 	DeleteExam(ctx context.Context, id string) error
 
+	// UnpublishExam reverts an active exam back to draft status (FR-BB318).
+	UnpublishExam(ctx context.Context, id string) (*Exam, error)
+
 	CreateSection(ctx context.Context, examID string, input SectionInput) (*ExamSection, error)
 	UpdateSection(ctx context.Context, examID, sectionID string, input SectionInput) (*ExamSection, error)
 	DeleteSection(ctx context.Context, examID, sectionID string) error
@@ -243,6 +246,28 @@ func (s *service) Archive(ctx context.Context, id string) (*Exam, error) {
 		return nil, fmt.Errorf("exams: Archive: %w", err)
 	}
 	e.Status = "archived"
+	return e, nil
+}
+
+func (s *service) UnpublishExam(ctx context.Context, id string) (*Exam, error) {
+	e, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("exams: UnpublishExam: %w", err)
+	}
+	if e.Status != "active" {
+		return nil, fmt.Errorf("%w: exam must be active to unpublish", ErrNotActive)
+	}
+	count, err := s.repo.CountActiveSessionsForExam(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("exams: UnpublishExam: %w", err)
+	}
+	if count > 0 {
+		return nil, ErrActiveSessionsExist
+	}
+	if err := s.repo.UpdateStatus(ctx, id, "draft"); err != nil {
+		return nil, fmt.Errorf("exams: UnpublishExam: %w", err)
+	}
+	e.Status = "draft"
 	return e, nil
 }
 

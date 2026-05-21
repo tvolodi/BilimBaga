@@ -182,6 +182,8 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
 				Post("/exams/{id}/publish", examsHandler.Publish)
 			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
+				Post("/exams/{id}/unpublish", examsHandler.Unpublish)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
 				Post("/exams/{id}/archive", examsHandler.Archive)
 			r.With(rbac.RequirePermission(rbacCache, "exams", "write")).
 				Post("/exams/{id}/status", examsHandler.TransitionStatus)

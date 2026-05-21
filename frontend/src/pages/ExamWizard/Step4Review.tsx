@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useExam, usePublishExam, useEligibleCounts, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
+import { useExam, usePublishExam, useUnpublishExam, useEligibleCounts, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -36,11 +37,14 @@ function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { data: exam, isLoading } = useExam(examId)
   const publishExam = usePublishExam(examId)
+  const unpublishExam = useUnpublishExam()
   const { data: eligibleData, isLoading: eligibleLoading, isError: eligibleError } = useEligibleCounts(examId)
 
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [unpublishDialogOpen, setUnpublishDialogOpen] = useState(false)
   const [successBanner, setSuccessBanner] = useState(false)
   const [unsatisfiedRules, setUnsatisfiedRules] = useState<PublishValidationDetail[] | null>(null)
   const [generalError, setGeneralError] = useState<string | null>(null)
@@ -61,6 +65,19 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
       } else {
         setGeneralError(apiErr.message)
       }
+    }
+  }
+
+  async function handleUnpublishConfirm() {
+    setGeneralError(null)
+    try {
+      await unpublishExam.mutateAsync(examId)
+      setUnpublishDialogOpen(false)
+      navigate(`/admin/exams/${examId}/edit`)
+    } catch (err) {
+      setUnpublishDialogOpen(false)
+      const apiErr = err as ExamApiError
+      setGeneralError(apiErr.message)
     }
   }
 
@@ -221,14 +238,31 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           </Button>
         )}
         {isPublished && (
-          <div className="flex items-center gap-2 text-sm text-green-700">
-            <CheckCircle2 size={16} />
-            Published
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-sm text-green-700">
+              <CheckCircle2 size={16} />
+              Published
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setUnpublishDialogOpen(true)}
+              disabled={unpublishExam.isPending}
+            >
+              {unpublishExam.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('exam.unpublish.button')}
+                </>
+              ) : (
+                t('exam.unpublish.button')
+              )}
+            </Button>
           </div>
         )}
       </div>
 
-      {/* Confirm dialog */}
+      {/* Publish confirm dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
@@ -253,6 +287,37 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
                 </>
               ) : (
                 t('exam.wizard.publish')
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unpublish confirm dialog */}
+      <Dialog open={unpublishDialogOpen} onOpenChange={setUnpublishDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('exam.unpublish.confirm')}</DialogTitle>
+            <DialogDescription>
+              {t('exam.unpublish.confirmDetail')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setUnpublishDialogOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" onClick={handleUnpublishConfirm} disabled={unpublishExam.isPending}>
+              {unpublishExam.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('exam.unpublish.button')}
+                </>
+              ) : (
+                t('exam.unpublish.confirm')
               )}
             </Button>
           </DialogFooter>

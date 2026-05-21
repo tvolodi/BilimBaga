@@ -1,0 +1,31 @@
+{
+  "run_id": "exam-unpublish",
+  "step": "01-requirement-development",
+  "completed_at": "2026-05-21T00:00:00Z",
+  "output": {
+    "fr_id": "FR-BB318",
+    "title": "Unpublish Exam",
+    "slug": "exam-unpublish",
+    "file": "docs/requirements/exam-unpublish.md",
+    "status": "draft",
+    "phase": "3 (enhancement to 3.12)",
+    "depends_on": ["FR-BB31", "FR-BB32", "FR-BB312", "FR-BB35"],
+    "scope_summary": {
+      "database": "No schema changes. Active-session guard uses exam_sessions query. Portal filter on e.status='active' provides implicit assignment hold.",
+      "api": "POST /api/v1/exams/{id}/unpublish — active→draft transition, blocked if in-progress sessions exist",
+      "frontend": "Step4Review.tsx (Unpublish button), ExamsListPage.tsx (action menu item)",
+      "i18n_namespaces": ["exam.unpublish"]
+    },
+    "new_sentinel_errors": ["ErrActiveSessionsExist"],
+    "new_repo_methods": ["CountActiveSessionsForExam", "SetStatus"],
+    "new_service_methods": ["UnpublishExam"],
+    "new_handler_methods": ["Unpublish"],
+    "router_change": "POST /exams/{id}/unpublish registered under exams:write permission",
+    "key_decisions": [
+      "Dedicated /unpublish endpoint (not reusing TransitionStatus) to allow explicit active-session guard",
+      "validTransitions map is NOT changed — unpublish is a guarded reverse transition, not a generic forward step",
+      "No DDL change for assignment hold — portal query WHERE e.status='active' provides behavior implicitly",
+      "Archived exams remain a terminal state — unpublish only applies to active exams"
+    ]
+  }
+}

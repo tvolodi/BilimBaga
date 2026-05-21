@@ -60,6 +60,10 @@ type Repository interface {
 	GetAssignmentByID(ctx context.Context, id string) (*ExamAssignment, error)
 	DeleteAssignment(ctx context.Context, id string) error
 	ListAssignmentsWithStats(ctx context.Context, examID string) ([]*AssignmentDetail, error)
+
+	// CountActiveSessionsForExam returns the number of exam_sessions with status='in_progress'
+	// for the given exam. Used by UnpublishExam to block the transition (FR-BB318 AC-2).
+	CountActiveSessionsForExam(ctx context.Context, examID string) (int, error)
 }
 
 type postgresRepository struct {
@@ -860,4 +864,13 @@ func (r *postgresRepository) listAssignmentsNoSessions(ctx context.Context, exam
 func isUniqueViolation(err error) bool {
 	var pgErr *pq.Error
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func (r *postgresRepository) CountActiveSessionsForExam(ctx context.Context, examID string) (int, error) {
+	const q = `SELECT COUNT(*) FROM exam_sessions WHERE exam_id = $1 AND status = 'in_progress'`
+	var count int
+	if err := r.db.QueryRowContext(ctx, q, examID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("exams: CountActiveSessionsForExam: %w", err)
+	}
+	return count, nil
 }

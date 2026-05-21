@@ -410,6 +410,45 @@ func (h *Handler) Archive(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Unpublish reverts an active exam to draft status (FR-BB318).
+func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	exam, err := h.svc.UnpublishExam(r.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "exam not found")
+		case errors.Is(err, ErrNotActive):
+			api.WriteJSON(w, http.StatusConflict, map[string]any{
+				"data": nil,
+				"error": map[string]string{
+					"code":    "ERR_INVALID_TRANSITION",
+					"message": "exam must be active to unpublish",
+				},
+			})
+		case errors.Is(err, ErrActiveSessionsExist):
+			api.WriteJSON(w, http.StatusConflict, map[string]any{
+				"data": nil,
+				"error": map[string]string{
+					"code":    "ERR_ACTIVE_SESSIONS",
+					"message": "cannot unpublish: exam has active in-progress sessions",
+				},
+			})
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to unpublish exam")
+		}
+		return
+	}
+
+	h.writer.Write(r.Context(), r, "exam.unpublish", "exam", &exam.ID, map[string]any{
+		"status": exam.Status,
+	})
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"data":  map[string]string{"id": exam.ID, "status": exam.Status},
+		"error": nil,
+	})
+}
+
 // TransitionStatus advances the exam through draft → active → archived.
 func (h *Handler) TransitionStatus(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

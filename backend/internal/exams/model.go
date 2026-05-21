@@ -6,19 +6,19 @@ import (
 )
 
 var (
-	ErrNotFound                        = errors.New("exam not found")
-	ErrInvalidInput                    = errors.New("invalid input")
-	ErrInvalidTransition               = errors.New("invalid status transition")
-	ErrNotDraft                        = errors.New("exam is not in draft status")
-	ErrRulesModeConflict               = errors.New("operation not allowed on random-mode rule")
-	ErrRulesUnsatisfied                = errors.New("one or more question rules cannot be satisfied")
-	ErrNotActive                       = errors.New("exam is not in active status")
-	ErrAssignmentExists                = errors.New("assignment already exists")
-	ErrAssignmentNotFound              = errors.New("assignment not found")
-	ErrForbidden                       = errors.New("forbidden")
-	ErrDeadlineInPast                  = errors.New("deadline must be in the future")
-	ErrInsufficientAdaptiveQuestions   = errors.New("insufficient questions per difficulty for adaptive exam")
-	ErrActiveSessionsExist             = errors.New("exam has active in-progress sessions")
+	ErrNotFound                      = errors.New("exam not found")
+	ErrInvalidInput                  = errors.New("invalid input")
+	ErrInvalidTransition             = errors.New("invalid status transition")
+	ErrNotDraft                      = errors.New("exam is not in draft status")
+	ErrRulesModeConflict             = errors.New("operation not allowed on random-mode rule")
+	ErrRulesUnsatisfied              = errors.New("one or more question rules cannot be satisfied")
+	ErrNotActive                     = errors.New("exam is not in active status")
+	ErrAssignmentExists              = errors.New("assignment already exists")
+	ErrAssignmentNotFound            = errors.New("assignment not found")
+	ErrForbidden                     = errors.New("forbidden")
+	ErrDeadlineInPast                = errors.New("deadline must be in the future")
+	ErrInsufficientAdaptiveQuestions = errors.New("insufficient questions per difficulty for adaptive exam")
+	ErrActiveSessionsExist           = errors.New("exam has active in-progress sessions")
 )
 
 // Exam is the core configuration row.
@@ -53,15 +53,15 @@ type ExamSection struct {
 
 // ExamQuestionRule describes how questions are selected for a section or the whole exam.
 type ExamQuestionRule struct {
-	ID         string   `db:"id"          json:"id"`
-	ExamID     string   `db:"exam_id"     json:"exam_id"`
-	SectionID  *string  `db:"section_id"  json:"section_id"`
-	Mode       string   `db:"mode"        json:"mode"`
-	CategoryID *string  `db:"category_id" json:"category_id"`
-	TagIDs     []byte   `db:"tag_ids"     json:"tag_ids"` // raw JSONB
-	Difficulty *string  `db:"difficulty"  json:"difficulty"`
-	Count      int      `db:"count"       json:"count"`
-	SortOrder  int      `db:"sort_order"  json:"sort_order"`
+	ID         string  `db:"id"          json:"id"`
+	ExamID     string  `db:"exam_id"     json:"exam_id"`
+	SectionID  *string `db:"section_id"  json:"section_id"`
+	Mode       string  `db:"mode"        json:"mode"`
+	CategoryID *string `db:"category_id" json:"category_id"`
+	TagIDs     []byte  `db:"tag_ids"     json:"tag_ids"` // raw JSONB
+	Difficulty *string `db:"difficulty"  json:"difficulty"`
+	Count      int     `db:"count"       json:"count"`
+	SortOrder  int     `db:"sort_order"  json:"sort_order"`
 }
 
 // ExamManualQuestion links a specific question to a manual rule.
@@ -117,9 +117,9 @@ type QuestionRuleDetail struct {
 
 // SectionDetail is the full section representation in the exam detail response.
 type SectionDetail struct {
-	ID        string `json:"id"`
+	ID        string  `json:"id"`
 	Title     *string `json:"title"`
-	SortOrder int    `json:"sort_order"`
+	SortOrder int     `json:"sort_order"`
 }
 
 // ExamDetail is the full exam including sections and rules.
@@ -184,7 +184,7 @@ type PublishValidationError struct {
 }
 
 func (e *PublishValidationError) Error() string { return ErrRulesUnsatisfied.Error() }
-func (e *PublishValidationError) Unwrap() error  { return ErrRulesUnsatisfied }
+func (e *PublishValidationError) Unwrap() error { return ErrRulesUnsatisfied }
 
 // CreateExamInput bundles all fields needed to create a new exam.
 type CreateExamInput struct {

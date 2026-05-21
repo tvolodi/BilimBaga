@@ -114,9 +114,9 @@ func (r *postgresRepository) GetByID(ctx context.Context, id string) (*Exam, err
 
 func (r *postgresRepository) ListFiltered(ctx context.Context, filter ExamFilter) ([]*ExamListItem, int, error) {
 	var (
-		args    []any
-		argN    int
-		wheres  []string
+		args   []any
+		argN   int
+		wheres []string
 	)
 
 	nextArg := func(v any) string {

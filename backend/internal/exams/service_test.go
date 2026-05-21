@@ -19,30 +19,30 @@ type mockRepo struct {
 	manual      map[string][]ManualQuestionInput
 	assignments map[string]*ExamAssignment
 
-	createFn                    func(ctx context.Context, e *Exam) error
-	getByIDFn                   func(ctx context.Context, id string) (*Exam, error)
-	listFilteredFn              func(ctx context.Context, f ExamFilter) ([]*ExamListItem, int, error)
-	updateFn                    func(ctx context.Context, id string, input UpdateExamInput) (*Exam, error)
-	updateStatusFn              func(ctx context.Context, id, status string) error
-	deleteByIDFn                func(ctx context.Context, id string) error
-	getWithDetailsFn            func(ctx context.Context, id string) (*ExamDetail, error)
-	createSectionFn             func(ctx context.Context, examID string, input SectionInput) (*ExamSection, error)
-	updateSectionFn             func(ctx context.Context, id string, input SectionInput) (*ExamSection, error)
-	deleteSectionFn             func(ctx context.Context, id string) error
-	createRuleFn                func(ctx context.Context, examID string, input QuestionRuleInput) (*ExamQuestionRule, error)
-	updateRuleFn                func(ctx context.Context, id string, input QuestionRuleInput) (*ExamQuestionRule, error)
-	deleteRuleFn                func(ctx context.Context, id string) error
-	setManualQsFn               func(ctx context.Context, ruleID string, qs []ManualQuestionInput) error
-	getRuleByIDFn               func(ctx context.Context, id string) (*ExamQuestionRule, error)
-	listRulesForExamFn          func(ctx context.Context, examID string) ([]*ExamQuestionRule, error)
-	countAvailableForRuleFn     func(ctx context.Context, rule *ExamQuestionRule) (int, error)
+	createFn                      func(ctx context.Context, e *Exam) error
+	getByIDFn                     func(ctx context.Context, id string) (*Exam, error)
+	listFilteredFn                func(ctx context.Context, f ExamFilter) ([]*ExamListItem, int, error)
+	updateFn                      func(ctx context.Context, id string, input UpdateExamInput) (*Exam, error)
+	updateStatusFn                func(ctx context.Context, id, status string) error
+	deleteByIDFn                  func(ctx context.Context, id string) error
+	getWithDetailsFn              func(ctx context.Context, id string) (*ExamDetail, error)
+	createSectionFn               func(ctx context.Context, examID string, input SectionInput) (*ExamSection, error)
+	updateSectionFn               func(ctx context.Context, id string, input SectionInput) (*ExamSection, error)
+	deleteSectionFn               func(ctx context.Context, id string) error
+	createRuleFn                  func(ctx context.Context, examID string, input QuestionRuleInput) (*ExamQuestionRule, error)
+	updateRuleFn                  func(ctx context.Context, id string, input QuestionRuleInput) (*ExamQuestionRule, error)
+	deleteRuleFn                  func(ctx context.Context, id string) error
+	setManualQsFn                 func(ctx context.Context, ruleID string, qs []ManualQuestionInput) error
+	getRuleByIDFn                 func(ctx context.Context, id string) (*ExamQuestionRule, error)
+	listRulesForExamFn            func(ctx context.Context, examID string) ([]*ExamQuestionRule, error)
+	countAvailableForRuleFn       func(ctx context.Context, rule *ExamQuestionRule) (int, error)
 	countAvailableForManualRuleFn func(ctx context.Context, ruleID string) (int, error)
-	createAssignmentFn          func(ctx context.Context, a *ExamAssignment) error
-	getAssignmentByIDFn              func(ctx context.Context, id string) (*ExamAssignment, error)
-	deleteAssignmentFn               func(ctx context.Context, id string) error
-	listAssignmentsWithStatsFn       func(ctx context.Context, examID string) ([]*AssignmentDetail, error)
-	countQuestionsPerDifficultyFn    func(ctx context.Context, rule *ExamQuestionRule, difficulty string) (int, error)
-	countActiveSessionsForExamFn     func(ctx context.Context, examID string) (int, error)
+	createAssignmentFn            func(ctx context.Context, a *ExamAssignment) error
+	getAssignmentByIDFn           func(ctx context.Context, id string) (*ExamAssignment, error)
+	deleteAssignmentFn            func(ctx context.Context, id string) error
+	listAssignmentsWithStatsFn    func(ctx context.Context, examID string) ([]*AssignmentDetail, error)
+	countQuestionsPerDifficultyFn func(ctx context.Context, rule *ExamQuestionRule, difficulty string) (int, error)
+	countActiveSessionsForExamFn  func(ctx context.Context, examID string) (int, error)
 }
 
 func newMockRepo() *mockRepo {

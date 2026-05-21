@@ -252,10 +252,12 @@ func (s *service) UpdateQuestion(ctx context.Context, id string, input UpdateQue
 }
 
 // validTransitions defines the allowed status state machine.
-var validTransitions = map[string]string{
-	"draft":  "review",
-	"review": "active",
-	"active": "archived",
+// Each entry maps a current status to the set of statuses it may transition to.
+var validTransitions = map[string][]string{
+	"draft":    {"review"},
+	"review":   {"active"},
+	"active":   {"archived"},
+	"archived": {"draft"},
 }
 
 // TransitionStatus enforces the status state machine and updates the question.
@@ -265,8 +267,18 @@ func (s *service) TransitionStatus(ctx context.Context, id, newStatus string) (*
 		return nil, fmt.Errorf("questions: TransitionStatus: %w", err)
 	}
 
-	allowed, ok := validTransitions[q.Status]
-	if !ok || allowed != newStatus {
+	allowedTargets, ok := validTransitions[q.Status]
+	if !ok {
+		return nil, fmt.Errorf("%w: cannot transition from %q to %q", ErrInvalidTransition, q.Status, newStatus)
+	}
+	found := false
+	for _, t := range allowedTargets {
+		if t == newStatus {
+			found = true
+			break
+		}
+	}
+	if !found {
 		return nil, fmt.Errorf("%w: cannot transition from %q to %q", ErrInvalidTransition, q.Status, newStatus)
 	}
 

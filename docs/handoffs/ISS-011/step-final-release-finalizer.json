@@ -1,0 +1,18 @@
+﻿{
+  "run_id": "ISS-011",
+  "pipeline": "B",
+  "commit_hash": "9bb1d5b",
+  "commit_message": "fix(exams): publish step 4 — clarify '0 available' error for draft questions (ISS-011)",
+  "files_committed": [
+    "frontend/src/pages/ExamWizard/Step4Review.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json",
+    "backend/internal/exams/service_test.go",
+    "docs/issue-reports/ISS-011-exam-publish-422.md",
+    "docs/issue-reports/README.md",
+    "docs/handoffs/ISS-011/step-01-issue-resolution.json"
+  ],
+  "inner_report_path": "docs/issue-reports/ISS-011-exam-publish-422.md",
+  "status": "success"
+}

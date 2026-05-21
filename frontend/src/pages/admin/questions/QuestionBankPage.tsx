@@ -282,7 +282,7 @@ const STATUS_TRANSITIONS: Record<QuestionListItem['status'], QuestionListItem['s
   draft: ['review'],
   review: ['active', 'draft'],
   active: ['archived'],
-  archived: ['active'],
+  archived: ['draft'],
 }
 
 function StatusTransitionCell({ question, onTransition }: StatusTransitionProps) {

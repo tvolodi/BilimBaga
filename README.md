@@ -7,7 +7,7 @@ Corporate exam platform for organizations — multilingual question banks, confi
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) with Docker Compose
-- Ports **5432**, **8080**, and **5173** must be free
+- Ports **80**, **5432**, and **8080** must be free
 
 ---
 
@@ -17,11 +17,11 @@ Corporate exam platform for organizations — multilingual question banks, confi
 make dev
 ```
 
-This builds and starts all services (PostgreSQL, API, frontend, Nginx) and runs all migrations automatically. The app is ready when you see the API and frontend containers reporting healthy.
+This builds all services (PostgreSQL, API, frontend, Nginx) and starts them. The frontend image is always rebuilt fresh on every `make dev` run — there is no stale-bundle risk. The app is ready when all containers report healthy.
 
 | Service  | URL                    |
 |----------|------------------------|
-| Frontend | http://localhost:5173  |
+| Frontend | http://localhost       |
 | API      | http://localhost:8080  |
 
 ---

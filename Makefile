@@ -1,6 +1,7 @@
 .PHONY: dev build migrate test security-check
 
 dev:
+	docker compose rm -sf frontend
 	docker compose up --build
 
 build:

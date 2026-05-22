@@ -1,0 +1,44 @@
+{
+  "run_id": "ISS-001-stale-frontend-fix",
+  "changes_applied": [
+    {
+      "type": "docker",
+      "description": "Added docker-entrypoint.sh to frontend/. The entrypoint clears the frontend_dist named volume and copies fresh dist files from the image layer on every container start, preventing stale bundles."
+    },
+    {
+      "type": "docker",
+      "description": "Modified frontend/Dockerfile Stage 2 (alpine): stores built dist at /app/dist-source (image layer, never shadowed by volume mount), copies docker-entrypoint.sh, sets ENTRYPOINT. Removed unused dead-code that just copied dist to /app/dist with no entrypoint."
+    },
+    {
+      "type": "docker",
+      "description": "docker-compose.yml: removed 'target: build' from frontend service (now uses final Stage 2 with entrypoint). Added healthcheck (test: /app/dist/index.html exists, interval 2s, retries 30). Updated nginx depends_on to use service_healthy for frontend and service_started for api."
+    },
+    {
+      "type": "config",
+      "description": "Makefile dev target: added 'docker compose rm -sf frontend' before 'docker compose up --build'. This forces the frontend container to be recreated on every make dev, guaranteeing the entrypoint always runs regardless of image cache hits."
+    }
+  ],
+  "migration_files": [],
+  "env_vars_added": [],
+  "files_changed": [
+    "frontend/docker-entrypoint.sh",
+    "frontend/Dockerfile",
+    "docker-compose.yml",
+    "Makefile"
+  ],
+  "verification_status": "ok",
+  "verification_evidence": {
+    "docker_ps": [
+      "bilimbaga-api-1      Up (healthy) :8080",
+      "bilimbaga-db-1       Up (healthy) :5432",
+      "bilimbaga-frontend-1 Up (healthy)",
+      "bilimbaga-mailhog-1  Up :1025/:8025",
+      "bilimbaga-nginx-1    Up :80"
+    ],
+    "entrypoint_output": "[frontend] Refreshing dist volume from image build... [frontend] Dist volume ready (49 files).",
+    "api_health": "{\"data\":{\"status\":\"ok\",\"db_ok\":true,\"version\":\"dev\"},\"error\":null}",
+    "nginx_http_status": "200"
+  },
+  "root_cause_addressed": "Named Docker volumes persist across container recreations. Docker only initializes a named volume with container content when the volume is EMPTY/NEW. On subsequent 'docker compose up --build', the rebuilt image's /app/dist was shadowed by the existing (stale) volume content. The entrypoint approach bypasses this by actively overwriting the volume on every container start.",
+  "user_instructions": "None. The fix is fully self-contained. 'make dev' continues to be the only command needed. ISS-001 cannot recur: every 'make dev' forces a fresh frontend container which wipes and rewrites the dist volume from the current image."
+}

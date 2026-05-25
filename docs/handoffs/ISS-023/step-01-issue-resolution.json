@@ -1,0 +1,22 @@
+{
+  "issue_id": "ISS-023",
+  "run_id": "ISS-023",
+  "is_recurring": false,
+  "root_cause": "Root .env set DB_PORT=5442 (host-mapped port) while API container must connect to db service on internal port 5432 inside Docker network.",
+  "affected_layer": "config",
+  "affected_files": [
+    ".env",
+    ".env.example"
+  ],
+  "fix_description": "Set DB_PORT back to 5432 for internal service connectivity and use HOST_DB_PORT=5442 for host port binding; added comments clarifying variable semantics.",
+  "files_changed": [
+    ".env",
+    ".env.example",
+    "docs/issue-reports/ISS-023-docker-db-port-mismatch.md",
+    "docs/handoffs/ISS-023/step-01-issue-resolution.json",
+    "docs/issue-reports/README.md"
+  ],
+  "migration_applied": false,
+  "regression_test_added": false,
+  "regression_test_path": null
+}

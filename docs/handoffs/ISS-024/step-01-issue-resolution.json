@@ -1,0 +1,21 @@
+{
+  "issue_id": "ISS-024",
+  "run_id": "ISS-024",
+  "is_recurring": false,
+  "root_cause": "AuditLogPage recalculated default from timestamp on every render when URL lacked from, causing React Query key churn and perpetual first-load behavior.",
+  "affected_layer": "frontend",
+  "affected_files": [
+    "frontend/src/pages/admin/AuditLogPage.tsx"
+  ],
+  "fix_description": "Memoized fallback from value per mount and reused it in filters to keep query key stable across rerenders.",
+  "files_changed": [
+    "frontend/src/pages/admin/AuditLogPage.tsx",
+    "frontend/src/pages/admin/AuditLogPage.test.tsx",
+    "docs/issue-reports/ISS-024-audit-log-loading-stuck.md",
+    "docs/issue-reports/README.md",
+    "docs/handoffs/ISS-024/step-01-issue-resolution.json"
+  ],
+  "migration_applied": false,
+  "regression_test_added": true,
+  "regression_test_path": "frontend/src/pages/admin/AuditLogPage.test.tsx"
+}

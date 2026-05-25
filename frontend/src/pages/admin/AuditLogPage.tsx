@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Download } from 'lucide-react'
@@ -41,12 +41,13 @@ export function AuditLogPage() {
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isExporting, setIsExporting] = useState(false)
+  const fallbackFrom = useMemo(() => defaultFrom(), [])
 
   // Initialise filters from URL; default to "last 7 days" when no date range set.
   const rawFilters = filtersFromParams(searchParams)
   const filters: AuditFilters = {
     ...rawFilters,
-    from: rawFilters.from ?? defaultFrom(),
+    from: rawFilters.from ?? fallbackFrom,
   }
 
   const page = parseInt(searchParams.get('page') ?? '1', 10) || 1

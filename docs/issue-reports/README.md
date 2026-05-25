@@ -24,3 +24,5 @@
 | [ISS-020](ISS-020-password-preview-missing.md) | Password preview toggle missing on login form — stale frontend Docker image | medium | config | auth | resolved | 2026-05-22 |
 | [ISS-021](ISS-021-usematches-data-router-error.md) | useMatches data-router error at runtime — stale frontend Docker image (never rebuilt) | high | config | auth | open | null |
 | [ISS-022](ISS-022-reports-page-empty.md) | Reports page at /admin/reports appears empty — stale frontend Docker image | medium | config | reports | resolved | 2026-05-22 |
+| [ISS-023](ISS-023-docker-db-port-mismatch.md) | make dev fails when DB_PORT is set to host-mapped 5442 | high | config | auth | resolved | 2026-05-25 |
+| [ISS-024](ISS-024-audit-log-loading-stuck.md) | Audit log page remains stuck in loading state due to unstable default from filter | high | frontend | audit | resolved | 2026-05-25 |

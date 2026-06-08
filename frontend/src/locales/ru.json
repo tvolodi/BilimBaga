@@ -345,6 +345,8 @@
       "currentPasswordLabel": "Текущий пароль",
       "newPasswordLabel": "Новый пароль",
       "confirmPasswordLabel": "Подтвердите новый пароль",
+      "showPassword": "Показать пароль",
+      "hidePassword": "Скрыть пароль",
       "submitButton": "Изменить пароль",
       "errors": {
         "INVALID_CREDENTIALS": "Текущий пароль неверен.",

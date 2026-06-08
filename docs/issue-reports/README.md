@@ -26,3 +26,5 @@
 | [ISS-022](ISS-022-reports-page-empty.md) | Reports page at /admin/reports appears empty — stale frontend Docker image | medium | config | reports | resolved | 2026-05-22 |
 | [ISS-023](ISS-023-docker-db-port-mismatch.md) | make dev fails when DB_PORT is set to host-mapped 5442 | high | config | auth | resolved | 2026-05-25 |
 | [ISS-024](ISS-024-audit-log-loading-stuck.md) | Audit log page remains stuck in loading state due to unstable default from filter | high | frontend | audit | resolved | 2026-05-25 |
+| [ISS-025](ISS-025-change-password-no-show-hide-toggle.md) | ChangePasswordForm — all three password fields have no show/hide toggle | medium | frontend | auth | resolved | 2026-06-08 |
+| [ISS-026](ISS-026-change-password-autofill-stale-credential.md) | ChangePasswordPage — stale browser autofill in current-password causes INVALID_CREDENTIALS | high | frontend | auth | resolved | 2026-06-08 |

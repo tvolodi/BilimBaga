@@ -345,6 +345,8 @@
       "currentPasswordLabel": "Current password",
       "newPasswordLabel": "New password",
       "confirmPasswordLabel": "Confirm new password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
       "submitButton": "Change password",
       "errors": {
         "INVALID_CREDENTIALS": "Current password is incorrect.",

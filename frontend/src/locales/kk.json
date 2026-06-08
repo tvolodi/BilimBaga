@@ -345,6 +345,8 @@
       "currentPasswordLabel": "Ағымдағы құпия сөз",
       "newPasswordLabel": "Жаңа құпия сөз",
       "confirmPasswordLabel": "Жаңа құпия сөзді растаңыз",
+      "showPassword": "Құпия сөзді көрсету",
+      "hidePassword": "Құпия сөзді жасыру",
       "submitButton": "Құпия сөзді өзгерту",
       "errors": {
         "INVALID_CREDENTIALS": "Ағымдағы құпия сөз қате.",

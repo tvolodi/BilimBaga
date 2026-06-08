@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,6 +23,9 @@ export function ChangePasswordForm({ onSubmit, isPending, error }: ChangePasswor
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [mismatch, setMismatch] = useState(false)
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -61,38 +65,71 @@ export function ChangePasswordForm({ onSubmit, isPending, error }: ChangePasswor
     <form onSubmit={handleSubmit} className="space-y-4 mt-6">
       <div className="space-y-1">
         <Label htmlFor="current-password">{t('auth.changePassword.currentPasswordLabel')}</Label>
-        <Input
-          id="current-password"
-          type="password"
-          autoComplete="current-password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          required
-        />
+        <div className="relative">
+          <Input
+            id="current-password"
+            type={showCurrent ? 'text' : 'password'}
+            autoComplete="off"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className="pr-10"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowCurrent((v) => !v)}
+            aria-label={t(showCurrent ? 'auth.changePassword.hidePassword' : 'auth.changePassword.showPassword')}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+          >
+            {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
       <div className="space-y-1">
         <Label htmlFor="new-password">{t('auth.changePassword.newPasswordLabel')}</Label>
-        <Input
-          id="new-password"
-          type="password"
-          autoComplete="new-password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-        />
+        <div className="relative">
+          <Input
+            id="new-password"
+            type={showNew ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="pr-10"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowNew((v) => !v)}
+            aria-label={t(showNew ? 'auth.changePassword.hidePassword' : 'auth.changePassword.showPassword')}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+          >
+            {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
       <div className="space-y-1">
         <Label htmlFor="confirm-password">{t('auth.changePassword.confirmPasswordLabel')}</Label>
-        <Input
-          id="confirm-password"
-          type="password"
-          autoComplete="new-password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          aria-describedby={mismatch ? 'confirm-password-error' : undefined}
-          aria-invalid={mismatch || undefined}
-          required
-        />
+        <div className="relative">
+          <Input
+            id="confirm-password"
+            type={showConfirm ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="pr-10"
+            aria-describedby={mismatch ? 'confirm-password-error' : undefined}
+            aria-invalid={mismatch || undefined}
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirm((v) => !v)}
+            aria-label={t(showConfirm ? 'auth.changePassword.hidePassword' : 'auth.changePassword.showPassword')}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+          >
+            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
       {renderError()}
       <Button type="submit" className="w-full" disabled={isPending}>

@@ -80,6 +80,51 @@ describe('ChangePasswordForm', () => {
 
   it('disables submit button while pending', () => {
     render(<ChangePasswordForm onSubmit={noop} isPending={true} error={null} />)
-    expect(screen.getByRole('button')).toBeDisabled()
+    const submitBtn = document.querySelector('button[type="submit"]') as HTMLButtonElement
+    expect(submitBtn).toBeDisabled()
+  })
+
+  it('toggles current-password visibility when eye icon is clicked', () => {
+    render(<ChangePasswordForm onSubmit={noop} isPending={false} error={null} />)
+    const input = document.getElementById('current-password')!
+    expect(input).toHaveAttribute('type', 'password')
+
+    const toggleBtns = screen.getAllByRole('button', { name: /show password/i })
+    fireEvent.click(toggleBtns[0])
+    expect(input).toHaveAttribute('type', 'text')
+
+    fireEvent.click(screen.getAllByRole('button', { name: /hide password/i })[0])
+    expect(input).toHaveAttribute('type', 'password')
+  })
+
+  it('toggles new-password visibility when eye icon is clicked', () => {
+    render(<ChangePasswordForm onSubmit={noop} isPending={false} error={null} />)
+    const input = document.getElementById('new-password')!
+    expect(input).toHaveAttribute('type', 'password')
+
+    const toggleBtns = screen.getAllByRole('button', { name: /show password/i })
+    fireEvent.click(toggleBtns[1])
+    expect(input).toHaveAttribute('type', 'text')
+
+    fireEvent.click(screen.getAllByRole('button', { name: /hide password/i })[0])
+    expect(input).toHaveAttribute('type', 'password')
+  })
+
+  it('toggles confirm-password visibility when eye icon is clicked', () => {
+    render(<ChangePasswordForm onSubmit={noop} isPending={false} error={null} />)
+    const input = document.getElementById('confirm-password')!
+    expect(input).toHaveAttribute('type', 'password')
+
+    const toggleBtns = screen.getAllByRole('button', { name: /show password/i })
+    fireEvent.click(toggleBtns[2])
+    expect(input).toHaveAttribute('type', 'text')
+
+    fireEvent.click(screen.getAllByRole('button', { name: /hide password/i })[0])
+    expect(input).toHaveAttribute('type', 'password')
+  })
+
+  it('current-password field has autoComplete off to prevent stale autofill', () => {
+    render(<ChangePasswordForm onSubmit={noop} isPending={false} error={null} />)
+    expect(document.getElementById('current-password')).toHaveAttribute('autocomplete', 'off')
   })
 })

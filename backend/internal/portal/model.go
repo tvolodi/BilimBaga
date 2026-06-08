@@ -22,16 +22,20 @@ const (
 
 // PortalExamItem is the summary row returned by the list endpoint.
 type PortalExamItem struct {
-	ID               string     `json:"id"`
-	Title            string     `json:"title"`
-	Description      *string    `json:"description"`
-	TimeLimitMinutes int        `json:"time_limit_minutes"`
-	PassingScorePct  float64    `json:"passing_score_pct"`
-	MaxAttempts      int        `json:"max_attempts"`
-	AttemptsUsed     int        `json:"attempts_used"`
-	Deadline         *time.Time `json:"deadline"`
-	UserStatus       UserStatus `json:"user_status"`
-	OpenSessionID    *string    `json:"open_session_id"`
+	ID                 string     `json:"id"`
+	Title              string     `json:"title"`
+	Description        *string    `json:"description"`
+	TimeLimitMinutes   int        `json:"time_limit_minutes"`
+	PassingScorePct    float64    `json:"passing_score_pct"`
+	MaxAttempts        int        `json:"max_attempts"`
+	AttemptsUsed       int        `json:"attempts_used"`
+	Deadline           *time.Time `json:"deadline"`
+	UserStatus         UserStatus `json:"user_status"`
+	OpenSessionID      *string    `json:"open_session_id"`
+	ShowAnswers        string     `json:"show_answers"`
+	ShuffleQuestions   bool       `json:"shuffle_questions"`
+	ShuffleOptions     bool       `json:"shuffle_options"`
+	CertificateEnabled bool       `json:"certificate_enabled"`
 }
 
 // AttemptHistory is a single historical session entry.

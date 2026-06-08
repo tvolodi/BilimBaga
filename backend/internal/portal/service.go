@@ -43,16 +43,20 @@ func (s *service) ListMyExams(ctx context.Context, userID, deptID string) ([]*Po
 
 		status, openSessionID, attemptsUsed := computeStatus(row.MaxAttempts, row.Deadline, sessions)
 		result = append(result, &PortalExamItem{
-			ID:               row.ID,
-			Title:            row.Title,
-			Description:      row.Description,
-			TimeLimitMinutes: row.TimeLimitMinutes,
-			PassingScorePct:  row.PassingScorePct,
-			MaxAttempts:      row.MaxAttempts,
-			AttemptsUsed:     attemptsUsed,
-			Deadline:         row.Deadline,
-			UserStatus:       status,
-			OpenSessionID:    openSessionID,
+			ID:                 row.ID,
+			Title:              row.Title,
+			Description:        row.Description,
+			TimeLimitMinutes:   row.TimeLimitMinutes,
+			PassingScorePct:    row.PassingScorePct,
+			MaxAttempts:        row.MaxAttempts,
+			AttemptsUsed:       attemptsUsed,
+			Deadline:           row.Deadline,
+			UserStatus:         status,
+			OpenSessionID:      openSessionID,
+			ShowAnswers:        row.ShowAnswers,
+			ShuffleQuestions:   row.ShuffleQuestions,
+			ShuffleOptions:     row.ShuffleOptions,
+			CertificateEnabled: row.CertificateEnabled,
 		})
 	}
 	return result, nil

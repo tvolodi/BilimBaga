@@ -10,6 +10,16 @@ interface ChangePasswordPayload {
   new_password: string
 }
 
+/** Decode the `role` claim from a JWT without signature verification. */
+function jwtRole(token: string): string | undefined {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return payload?.role as string | undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function ChangePasswordPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -19,11 +29,16 @@ export function ChangePasswordPage() {
   async function handleSubmit(values: ChangePasswordPayload) {
     try {
       await changePassword.mutateAsync(values)
+      // Update currentUser cache to clear force_password_change if it's still present.
       const user = qc.getQueryData<CurrentUser>(['auth', 'currentUser'])
       if (user) {
         qc.setQueryData(['auth', 'currentUser'], { ...user, force_password_change: false })
       }
-      if (user?.role === 'employee') {
+      // ISS-027: Decode role from JWT (same pattern as RequireRole after ISS-019).
+      // Do NOT rely on currentUser.role — it may have been garbage-collected by TanStack Query.
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      const role = token ? jwtRole(token) : undefined
+      if (role === 'employee') {
         navigate('/portal')
       } else {
         navigate('/admin')

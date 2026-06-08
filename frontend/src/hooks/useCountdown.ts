@@ -36,6 +36,10 @@ export function useCountdown(deadline: string | null): string {
       return
     }
 
+    // ISS-027: declare interval with let before tick() so the closure
+    // can safely call clearInterval(interval) without a TDZ ReferenceError.
+    let interval: ReturnType<typeof setInterval>
+
     const tick = () => {
       const remaining = new Date(deadline).getTime() - Date.now()
       if (remaining <= 0) {
@@ -47,7 +51,7 @@ export function useCountdown(deadline: string | null): string {
     }
 
     tick()
-    const interval = setInterval(tick, 1000)
+    interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [deadline, expiredStr, noDeadlineStr])
 

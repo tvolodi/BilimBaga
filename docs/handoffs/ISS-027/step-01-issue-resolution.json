@@ -1,0 +1,34 @@
+{
+  "issue_id": "ISS-027",
+  "run_id": "ISS-027",
+  "is_recurring": false,
+  "root_cause": "useCountdown.ts declares `const interval` after calling `tick()` synchronously. When `tick()` runs for a past deadline (remaining <= 0), it tries `clearInterval(interval)` while `interval` is still in the temporal dead zone (TDZ), throwing `ReferenceError: Cannot access 'interval' before initialization`. Without an error boundary, React 18 silently unmounts the entire tree, producing a blank page. Any employee with an expired exam triggers this on portal load.",
+  "affected_layer": "frontend",
+  "affected_files": [
+    "frontend/src/hooks/useCountdown.ts",
+    "frontend/src/components/ErrorBoundary.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/pages/auth/ChangePasswordPage.tsx",
+    "backend/internal/portal/model.go",
+    "backend/internal/portal/service.go",
+    "frontend/src/pages/EmployeePortal/EmployeePortal.test.tsx",
+    "docs/issue-reports/ISS-027-portal-blank-page-employee.md",
+    "docs/issue-reports/README.md"
+  ],
+  "fix_description": "1) Fix TDZ in useCountdown.ts: change `const interval` to `let interval` declared before `tick` so clearInterval works. 2) Add ErrorBoundary wrapping AppRoutes. 3) Fix ChangePasswordPage to decode role from JWT not currentUser cache. 4) Add show_answers/shuffle_questions/shuffle_options/certificate_enabled to PortalExamItem backend response. 5) Add 7 unit tests for EmployeePortal.",
+  "files_changed": [
+    "frontend/src/hooks/useCountdown.ts",
+    "frontend/src/components/ErrorBoundary.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/pages/auth/ChangePasswordPage.tsx",
+    "backend/internal/portal/model.go",
+    "backend/internal/portal/service.go",
+    "frontend/src/pages/EmployeePortal/EmployeePortal.test.tsx",
+    "docs/issue-reports/ISS-027-portal-blank-page-employee.md",
+    "docs/issue-reports/README.md",
+    "docs/handoffs/ISS-027/step-01-issue-resolution.json"
+  ],
+  "migration_applied": false,
+  "regression_test_added": true,
+  "regression_test_path": "frontend/src/pages/EmployeePortal/EmployeePortal.test.tsx"
+}

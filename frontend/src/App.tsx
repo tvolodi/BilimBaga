@@ -6,6 +6,7 @@ import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { RequireAuth } from '@/components/RequireAuth'
 import { RequireRole } from '@/components/RequireRole'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useRefreshToken } from '@/api/auth'
 import { useLocaleDirection } from '@/hooks/useLocaleDirection'
 import { SkipLink } from '@/components/SkipLink'
@@ -286,7 +287,9 @@ function AppRoot() {
   return (
     <>
       <SkipLink />
-      <AppRoutes />
+      <ErrorBoundary>
+        <AppRoutes />
+      </ErrorBoundary>
     </>
   )
 }

@@ -846,17 +846,79 @@ func TestPublish_UnsatisfiedRule_Returns422Error(t *testing.T) {
 	assert.Equal(t, 3, pve.Details[0].Available)
 }
 
-func TestPublish_ManualRulesSkippedInValidation(t *testing.T) {
+// ISS-033: manual-mode rules with sufficient selected questions must publish successfully.
+func TestPublish_ManualRule_SufficientQuestions_Succeeds(t *testing.T) {
 	repo := newMockRepo()
 	seedExam(repo, "exam-1", "draft")
-	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 10}
-	repo.countAvailableForRuleFn = func(_ context.Context, _ *ExamQuestionRule) (int, error) {
-		return 0, nil // would fail if called
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 3}
+	repo.countAvailableForManualRuleFn = func(_ context.Context, ruleID string) (int, error) {
+		assert.Equal(t, "rule-1", ruleID)
+		return 3, nil // exactly satisfied
 	}
 	svc := NewService(repo)
 	e, err := svc.Publish(context.Background(), "exam-1")
 	require.NoError(t, err)
 	assert.Equal(t, "active", e.Status)
+}
+
+// ISS-033: manual-mode rule with 0 selected questions must be rejected on publish.
+func TestPublish_ManualRule_ZeroSelectedQuestions_ReturnsUnsatisfied(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 3}
+	repo.countAvailableForManualRuleFn = func(_ context.Context, _ string) (int, error) {
+		return 0, nil // no questions selected
+	}
+	svc := NewService(repo)
+	_, err := svc.Publish(context.Background(), "exam-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrRulesUnsatisfied)
+	var pve *PublishValidationError
+	require.ErrorAs(t, err, &pve)
+	require.Len(t, pve.Details, 1)
+	assert.Equal(t, "rule-1", pve.Details[0].RuleID)
+	assert.Equal(t, 3, pve.Details[0].Required)
+	assert.Equal(t, 0, pve.Details[0].Available)
+}
+
+// ISS-033: manual-mode rule with fewer questions than count must be rejected on publish.
+func TestPublish_ManualRule_InsufficientSelectedQuestions_ReturnsUnsatisfied(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 50}
+	repo.countAvailableForManualRuleFn = func(_ context.Context, _ string) (int, error) {
+		return 2, nil // 2 selected but 50 required
+	}
+	svc := NewService(repo)
+	_, err := svc.Publish(context.Background(), "exam-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrRulesUnsatisfied)
+	var pve *PublishValidationError
+	require.ErrorAs(t, err, &pve)
+	require.Len(t, pve.Details, 1)
+	assert.Equal(t, "rule-1", pve.Details[0].RuleID)
+	assert.Equal(t, 50, pve.Details[0].Required)
+	assert.Equal(t, 2, pve.Details[0].Available)
+}
+
+// ISS-033: mixed exam (one random rule, one manual rule — both unsatisfied) reports both.
+func TestPublish_MixedRules_BothUnsatisfied_ReportsBoth(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-rand"] = &ExamQuestionRule{ID: "rule-rand", ExamID: "exam-1", Mode: "random", Count: 10}
+	repo.rules["rule-man"] = &ExamQuestionRule{ID: "rule-man", ExamID: "exam-1", Mode: "manual", Count: 5}
+	repo.countAvailableForRuleFn = func(_ context.Context, _ *ExamQuestionRule) (int, error) {
+		return 2, nil // random rule unsatisfied
+	}
+	repo.countAvailableForManualRuleFn = func(_ context.Context, _ string) (int, error) {
+		return 1, nil // manual rule unsatisfied
+	}
+	svc := NewService(repo)
+	_, err := svc.Publish(context.Background(), "exam-1")
+	require.Error(t, err)
+	var pve *PublishValidationError
+	require.ErrorAs(t, err, &pve)
+	assert.Len(t, pve.Details, 2)
 }
 
 func TestPublish_NonDraftExam_ReturnsErrNotDraft(t *testing.T) {

@@ -193,10 +193,23 @@ func (s *service) Publish(ctx context.Context, id string) (*Exam, error) {
 
 	var unsatisfied []RuleUnsatisfiedDetail
 	for _, rule := range rules {
+		var available int
 		if rule.Mode == "manual" {
+			available, err = s.repo.CountAvailableForManualRule(ctx, rule.ID)
+			if err != nil {
+				return nil, fmt.Errorf("exams: Publish: count manual rule %s: %w", rule.ID, err)
+			}
+			if available < rule.Count {
+				unsatisfied = append(unsatisfied, RuleUnsatisfiedDetail{
+					RuleID:    rule.ID,
+					Required:  rule.Count,
+					Available: available,
+					Filter:    map[string]any{"mode": "manual"},
+				})
+			}
 			continue
 		}
-		available, err := s.repo.CountAvailableForRule(ctx, rule)
+		available, err = s.repo.CountAvailableForRule(ctx, rule)
 		if err != nil {
 			return nil, fmt.Errorf("exams: Publish: count for rule %s: %w", rule.ID, err)
 		}

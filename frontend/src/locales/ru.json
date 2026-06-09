@@ -626,6 +626,7 @@
       },
       "timeLimit": "{{minutes}} мин",
       "passingScore": "Порог: {{pct}}%",
+      "noAttemptsRemaining": "Попытки исчерпаны",
       "attempts": "Попытка {{used}} из {{max}}",
       "deadline": "До {{countdown}}",
       "noDeadline": "Без срока"
@@ -633,6 +634,7 @@
     "modal": {
       "title": "Начать экзамен",
       "timeLimit": "У вас будет {{minutes}} минут.",
+      "passingScore": "Проходной балл: {{pct}}%",
       "maxAttempts": "Осталось попыток: {{remaining}}.",
       "warning": "После старта не закрывайте и не переключайте вкладки — это может быть зачтено как нарушение.",
       "confirm": "Начать экзамен",

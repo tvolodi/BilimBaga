@@ -37,6 +37,7 @@ export function StartExamModal({
           {exam.time_limit_minutes > 0 && (
             <p>{t('portal.modal.timeLimit', { minutes: exam.time_limit_minutes })}</p>
           )}
+          <p>{t('portal.modal.passingScore', { pct: exam.passing_score_pct })}</p>
           <p>{t('portal.modal.maxAttempts', { remaining })}</p>
           <p className="text-amber-600 font-medium">{t('portal.modal.warning')}</p>
         </div>

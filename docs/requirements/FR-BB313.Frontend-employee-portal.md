@@ -6,7 +6,7 @@
 | ID | FR-BB313 |
 | Phase | 3 — Exam Engine |
 | Priority | 2 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | FR-BB34, FR-BB35 |
 
 ## Scope
@@ -26,13 +26,14 @@ Implements the employee-facing exam portal page — the primary entry point for 
 - [ ] AC-1: The portal page loads all assigned exams via `GET /api/v1/portal/exams` using React Query with a `refetchInterval` of 30 000 ms (30 seconds).
 - [ ] AC-2: Each exam card displays: exam title, description (truncated to 2 lines), a status pill, time limit, passing score %, attempts used vs max, and deadline countdown (or "No deadline" if absent).
 - [ ] AC-3: Status pill colours and labels: `not_started` → grey "Not started"; `in_progress` → blue "In progress"; `passed` → green "Passed"; `failed` → red "Failed"; `expired` → orange "Expired".
-- [ ] AC-4: The CTA button per card: `not_started` → "Start exam"; `in_progress` → "Continue"; `passed` → "View result"; `failed` → "View result" (disabled if `show_answers === 'never'`); `expired` → no action button.
-- [ ] AC-5: Clicking "Start exam" opens a confirmation modal that displays: time limit, whether questions/options are shuffled, max attempts warning, and cannot-leave warning message; the user must explicitly confirm before the session is created.
+- [ ] AC-4: The CTA button per card: `not_started` → "Start exam"; `in_progress` → "Continue"; `passed` → "View result"; `failed` → "View result" (disabled if `show_answers === 'never'`); `expired` → no action button. **Exception**: when `attempts_used >= max_attempts` AND `user_status === 'failed'`, replace the CTA with a disabled "No attempts remaining" state (button hidden or visually disabled) and display a `portal.card.noAttemptsRemaining` sub-label beneath the status pill.
+- [ ] AC-5: Clicking "Start exam" opens a confirmation modal that displays: time limit, passing score (from `passing_score_pct`), whether questions/options are shuffled, max attempts warning, and cannot-leave warning message; the user must explicitly confirm before the session is created.
 - [ ] AC-6: The confirmation modal's "Begin" button calls `POST /api/v1/portal/exams/:id/sessions`; on success, navigates to `/portal/sessions/:sessionId` (exam-taking route defined in FR-BB37).
 - [ ] AC-7: Clicking "Continue" navigates to `/portal/sessions/:sessionId` using the `open_session_id` (no new session created).
 - [ ] AC-8: An empty state component is shown when the `data` array is empty, with an appropriate icon and localised message.
 - [ ] AC-9: Deadline countdown displays `HH:MM:SS` when less than 24 hours remain; `X days Y hours` for longer durations; counts down in real-time using a `setInterval` on the client (updated every second).
 - [ ] AC-10: Zero hardcoded user-visible strings; all text references `src/locales/{locale}.json` keys.
+- [ ] AC-11: When `attempts_used >= max_attempts` AND `user_status === 'failed'`, the exam card must visually communicate that no retakes are available — specifically: the "Failed" status pill remains visible, a `portal.card.noAttemptsRemaining` sub-label is rendered beneath it, and no active CTA is presented.
 
 ## Technical Specification
 
@@ -91,7 +92,7 @@ interface StartExamModalProps {
 }
 ```
 
-> **Note**: `StartExamModal` reads `shuffle_questions` and `shuffle_options` directly from the `exam` prop (already loaded with the card list — no extra fetch needed).
+> **Note**: `StartExamModal` reads `shuffle_questions`, `shuffle_options`, and `passing_score_pct` directly from the `exam` prop (already loaded with the card list — no extra fetch needed). No API change is required to expose `passing_score_pct` in the modal; it is already present on the `PortalExam` interface.
 
 #### CreateSession Response Interface
 
@@ -186,8 +187,10 @@ export function useCreateSession(examId: string) {
   "portal.modal.timeLimit": "You will have {{minutes}} minutes.",
   "portal.modal.maxAttempts": "You have {{remaining}} attempt(s) remaining.",
   "portal.modal.warning": "Once started, do not close or switch tabs — it may be counted against you.",
+  "portal.modal.passingScore": "Pass score: {{pct}}%",
   "portal.modal.confirm": "Begin exam",
   "portal.modal.cancel": "Cancel",
+  "portal.card.noAttemptsRemaining": "No attempts remaining",
   "portal.deadline.expired": "Expired"
 }
 ```
@@ -198,6 +201,12 @@ export function useCreateSession(examId: string) {
 - Session answer-saving logic and question rendering (FR-BB37).
 - Admin exam management UI (covered in Phase 3 admin requirements).
 - Backend `PortalExamItem` changes needed to expose `show_answers`, `shuffle_questions`, `shuffle_options` on the list endpoint (tracked separately as a backend concern; this requirement specifies the frontend contract).
+
+## Amendment Log
+
+### 2026-06-09 — UAT Gap Resolution (uat-employee-exam-taking-20260609)
+- Added passing score to StartExamModal specification (AC-5 amendment, Gap D1).
+- Added "No attempts remaining" state to ExamCard specification (AC-4 amendment / AC-11 addition, Gap D6).
 
 ## Test Strategy
 

@@ -1,0 +1,14 @@
+{
+  "run_id": "uat-employee-exam-taking-20260609-rerun",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "PASS",
+  "iss_ids_resolved": ["ISS-036", "ISS-037", "ISS-038", "ISS-039"],
+  "gaps_resolved": ["D1", "D6"],
+  "requirements_updated": [
+    "docs/requirements/employee-exam-taking-process.md",
+    "docs/requirements/FR-BB313.Frontend-employee-portal.md",
+    "docs/requirements/FR-BB314.Frontend-exam-taking-screen.md"
+  ],
+  "next_action": "Release Finalizer"
+}

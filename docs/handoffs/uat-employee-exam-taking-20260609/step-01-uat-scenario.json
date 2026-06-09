@@ -1,0 +1,8 @@
+{
+  "run_id": "uat-employee-exam-taking-20260609",
+  "pipeline": "UAT",
+  "step": 1,
+  "scenario_path": "docs/uat-scenarios/employee-exam-taking-20260609.md",
+  "requirement_path": "docs/requirements/employee-exam-taking-process.md",
+  "base_url": "http://localhost:5173"
+}

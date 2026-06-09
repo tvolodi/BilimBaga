@@ -116,7 +116,29 @@ describe('EmployeePortal', () => {
     )
   })
 
-  it('renders a failed exam with View result button', async () => {
+  it('renders a failed exam with View result button when attempts remain', async () => {
+    server.use(
+      http.get('/api/v1/portal/exams', () =>
+        HttpResponse.json({
+          data: [
+            makeExam({
+              user_status: 'failed',
+              attempts_used: 2,
+              max_attempts: 3,
+              show_answers: 'after_completion',
+            }),
+          ],
+          error: null,
+        }),
+      ),
+    )
+    renderPortal()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /view result/i })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders a failed exam with no CTA and no-attempts sub-label when all attempts exhausted', async () => {
     server.use(
       http.get('/api/v1/portal/exams', () =>
         HttpResponse.json({
@@ -134,8 +156,9 @@ describe('EmployeePortal', () => {
     )
     renderPortal()
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /view result/i })).toBeInTheDocument(),
+      expect(screen.getByText(/no attempts remaining/i)).toBeInTheDocument(),
     )
+    expect(screen.queryByRole('button', { name: /view result/i })).not.toBeInTheDocument()
   })
 
   it('renders an expired exam without CTA button', async () => {
@@ -181,5 +204,30 @@ describe('EmployeePortal', () => {
       const btn = screen.getByRole('button', { name: /view result/i })
       expect(btn).toBeDisabled()
     })
+  })
+
+  // ISS-038: open_session_id takes priority over user_status for card display
+  it('shows "In progress" status and "Continue" button when open_session_id is set even if user_status is "passed"', async () => {
+    server.use(
+      http.get('/api/v1/portal/exams', () =>
+        HttpResponse.json({
+          data: [
+            makeExam({
+              user_status: 'passed',
+              open_session_id: 'sess-abc-123',
+              attempts_used: 1,
+              max_attempts: 2,
+            }),
+          ],
+          error: null,
+        }),
+      ),
+    )
+    renderPortal()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument()
+    })
+    expect(screen.getByText(/in progress/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /view result/i })).toBeNull()
   })
 })

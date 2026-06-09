@@ -26,11 +26,15 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
   const navigate = useNavigate()
   const countdown = useCountdown(exam.deadline)
 
-  const statusVariant = STATUS_VARIANT[exam.user_status]
-  const statusLabel = t(`portal.card.status.${exam.user_status}`)
+  // ISS-038: when an active session exists, always show in-progress state regardless of user_status
+  const displayStatus: UserStatus = exam.open_session_id ? 'in_progress' : exam.user_status
+
+  const statusVariant = STATUS_VARIANT[displayStatus]
+  const statusLabel = t(`portal.card.status.${displayStatus}`)
+  const noAttemptsRemaining = displayStatus === 'failed' && exam.attempts_used >= exam.max_attempts
 
   function handleCta() {
-    switch (exam.user_status) {
+    switch (displayStatus) {
       case 'not_started':
         onStart(exam.id)
         break
@@ -47,7 +51,7 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
   }
 
   const ctaLabel = (() => {
-    switch (exam.user_status) {
+    switch (displayStatus) {
       case 'not_started':
         return t('portal.card.cta.start')
       case 'in_progress':
@@ -60,15 +64,20 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
     }
   })()
 
-  const ctaDisabled = exam.user_status === 'failed' && exam.show_answers === 'never'
-  const showCta = exam.user_status !== 'expired' && ctaLabel !== null
+  const ctaDisabled = displayStatus === 'failed' && exam.show_answers === 'never'
+  const showCta = displayStatus !== 'expired' && ctaLabel !== null && !noAttemptsRemaining
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-base leading-tight">{exam.title}</h3>
-          <Badge variant={statusVariant}>{statusLabel}</Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant={statusVariant}>{statusLabel}</Badge>
+            {noAttemptsRemaining && (
+              <span className="text-xs text-muted-foreground">{t('portal.card.noAttemptsRemaining')}</span>
+            )}
+          </div>
         </div>
         {exam.description && (
           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{exam.description}</p>
@@ -92,7 +101,7 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
         {showCta && (
           <Button
             className="w-full"
-            variant={exam.user_status === 'not_started' ? 'default' : 'outline'}
+            variant={displayStatus === 'not_started' ? 'default' : 'outline'}
             disabled={ctaDisabled}
             onClick={handleCta}
           >

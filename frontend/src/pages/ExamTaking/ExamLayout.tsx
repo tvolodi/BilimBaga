@@ -68,6 +68,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
 
   // Save status
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null)
   const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -129,12 +130,16 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
   // Reset save status auto-dismiss helper
   function scheduleSaveStatusReset(ms: number) {
     if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current)
-    saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), ms)
+    saveStatusTimerRef.current = setTimeout(() => {
+      setSaveStatus('idle')
+      setSavingQuestionId(null)
+    }, ms)
   }
 
   // Core save trigger
   const triggerSave = useCallback(
     (questionId: string, answer: SavedAnswer) => {
+      setSavingQuestionId(questionId)
       setSaveStatus('saving')
       saveAnswer.mutate(
         {
@@ -291,6 +296,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
               onAnswer={(optionIds, textAnswer) => handleAnswer(nextQ.id, optionIds, textAnswer)}
               isFlagged={false}
               onToggleFlag={() => {}}
+              saveStatus={saveStatus}
             />
           )}
         </main>
@@ -345,6 +351,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
                 }
                 isFlagged={flags.has(question.id)}
                 onToggleFlag={() => toggleFlag(question.id)}
+                saveStatus={question.id === savingQuestionId ? saveStatus : 'idle'}
               />
             </div>
           ))}

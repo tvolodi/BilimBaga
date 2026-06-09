@@ -1,15 +1,13 @@
-import { useState } from 'react'
-import { useParams, Navigate } from 'react-router-dom'
+import { useParams, Navigate, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useSession, type SubmitResult } from '@/api/sessions'
+import { useSession } from '@/api/sessions'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { ExamLayout } from './ExamLayout'
-import { ResultScreen } from './ResultScreen'
 
 export function ExamTakingPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const { t } = useTranslation()
-  const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null)
+  const navigate = useNavigate()
 
   const { data: session, isLoading, isError } = useSession(sessionId ?? '')
 
@@ -25,36 +23,14 @@ export function ExamTakingPage() {
     )
   }
 
-  if (submitResult) {
-    return (
-      <ResultScreen
-        result={submitResult}
-        examTitle={session.exam_title}
-        certificateEnabled={session.certificate_enabled}
-      />
-    )
-  }
-
   if (session.status === 'submitted' || session.status === 'auto_submitted') {
-    return (
-      <ResultScreen
-        result={{
-          session_id: session.session_id,
-          status: session.status,
-          submitted_at: session.expires_at,
-          score_pct: null,
-          passed: null,
-        }}
-        examTitle={session.exam_title}
-        certificateEnabled={session.certificate_enabled}
-      />
-    )
+    return <Navigate to={`/portal/sessions/${session.session_id}/result`} replace />
   }
 
   return (
     <ExamLayout
       session={session}
-      onSubmitSuccess={setSubmitResult}
+      onSubmitSuccess={(result) => navigate(`/portal/sessions/${result.session_id}/result`)}
     />
   )
 }

@@ -15,7 +15,6 @@ export function ResultActions({
   passed,
   certificateEnabled,
   canRetake,
-  examId,
 }: ResultActionsProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -42,7 +41,7 @@ export function ResultActions({
         </Button>
       )}
       {canRetake && (
-        <Button variant="outline" onClick={() => navigate(`/portal/exams/${examId}`)}>
+        <Button variant="outline" onClick={() => navigate('/portal')}>
           {t('result.retake_exam')}
         </Button>
       )}

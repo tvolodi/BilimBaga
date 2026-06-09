@@ -626,6 +626,7 @@
       },
       "timeLimit": "{{minutes}} мин",
       "passingScore": "Өту балы: {{pct}}%",
+      "noAttemptsRemaining": "Қайта тапсыру мүмкіндігі жоқ",
       "attempts": "{{max}} ішінен {{used}}-ші әрекет",
       "deadline": "Мерзімі: {{countdown}}",
       "noDeadline": "Мерзімсіз"
@@ -633,6 +634,7 @@
     "modal": {
       "title": "Емтиханды бастау",
       "timeLimit": "Сізге {{minutes}} минут беріледі.",
+      "passingScore": "Өту балы: {{pct}}%",
       "maxAttempts": "Сізде {{remaining}} әрекет қалды.",
       "warning": "Бастағаннан кейін қойындыны жаппаңыз немесе ауыстырмаңыз — бұл есепке алынуы мүмкін.",
       "confirm": "Емтиханды бастау",

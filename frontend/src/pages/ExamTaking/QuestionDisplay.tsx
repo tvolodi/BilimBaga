@@ -4,6 +4,8 @@ import { MultipleChoiceInput } from './MultipleChoiceInput'
 import { LikertInput } from './LikertInput'
 import { ShortTextInput } from './ShortTextInput'
 import { FlagButton } from './FlagButton'
+import { SaveIndicator } from './SaveIndicator'
+import type { SaveStatus } from './ExamLayout'
 
 interface QuestionDisplayProps {
   question: SessionQuestion
@@ -11,6 +13,7 @@ interface QuestionDisplayProps {
   onAnswer: (optionIds: string[], textAnswer: string | null) => void
   isFlagged: boolean
   onToggleFlag: () => void
+  saveStatus?: SaveStatus
 }
 
 export function QuestionDisplay({
@@ -19,6 +22,7 @@ export function QuestionDisplay({
   onAnswer,
   isFlagged,
   onToggleFlag,
+  saveStatus = 'idle',
 }: QuestionDisplayProps) {
   const renderInput = () => {
     switch (question.type) {
@@ -70,6 +74,11 @@ export function QuestionDisplay({
         <FlagButton isFlagged={isFlagged} onToggle={onToggleFlag} />
       </div>
       {renderInput()}
+      {saveStatus !== 'idle' && (
+        <div className="flex justify-end pt-1">
+          <SaveIndicator status={saveStatus} />
+        </div>
+      )}
     </div>
   )
 }

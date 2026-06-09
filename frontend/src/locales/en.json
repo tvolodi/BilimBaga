@@ -626,6 +626,7 @@
       },
       "timeLimit": "{{minutes}} min",
       "passingScore": "Pass: {{pct}}%",
+      "noAttemptsRemaining": "No attempts remaining",
       "attempts": "Attempt {{used}} of {{max}}",
       "deadline": "Due {{countdown}}",
       "noDeadline": "No deadline"
@@ -633,6 +634,7 @@
     "modal": {
       "title": "Start exam",
       "timeLimit": "You will have {{minutes}} minutes.",
+      "passingScore": "Pass score: {{pct}}%",
       "maxAttempts": "You have {{remaining}} attempt(s) remaining.",
       "warning": "Once started, do not close or switch tabs — it may be counted against you.",
       "confirm": "Begin exam",

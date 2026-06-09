@@ -2,9 +2,17 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Plus, BarChart2, Pencil } from 'lucide-react'
-import { useExams, useUnpublishExam, type ExamApiError } from '@/api/exams'
+import { useExams, useUnpublishExam, useArchiveExam, type ExamApiError } from '@/api/exams'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 function StatusBadge({ status }: { status: 'draft' | 'active' | 'archived' }) {
   const colors = {
@@ -25,8 +33,12 @@ export function ExamsListPage() {
   const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [unpublishError, setUnpublishError] = useState<string | null>(null)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
+  const [archiveSuccess, setArchiveSuccess] = useState<string | null>(null)
+  const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null)
   const { data, isLoading, isError } = useExams({ page, per_page: 20 })
   const unpublishMutation = useUnpublishExam()
+  const archiveMutation = useArchiveExam()
 
   const totalPages = data ? Math.ceil(data.meta.total / data.meta.per_page) : 1
 
@@ -35,6 +47,22 @@ export function ExamsListPage() {
     unpublishMutation.mutate(examId, {
       onError: (err: ExamApiError) => {
         setUnpublishError(err.message)
+      },
+    })
+  }
+
+  function handleArchiveConfirm() {
+    if (!archiveConfirmId) return
+    setArchiveError(null)
+    setArchiveSuccess(null)
+    archiveMutation.mutate(archiveConfirmId, {
+      onSuccess: () => {
+        setArchiveConfirmId(null)
+        setArchiveSuccess(t('exam.archive.success'))
+      },
+      onError: (err: ExamApiError) => {
+        setArchiveConfirmId(null)
+        setArchiveError(err.message || t('exam.archive.error'))
       },
     })
   }
@@ -69,6 +97,14 @@ export function ExamsListPage() {
       {/* Unpublish error */}
       {unpublishError && (
         <p className="text-sm text-destructive">{unpublishError}</p>
+      )}
+
+      {/* Archive feedback */}
+      {archiveSuccess && (
+        <p className="text-sm text-green-700">{archiveSuccess}</p>
+      )}
+      {archiveError && (
+        <p className="text-sm text-destructive">{archiveError}</p>
       )}
 
       {/* Table */}
@@ -137,6 +173,16 @@ export function ExamsListPage() {
                           {t('exam.unpublish.button')}
                         </Button>
                       )}
+                      {(exam.status === 'draft' || exam.status === 'active') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setArchiveConfirmId(exam.id)}
+                          disabled={archiveMutation.isPending}
+                        >
+                          {t('exam.archive.button')}
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -170,6 +216,34 @@ export function ExamsListPage() {
           </Button>
         </div>
       )}
+
+      {/* Archive confirmation dialog */}
+      <Dialog open={!!archiveConfirmId} onOpenChange={(open) => { if (!open) setArchiveConfirmId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('exam.archive.confirm')}</DialogTitle>
+            <DialogDescription>
+              {t('exam.archive.confirmDetail')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setArchiveConfirmId(null)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleArchiveConfirm}
+              disabled={archiveMutation.isPending}
+            >
+              {t('exam.archive.button')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

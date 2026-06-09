@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useExam, usePublishExam, useUnpublishExam, useEligibleCounts, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
+import { useExam, usePublishExam, useUnpublishExam, useArchiveExam, useEligibleCounts, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -41,10 +41,12 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
   const { data: exam, isLoading } = useExam(examId)
   const publishExam = usePublishExam(examId)
   const unpublishExam = useUnpublishExam()
+  const archiveExam = useArchiveExam()
   const { data: eligibleData, isLoading: eligibleLoading, isError: eligibleError } = useEligibleCounts(examId)
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [unpublishDialogOpen, setUnpublishDialogOpen] = useState(false)
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
   const [successBanner, setSuccessBanner] = useState(false)
   const [unsatisfiedRules, setUnsatisfiedRules] = useState<PublishValidationDetail[] | null>(null)
   const [generalError, setGeneralError] = useState<string | null>(null)
@@ -78,6 +80,19 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
       setUnpublishDialogOpen(false)
       const apiErr = err as ExamApiError
       setGeneralError(apiErr.message)
+    }
+  }
+
+  async function handleArchiveConfirm() {
+    setGeneralError(null)
+    try {
+      await archiveExam.mutateAsync(examId)
+      setArchiveDialogOpen(false)
+      navigate('/admin/exams')
+    } catch (err) {
+      setArchiveDialogOpen(false)
+      const apiErr = err as ExamApiError
+      setGeneralError(apiErr.message || t('exam.archive.error'))
     }
   }
 
@@ -258,6 +273,21 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
                 t('exam.unpublish.button')
               )}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setArchiveDialogOpen(true)}
+              disabled={archiveExam.isPending}
+            >
+              {archiveExam.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('exam.archive.button')}
+                </>
+              ) : (
+                t('exam.archive.button')
+              )}
+            </Button>
           </div>
         )}
       </div>
@@ -318,6 +348,37 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
                 </>
               ) : (
                 t('exam.unpublish.confirm')
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive confirm dialog */}
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('exam.archive.confirm')}</DialogTitle>
+            <DialogDescription>
+              {t('exam.archive.confirmDetail')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setArchiveDialogOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" onClick={handleArchiveConfirm} disabled={archiveExam.isPending}>
+              {archiveExam.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('exam.archive.button')}
+                </>
+              ) : (
+                t('exam.archive.button')
               )}
             </Button>
           </DialogFooter>

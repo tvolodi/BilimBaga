@@ -486,7 +486,8 @@
       "back": "Back",
       "saving": "Saving…",
       "createTitle": "Create Exam",
-      "editTitle": "Edit Exam"
+      "editTitle": "Edit Exam",
+      "activeReadOnlyNotice": "This exam is active. Unpublish it to make changes."
     },
     "field": {
       "title": "Exam title",
@@ -536,6 +537,13 @@
       "confirmDetail": "This will revert the exam to Draft status. Employees will no longer see it until you publish it again. Completed results will not be affected.",
       "success": "Exam reverted to draft.",
       "errorActiveSessions": "Cannot unpublish: there are active exam sessions in progress."
+    },
+    "archive": {
+      "button": "Archive",
+      "confirm": "Archive this exam?",
+      "confirmDetail": "Archiving this exam will remove it from the assignable list. Historical session data will remain accessible. This action cannot be undone.",
+      "success": "Exam archived successfully.",
+      "error": "Failed to archive exam. Please try again."
     },
     "error": {
       "required": "is required",

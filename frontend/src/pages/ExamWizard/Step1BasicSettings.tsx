@@ -46,10 +46,12 @@ function Switch({
   checked,
   onChange,
   id,
+  disabled,
 }: {
   checked: boolean
   onChange: (v: boolean) => void
   id?: string
+  disabled?: boolean
 }) {
   return (
     <button
@@ -57,8 +59,9 @@ function Switch({
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
         checked ? 'bg-primary' : 'bg-input'
       }`}
     >
@@ -145,6 +148,8 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
   const [errors, setErrors] = useState<ValidationErrors>({})
   const [apiError, setApiError] = useState<string | null>(null)
 
+  const isReadOnly = exam?.status === 'active'
+
   useEffect(() => {
     setForm(formFromExam(exam))
   }, [exam?.id])
@@ -213,6 +218,12 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {isReadOnly && (
+        <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+          {t('exam.wizard.activeReadOnlyNotice')}
+        </div>
+      )}
+
       {apiError && (
         <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
           {apiError}
@@ -228,6 +239,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
           onChange={(e) => set('title', e.target.value)}
           placeholder={t('exam.field.title')}
           className={errors.title ? 'border-destructive' : ''}
+          disabled={isReadOnly}
         />
         {errors.title && (
           <p className="text-xs text-destructive">{t('exam.field.title')} {t('exam.error.required')}</p>
@@ -242,6 +254,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
           value={form.description}
           onChange={(e) => set('description', e.target.value)}
           rows={3}
+          disabled={isReadOnly}
           className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
         />
       </div>
@@ -258,6 +271,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
             value={form.timeLimitMinutes}
             onChange={(e) => set('timeLimitMinutes', e.target.value)}
             className={errors.timeLimitMinutes ? 'border-destructive' : ''}
+            disabled={isReadOnly}
           />
           {errors.timeLimitMinutes && (
             <p className="text-xs text-destructive">{t('exam.error.range', { min: 1, max: 300 })}</p>
@@ -275,6 +289,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
             value={form.passingScorePct}
             onChange={(e) => set('passingScorePct', e.target.value)}
             className={errors.passingScorePct ? 'border-destructive' : ''}
+            disabled={isReadOnly}
           />
           {errors.passingScorePct && (
             <p className="text-xs text-destructive">{t('exam.error.range', { min: 0, max: 100 })}</p>
@@ -292,6 +307,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
             value={form.maxAttempts}
             onChange={(e) => set('maxAttempts', e.target.value)}
             className={errors.maxAttempts ? 'border-destructive' : ''}
+            disabled={isReadOnly}
           />
           {errors.maxAttempts && (
             <p className="text-xs text-destructive">{t('exam.error.range', { min: 1, max: 10 })}</p>
@@ -306,12 +322,14 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
           label={t('exam.field.availableFrom')}
           value={form.availableFrom}
           onChange={(v) => set('availableFrom', v)}
+          disabled={isReadOnly}
         />
         <DateTimePicker
           id="availableUntil"
           label={t('exam.field.availableUntil')}
           value={form.availableUntil}
           onChange={(v) => set('availableUntil', v)}
+          disabled={isReadOnly}
         />
       </div>
       {errors.availableUntil && (
@@ -326,6 +344,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
             id="showAnswers"
             value={form.showAnswers}
             onChange={(e) => set('showAnswers', e.target.value as FormState['showAnswers'])}
+            disabled={isReadOnly}
           >
             <option value="never">{t('exam.showAnswers.never')}</option>
             <option value="after_completion">{t('exam.showAnswers.after_completion')}</option>
@@ -339,6 +358,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
             id="onTabSwitch"
             value={form.onTabSwitch}
             onChange={(e) => set('onTabSwitch', e.target.value as FormState['onTabSwitch'])}
+            disabled={isReadOnly}
           >
             <option value="log">{t('exam.onTabSwitch.log')}</option>
             <option value="warn">{t('exam.onTabSwitch.warn')}</option>
@@ -362,6 +382,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
               id={key}
               checked={form[key] as boolean}
               onChange={(v) => set(key, v)}
+              disabled={isReadOnly}
             />
           </div>
         ))}
@@ -369,7 +390,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
 
       {/* Navigation */}
       <div className="flex justify-end pt-4">
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || isReadOnly}>
           {isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

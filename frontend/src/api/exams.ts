@@ -276,6 +276,24 @@ export function useUnpublishExam() {
   })
 }
 
+export function useArchiveExam() {
+  const qc = useQueryClient()
+  return useMutation<{ id: string; status: string }, ExamApiError, string>({
+    mutationFn: (examId) => {
+      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+      return examsFetch<{ id: string; status: string }>(
+        `/api/v1/exams/${examId}/archive`,
+        token,
+        { method: 'POST' },
+      )
+    },
+    onSuccess: (_data, examId) => {
+      qc.invalidateQueries({ queryKey: ['exams'] })
+      qc.invalidateQueries({ queryKey: ['exams', examId] })
+    },
+  })
+}
+
 // ---- Section hooks ----------------------------------------------------------
 
 export function useAddSection() {

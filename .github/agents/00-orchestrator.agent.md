@@ -27,6 +27,14 @@ handoffs:
     agent: e2e-repair
     prompt: Run the full visual E2E walkthrough, diagnose failures, and drive Issue Resolution until all tests pass.
     send: true
+  - label: Business Analyst
+    agent: business-analyst
+    prompt: Execute the assigned BA mode (process-definition, uat-scenario, or uat-decision). Full instructions in .github/agents/business-analyst.agent.md.
+    send: true
+  - label: UAT Runner
+    agent: uat-runner
+    prompt: Execute the UAT scenario script and return the UAT report to the Business Analyst.
+    send: true
 ---
 
 # Orchestrator Agent
@@ -71,6 +79,8 @@ When a subagent reports an **unrelated blocker** (broken Go package, failing unr
 | "Update docs...", "Documentation..." | C | Requirement Development |
 | "Configure...", "Set up env...", Docker, migrations, CORS | Infra | Infrastructure Configuration |
 | "Run E2E tests", "Run walkthrough", "/e2e-repair", "test everything visually" | E2E | E2E Repair Loop |
+| "Define business process for...", "Document workflow for...", "BA spec for..." | BA | Business Analyst (Mode A/B) |
+| "Verify business process", "UAT for...", "Test <feature> as a user", "BA check" | UAT | Business Analyst (Mode B) → UAT Runner → Business Analyst (Mode C) |
 
 ---
 
@@ -115,6 +125,50 @@ Step 2  Release Finalizer       → git commit
 ```
 Step 1  Infrastructure Configuration → env, Docker, migrations, CORS, source code
 Step 2  Release Finalizer            → git commit
+```
+
+---
+
+## Pipeline BA: Business Process Definition
+
+**Trigger**: user asks to define, document, create, or change a business process.
+
+```
+Step 1  Business Analyst (Mode A — Process Definition)
+        → produces: docs/requirements/{slug}-process.md
+        → hands off to Requirement Development
+Step 2  Requirement Development
+        → produces: docs/requirements/{slug}.md (FR-BBxxx)
+Step 3  Continue as Pipeline A from Step 2 (Requirement Validation → Implementation)
+```
+
+---
+
+## Pipeline UAT: Business Process Verification
+
+**Trigger**: user says "verify <process>", "UAT for <feature>", "test <feature> as a user", "BA check".
+
+**Prerequisite check**: Confirm `make dev` is running before spawning UAT Runner. If not, spawn Infrastructure Configuration first.
+
+```
+Step 1  Business Analyst (Mode B — UAT Scenario Authoring)
+        → produces: docs/uat-scenarios/{slug}-{date}.md
+Step 2  UAT Runner
+        → executes scenario against live GUI (hybrid: Playwright + browser tool)
+        → produces: docs/uat-reports/{run-id}.md
+Step 3  Business Analyst (Mode C — UAT Decision)
+        ├── PASS       → Release Finalizer (status update to uat-verified)
+        ├── DEFECT     → Issue Resolution (per failing step) → re-run UAT (back to Step 2)
+        ├── REQ GAP    → Requirement Development → continue as Pipeline A
+        └── ENV ISSUE  → Infrastructure Configuration → re-run UAT (back to Step 2)
+        Retry cap: 3 iterations per defect; escalate to user if unresolved
+```
+
+**State fields** (add to the yaml tracking block):
+```yaml
+uat_iteration: 0              # increments each full UAT run
+uat_failing_steps: []         # list of step descriptions still failing
+uat_iss_ids: []               # ISS IDs opened this UAT session
 ```
 
 ---

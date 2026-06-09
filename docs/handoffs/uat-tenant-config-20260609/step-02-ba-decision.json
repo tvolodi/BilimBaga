@@ -1,0 +1,45 @@
+{
+  "run_id": "uat-tenant-config-20260609",
+  "pipeline": "UAT",
+  "step": 2,
+  "decision": "DEFECT",
+  "defect_count": 2,
+  "scenario_path": "docs/uat-scenarios/tenant-configuration-20260609.md",
+  "requirement_path": "docs/requirements/tenant-configuration-process.md",
+  "uat_report_path": "docs/uat-reports/uat-tenant-config-20260609.md",
+  "defects": [
+    {
+      "id": "D-01",
+      "iss": "ISS-028",
+      "iss_path": "docs/issue-reports/ISS-028-uat-defect-sidebar-app-name-hardcoded.md",
+      "decision": "DEFECT",
+      "severity": "medium",
+      "title": "Admin sidebar app name hardcoded — does not use tenant config app_name",
+      "layer": "frontend",
+      "module": "src/components/admin/Sidebar.tsx",
+      "root_cause_summary": "Sidebar.tsx renders a hardcoded literal 'BilimBaga' instead of reading app_name from the tenant config query. The login page correctly fetches and displays app_name; the sidebar does not.",
+      "routing_action": "delegate to Issue Resolution",
+      "ac_impacted": ["AC#2"],
+      "related_requirement": "FR-BB13"
+    },
+    {
+      "id": "D-02",
+      "iss": "ISS-029",
+      "iss_path": "docs/issue-reports/ISS-029-uat-defect-dept-admin-login-redirect-loop.md",
+      "decision": "DEFECT",
+      "severity": "high",
+      "title": "Department Admin cannot log in — RequireAuth race condition redirects to /login after successful API authentication",
+      "layer": "frontend",
+      "module": "src/components/RequireAuth.tsx",
+      "root_cause_summary": "RequireAuth reads getQueryData(['auth', 'accessToken']) synchronously. For users without a prior httpOnly refresh cookie, /auth/refresh returns 401, the cache stays null, and the synchronous guard redirects to /login — even immediately after a successful login mutation sets the cache — because the route change triggers a new synchronous evaluation before the query settles.",
+      "routing_action": "delegate to Issue Resolution (fix before D-01; D-01 testing is unblocked by this fix because RBAC verification requires dept admin login to work)",
+      "ac_impacted": ["AC#6"],
+      "related_requirement": "FR-BB112"
+    }
+  ],
+  "grouping_recommendation": "Fix D-02 first (blocks RBAC verification for AC#6). D-01 and D-02 have different root causes and different modules; treat as separate Issue Resolution tasks.",
+  "rerun_uat_after_fixes": true,
+  "retry_count": 1,
+  "retry_cap": 3,
+  "next_step": "Orchestrator: spawn Issue Resolution for ISS-029 (D-02, high severity, RequireAuth race condition), then Issue Resolution for ISS-028 (D-01, medium severity, Sidebar hardcoded name). After both fixes: re-run UAT Runner with the same scenario script to verify AC#2 and AC#6."
+}

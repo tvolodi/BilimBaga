@@ -160,10 +160,13 @@ Format: `FR-BB{phase}{section}` e.g. `FR-BB11` = Phase 1 Section 1.1, `FR-BB35` 
 | File Type | Directory |
 |-----------|-----------|
 | Requirements | `docs/requirements/` |
+| Process descriptions | `docs/requirements/` (suffix: `-process.md`) |
 | Handoff payloads | `docs/handoffs/{run-id}/` |
 | Inner reports | `docs/issue-reports/` |
 | Test reports | `docs/test-reports/` |
 | Code reviews | `docs/code-reviews/` |
+| UAT scenario scripts | `docs/uat-scenarios/` |
+| UAT reports | `docs/uat-reports/` |
 
 ---
 
@@ -184,6 +187,8 @@ Each subagent is a separate `Agent` tool call. You pass the subagent's full inst
 | "Update docs...", "Add requirement doc..." | C | Requirement Development → Release Finalizer |
 | "Configure...", "Set up env...", Docker, migrations, CORS | Infra | Infrastructure Configuration → Release Finalizer |
 | "Run E2E tests", "Test visually", "/e2e-repair", "test everything" | E2E | E2E Repair Loop |
+| "Define business process", "Document workflow", "BA spec for..." | BA | Business Analyst (Mode A/B) |
+| "Verify business process", "UAT for...", "Test as a user", "BA check" | UAT | Business Analyst → UAT Runner → Business Analyst |
 
 ### Pipeline A — Feature Development
 
@@ -233,6 +238,38 @@ Step 1  Spawn: E2E Repair Loop
         └── Loops until all 22 tests pass OR 3 retries per test (then escalates)
 ```
 
+### Pipeline BA — Business Process Definition
+
+**Trigger**: "define business process for...", "document workflow for...", "BA spec for..."
+
+```
+Step 1  Spawn: Business Analyst (Mode A — Process Definition)
+        → produces docs/requirements/{slug}-process.md
+Step 2  Spawn: Requirement Development
+        → converts process description to FR-BBxxx requirement doc
+Step 3  Continue as Pipeline A from Step 2 (Validation → Implementation)
+```
+
+### Pipeline UAT — Business Process Verification
+
+**Trigger**: "verify business process", "UAT for...", "test <feature> as a user", "BA check"
+
+**Prerequisite**: `make dev` must be running. If not, spawn Infrastructure Configuration first.
+
+```
+Step 1  Spawn: Business Analyst (Mode B — UAT Scenario Authoring)
+        → produces docs/uat-scenarios/{slug}-{date}.md
+Step 2  Spawn: UAT Runner
+        → executes scenario against live GUI (hybrid Playwright + browser tool)
+        → produces docs/uat-reports/{run-id}.md
+Step 3  Spawn: Business Analyst (Mode C — UAT Decision)
+        ├── PASS       → Release Finalizer (marks requirement uat-verified)
+        ├── DEFECT     → Issue Resolution → re-run UAT (back to Step 2)
+        ├── REQ GAP    → Requirement Development → Pipeline A
+        └── ENV ISSUE  → Infrastructure Configuration → re-run UAT (back to Step 2)
+        Retry cap: 3 iterations per defect; escalate to user if unresolved
+```
+
 ### Subagent prompt sources
 
 | Subagent | Prompt file |
@@ -246,6 +283,8 @@ Step 1  Spawn: E2E Repair Loop
 | Code Reviewer | `.claude/commands/code-review.md` |
 | Release Finalizer | `.claude/commands/release-preparation.md` |
 | E2E Repair Loop | `.claude/commands/e2e-repair.md` |
+| Business Analyst | `.claude/commands/business-analyst.md` |
+| UAT Runner | `.claude/commands/uat-runner.md` |
 
 ### State tracking
 

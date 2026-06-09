@@ -6,7 +6,7 @@
 | ID | FR-BB13 |
 | Phase | 1 — Foundation |
 | Priority | 1 |
-| Status | Revised |
+| Status | uat-verified |
 | Depends On | FR-BB12 |
 
 ## Description

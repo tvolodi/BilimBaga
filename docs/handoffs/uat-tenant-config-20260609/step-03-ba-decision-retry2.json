@@ -1,0 +1,76 @@
+{
+  "run_id": "uat-tenant-config-20260609",
+  "pipeline": "UAT",
+  "step": 3,
+  "retry": 2,
+  "decision": "PASS",
+  "decided_at": "2026-06-09",
+  "decided_by": "Business Analyst",
+  "rationale": "Both defects from run 1 have been resolved and verified. D-01 (ISS-028, admin sidebar hardcoded app name) was fixed and Playwright-confirmed: sidebar now reads app_name from tenant config. D-02 (ISS-029, dept admin login redirect loop) was fixed and Playwright-confirmed: dept admin reaches /admin/dashboard; direct navigation to /admin/settings/branding is correctly redirected to /admin/dashboard (RBAC active). All in-scope acceptance criteria are now satisfied.",
+  "ac_coverage": [
+    {
+      "ac": "AC#1",
+      "criterion": "After saving new logo, login page displays new logo on fresh load",
+      "status": "PASS",
+      "verified_in": "Run 1 — S1 Step 9; Retry 2 — S1 re-run"
+    },
+    {
+      "ac": "AC#2",
+      "criterion": "Admin sidebar reflects app_name from tenant config",
+      "status": "PASS",
+      "verified_in": "Retry 2 — Playwright test for ISS-028 fix; sidebar shows 'RetryTestApp' after save"
+    },
+    {
+      "ac": "AC#3",
+      "criterion": "WCAG contrast warning visible for failing colour; save button remains enabled",
+      "status": "PASS",
+      "verified_in": "Run 1 — S2; Retry 2 — WCAG warning confirmed visible (save-button assertion failed due to test script selector issue, not product defect)"
+    },
+    {
+      "ac": "AC#4",
+      "criterion": "After changing default locale, new questions have that locale translation",
+      "status": "N/A — OUT OF SCOPE",
+      "verified_in": "Not tested in this UAT run; excluded from scope"
+    },
+    {
+      "ac": "AC#5",
+      "criterion": "Certificate downloaded before branding change retains old branding",
+      "status": "N/A — OUT OF SCOPE",
+      "verified_in": "Not tested in this UAT run; excluded from scope"
+    },
+    {
+      "ac": "AC#6",
+      "criterion": "Department Admin cannot access Branding settings page",
+      "status": "PASS",
+      "verified_in": "Retry 2 — Playwright test for ISS-029 fix; dept admin reaches /admin/dashboard; /admin/settings/branding redirects to /admin/dashboard (RBAC enforced, not login failure)"
+    }
+  ],
+  "notes": [
+    "Scenario 2 save-button Playwright assertion failure in retry 2 is a TEST SCRIPT DEFECT (hex input selector matched wrong colour field, no dirty state triggered, save button stayed disabled). Product behaviour was verified correct in run 1 (screenshot: uat-s2-contrast-warning.png). No product fix required.",
+    "AC#4 and AC#5 were explicitly out of scope for this UAT run and do not affect the PASS verdict.",
+    "Requirement FR-BB13 status should be updated to 'uat-verified'."
+  ],
+  "defects_resolved": [
+    {
+      "id": "D-01",
+      "iss": "ISS-028",
+      "status": "RESOLVED",
+      "fix_summary": "Sidebar.tsx now reads app_name from useTenantConfig hook instead of hardcoded literal"
+    },
+    {
+      "id": "D-02",
+      "iss": "ISS-029",
+      "status": "RESOLVED",
+      "fix_summary": "Three-part fix: RequireAuth no longer redirects synchronously on stale cache; dept admin login flow reaches /admin/dashboard correctly; RBAC blocks /admin/settings/branding for non-super-admin roles"
+    }
+  ],
+  "open_items": [
+    {
+      "type": "TEST_SCRIPT_DEFECT",
+      "description": "Scenario 2 save-button selector issue: hex input matched wrong colour field in Playwright script. Should be fixed in the UAT scenario script before next run, but does not require a product fix.",
+      "severity": "low",
+      "action": "Update UAT scenario script selector for S2 save-button assertion in next iteration"
+    }
+  ],
+  "next_step": "Delegate to Release Finalizer: update FR-BB13 status to 'uat-verified' and commit the status change."
+}

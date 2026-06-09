@@ -1,0 +1,19 @@
+{
+  "issue_id": "ISS-040",
+  "run_id": "ISS-040",
+  "is_recurring": false,
+  "root_cause": "The audit INSERT query in postgresRepository.GradeAnswer reused positional parameter $2 (graderID) in two conflicting type contexts: (1) as the value for column actor_id UUID, giving PostgreSQL a UUID type constraint, and (2) inside jsonb_build_object() which uses variadic any with no type constraint. PostgreSQL's type inference algorithm cannot resolve a single parameter that appears in both a UUID-typed column context and an untyped variadic-any context, resulting in 'pq: could not determine data type of parameter $2'. Parameters $5 and $6 (sessionID and scorePct) inside jsonb_build_object also lacked type context and required explicit casts.",
+  "affected_layer": "backend",
+  "affected_files": [
+    "backend/internal/sessions/repository.go",
+    "backend/internal/sessions/handler.go"
+  ],
+  "fix_description": "1. Broke parameter reuse: replaced $2 inside jsonb_build_object with a new 7th parameter $7 (same graderID value), isolating $2 to the actor_id UUID column context only. 2. Added explicit ::text and ::numeric casts to $5, $6, $7 inside jsonb_build_object so PostgreSQL can infer their types. 3. Added slog.Error logging in the handler's default 500 case to make future errors visible in application logs.",
+  "files_changed": [
+    "backend/internal/sessions/repository.go",
+    "backend/internal/sessions/handler.go"
+  ],
+  "migration_applied": false,
+  "regression_test_added": false,
+  "regression_test_path": null
+}

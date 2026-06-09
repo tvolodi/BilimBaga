@@ -29,3 +29,7 @@
 | [ISS-025](ISS-025-change-password-no-show-hide-toggle.md) | ChangePasswordForm — all three password fields have no show/hide toggle | medium | frontend | auth | resolved | 2026-06-08 |
 | [ISS-026](ISS-026-change-password-autofill-stale-credential.md) | ChangePasswordPage — stale browser autofill in current-password causes INVALID_CREDENTIALS | high | frontend | auth | resolved | 2026-06-08 |
 | [ISS-027](ISS-027-portal-blank-page-employee.md) | Employee portal blank page — TDZ crash in useCountdown for expired exams + no error boundary | high | frontend | portal | resolved | 2026-06-08 |
+| [ISS-036](ISS-036-uat-defect-exam-taking-no-saved-indicator.md) | UAT Defect: Employee Exam Taking — Auto-save 'Saved ✓' indicator not displayed after answer selection | medium | frontend | exam-taking | resolved | 2026-06-09 |
+| [ISS-038](ISS-038-uat-defect-portal-card-wrong-status-open-second-attempt.md) | UAT Defect: Portal card shows 'Passed'/'View result' when in-progress second attempt exists | high | frontend | employee-portal | resolved | 2026-06-09 |
+| [ISS-039](ISS-039-uat-defect-retake-exam-button-broken-route.md) | UAT Defect: 'Retake Exam' button navigates to non-existent route | high | frontend | exam-taking | resolved | 2026-06-09 |
+| [ISS-040](ISS-040-uat-defect-manual-grading-api-500.md) | UAT Defect: Manual Grading — POST grading answer endpoint returns HTTP 500 | high | backend | grading | resolved | 2026-06-09 |

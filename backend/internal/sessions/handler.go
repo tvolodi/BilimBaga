@@ -3,6 +3,7 @@ package sessions
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -368,6 +369,7 @@ func (h *Handler) HandleGradeAnswer(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrSessionNotFound):
 			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
 		default:
+			slog.Error("GradeAnswer failed", "error", err, "sessionId", sessionID, "questionId", questionID)
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to grade answer")
 		}
 		return

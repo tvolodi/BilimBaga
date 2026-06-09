@@ -1438,8 +1438,8 @@ WHERE session_id = $1 AND question_id = $2`
 	const auditQ = `
 INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
 VALUES ($1, $2, 'answer.grade', 'session_answer', $3, $4,
-        jsonb_build_object('grader_id', $2, 'session_id', $5, 'score_pct', $6))`
-	if _, err := tx.ExecContext(ctx, auditQ, tenantID, graderID, questionID, actorIP, sessionID, scorePct); err != nil {
+        jsonb_build_object('grader_id', $7::text, 'session_id', $5::text, 'score_pct', $6::numeric))`
+	if _, err := tx.ExecContext(ctx, auditQ, tenantID, graderID, questionID, actorIP, sessionID, scorePct, graderID); err != nil {
 		return nil, fmt.Errorf("sessions: GradeAnswer: audit: %w", err)
 	}
 

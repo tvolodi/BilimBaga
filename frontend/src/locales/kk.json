@@ -783,6 +783,11 @@
     "ai_reasoning_label": "ЖИ негіздемесі",
     "ai_reasoning_show": "ЖИ негіздемесін көрсету",
     "ai_reasoning_hide": "ЖИ негіздемесін жасыру",
+    "filter_by_exam": "Емтихан бойынша сүзу",
+    "filter_all_exams": "Барлық емтихандар",
+    "showing_range": "{{total}} ішінен {{start}}\u2013{{end}} көрсетілуде",
+    "prev_page": "Алдыңғы",
+    "next_page": "Келесі",
     "nav": "Қолмен бағалау"
   },
   "employee_record": {

@@ -783,6 +783,11 @@
     "ai_reasoning_label": "Обоснование ИИ",
     "ai_reasoning_show": "Показать обоснование ИИ",
     "ai_reasoning_hide": "Скрыть обоснование ИИ",
+    "filter_by_exam": "Фильтр по экзамену",
+    "filter_all_exams": "Все экзамены",
+    "showing_range": "Показаны {{start}}\u2013{{end}} из {{total}}",
+    "prev_page": "Назад",
+    "next_page": "Вперёд",
     "nav": "Ручная проверка"
   },
   "employee_record": {

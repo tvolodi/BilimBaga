@@ -783,6 +783,11 @@
     "ai_reasoning_label": "AI Reasoning",
     "ai_reasoning_show": "Show AI reasoning",
     "ai_reasoning_hide": "Hide AI reasoning",
+    "filter_by_exam": "Filter by exam",
+    "filter_all_exams": "All exams",
+    "showing_range": "Showing {{start}}\u2013{{end}} of {{total}}",
+    "prev_page": "Previous",
+    "next_page": "Next",
     "nav": "Manual Grading"
   },
   "employee_record": {

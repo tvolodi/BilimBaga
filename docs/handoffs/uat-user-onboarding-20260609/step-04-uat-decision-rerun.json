@@ -1,0 +1,12 @@
+{
+  "run_id": "uat-user-onboarding-20260609-rerun",
+  "pipeline": "UAT",
+  "step": 4,
+  "decision": "PASS",
+  "scenarios_passed": 5,
+  "scenarios_total": 5,
+  "defects_resolved": ["ISS-030", "ISS-031"],
+  "uat_report": "docs/uat-reports/uat-user-onboarding-20260609-rerun.md",
+  "requirement_updated": "docs/requirements/user-onboarding-process.md → status: uat-verified",
+  "next_step": "Release Finalizer"
+}

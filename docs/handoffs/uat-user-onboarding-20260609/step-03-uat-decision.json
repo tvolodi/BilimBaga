@@ -1,0 +1,24 @@
+{
+  "run_id": "uat-user-onboarding-20260609",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "DEFECT",
+  "defects": [
+    {
+      "iss_id": "ISS-030",
+      "severity": "high",
+      "layer": "backend",
+      "title": "Inactive user can authenticate and access portal",
+      "issue_report": "docs/issue-reports/ISS-030-uat-defect-inactive-user-can-login.md"
+    },
+    {
+      "iss_id": "ISS-031",
+      "severity": "medium",
+      "layer": "frontend",
+      "title": "Employee Portal has no logout button",
+      "issue_report": "docs/issue-reports/ISS-031-uat-defect-portal-no-logout.md"
+    }
+  ],
+  "uat_report": "docs/uat-reports/uat-user-onboarding-20260609.md",
+  "next_step": "Issue Resolution for ISS-030 and ISS-031, then re-run UAT"
+}

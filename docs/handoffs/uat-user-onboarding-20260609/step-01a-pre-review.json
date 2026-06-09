@@ -1,0 +1,10 @@
+{
+  "run_id": "uat-user-onboarding-20260609",
+  "issue_id": "ISS-030",
+  "root_cause_summary": "auth.service.Login never checked users.status before issuing a JWT. Any user with valid credentials but status='inactive' received a valid token and full portal access.",
+  "files_changed": [
+    "backend/internal/auth/service.go",
+    "backend/internal/auth/handler_test.go"
+  ],
+  "pipeline": "B"
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // --- Mock Service ---
@@ -419,6 +420,7 @@ func TestService_Login_LockedAccount_Returns423BeforePasswordCheck(t *testing.T)
 				Email:        email,
 				PasswordHash: "$2a$12$invalid",
 				RoleName:     "employee",
+				Status:       "active",
 				LockedUntil:  &lockTime,
 			}, nil
 		},
@@ -440,6 +442,46 @@ func TestService_Login_LockedAccount_Returns423BeforePasswordCheck(t *testing.T)
 	assert.Equal(t, http.StatusLocked, svcErr.HTTPStatus)
 }
 
+// TestService_Login_InactiveUser_Returns401 is the regression test for ISS-030.
+// An inactive user must never receive a JWT, regardless of password correctness.
+func TestService_Login_InactiveUser_Returns401(t *testing.T) {
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte("ValidPass123!"), 4)
+	require.NoError(t, err)
+
+	repo := &mockRepository{
+		getUserByEmailFn: func(_ context.Context, email string) (*User, error) {
+			return &User{
+				ID:           "user-inactive-1",
+				Email:        email,
+				PasswordHash: string(passwordHash),
+				RoleName:     "employee",
+				Status:       "inactive",
+			}, nil
+		},
+	}
+
+	svc := NewService(ServiceConfig{
+		JWTSecret:         "a-secret-that-is-at-least-32-chars!!",
+		JWTAccessTTLMin:   15,
+		JWTRefreshTTLDays: 7,
+		BcryptCost:        4,
+	}, repo)
+
+	resp, cookie, loginErr := svc.Login(context.Background(), &LoginRequest{
+		Email:    "inactive@example.com",
+		Password: "ValidPass123!",
+	}, "127.0.0.1")
+
+	require.Error(t, loginErr)
+	assert.Nil(t, resp)
+	assert.Nil(t, cookie)
+
+	var svcErr *ServiceError
+	require.ErrorAs(t, loginErr, &svcErr)
+	assert.Equal(t, "ACCOUNT_INACTIVE", svcErr.Code)
+	assert.Equal(t, http.StatusUnauthorized, svcErr.HTTPStatus)
+}
+
 func TestService_Login_FifthFailureLocks(t *testing.T) {
 	var lockedUntil time.Time
 	var storedAttempts int
@@ -451,6 +493,7 @@ func TestService_Login_FifthFailureLocks(t *testing.T) {
 				Email:          "alice@example.com",
 				PasswordHash:   "$2a$04$notavalidhashXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
 				RoleName:       "employee",
+				Status:         "active",
 				FailedAttempts: 4, // one more failure should lock
 			}, nil
 		},

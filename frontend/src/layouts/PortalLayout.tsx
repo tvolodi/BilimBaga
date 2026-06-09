@@ -1,10 +1,20 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { Button } from '@/components/ui/button'
+import { useLogout } from '@/api/auth'
 
 export function PortalLayout() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const logout = useLogout()
+
+  async function handleLogout() {
+    await logout.mutateAsync()
+    navigate('/login', { replace: true })
+  }
 
   const tabClass = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -26,7 +36,19 @@ export function PortalLayout() {
               {t('portal.tab_results', 'My Results')}
             </NavLink>
           </div>
-          <LocaleSwitcher />
+          <div className="flex items-center gap-3">
+            <LocaleSwitcher />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              disabled={logout.isPending}
+              aria-label={t('common.signOut')}
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut size={16} aria-hidden="true" />
+            </Button>
+          </div>
         </nav>
       </div>
       <main id="main-content" tabIndex={-1} className="outline-none">

@@ -74,6 +74,15 @@ func (s *service) Login(ctx context.Context, req *LoginRequest, ipAddr string) (
 		}
 	}
 
+	// Reject inactive accounts before password verification.
+	if user.Status != "active" {
+		return nil, nil, &ServiceError{
+			Code:       "ACCOUNT_INACTIVE",
+			Message:    "account is inactive",
+			HTTPStatus: http.StatusUnauthorized,
+		}
+	}
+
 	// Verify password.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// AC-4: increment failure counter; lock if threshold reached.

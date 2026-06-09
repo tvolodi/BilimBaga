@@ -1,0 +1,33 @@
+﻿{
+  "run_id": "uat-employee-exam-taking-20260609",
+  "pipeline": "UAT",
+  "commit_hash": "1dc87f7648f00875e148b51fd3ea207a35c9acf5",
+  "commit_message": "uat(employee-exam-taking): all 26 UAT scenarios pass",
+  "files_committed": [
+    "docs/handoffs/uat-employee-exam-taking-20260609/step-01-uat-scenario.json",
+    "docs/handoffs/uat-employee-exam-taking-20260609/step-03-uat-decision.json",
+    "docs/issue-reports/ISS-036-uat-defect-exam-taking-no-saved-indicator.md",
+    "docs/issue-reports/ISS-037-uat-defect-exam-taking-wrong-post-submit-redirect.md",
+    "docs/issue-reports/ISS-038-uat-defect-portal-card-wrong-status-open-second-attempt.md",
+    "docs/issue-reports/ISS-039-uat-defect-retake-exam-button-broken-route.md",
+    "docs/requirements/FR-BB313.Frontend-employee-portal.md",
+    "docs/requirements/FR-BB314.Frontend-exam-taking-screen.md",
+    "docs/requirements/employee-exam-taking-process.md",
+    "docs/uat-reports/uat-employee-exam-taking-20260609-rerun.md",
+    "docs/uat-reports/uat-employee-exam-taking-20260609.md",
+    "docs/uat-scenarios/employee-exam-taking-20260609.md",
+    "frontend/src/components/results/ResultActions.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/pages/EmployeePortal/EmployeePortal.test.tsx",
+    "frontend/src/pages/EmployeePortal/ExamCard.tsx",
+    "frontend/src/pages/EmployeePortal/StartExamModal.tsx",
+    "frontend/src/pages/ExamTaking/ExamLayout.tsx",
+    "frontend/src/pages/ExamTaking/QuestionDisplay.tsx",
+    "frontend/src/pages/ExamTaking/__tests__/QuestionDisplay.test.tsx",
+    "frontend/src/pages/ExamTaking/index.tsx"
+  ],
+  "inner_report_path": "docs/issue-reports/uat-employee-exam-taking-20260609-INNER-REPORT.md",
+  "status": "success"
+}

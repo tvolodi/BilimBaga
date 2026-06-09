@@ -6,7 +6,7 @@
 | ID | FR-BB21 |
 | Phase | 2 — Content Management |
 | Priority | 1 |
-| Status | Implemented |
+| Status | uat-verified |
 | Depends On | FR-BB16 |
 
 ## Description

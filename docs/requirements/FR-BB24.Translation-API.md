@@ -6,7 +6,7 @@
 | ID | FR-BB24 |
 | Phase | 2 — Content Management |
 | Priority | 2 |
-| Status | Implemented |
+| Status | uat-verified |
 | Depends On | FR-BB23 |
 
 ## Description

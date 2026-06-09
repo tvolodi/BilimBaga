@@ -6,7 +6,7 @@
 | ID | FR-BB22 |
 | Phase | 2 — Content Management |
 | Priority | 1 |
-| Status | Implemented |
+| Status | uat-verified |
 | Depends On | FR-BB21 |
 
 ## Scope

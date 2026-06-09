@@ -6,7 +6,7 @@
 | ID | FR-BB28 |
 | Phase | 2 — Content Management |
 | Priority | 2 |
-| Status | Implemented |
+| Status | uat-verified |
 | Depends On | FR-BB21, FR-BB111 |
 
 ## Description

@@ -6,7 +6,7 @@
 | ID | FR-BB26 |
 | Phase | 2 — Content Management |
 | Priority | 2 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | FR-BB21, FR-BB23, FR-BB24 |
 
 ## Description

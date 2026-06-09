@@ -6,7 +6,7 @@
 | ID | FR-BB23 |
 | Phase | 2 — Content Management |
 | Priority | 1 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | FR-BB22 |
 
 ## Description

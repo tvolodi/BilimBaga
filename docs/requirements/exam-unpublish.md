@@ -1,6 +1,6 @@
 # FR-BB318 — Unpublish Exam
 
-**Status**: implemented  
+**Status**: uat-verified  
 **Updated**: 2026-05-21 (revision 2)  
 **Phase**: 3 (enhancement to 3.12)  
 **Depends on**: FR-BB31, FR-BB32, FR-BB312, FR-BB35

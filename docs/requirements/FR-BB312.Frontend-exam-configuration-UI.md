@@ -6,7 +6,7 @@
 | ID | FR-BB312 |
 | Phase | 3 — Exam Engine |
 | Priority | 2 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | FR-BB31, FR-BB32, FR-BB33 |
 
 ## Description

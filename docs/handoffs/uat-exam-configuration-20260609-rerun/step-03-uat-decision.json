@@ -1,0 +1,14 @@
+{
+  "run_id": "uat-exam-configuration-20260609-rerun",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "PASS",
+  "uat_report_path": "docs/uat-reports/uat-exam-configuration-20260609-rerun.md",
+  "requirements_updated": [
+    "docs/requirements/exam-configuration-process.md",
+    "docs/requirements/FR-BB312.Frontend-exam-configuration-UI.md",
+    "docs/requirements/exam-step4-eligible-question-counts.md",
+    "docs/requirements/exam-unpublish.md"
+  ],
+  "next_action": "Release Finalizer — commit status changes"
+}

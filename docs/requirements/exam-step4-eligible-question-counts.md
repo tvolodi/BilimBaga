@@ -1,6 +1,6 @@
 # FR-BB315 — Exam Step 4: Eligible Question Counts per Rule
 
-**Status**: implemented  
+**Status**: uat-verified  
 **Phase**: 3 (enhancement to 3.12)  
 **Depends on**: FR-BB312, FR-BB32, FR-BB22
 

@@ -31,9 +31,9 @@ handoffs:
 ## Prerequisites
 
 Before executing, verify the stack is live:
-- Frontend: `http://localhost:5173` — must return HTTP 200
-- Backend: `http://localhost:8080/health` — must return HTTP 200
-- If either check fails: spawn **Infrastructure Configuration** with instruction to run `make dev`.
+- Backend: `http://localhost:8080/api/v1/health` — must return HTTP 200
+- Frontend: `http://localhost` (port 80, served via Nginx) — must return HTTP 200
+- If either check fails: spawn **Infrastructure Configuration** with instruction to run `make dev`, wait for it to complete, then immediately continue execution — do not pause or return to the Orchestrator.
 
 ---
 

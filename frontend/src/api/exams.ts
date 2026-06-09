@@ -159,6 +159,11 @@ async function examsFetch<T>(url: string, token?: string | null, options?: Reque
     credentials: 'include',
     headers: { ...authHeader, ...options?.headers },
   })
+  // 204 No Content responses have no body — skip JSON parsing
+  if (res.status === 204) {
+    if (!res.ok) throw new ExamApiError('Request failed', 'ERR_UNKNOWN', res.status)
+    return undefined as unknown as T
+  }
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     throw new ExamApiError(

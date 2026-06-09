@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { useExam } from '@/api/exams'
@@ -64,8 +64,13 @@ export function ExamWizard({ examId: examIdProp }: ExamWizardProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [searchParams] = useSearchParams()
 
-  const [step, setStep] = useState(1)
+  const initialStep = examIdProp
+    ? Math.max(1, Math.min(4, Number(searchParams.get('step')) || 1))
+    : 1
+
+  const [step, setStep] = useState(initialStep)
   const [resolvedExamId, setResolvedExamId] = useState<string | null>(examIdProp ?? null)
   const [resolvedSectionId, setResolvedSectionId] = useState<string | null>(null)
 

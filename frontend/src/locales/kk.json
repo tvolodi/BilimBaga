@@ -751,7 +751,8 @@
   "exam_list": {
     "col_status": "Күй",
     "col_actions": "Әрекеттер",
-    "minutes_format": "{{minutes}} мин"
+    "minutes_format": "{{minutes}} мин",
+    "manage_assignments": "Тағайындау"
   },
   "grading": {
     "queue_title": "Қолмен бағалау кезегі",

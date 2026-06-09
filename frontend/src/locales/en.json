@@ -751,7 +751,8 @@
   "exam_list": {
     "col_status": "Status",
     "col_actions": "Actions",
-    "minutes_format": "{{minutes}} min"
+    "minutes_format": "{{minutes}} min",
+    "manage_assignments": "Assign"
   },
   "grading": {
     "queue_title": "Manual Grading Queue",

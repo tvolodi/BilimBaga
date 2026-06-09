@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import '@/i18n'
@@ -80,11 +80,21 @@ describe('Step1BasicSettings', () => {
     })
   })
 
-  it('disables the submit button when exam status is active', () => {
+  it('keeps the Next button enabled for active exams to allow navigation', () => {
     renderStep1(makeExam({ status: 'active' }))
 
     const submitBtn = screen.getByRole('button', { name: /next/i })
-    expect(submitBtn).toBeDisabled()
+    expect(submitBtn).not.toBeDisabled()
+  })
+
+  it('calls onDone directly without saving when Next is clicked for an active exam', () => {
+    const onDone = vi.fn()
+    renderStep1(makeExam({ status: 'active', id: 'exam-active-1' }), onDone)
+
+    const submitBtn = screen.getByRole('button', { name: /next/i })
+    fireEvent.click(submitBtn)
+
+    expect(onDone).toHaveBeenCalledWith('exam-active-1', null)
   })
 
   it('shows the read-only banner when exam status is active', () => {

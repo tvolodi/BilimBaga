@@ -172,6 +172,13 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setApiError(null)
+
+    // Active exams are read-only: skip save and navigate directly to next step
+    if (isReadOnly && exam) {
+      onDone(exam.id, resolvedSectionId)
+      return
+    }
+
     const validationErrors = validateForm(form)
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors)
@@ -390,7 +397,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
 
       {/* Navigation */}
       <div className="flex justify-end pt-4">
-        <Button type="submit" disabled={isPending || isReadOnly}>
+        <Button type="submit" disabled={isPending}>
           {isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

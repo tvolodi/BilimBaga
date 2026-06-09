@@ -227,9 +227,10 @@ Step 2  Spawn: Release Finalizer
 
 **Trigger**: "run E2E tests", "test everything visually", `/e2e-repair`
 
-**Prerequisite**: `make dev` must be running. If not, spawn Infrastructure Configuration to start it first.
+**Stack check (inline — no user stop)**: If `http://localhost:8080/api/v1/health` is not 200, spawn Infrastructure Configuration to run `make dev`, wait for it, then immediately continue — do not pause for the user.
 
 ```
+Step 0  [if stack down] Spawn: Infrastructure Configuration → start `make dev`, confirm health
 Step 1  Spawn: E2E Repair Loop
         ├── Runs npm run test:e2e:live and parses e2e-results.json
         ├── For each failing test: writes ISS-{NNN}-e2e-failure.md
@@ -254,9 +255,10 @@ Step 3  Continue as Pipeline A from Step 2 (Validation → Implementation)
 
 **Trigger**: "verify business process", "UAT for...", "test <feature> as a user", "BA check"
 
-**Prerequisite**: `make dev` must be running. If not, spawn Infrastructure Configuration first.
+**Stack check (inline — no user stop)**: If `http://localhost:8080/api/v1/health` is not 200, spawn Infrastructure Configuration to run `make dev`, wait for it, then immediately continue — do not pause for the user.
 
 ```
+Step 0  [if stack down] Spawn: Infrastructure Configuration → start `make dev`, confirm health
 Step 1  Spawn: Business Analyst (Mode B — UAT Scenario Authoring)
         → produces docs/uat-scenarios/{slug}-{date}.md
 Step 2  Spawn: UAT Runner

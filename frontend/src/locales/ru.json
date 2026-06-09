@@ -751,7 +751,8 @@
   "exam_list": {
     "col_status": "Статус",
     "col_actions": "Действия",
-    "minutes_format": "{{minutes}} мин"
+    "minutes_format": "{{minutes}} мин",
+    "manage_assignments": "Назначить"
   },
   "grading": {
     "queue_title": "Очередь ручного оценивания",

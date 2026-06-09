@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus, BarChart2, Pencil } from 'lucide-react'
+import { Plus, BarChart2, Pencil, Users } from 'lucide-react'
 import { useExams, useUnpublishExam, useArchiveExam, type ExamApiError } from '@/api/exams'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -157,6 +157,14 @@ export function ExamsListPage() {
                           <Pencil size={14} />
                         </Button>
                       </Link>
+                      {exam.status === 'active' && (
+                        <Link to={`/admin/exams/${exam.id}/edit?step=3`}>
+                          <Button variant="outline" size="sm">
+                            <Users size={14} className="mr-1" />
+                            {t('exam_list.manage_assignments')}
+                          </Button>
+                        </Link>
+                      )}
                       <Link to={`/admin/exams/${exam.id}/analytics`}>
                         <Button variant="outline" size="sm">
                           <BarChart2 size={14} className="mr-1" />

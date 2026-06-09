@@ -148,9 +148,10 @@ Step 3  Continue as Pipeline A from Step 2 (Requirement Validation → Implement
 
 **Trigger**: user says "verify <process>", "UAT for <feature>", "test <feature> as a user", "BA check".
 
-**Prerequisite check**: Confirm `make dev` is running before spawning UAT Runner. If not, spawn Infrastructure Configuration first.
+**Stack check (inline — no user stop)**: Before spawning Business Analyst, silently verify the stack. If `http://localhost:8080/api/v1/health` returns non-200, spawn Infrastructure Configuration to run `make dev` and wait for it to complete — then immediately continue to Step 1 without pausing for the user.
 
 ```
+Step 0  [if stack down] Infrastructure Configuration → start `make dev`, confirm health
 Step 1  Business Analyst (Mode B — UAT Scenario Authoring)
         → produces: docs/uat-scenarios/{slug}-{date}.md
 Step 2  UAT Runner
@@ -177,7 +178,7 @@ uat_iss_ids: []               # ISS IDs opened this UAT session
 
 **Trigger**: user says "run E2E tests", "test everything visually", `/e2e-repair`, or any request to run the full walkthrough and fix failures.
 
-**Prerequisite check**: Confirm `make dev` is running before spawning the subagent. If not, spawn Infrastructure Configuration to start it first.
+**Stack check (inline — no user stop)**: Before spawning E2E Repair Loop, silently verify the stack. If `http://localhost:8080/api/v1/health` returns non-200, spawn Infrastructure Configuration to run `make dev` and wait for it to complete — then immediately continue to Step 1 without pausing for the user.
 
 ```
 Step 1  E2E Repair Loop

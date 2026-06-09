@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useMutation } from '@tanstack/react-query'
+import { Loader2, Download } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useUser, useMe } from '@/api/users'
-import { useEmployeeRecord, useEmployeeProgress } from '@/api/employees'
+import { useEmployeeRecord, useEmployeeProgress, exportEmployeeRecord } from '@/api/employees'
 import { fetchLoyaltyNarrative } from '@/api/ai'
 import { EmployeeInfoHeader } from '@/components/employees/EmployeeInfoHeader'
 import { SessionHistoryTable } from '@/components/employees/SessionHistoryTable'
@@ -75,6 +76,18 @@ export function EmployeeRecordPage() {
   const { userId = '' } = useParams<{ userId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [isExporting, setIsExporting] = useState(false)
+
+  async function handleExport() {
+    const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+    setIsExporting(true)
+    try {
+      await exportEmployeeRecord(userId, token)
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
 
@@ -144,7 +157,27 @@ export function EmployeeRecordPage() {
 
       {/* Session history */}
       <section className="space-y-3" aria-label={t('employee_record.history_section')}>
-        <h2 className="text-lg font-semibold">{t('employee_record.history_section')}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{t('employee_record.history_section')}</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t('common.loading')}
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                {t('employee_record.export_csv')}
+              </>
+            )}
+          </Button>
+        </div>
         <SessionHistoryTable sessions={record.data.sessions} />
 
         {total > 0 && (

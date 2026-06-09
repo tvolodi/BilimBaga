@@ -1,0 +1,35 @@
+{
+  "run_id": "analytics-and-reporting-20260609",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "PARTIAL — 2 DEFECTS + 1 ENVIRONMENT ISSUE",
+  "defects": [
+    {
+      "iss_id": "ISS-048",
+      "title": "Employee Record page missing CSV Export button",
+      "severity": "medium",
+      "layer": "frontend",
+      "file": "docs/issue-reports/ISS-048-uat-defect-employee-record-missing-export-button.md"
+    },
+    {
+      "iss_id": "ISS-049",
+      "title": "Exam Analytics score display inflated (×100 double multiply)",
+      "severity": "high",
+      "layer": "frontend",
+      "file": "docs/issue-reports/ISS-049-uat-defect-exam-analytics-score-display-inflated.md"
+    }
+  ],
+  "environment_issues": [
+    {
+      "description": "dept.admin@test.com has wrong password (DeptAdmin1! fails) and is in wrong department ('Deparment 1' instead of 'UAT Engineering'). Must reset password to DeptAdmin1! and move account to UAT Engineering before re-running Scenario 5.",
+      "action": "Infrastructure Configuration — reset dept.admin@test.com password to DeptAdmin1! and reassign to UAT Engineering department"
+    }
+  ],
+  "next_steps": [
+    "Route ISS-049 (high) to Issue Resolution — fix StatsSummaryRow.tsx score display",
+    "Route ISS-048 (medium) to Issue Resolution — add Export button to EmployeeRecordPage.tsx",
+    "Route environment issue to Infrastructure Configuration — reset dept.admin@test.com password and department",
+    "Re-run UAT Scenario 5 after environment fix",
+    "Re-run full UAT after all fixes"
+  ]
+}

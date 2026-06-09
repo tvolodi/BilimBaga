@@ -6,7 +6,7 @@
 | ID | FR-BB59 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 2 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | FR-BB51, FR-BB52, FR-BB53, FR-BB54, FR-BB56, FR-BB57 |
 
 ## Description

@@ -823,7 +823,8 @@
     "valuesProfileTitle": "Ценностный профиль",
     "generateNarrative": "Создать",
     "regenerateNarrative": "Обновить",
-    "generating": "Создание..."
+    "generating": "Создание...",
+    "export_csv": "Экспорт CSV"
   },
   "errors": {
     "missingToken": "Требуется аутентификация. Войдите в систему.",

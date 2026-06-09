@@ -31,11 +31,11 @@ export function StatsSummaryRow({
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatCard
         label={t('exam_analytics.avg_score')}
-        value={avgScore !== null ? `${(avgScore * 100).toFixed(1)}%` : '—'}
+        value={avgScore !== null ? `${avgScore.toFixed(1)}%` : '—'}
       />
       <StatCard
         label={t('exam_analytics.median_score')}
-        value={medianScore !== null ? `${(medianScore * 100).toFixed(1)}%` : '—'}
+        value={medianScore !== null ? `${medianScore.toFixed(1)}%` : '—'}
       />
       <StatCard
         label={t('exam_analytics.total_attempts')}

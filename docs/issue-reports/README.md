@@ -40,3 +40,5 @@
 | [ISS-045](ISS-045-uat-defect-manual-grading-feedback-not-shown-employee.md) | UAT Defect: Manual Grading — Examiner manual_feedback not displayed on employee result screen | medium | frontend+backend | grading | resolved | 2026-06-09 |
 | [ISS-046](ISS-046-uat-defect-per-section-scores-non-empty-flat-exam.md) | UAT Defect: Result & Certification — per_section_scores non-empty for flat exams | medium | both | results | resolved | 2026-06-09 |
 | [ISS-047](ISS-047-uat-defect-error-states-not-rendered-results-pages.md) | UAT Defect: Result & Certification — error states not rendered on My Results and Result Detail pages | low | frontend | results | resolved | 2026-06-09 |
+| [ISS-048](ISS-048-uat-defect-employee-record-missing-export-button.md) | UAT Defect: Analytics & Reporting — Employee Record page missing CSV Export button | medium | frontend | analytics / employee record | resolved | 2026-06-09 |
+| [ISS-049](ISS-049-uat-defect-exam-analytics-score-display-inflated.md) | UAT Defect: Analytics & Reporting — Exam Analytics average/median score inflated (×100 double multiply) | high | frontend | analytics / per-exam | resolved | 2026-06-09 |

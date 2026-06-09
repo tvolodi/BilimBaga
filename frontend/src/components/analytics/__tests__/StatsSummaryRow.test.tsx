@@ -7,8 +7,8 @@ describe('StatsSummaryRow', () => {
   it('renders all 4 stat cards', () => {
     render(
       <StatsSummaryRow
-        avgScore={0.75}
-        medianScore={0.78}
+        avgScore={75.0}
+        medianScore={78.0}
         totalAttempts={120}
         uniqueParticipants={95}
       />,
@@ -19,11 +19,13 @@ describe('StatsSummaryRow', () => {
     expect(screen.getByText('Unique Participants')).toBeInTheDocument()
   })
 
+  // avgScore and medianScore come from the API already as percentage values (e.g. 75.0 = 75.0%)
+  // ISS-049: removing the ×100 multiplication that was inflating displayed values
   it('renders numeric values correctly', () => {
     render(
       <StatsSummaryRow
-        avgScore={0.75}
-        medianScore={0.78}
+        avgScore={75.0}
+        medianScore={78.0}
         totalAttempts={120}
         uniqueParticipants={95}
       />,
@@ -51,8 +53,8 @@ describe('StatsSummaryRow', () => {
   it('renders 4 card elements', () => {
     const { container } = render(
       <StatsSummaryRow
-        avgScore={0.5}
-        medianScore={0.5}
+        avgScore={50.0}
+        medianScore={50.0}
         totalAttempts={10}
         uniqueParticipants={10}
       />,

@@ -823,7 +823,8 @@
     "valuesProfileTitle": "Values Profile",
     "generateNarrative": "Generate",
     "regenerateNarrative": "Regenerate",
-    "generating": "Generating..."
+    "generating": "Generating...",
+    "export_csv": "Export CSV"
   },
   "errors": {
     "missingToken": "Authentication required. Please sign in.",

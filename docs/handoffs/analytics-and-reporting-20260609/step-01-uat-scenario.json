@@ -1,0 +1,18 @@
+{
+  "run_id": "analytics-and-reporting-20260609",
+  "pipeline": "UAT",
+  "step": 1,
+  "scenario_path": "docs/uat-scenarios/analytics-and-reporting-20260609.md",
+  "requirement_paths": [
+    "docs/requirements/FR-BB51.Dashboard-metrics-API.md",
+    "docs/requirements/FR-BB52.Per-exam-analytics-API.md",
+    "docs/requirements/FR-BB53.Per-employee-record-API.md",
+    "docs/requirements/FR-BB54.Export-API.md",
+    "docs/requirements/FR-BB55.Audit-log-viewer.md",
+    "docs/requirements/FR-BB56.Frontend-admin-dashboard.md",
+    "docs/requirements/FR-BB57.Frontend-per-exam-analytics.md",
+    "docs/requirements/FR-BB58.Frontend-employee-record.md",
+    "docs/requirements/FR-BB59.Reports-hub-page.md"
+  ],
+  "base_url": "http://localhost:5173"
+}

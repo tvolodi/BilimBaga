@@ -823,7 +823,8 @@
     "valuesProfileTitle": "Құндылықтар профилі",
     "generateNarrative": "Жасау",
     "regenerateNarrative": "Жаңарту",
-    "generating": "Жасалуда..."
+    "generating": "Жасалуда...",
+    "export_csv": "CSV жүктеу"
   },
   "errors": {
     "missingToken": "Аутентификация қажет. Жүйеге кіріңіз.",

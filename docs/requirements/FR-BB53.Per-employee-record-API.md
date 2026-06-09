@@ -6,7 +6,7 @@
 | ID | FR-BB53 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 1 |
-| Status | Implemented |
+| Status | uat-verified |
 | Depends On | FR-BB311 (Grading Engine), FR-BB43 (Certificate Generation) |
 
 ## Description

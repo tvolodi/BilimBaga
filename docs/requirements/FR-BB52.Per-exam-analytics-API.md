@@ -6,7 +6,7 @@
 | ID | FR-BB52 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 1 |
-| Status | Implemented |
+| Status | uat-verified |
 | Depends On | FR-BB311 |
 
 ## Description

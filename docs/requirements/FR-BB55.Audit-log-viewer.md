@@ -6,7 +6,7 @@
 | ID | FR-BB55 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 2 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | FR-BB19 |
 
 ## Description

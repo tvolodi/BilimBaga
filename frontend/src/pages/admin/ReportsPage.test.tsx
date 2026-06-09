@@ -113,12 +113,13 @@ describe('ReportsPage', () => {
             />
             <Route path="/login" element={<div>Login Page</div>} />
             <Route path="/admin" element={<div>Admin Home</div>} />
+            <Route path="/portal" element={<div>Portal Home</div>} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     )
 
-    expect(screen.getByText('Admin Home')).toBeInTheDocument()
+    expect(screen.getByText('Portal Home')).toBeInTheDocument()
     expect(screen.queryByText('Reports')).not.toBeInTheDocument()
   })
 

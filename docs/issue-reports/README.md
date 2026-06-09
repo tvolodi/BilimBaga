@@ -34,3 +34,4 @@
 | [ISS-039](ISS-039-uat-defect-retake-exam-button-broken-route.md) | UAT Defect: 'Retake Exam' button navigates to non-existent route | high | frontend | exam-taking | resolved | 2026-06-09 |
 | [ISS-040](ISS-040-uat-defect-manual-grading-api-500.md) | UAT Defect: Manual Grading — POST grading answer endpoint returns HTTP 500 | high | backend | grading | resolved | 2026-06-09 |
 | [ISS-041](ISS-041-uat-defect-manual-grading-question-sort-order.md) | UAT Defect: Manual Grading — Questions displayed in wrong order on grading detail page | low | backend | grading | resolved | 2026-06-09 |
+| [ISS-042](ISS-042-uat-defect-manual-grading-employee-403-redirect.md) | UAT Defect: Manual Grading — Employee redirected to blank /admin page instead of 403 message | low | frontend | grading | resolved | 2026-06-09 |

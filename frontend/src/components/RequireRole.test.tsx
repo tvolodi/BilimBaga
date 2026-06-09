@@ -49,6 +49,7 @@ function renderWithToken(
           />
           <Route path="/login" element={<div>Login Page</div>} />
           <Route path="/admin" element={<div>Admin Home</div>} />
+          <Route path="/portal" element={<div>Portal Home</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -74,10 +75,11 @@ describe('RequireRole', () => {
     expect(screen.getByText('Login Page')).toBeInTheDocument()
   })
 
-  it('redirects to /admin when token role does not match (prevents login-loop on access denied)', () => {
+  it('redirects employee to /portal when token role does not match (FR-BB47 AC-1: prevents blank-page loop)', () => {
     renderWithToken(EMPLOYEE_TOKEN, ['super_admin', 'hr_admin'])
-    expect(screen.getByText('Admin Home')).toBeInTheDocument()
+    expect(screen.getByText('Portal Home')).toBeInTheDocument()
     expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
+    expect(screen.queryByText('Admin Home')).not.toBeInTheDocument()
   })
 
   it('redirects to /admin when token is malformed (prevents login-loop on access denied)', () => {

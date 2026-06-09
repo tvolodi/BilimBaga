@@ -1,0 +1,30 @@
+﻿{
+    "commit_hash":  "0f0702b",
+    "files_committed":  [
+                            "backend/internal/sessions/repository.go",
+                            "docs/handoffs/result-and-certification-uat-20260609/step-01-uat-scenario.json",
+                            "docs/handoffs/result-and-certification-uat-20260609/step-03-uat-decision-r2.json",
+                            "docs/handoffs/result-and-certification-uat-20260609/step-03-uat-decision.json",
+                            "docs/issue-reports/ISS-046-uat-defect-per-section-scores-non-empty-flat-exam.md",
+                            "docs/issue-reports/ISS-047-uat-defect-error-states-not-rendered-results-pages.md",
+                            "docs/issue-reports/README.md",
+                            "docs/requirements/FR-BB41.Result-retrieval-API.md",
+                            "docs/requirements/FR-BB43.Certificate-generation.md",
+                            "docs/requirements/FR-BB44.PDF-generation.md",
+                            "docs/requirements/FR-BB45.Frontend-result-screen.md",
+                            "docs/requirements/FR-BB46.Frontend-employee-history.md",
+                            "docs/requirements/result-and-certification-process.md",
+                            "docs/uat-reports/result-and-certification-uat-20260609-INNER-REPORT.md",
+                            "docs/uat-reports/result-and-certification-uat-20260609-r2.md",
+                            "docs/uat-reports/result-and-certification-uat-20260609.md",
+                            "docs/uat-scenarios/result-and-certification-20260609.md",
+                            "frontend/src/api/sessions.ts",
+                            "frontend/src/components/results/SectionScores.test.tsx",
+                            "frontend/src/components/results/SectionScores.tsx"
+                        ],
+    "status":  "success",
+    "commit_message":  "uat(result-and-certification): UAT PASS — FR-BB41/43/44/45/46 uat-verified",
+    "inner_report_path":  "docs/uat-reports/result-and-certification-uat-20260609-INNER-REPORT.md",
+    "pipeline":  "UAT",
+    "run_id":  "result-and-certification-uat-20260609"
+}

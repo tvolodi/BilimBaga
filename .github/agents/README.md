@@ -1,10 +1,10 @@
 ---
-description: BilimBaga Agent Workflow System — 11 agents with central Orchestrator
+description: BilimBaga Agent Workflow System — 13 agents with central Orchestrator
 ---
 
 # BilimBaga Agent Workflow System
 
-> **11-agent system** with a central Orchestrator driving focused subagents.
+> **13-agent system** with a central Orchestrator driving focused subagents.
 > Orchestrator manages pipeline sequencing, retry limits, and model selection.
 > Subagents each do ONE job — no handoff logic inside subagents.
 > Compatible with GitHub Copilot agents and Claude Code.
@@ -17,7 +17,7 @@ description: BilimBaga Agent Workflow System — 11 agents with central Orchestr
 Tier 1: Orchestrator (1 agent)
          Routes requests, sequences steps, manages validation revision loop, escalates on failure
 
-Tier 2: Subagents (10 agents)
+Tier 2: Subagents (12 agents)
          Each does exactly one job; returns structured output to the Orchestrator
 ```
 
@@ -35,11 +35,13 @@ Tier 2: Subagents (10 agents)
 ├── 04-code-reviewer.agent.md               ← Review code: quality, security, AC coverage
 ├── 05-code-fixer.agent.md                  ← Fix Code Reviewer findings
 ├── test-run-error-resolution.agent.md      ← Run test suites, fix failures
-├── issue-resolution.agent.md              ← Root cause analysis + bug fix
-├── infrastructure-configuration.agent.md  ← Env, Docker, migrations, CORS
-├── 06-release-finalizer.agent.md          ← Git commit + inner report
+├── issue-resolution.agent.md               ← Root cause analysis + bug fix
+├── infrastructure-configuration.agent.md   ← Env, Docker, migrations, CORS
+├── 06-release-finalizer.agent.md           ← Git commit + inner report
 ├── e2e-repair.agent.md                     ← Visual E2E walkthrough repair loop
 ├── explore.agent.md                        ← Read-only codebase exploration (subagent only)
+├── business-analyst.agent.md               ← Business process definition, UAT scenarios, UAT decisions
+├── uat-runner.agent.md                     ← Execute UAT scenario scripts against live GUI
 └── functions/                              ← Reusable workflow atoms
     ├── ANALYZE_CONTEXT.md
     ├── DESIGN_SOLUTION.md
@@ -108,6 +110,41 @@ Step 1  E2E Repair Loop
 
 ---
 
+### Pipeline BA: Business Process Definition
+
+```
+Step 1  Business Analyst (Mode A — Process Definition)
+        → docs/requirements/{slug}-process.md
+Step 2  Requirement Development
+        → converts process description to FR-BBxxx requirement doc
+Step 3  Continue as Pipeline A from Step 2 (Validation → Implementation)
+```
+
+**Trigger**: "Define business process for...", "Document workflow for...", "BA spec for..."
+
+---
+
+### Pipeline UAT: Business Process Verification
+
+```
+Step 1  Business Analyst (Mode B — UAT Scenario Authoring)
+        → docs/uat-scenarios/{slug}-{date}.md
+Step 2  UAT Runner
+        → executes scenario against live GUI (hybrid Playwright + browser tool)
+        → docs/uat-reports/{run-id}.md
+Step 3  Business Analyst (Mode C — UAT Decision)
+        ├── PASS       → Release Finalizer (marks requirement uat-verified)
+        ├── DEFECT     → Issue Resolution → re-run UAT (back to Step 2)
+        ├── REQ GAP    → Requirement Development → Pipeline A
+        └── ENV ISSUE  → Infrastructure Configuration → re-run UAT (back to Step 2)
+        Retry cap: 3 iterations per defect; escalate to user if unresolved
+```
+
+**Trigger**: "Verify business process", "UAT for...", "Test <feature> as a user", "BA check"
+**Prerequisite**: `make dev` must be running
+
+---
+
 ## Handoff File Convention
 
 Every subagent writes its output to:
@@ -160,3 +197,5 @@ Reusable workflow atoms in `functions/`:
 | "Update docs..." | Pipeline C → Requirement Development |
 | "Configure..." / "Set up env..." | Pipeline Infra → Infrastructure Configuration |
 | "Run E2E tests" / "test everything" / "@e2e-repair" | Pipeline E2E → E2E Repair Loop |
+| "Define business process for..." / "BA spec for..." | Pipeline BA → Business Analyst (Mode A) |
+| "Run UAT for..." / "Verify <feature> as a user" | Pipeline UAT → Business Analyst (Mode B) → UAT Runner → Business Analyst (Mode C) |

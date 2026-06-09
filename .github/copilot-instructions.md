@@ -82,3 +82,13 @@ For structured, multi-step work, use the custom agents in `.github/agents/`:
 | `05-code-fixer` | Fixing Code Reviewer findings |
 | `06-release-finalizer` | Git commit + inner report |
 | `explore` | Read-only codebase exploration (subagent only) |
+| `business-analyst` | Define business processes (Mode A), author UAT scenario scripts (Mode B), make UAT pass/fail decisions (Mode C) |
+| `uat-runner` | Execute UAT scenario scripts against the live GUI using Playwright + browser tool; produce UAT reports |
+
+### When to use Business Analyst + UAT Runner
+
+- **"Define business process for X"** → `business-analyst` (Mode A) → `requirement-development` → Pipeline A
+- **"Run UAT for X"** / **"Verify X as a user"** → `business-analyst` (Mode B) → `uat-runner` → `business-analyst` (Mode C)
+  - Prerequisite: stack must be running (`make dev`)
+  - UAT Runner uses Playwright for standard interactions; browser screenshots for visual/ambiguous steps
+  - Results written to `docs/uat-reports/{run-id}.md`; defects routed to `issue-resolution`

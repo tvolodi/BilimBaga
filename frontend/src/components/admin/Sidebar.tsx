@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router-dom'
+import { useTenantConfig } from '@/api/useTenantConfig'
 import {
   LayoutDashboard,
   Users,
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { t } = useTranslation()
+  const { data: tenantConfig } = useTenantConfig()
 
   return (
     <aside
@@ -49,7 +51,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Logo / Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
         {!collapsed && (
-          <span className="text-lg font-bold tracking-tight truncate">BilimBaga</span>
+          <span className="text-lg font-bold tracking-tight truncate">{tenantConfig?.app_name ?? 'BilimBaga'}</span>
         )}
         <button
           onClick={onToggle}

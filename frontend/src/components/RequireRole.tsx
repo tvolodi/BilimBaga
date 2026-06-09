@@ -22,6 +22,6 @@ export function RequireRole({ children, roles }: RequireRoleProps) {
   const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   if (!token) return <Navigate to="/login" replace />
   const role = jwtRole(token)
-  if (!role || !roles.includes(role)) return <Navigate to="/login" replace />
+  if (!role || !roles.includes(role)) return <Navigate to="/admin" replace />
   return <>{children}</>
 }

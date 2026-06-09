@@ -1,9 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import '@/i18n'
 import { Sidebar } from './Sidebar'
+
+vi.mock('@/api/useTenantConfig', () => ({
+  useTenantConfig: vi.fn(),
+}))
+
+import { useTenantConfig } from '@/api/useTenantConfig'
 
 function renderSidebar(collapsed = false) {
   const onToggle = vi.fn()
@@ -16,6 +22,12 @@ function renderSidebar(collapsed = false) {
 }
 
 describe('Sidebar', () => {
+  beforeEach(() => {
+    vi.mocked(useTenantConfig).mockReturnValue({
+      data: { app_name: 'BilimBaga', primary_color: '#000', accent_color: '#fff', default_locale: 'en', available_locales: ['en'] },
+    } as ReturnType<typeof useTenantConfig>)
+  })
+
   it('renders all navigation links when expanded', () => {
     renderSidebar(false)
     // Should have nav links for key sections
@@ -47,5 +59,24 @@ describe('Sidebar', () => {
 
     const settingsLink = screen.getByRole('link', { name: /settings/i })
     expect(settingsLink).toHaveAttribute('href', '/admin/settings/branding')
+  })
+
+  it('displays app_name from tenant config instead of hardcoded literal', () => {
+    vi.mocked(useTenantConfig).mockReturnValue({
+      data: { app_name: 'AcmeCorp', primary_color: '#000', accent_color: '#fff', default_locale: 'en', available_locales: ['en'] },
+    } as ReturnType<typeof useTenantConfig>)
+
+    renderSidebar(false)
+    expect(screen.getByText('AcmeCorp')).toBeInTheDocument()
+    expect(screen.queryByText('BilimBaga')).not.toBeInTheDocument()
+  })
+
+  it('falls back to "BilimBaga" when tenant config is not yet loaded', () => {
+    vi.mocked(useTenantConfig).mockReturnValue({
+      data: undefined,
+    } as ReturnType<typeof useTenantConfig>)
+
+    renderSidebar(false)
+    expect(screen.getByText('BilimBaga')).toBeInTheDocument()
   })
 })

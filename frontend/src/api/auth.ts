@@ -135,7 +135,14 @@ export function useRefreshToken() {
           method: 'POST',
           credentials: 'include',
         })
-        if (!res.ok) return null
+        if (!res.ok) {
+          // If a login mutation already placed a valid token in the cache (e.g. fresh
+          // login with no pre-existing refresh cookie), preserve it rather than
+          // overwriting with null — which would immediately log the user out.
+          const cached = qc.getQueryData<string | null>(['auth', 'accessToken'])
+          if (cached) return cached
+          return null
+        }
         const json = await res.json()
         if (json.error || !json.data) return null
         const accessToken = json.data.access_token as string

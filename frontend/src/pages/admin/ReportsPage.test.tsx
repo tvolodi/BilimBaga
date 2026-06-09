@@ -94,7 +94,7 @@ describe('ReportsPage', () => {
     })
   })
 
-  it('AC-2: unauthorized role is redirected to /login', () => {
+  it('AC-2: unauthorized role is redirected away from reports (to /admin)', () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     qc.setQueryData(['auth', 'accessToken'], makeToken('employee'))
     global.fetch = vi.fn()
@@ -112,12 +112,13 @@ describe('ReportsPage', () => {
               }
             />
             <Route path="/login" element={<div>Login Page</div>} />
+            <Route path="/admin" element={<div>Admin Home</div>} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     )
 
-    expect(screen.getByText('Login Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Home')).toBeInTheDocument()
     expect(screen.queryByText('Reports')).not.toBeInTheDocument()
   })
 

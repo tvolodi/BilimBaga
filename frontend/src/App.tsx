@@ -118,7 +118,7 @@ function AppRoutes() {
         <Route
           path="dashboard"
           element={
-            <RequireRole roles={['examiner', 'hr_admin', 'super_admin']}>
+            <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']}>
               <AdminDashboardPage />
             </RequireRole>
           }

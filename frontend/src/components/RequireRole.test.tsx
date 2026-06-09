@@ -48,6 +48,7 @@ function renderWithToken(
             }
           />
           <Route path="/login" element={<div>Login Page</div>} />
+          <Route path="/admin" element={<div>Admin Home</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -73,13 +74,15 @@ describe('RequireRole', () => {
     expect(screen.getByText('Login Page')).toBeInTheDocument()
   })
 
-  it('redirects to /login when token role does not match', () => {
+  it('redirects to /admin when token role does not match (prevents login-loop on access denied)', () => {
     renderWithToken(EMPLOYEE_TOKEN, ['super_admin', 'hr_admin'])
-    expect(screen.getByText('Login Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Home')).toBeInTheDocument()
+    expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
   })
 
-  it('redirects to /login when token is malformed', () => {
+  it('redirects to /admin when token is malformed (prevents login-loop on access denied)', () => {
     renderWithToken('not.a.jwt', ['super_admin'])
-    expect(screen.getByText('Login Page')).toBeInTheDocument()
+    expect(screen.getByText('Admin Home')).toBeInTheDocument()
+    expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
   })
 })

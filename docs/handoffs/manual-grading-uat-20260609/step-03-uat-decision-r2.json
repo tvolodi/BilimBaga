@@ -1,0 +1,13 @@
+{
+  "run_id": "manual-grading-uat-20260609",
+  "iteration": 2,
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "DEFECT",
+  "iss_ids": ["ISS-043", "ISS-044", "ISS-045"],
+  "req_gaps": ["exam-filter-ui", "grading-queue-pagination-text"],
+  "partial_notes": [
+    "AC-10 (graded_by/graded_at persisted in DB) — fields exist in DB; GET /admin/grading/:sessionId does not return them in response; FR-BB42 AC-10 only requires persistence, not API exposure. Marked PARTIAL-NOTE, not a defect."
+  ],
+  "next_action": "Issue Resolution for ISS-043, ISS-044, ISS-045 — then re-run UAT (iteration 3)"
+}

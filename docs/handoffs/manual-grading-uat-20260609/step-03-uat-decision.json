@@ -1,0 +1,43 @@
+{
+  "run_id": "manual-grading-uat-20260609",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "DEFECT + REQUIREMENT GAP",
+  "iss_ids": ["ISS-040", "ISS-041", "ISS-042"],
+  "req_gaps": [
+    {
+      "id": "GAP-001",
+      "description": "No exam filter UI control on grading queue page. FR-BB47 has no AC requiring an exam_id filter input. The useGradingQueue hook accepts examId param but no AC mandates a filter UI. Recommend adding to FR-BB47 or as a new FR-BB47a.",
+      "evidence": "DEFECT-003: filter input element absent; FR-BB47 AC-1 through AC-11 do not mention a filter control"
+    },
+    {
+      "id": "GAP-002",
+      "description": "No pagination metadata text (e.g. 'Showing X-Y of Z') displayed in queue UI. FR-BB47 AC-2 specifies columns and sort order but does not require a count/range display label. Backend returns meta.total and meta.page but no AC requires the frontend to render this.",
+      "evidence": "MINOR-001: no 'Showing X-Y of Z' label; FR-BB47 AC-2 does not require pagination metadata display"
+    }
+  ],
+  "defects": [
+    {
+      "id": "ISS-040",
+      "original_id": "DEFECT-001",
+      "severity": "high",
+      "summary": "POST /api/v1/admin/grading/{sessionId}/answers/{questionId} returns HTTP 500 — service layer failure, no error logging",
+      "ac_violated": ["AC-8", "AC-9", "AC-11"]
+    },
+    {
+      "id": "ISS-041",
+      "original_id": "DEFECT-002",
+      "severity": "low",
+      "summary": "Questions displayed in wrong sort order on grading detail page",
+      "ac_violated": ["AC-4"]
+    },
+    {
+      "id": "ISS-042",
+      "original_id": "NOTE-001",
+      "severity": "low",
+      "summary": "Employee redirected to blank /admin page instead of 403 message",
+      "ac_violated": ["AC-1"]
+    }
+  ],
+  "next_action": "Issue Resolution for ISS-040 (high priority), ISS-041, ISS-042 in parallel; then re-run UAT with same scenario script"
+}

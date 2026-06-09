@@ -6,7 +6,7 @@
 | ID | FR-BB47 |
 | Phase | 4 — Results & Certificates |
 | Priority | 2 |
-| Status | Ready |
+| Status | uat-verified |
 | Depends On | FR-BB42 |
 
 ## Description

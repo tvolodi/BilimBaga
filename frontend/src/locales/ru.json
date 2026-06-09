@@ -661,6 +661,7 @@
     "correct_answer": "Правильный ответ",
     "points": "Баллы",
     "explanation": "Пояснение",
+    "examiner_feedback": "Комментарий проверяющего",
     "show_more": "Показать больше",
     "show_less": "Скрыть",
     "download_certificate": "Скачать сертификат",

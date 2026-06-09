@@ -42,7 +42,7 @@ export function ResultPage() {
   }
 
   const primaryColor = tenantConfig?.primary_color ?? '#6366f1'
-  const isPending = result.score_pct === null
+  const isPending = result.score_pct === null || result.status === 'grading_pending'
   const canRetake =
     !!exam &&
     result.attempt_number < exam.max_attempts &&

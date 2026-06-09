@@ -35,3 +35,6 @@
 | [ISS-040](ISS-040-uat-defect-manual-grading-api-500.md) | UAT Defect: Manual Grading — POST grading answer endpoint returns HTTP 500 | high | backend | grading | resolved | 2026-06-09 |
 | [ISS-041](ISS-041-uat-defect-manual-grading-question-sort-order.md) | UAT Defect: Manual Grading — Questions displayed in wrong order on grading detail page | low | backend | grading | resolved | 2026-06-09 |
 | [ISS-042](ISS-042-uat-defect-manual-grading-employee-403-redirect.md) | UAT Defect: Manual Grading — Employee redirected to blank /admin page instead of 403 message | low | frontend | grading | resolved | 2026-06-09 |
+| [ISS-043](ISS-043-uat-defect-manual-grading-pending-result-page.md) | UAT Defect: Manual Grading — Result page shows 0%/Failed for grading_pending session | high | frontend | grading | resolved | 2026-06-09 |
+| [ISS-044](ISS-044-uat-defect-manual-grading-retake-button-visible-pending.md) | UAT Defect: Manual Grading — Retake Exam button visible while session is grading_pending | medium | frontend | grading | resolved | 2026-06-09 |
+| [ISS-045](ISS-045-uat-defect-manual-grading-feedback-not-shown-employee.md) | UAT Defect: Manual Grading — Examiner manual_feedback not displayed on employee result screen | medium | frontend+backend | grading | resolved | 2026-06-09 |

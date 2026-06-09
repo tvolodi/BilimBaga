@@ -251,6 +251,7 @@ type QuestionBreakdownItem struct {
 	PointsEarned   float64  `json:"points_earned"`
 	MaxPoints      float64  `json:"max_points"`
 	Explanation    *string  `json:"explanation"`
+	ManualFeedback *string  `json:"manual_feedback"`
 }
 
 // SessionResultResponse is the response for GET /portal/sessions/:id/result
@@ -261,6 +262,7 @@ type SessionResultResponse struct {
 	SessionID            string                   `json:"session_id"`
 	ExamID               string                   `json:"exam_id"`
 	ExamTitle            string                   `json:"exam_title"`
+	Status               string                   `json:"status"`
 	ScorePct             *float64                 `json:"score_pct"`
 	Passed               bool                     `json:"passed"`
 	TimeTakenSeconds     *int                     `json:"time_taken_seconds"`

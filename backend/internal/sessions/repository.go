@@ -254,12 +254,13 @@ type sessionResultRow struct {
 
 // questionBreakdownRow holds one per-question score breakdown row (FR-BB41).
 type questionBreakdownRow struct {
-	QuestionID   string  `db:"question_id"`
-	QuestionType string  `db:"question_type"`
-	Stem         string  `db:"stem"`
-	PointsEarned float64 `db:"points_earned"`
-	MaxPoints    float64 `db:"max_points"`
-	Explanation  *string `db:"explanation"`
+	QuestionID     string  `db:"question_id"`
+	QuestionType   string  `db:"question_type"`
+	Stem           string  `db:"stem"`
+	PointsEarned   float64 `db:"points_earned"`
+	MaxPoints      float64 `db:"max_points"`
+	Explanation    *string `db:"explanation"`
+	ManualFeedback *string `db:"manual_feedback"`
 }
 
 // historyRow holds one session in an exam's history list (FR-BB41).
@@ -1032,7 +1033,8 @@ SELECT
     COALESCE(qt.stem, '')               AS stem,
     sqs.score           AS points_earned,
     sqs.max_score       AS max_points,
-    qt.explanation
+    qt.explanation,
+    sqs.manual_feedback
 FROM session_question_scores sqs
 JOIN session_questions sq   ON sq.session_id = sqs.session_id AND sq.question_id = sqs.question_id
 JOIN questions q            ON q.id = sqs.question_id

@@ -60,6 +60,7 @@ export function QuestionBreakdownTable({ breakdown }: QuestionBreakdownTableProp
               <TableHead>{t('result.correct_answer')}</TableHead>
               <TableHead className="text-right">{t('result.points')}</TableHead>
               <TableHead>{t('result.explanation')}</TableHead>
+              <TableHead>{t('result.examiner_feedback')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -88,6 +89,11 @@ export function QuestionBreakdownTable({ breakdown }: QuestionBreakdownTableProp
                   </TableCell>
                   <TableCell className="align-top text-sm max-w-[240px]">
                     <ExplanationCell text={item.explanation} />
+                  </TableCell>
+                  <TableCell className="align-top text-sm max-w-[240px]">
+                    {item.manual_feedback
+                      ? <span className="text-blue-700">{item.manual_feedback}</span>
+                      : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                 </TableRow>
               )

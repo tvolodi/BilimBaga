@@ -1,0 +1,45 @@
+{
+  "issue_ids": ["ISS-043", "ISS-044", "ISS-045"],
+  "run_id": "ISS-043-044-045",
+  "is_recurring": false,
+  "root_causes": {
+    "ISS-043": "SessionResultResponse lacked a status field; frontend isPending check (score_pct === null) missed grading_pending sessions with score_pct = 0",
+    "ISS-044": "isPending was false for grading_pending sessions with score_pct = 0, so canRetake={isPending ? false : canRetake} guard did not suppress the retake button",
+    "ISS-045": "GetQuestionBreakdown SQL did not SELECT sqs.manual_feedback; questionBreakdownRow, QuestionBreakdownItem (Go and TS), and QuestionBreakdownTable all lacked the manual_feedback field"
+  },
+  "affected_layer": "frontend+backend",
+  "affected_files": [
+    "backend/internal/sessions/model.go",
+    "backend/internal/sessions/service.go",
+    "backend/internal/sessions/repository.go",
+    "frontend/src/api/sessions.ts",
+    "frontend/src/pages/ResultPage.tsx",
+    "frontend/src/components/results/QuestionBreakdownTable.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json"
+  ],
+  "fix_descriptions": {
+    "ISS-043": "Added Status field to SessionResultResponse (backend model + service); added status to SessionResult TS type; updated isPending to check status === 'grading_pending'",
+    "ISS-044": "Fixed by ISS-043 fix — isPending now correctly true for grading_pending, suppressing canRetake via existing guard",
+    "ISS-045": "Added sqs.manual_feedback to GetQuestionBreakdown SQL; added ManualFeedback to questionBreakdownRow and QuestionBreakdownItem (Go); propagated in buildSessionResult; added manual_feedback to TS type and rendered Examiner Feedback column in QuestionBreakdownTable; added i18n keys"
+  },
+  "files_changed": [
+    "backend/internal/sessions/model.go",
+    "backend/internal/sessions/service.go",
+    "backend/internal/sessions/repository.go",
+    "frontend/src/api/sessions.ts",
+    "frontend/src/pages/ResultPage.tsx",
+    "frontend/src/components/results/QuestionBreakdownTable.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/locales/kk.json",
+    "docs/issue-reports/ISS-043-uat-defect-manual-grading-pending-result-page.md",
+    "docs/issue-reports/ISS-044-uat-defect-manual-grading-retake-button-visible-pending.md",
+    "docs/issue-reports/ISS-045-uat-defect-manual-grading-feedback-not-shown-employee.md",
+    "docs/issue-reports/README.md"
+  ],
+  "migration_applied": false,
+  "regression_test_added": false,
+  "regression_test_path": null
+}

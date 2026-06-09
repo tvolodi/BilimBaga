@@ -620,6 +620,7 @@ func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow,
 		SessionID:        row.SessionID,
 		ExamID:           row.ExamID,
 		ExamTitle:        row.ExamTitle,
+		Status:           row.Status,
 		ScorePct:         row.ScorePct,
 		Passed:           row.Passed,
 		TimeTakenSeconds: row.TimeTakenSeconds,
@@ -707,6 +708,7 @@ func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow,
 				PointsEarned:   b.PointsEarned,
 				MaxPoints:      b.MaxPoints,
 				Explanation:    b.Explanation,
+				ManualFeedback: b.ManualFeedback,
 			}
 		}
 		resp.PerQuestionBreakdown = &breakdown

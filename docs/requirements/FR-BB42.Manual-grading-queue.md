@@ -6,7 +6,7 @@
 | ID | FR-BB42 |
 | Phase | 4 — Results & Certificates |
 | Priority | 1 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | FR-BB39, FR-BB311 |
 
 ## Scope

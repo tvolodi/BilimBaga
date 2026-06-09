@@ -661,6 +661,7 @@
     "correct_answer": "Дұрыс жауап",
     "points": "Балдар",
     "explanation": "Түсіндірме",
+    "examiner_feedback": "Тексерушінің пікірі",
     "show_more": "Толығырақ",
     "show_less": "Жасыру",
     "download_certificate": "Сертификатты жүктеу",

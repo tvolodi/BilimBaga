@@ -78,12 +78,14 @@ export interface QuestionBreakdownItem {
   points_earned: number
   max_points: number
   explanation: string | null
+  manual_feedback: string | null
 }
 
 export interface SessionResult {
   session_id: string
   exam_id: string
   exam_title: string
+  status: string
   score_pct: number | null
   passed: boolean
   time_taken_seconds: number | null

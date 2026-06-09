@@ -1,0 +1,11 @@
+{
+  "run_id": "manual-grading-uat-20260609",
+  "pipeline": "UAT",
+  "step": 1,
+  "scenario_path": "docs/uat-scenarios/manual-grading-20260609.md",
+  "requirement_paths": [
+    "docs/requirements/FR-BB42.Manual-grading-queue.md",
+    "docs/requirements/FR-BB47.Frontend-manual-grading-UI.md"
+  ],
+  "base_url": "http://localhost"
+}

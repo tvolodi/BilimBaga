@@ -1,0 +1,14 @@
+{
+  "run_id": "result-and-certification-uat-20260609",
+  "pipeline": "UAT",
+  "step": 1,
+  "scenario_path": "docs/uat-scenarios/result-and-certification-20260609.md",
+  "requirement_paths": [
+    "docs/requirements/FR-BB41.Result-retrieval-API.md",
+    "docs/requirements/FR-BB43.Certificate-generation.md",
+    "docs/requirements/FR-BB44.PDF-generation.md",
+    "docs/requirements/FR-BB45.Frontend-result-screen.md",
+    "docs/requirements/FR-BB46.Frontend-employee-history.md"
+  ],
+  "base_url": "http://localhost"
+}

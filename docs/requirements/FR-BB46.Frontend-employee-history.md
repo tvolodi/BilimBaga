@@ -6,7 +6,7 @@
 | ID | FR-BB46 |
 | Phase | 4 — Results & Certificates |
 | Priority | 2 |
-| Status | Implemented |
+| Status | uat-verified |
 | Depends On | FR-BB41 |
 
 ## Description

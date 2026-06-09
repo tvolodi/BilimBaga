@@ -194,6 +194,7 @@ export function useSessionResult(sessionId: string) {
     queryKey: ['session-result', sessionId],
     queryFn: () => apiFetch<SessionResult>(`/api/v1/portal/sessions/${sessionId}/result`, token),
     staleTime: Infinity,
+    retry: false,
   })
 }
 
@@ -246,6 +247,7 @@ export function useMyResults(page: number, sort: 'date' | 'score', dir: 'asc' | 
         token,
       ),
     placeholderData: keepPreviousData,
+    retry: false,
   })
 }
 

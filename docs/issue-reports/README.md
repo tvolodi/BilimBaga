@@ -38,3 +38,5 @@
 | [ISS-043](ISS-043-uat-defect-manual-grading-pending-result-page.md) | UAT Defect: Manual Grading — Result page shows 0%/Failed for grading_pending session | high | frontend | grading | resolved | 2026-06-09 |
 | [ISS-044](ISS-044-uat-defect-manual-grading-retake-button-visible-pending.md) | UAT Defect: Manual Grading — Retake Exam button visible while session is grading_pending | medium | frontend | grading | resolved | 2026-06-09 |
 | [ISS-045](ISS-045-uat-defect-manual-grading-feedback-not-shown-employee.md) | UAT Defect: Manual Grading — Examiner manual_feedback not displayed on employee result screen | medium | frontend+backend | grading | resolved | 2026-06-09 |
+| [ISS-046](ISS-046-uat-defect-per-section-scores-non-empty-flat-exam.md) | UAT Defect: Result & Certification — per_section_scores non-empty for flat exams | medium | both | results | resolved | 2026-06-09 |
+| [ISS-047](ISS-047-uat-defect-error-states-not-rendered-results-pages.md) | UAT Defect: Result & Certification — error states not rendered on My Results and Result Detail pages | low | frontend | results | resolved | 2026-06-09 |

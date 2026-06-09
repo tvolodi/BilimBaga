@@ -9,7 +9,8 @@ interface SectionScoresProps {
 export function SectionScores({ sections }: SectionScoresProps) {
   const { t } = useTranslation()
 
-  if (sections.length === 0) return null
+  const validSections = sections.filter(s => s.title.trim() !== '')
+  if (validSections.length === 0) return null
 
   return (
     <div className="w-full">
@@ -17,7 +18,7 @@ export function SectionScores({ sections }: SectionScoresProps) {
         {t('result.section_scores')}
       </h3>
       <div className="flex flex-row flex-wrap gap-3">
-        {sections.map((section) => (
+        {validSections.map((section) => (
           <Card key={section.section_id} className="min-w-[140px] flex-1">
             <CardHeader className="pb-1 pt-3 px-4">
               <p className="text-xs font-medium text-muted-foreground truncate">

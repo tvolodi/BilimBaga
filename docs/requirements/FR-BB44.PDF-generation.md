@@ -6,7 +6,7 @@
 | ID | FR-BB44 |
 | Phase | 4 — Results & Certificates |
 | Priority | 1 |
-| Status | implemented |
+| Status | uat-verified |
 | Depends On | none (requires only that `Certificate` and `TemplateSnapshot` types exist in the `certificates` package) |
 
 ## Description

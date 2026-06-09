@@ -994,6 +994,7 @@ LEFT JOIN exam_question_rules eqr ON eqr.id = sq.rule_id
 LEFT JOIN exam_sections es ON es.id = eqr.section_id
 WHERE sqs.session_id = $1
   AND sq.rule_id IS NOT NULL
+  AND eqr.section_id IS NOT NULL
 GROUP BY sq.rule_id, es.title
 ORDER BY MIN(sq.sort_order)`
 

@@ -1,0 +1,8 @@
+{
+  "run_id": "result-and-certification-uat-20260609",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "DEFECT",
+  "iss_ids": ["ISS-046", "ISS-047"],
+  "next_action": "Issue Resolution for each ISS, then re-run UAT"
+}

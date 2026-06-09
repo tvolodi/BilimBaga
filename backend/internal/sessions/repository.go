@@ -1323,13 +1323,15 @@ SELECT
 FROM session_question_scores sqs
 JOIN questions q
     ON q.id = sqs.question_id
+JOIN session_questions sq
+    ON sq.session_id = sqs.session_id AND sq.question_id = sqs.question_id
 LEFT JOIN question_translations qt
     ON qt.question_id = q.id AND qt.locale = q.default_locale
 LEFT JOIN session_answers sa
     ON sa.session_id = sqs.session_id AND sa.question_id = sqs.question_id
 WHERE sqs.session_id = $1
   AND q.type = 'shorttext'
-ORDER BY sqs.question_id`
+ORDER BY sq.sort_order ASC`
 
 	rows, err := r.db.QueryxContext(ctx, questionsQ, sessionID)
 	if err != nil {

@@ -33,3 +33,4 @@
 | [ISS-038](ISS-038-uat-defect-portal-card-wrong-status-open-second-attempt.md) | UAT Defect: Portal card shows 'Passed'/'View result' when in-progress second attempt exists | high | frontend | employee-portal | resolved | 2026-06-09 |
 | [ISS-039](ISS-039-uat-defect-retake-exam-button-broken-route.md) | UAT Defect: 'Retake Exam' button navigates to non-existent route | high | frontend | exam-taking | resolved | 2026-06-09 |
 | [ISS-040](ISS-040-uat-defect-manual-grading-api-500.md) | UAT Defect: Manual Grading — POST grading answer endpoint returns HTTP 500 | high | backend | grading | resolved | 2026-06-09 |
+| [ISS-041](ISS-041-uat-defect-manual-grading-question-sort-order.md) | UAT Defect: Manual Grading — Questions displayed in wrong order on grading detail page | low | backend | grading | resolved | 2026-06-09 |

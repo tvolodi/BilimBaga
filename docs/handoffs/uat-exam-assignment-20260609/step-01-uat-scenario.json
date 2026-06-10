@@ -1,0 +1,8 @@
+{
+  "run_id": "uat-exam-assignment-20260609",
+  "pipeline": "UAT",
+  "step": 1,
+  "scenario_path": "docs/uat-scenarios/exam-assignment-20260609.md",
+  "requirement_path": "docs/requirements/exam-assignment-process.md",
+  "base_url": "http://localhost"
+}

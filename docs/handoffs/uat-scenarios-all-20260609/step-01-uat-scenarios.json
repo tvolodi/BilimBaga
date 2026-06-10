@@ -1,0 +1,98 @@
+{
+  "run_id": "uat-scenarios-all-20260609",
+  "pipeline": "UAT",
+  "step": 1,
+  "created": "2026-06-09",
+  "author": "Business Analyst",
+  "base_url": "http://localhost:5173",
+  "description": "UAT scenario scripts for all 10 business processes. Execute each script in the order listed. Each script is self-contained with its own preconditions. Run scripts in dependency order: tenant-configuration → user-onboarding → question-authoring → exam-configuration → exam-assignment → employee-exam-taking → manual-grading → result-and-certification → analytics-and-reporting → ai-content-authoring.",
+  "execution_order": [
+    {
+      "order": 1,
+      "slug": "tenant-configuration",
+      "scenario_path": "docs/uat-scenarios/tenant-configuration-20260609.md",
+      "requirement_paths": ["docs/requirements/tenant-configuration-process.md"],
+      "depends_on": [],
+      "notes": "Run first — sets up branding. No data dependencies."
+    },
+    {
+      "order": 2,
+      "slug": "user-onboarding",
+      "scenario_path": "docs/uat-scenarios/user-onboarding-20260609.md",
+      "requirement_paths": ["docs/requirements/user-onboarding-process.md"],
+      "depends_on": ["tenant-configuration"],
+      "notes": "Creates UAT Engineering department and uat.employee@test.com. Must run before all other employee-facing scenarios."
+    },
+    {
+      "order": 3,
+      "slug": "question-authoring",
+      "scenario_path": "docs/uat-scenarios/question-authoring-20260609.md",
+      "requirement_paths": ["docs/requirements/question-authoring-process.md"],
+      "depends_on": ["user-onboarding"],
+      "notes": "Creates UAT Security category, uat-tag, and at least 5 active questions. Must run before exam-configuration."
+    },
+    {
+      "order": 4,
+      "slug": "exam-configuration",
+      "scenario_path": "docs/uat-scenarios/exam-configuration-20260609.md",
+      "requirement_paths": ["docs/requirements/exam-configuration-process.md"],
+      "depends_on": ["question-authoring"],
+      "notes": "Creates and publishes UAT Security Assessment. Must run before exam-assignment."
+    },
+    {
+      "order": 5,
+      "slug": "exam-assignment",
+      "scenario_path": "docs/uat-scenarios/exam-assignment-20260609.md",
+      "requirement_paths": ["docs/requirements/exam-assignment-process.md"],
+      "depends_on": ["exam-configuration", "user-onboarding"],
+      "notes": "Assigns UAT Security Assessment to uat.employee@test.com. Must run before employee-exam-taking."
+    },
+    {
+      "order": 6,
+      "slug": "employee-exam-taking",
+      "scenario_path": "docs/uat-scenarios/employee-exam-taking-20260609.md",
+      "requirement_paths": ["docs/requirements/employee-exam-taking-process.md"],
+      "depends_on": ["exam-assignment"],
+      "notes": "Employee takes the exam. Must complete at least one passing session for result-and-certification and analytics scenarios."
+    },
+    {
+      "order": 7,
+      "slug": "manual-grading",
+      "scenario_path": "docs/uat-scenarios/manual-grading-20260609.md",
+      "requirement_paths": ["docs/requirements/manual-grading-process.md"],
+      "depends_on": ["user-onboarding"],
+      "notes": "Requires a separate short-text exam to be set up as described in the preconditions. Can run in parallel with employee-exam-taking if setup is done first."
+    },
+    {
+      "order": 8,
+      "slug": "result-and-certification",
+      "scenario_path": "docs/uat-scenarios/result-and-certification-20260609.md",
+      "requirement_paths": ["docs/requirements/result-and-certification-process.md"],
+      "depends_on": ["employee-exam-taking"],
+      "notes": "Requires a completed passing session from employee-exam-taking."
+    },
+    {
+      "order": 9,
+      "slug": "analytics-and-reporting",
+      "scenario_path": "docs/uat-scenarios/analytics-and-reporting-20260609.md",
+      "requirement_paths": ["docs/requirements/analytics-and-reporting-process.md"],
+      "depends_on": ["employee-exam-taking"],
+      "notes": "Requires at least one completed session in the system."
+    },
+    {
+      "order": 10,
+      "slug": "ai-content-authoring",
+      "scenario_path": "docs/uat-scenarios/ai-content-authoring-20260609.md",
+      "requirement_paths": ["docs/requirements/ai-content-authoring-process.md"],
+      "depends_on": ["question-authoring", "analytics-and-reporting"],
+      "notes": "Phase 7 features. AI API must be configured. Steps marked (Phase 7) should be skipped and noted as N/A if AI is not available; mark graceful-fallback steps instead."
+    }
+  ],
+  "test_accounts": {
+    "super_admin": {"email": "admin@test.com", "password": "Admin1234!"},
+    "employee": {"email": "uat.employee@test.com", "password": "NewPass123!"},
+    "dept_admin": {"email": "dept.admin@test.com", "password": "DeptAdmin1!"},
+    "examiner": {"email": "examiner@test.com", "password": "Examiner1234!"}
+  },
+  "report_path": "docs/uat-reports/uat-scenarios-all-20260609.md"
+}

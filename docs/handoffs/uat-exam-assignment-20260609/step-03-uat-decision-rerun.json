@@ -1,0 +1,16 @@
+{
+  "run_id": "uat-exam-assignment-20260609-rerun",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "PASS",
+  "uat_report": "docs/uat-reports/uat-exam-assignment-20260609-rerun.md",
+  "process_doc": "docs/requirements/exam-assignment-process.md",
+  "status_updated_to": "uat-verified",
+  "scenarios_passed": 4,
+  "scenarios_total": 4,
+  "steps_passed": 18,
+  "steps_total": 18,
+  "defects_resolved": ["ISS-035", "ISS-036"],
+  "notes": "All 4 scenarios and 18 steps passed. ISS-035 (Assign button on ExamsListPage for active exams) confirmed fixed. ISS-036 (204 No Content JSON parse error on DELETE assignment) discovered and fixed during run. exam-assignment-process.md status updated to uat-verified.",
+  "next_action": "Release Finalizer — commit status change in docs/requirements/exam-assignment-process.md"
+}

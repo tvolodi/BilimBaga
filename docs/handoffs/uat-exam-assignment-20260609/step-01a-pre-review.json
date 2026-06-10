@@ -1,0 +1,19 @@
+{
+  "run_id": "uat-exam-assignment-20260609",
+  "issue_id": "ISS-035",
+  "root_cause": "The ISS-034 fix disabled the Step 1 Next button with `disabled={isPending || isReadOnly}`, where isReadOnly=true for active exams. This blocked all navigation through the wizard, making Step 3 (Assignments) unreachable. Additionally, ExamsListPage had no direct Assign shortcut for active exams.",
+  "files_changed": [
+    "frontend/src/pages/ExamWizard/Step1BasicSettings.tsx",
+    "frontend/src/pages/ExamWizard/index.tsx",
+    "frontend/src/pages/admin/ExamsListPage.tsx",
+    "frontend/src/locales/en.json",
+    "frontend/src/locales/kk.json",
+    "frontend/src/locales/ru.json",
+    "frontend/src/pages/ExamWizard/Step1BasicSettings.test.tsx",
+    "frontend/src/pages/admin/ExamsListPage.test.tsx"
+  ],
+  "test_results": {
+    "frontend": "248 passed, 0 failed",
+    "backend": "all packages pass"
+  }
+}

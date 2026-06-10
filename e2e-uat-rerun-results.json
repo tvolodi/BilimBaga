@@ -1,0 +1,259 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\playwright.uat.config.ts",
+    "rootDir": "C:/Users/tvolo/dev/ai-dala/BilimBaga/frontend/e2e/uat-temp",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/tvolo/dev/ai-dala/BilimBaga/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-uat",
+        "name": "chromium-uat",
+        "testDir": "C:/Users/tvolo/dev/ai-dala/BilimBaga/frontend/e2e/uat-temp",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../e2e-uat-rerun-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "uat-exam-configuration-20260609-rerun.spec.ts",
+      "file": "uat-exam-configuration-20260609-rerun.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "S1: Create, Configure, and Publish exam — happy path",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-uat",
+              "projectName": "chromium-uat",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10518,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-09T11:07:44.806Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-e5b00-d-Publish-exam-—-happy-path-chromium-uat\\test-finished-1.png"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-e5b00-d-Publish-exam-—-happy-path-chromium-uat\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "767c59e8c2166f8bf36a-26e9843b4e146fa73638",
+          "file": "uat-exam-configuration-20260609-rerun.spec.ts",
+          "line": 163,
+          "column": 1
+        },
+        {
+          "title": "S2: Publish fails for unsatisfiable random rule",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-uat",
+              "projectName": "chromium-uat",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6335,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-09T11:07:55.909Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-7273b-r-unsatisfiable-random-rule-chromium-uat\\test-finished-1.png"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-7273b-r-unsatisfiable-random-rule-chromium-uat\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "767c59e8c2166f8bf36a-38ffbc479b77d9e49575",
+          "file": "uat-exam-configuration-20260609-rerun.spec.ts",
+          "line": 237,
+          "column": 1
+        },
+        {
+          "title": "S3: Active exam is read-only; unpublish → edit → re-publish",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-uat",
+              "projectName": "chromium-uat",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9616,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-09T11:08:02.392Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-fa6c7-publish-→-edit-→-re-publish-chromium-uat\\test-finished-1.png"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-fa6c7-publish-→-edit-→-re-publish-chromium-uat\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "767c59e8c2166f8bf36a-8c8bdfd8fdd0e9e80ea8",
+          "file": "uat-exam-configuration-20260609-rerun.spec.ts",
+          "line": 291,
+          "column": 1
+        },
+        {
+          "title": "S4: Archive an active exam",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-uat",
+              "projectName": "chromium-uat",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4264,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-09T11:08:12.302Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-03078-n-S4-Archive-an-active-exam-chromium-uat\\test-finished-1.png"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\tvolo\\dev\\ai-dala\\BilimBaga\\frontend\\test-results\\uat-exam-configuration-202-03078-n-S4-Archive-an-active-exam-chromium-uat\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "767c59e8c2166f8bf36a-74d406abadd55eeab17e",
+          "file": "uat-exam-configuration-20260609-rerun.spec.ts",
+          "line": 391,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-06-09T11:07:43.997Z",
+    "duration": 33187.282,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

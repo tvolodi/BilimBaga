@@ -1,0 +1,9 @@
+{
+  "run_id": "uat-exam-configuration-20260609",
+  "pipeline": "UAT",
+  "step": 3,
+  "decision": "DEFECT",
+  "issues": ["ISS-032", "ISS-033", "ISS-034"],
+  "uat_report_path": "docs/uat-reports/uat-exam-configuration-20260609.md",
+  "next_action": "Issue Resolution for all three defects, then re-run UAT"
+}

@@ -1,0 +1,31 @@
+{
+  "run_id": "infra-seed-20260901",
+  "timestamp": "2026-09-01T05:44:28Z",
+  "changes_applied": [
+    {
+      "type": "deploy",
+      "description": "Ran bash /opt/apps/bilimbaga-test/deploy/redeploy-test.sh on hetzner-prod to deploy commit b6fafe6 (already merged to main) to bilimbaga-test.ai-dala.com, applying migration 030_reset_admin_password on API startup."
+    }
+  ],
+  "migration_files": [
+    "backend/migrations/030_reset_admin_password.up.sql",
+    "backend/migrations/030_reset_admin_password.down.sql"
+  ],
+  "env_vars_added": [],
+  "files_changed": [],
+  "git_commit": "b6fafe6 (deployed; not a new commit)",
+  "verification_status": "success",
+  "verification_details": {
+    "pre_deploy_migration_version": "29 (dirty=false)",
+    "post_deploy_migration_version": "30 (dirty=false)",
+    "api_health_check": "https://bilimbaga-test.ai-dala.com/api/v1/health -> {\"data\":{\"status\":\"ok\",\"db_ok\":true,\"version\":\"dev\"},\"error\":null}",
+    "seed_script_run_1": "npx tsx scripts/seed-test-env.ts -> admin login OK (initial password Admin1234!, normalised to Admin2024!), full seed created (4 departments, 15 users, 21 questions, 5 exams, assignments, sessions), exit code 0",
+    "seed_script_run_2": "npx tsx scripts/seed-test-env.ts (idempotency check) -> all entities already exist, exit code 0"
+  },
+  "resolution_path": "OPTION A from step-01 (deploy migration via redeploy-test.sh) was executed successfully. Admin account unlocked and password normalised to Admin2024!.",
+  "follow_up_issue": "ISS-050 — after the admin lockout was resolved, the seed script hit three further bugs of its own (rate limiting, wrong question type/field names, invalid likert_polarity) which were fixed and verified in the same session. See docs/issue-reports/ISS-050-seed-script-blocked-live-test-env.md.",
+  "cleanup": [
+    "Reverted uncommitted guessed-password edits to README.md and scripts/seed-test-env.ts (hardcoded an incorrect/unverified password 'Admin12345!' as a workaround instead of deploying the real fix).",
+    "Deleted backend/cmd/genhash/ — an uncompilable scratch debug tool (duplicate 'package main' declaration) used during password-guessing attempts, not part of the application."
+  ]
+}

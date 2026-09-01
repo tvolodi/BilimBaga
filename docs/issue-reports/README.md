@@ -42,3 +42,4 @@
 | [ISS-047](ISS-047-uat-defect-error-states-not-rendered-results-pages.md) | UAT Defect: Result & Certification — error states not rendered on My Results and Result Detail pages | low | frontend | results | resolved | 2026-06-09 |
 | [ISS-048](ISS-048-uat-defect-employee-record-missing-export-button.md) | UAT Defect: Analytics & Reporting — Employee Record page missing CSV Export button | medium | frontend | analytics / employee record | resolved | 2026-06-09 |
 | [ISS-049](ISS-049-uat-defect-exam-analytics-score-display-inflated.md) | UAT Defect: Analytics & Reporting — Exam Analytics average/median score inflated (×100 double multiply) | high | frontend | analytics / per-exam | resolved | 2026-06-09 |
+| [ISS-050](ISS-050-seed-script-blocked-live-test-env.md) | seed-test-env.ts blocked by rate limiting, wrong question type/field names, invalid likert_polarity | medium | config | questions | resolved | 2026-09-01 |

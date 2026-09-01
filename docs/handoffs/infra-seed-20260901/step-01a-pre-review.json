@@ -1,0 +1,19 @@
+{
+  "run_id": "infra-seed-20260901",
+  "issue_id": "ISS-050",
+  "pipeline": "B",
+  "files_changed": [
+    "scripts/seed-test-env.ts"
+  ],
+  "files_reverted": [
+    "README.md",
+    "scripts/seed-test-env.ts (guessed-password edits reverted before real fix applied)"
+  ],
+  "files_deleted": [
+    "backend/cmd/genhash/ (scratch debug tool, uncompilable duplicate package main, not part of the app)"
+  ],
+  "root_cause_summary": "Three independent bugs in scripts/seed-test-env.ts blocked seeding the live test environment: (1) no retry/backoff on HTTP 429 rate-limit responses from POST /api/v1/auth/login during rapid successive user creation; (2) question 'type' field sent script-internal labels (single_choice, etc.) instead of the API's wire values (single, etc.), and answer-option translations used JSON key 'body' instead of the API DTO's 'text'; (3) the Likert 'Neutral' option sent likert_polarity: 'neutral', which violates the DB CHECK constraint on answer_options.likert_polarity (only 'positive'/'negative'/NULL allowed), causing an unhandled 500.",
+  "fix_summary": "Added fetchWithRateLimitRetry() wrapping apiPost/apiPut/apiGet with exponential backoff on 429; added QUESTION_TYPE_WIRE mapping and fixed answer-option translation key; changed Likert 'Neutral' option's likert_polarity to null.",
+  "verification": "Ran `npx tsx scripts/seed-test-env.ts` against https://bilimbaga-test.ai-dala.com twice: first run completed full seed (departments, roles, 15 users, 21 questions, 5 exams, assignments, sessions) with exit code 0; second run confirmed idempotency (all entities already-exists, exit code 0).",
+  "backend_build": "cd backend && go build ./... — clean (no backend files touched by this fix)"
+}

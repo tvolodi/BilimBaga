@@ -20,6 +20,27 @@ const EMPLOYEE_PASS = 'TestPass2024!'
 
 // ─── Low-level helpers ───────────────────────────────────────────────────────
 
+const RATE_LIMIT_MAX_RETRIES = 5
+const RATE_LIMIT_BASE_DELAY_MS = 500
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/** Retries the given fetch on HTTP 429 with exponential backoff before giving up. */
+async function fetchWithRateLimitRetry(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, init)
+    if (res.status !== 429 || attempt >= RATE_LIMIT_MAX_RETRIES) return res
+    const retryAfterHeader = res.headers.get('Retry-After')
+    const delayMs = retryAfterHeader
+      ? Number(retryAfterHeader) * 1000
+      : RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt
+    warn(`Rate limited (429) on ${url} — retrying in ${delayMs}ms (attempt ${attempt + 1}/${RATE_LIMIT_MAX_RETRIES})`)
+    await sleep(delayMs)
+  }
+}
+
 async function apiPost<T>(
   url: string,
   body: unknown,
@@ -27,7 +48,7 @@ async function apiPost<T>(
 ): Promise<{ ok: boolean; status: number; data: T | null; error: string | null }> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
+  const res = await fetchWithRateLimitRetry(url, { method: 'POST', headers, body: JSON.stringify(body) })
   const json = (await res.json()) as { data: T; error: { code: string; message: string } | null }
   return { ok: res.ok, status: res.status, data: json.data ?? null, error: json.error?.code ?? null }
 }
@@ -38,7 +59,7 @@ async function apiPut<T>(
   token: string,
 ): Promise<{ ok: boolean; status: number; data: T | null; error: string | null }> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-  const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) })
+  const res = await fetchWithRateLimitRetry(url, { method: 'PUT', headers, body: JSON.stringify(body) })
   const json = (await res.json()) as { data: T; error: { code: string; message: string } | null }
   return { ok: res.ok, status: res.status, data: json.data ?? null, error: json.error?.code ?? null }
 }
@@ -47,7 +68,7 @@ async function apiGet<T>(
   url: string,
   token: string,
 ): Promise<{ ok: boolean; status: number; data: T | null; error: string | null }> {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  const res = await fetchWithRateLimitRetry(url, { headers: { Authorization: `Bearer ${token}` } })
   const json = (await res.json()) as { data: T; error: { code: string; message: string } | null }
   return { ok: res.ok, status: res.status, data: json.data ?? null, error: json.error?.code ?? null }
 }
@@ -291,6 +312,15 @@ async function ensureCategory(token: string, name: string, existing: Category[])
 
 interface QuestionCreated { id: string }
 
+// Maps the script's descriptive question type labels to the API's wire format.
+const QUESTION_TYPE_WIRE: Record<string, string> = {
+  single_choice: 'single',
+  multiple_choice: 'multiple',
+  true_false: 'truefalse',
+  likert: 'likert',
+  short_text: 'shorttext',
+}
+
 async function createQuestion(
   token: string,
   type: 'single_choice' | 'multiple_choice' | 'true_false' | 'likert' | 'short_text',
@@ -311,15 +341,15 @@ async function createQuestion(
       is_correct: o.is_correct,
       likert_weight: null,
       likert_polarity: null,
-      translations: { en: { body: o.text } },
+      translations: { en: { text: o.text } },
     }))
   } else if (type === 'likert') {
     answer_options = [
-      { sort_order: 1, is_correct: false, likert_weight: 1, likert_polarity: 'positive', translations: { en: { body: 'Strongly Agree' } } },
-      { sort_order: 2, is_correct: false, likert_weight: 2, likert_polarity: 'positive', translations: { en: { body: 'Agree' } } },
-      { sort_order: 3, is_correct: false, likert_weight: 3, likert_polarity: 'neutral', translations: { en: { body: 'Neutral' } } },
-      { sort_order: 4, is_correct: false, likert_weight: 4, likert_polarity: 'negative', translations: { en: { body: 'Disagree' } } },
-      { sort_order: 5, is_correct: false, likert_weight: 5, likert_polarity: 'negative', translations: { en: { body: 'Strongly Disagree' } } },
+      { sort_order: 1, is_correct: false, likert_weight: 1, likert_polarity: 'positive', translations: { en: { text: 'Strongly Agree' } } },
+      { sort_order: 2, is_correct: false, likert_weight: 2, likert_polarity: 'positive', translations: { en: { text: 'Agree' } } },
+      { sort_order: 3, is_correct: false, likert_weight: 3, likert_polarity: null, translations: { en: { text: 'Neutral' } } },
+      { sort_order: 4, is_correct: false, likert_weight: 4, likert_polarity: 'negative', translations: { en: { text: 'Disagree' } } },
+      { sort_order: 5, is_correct: false, likert_weight: 5, likert_polarity: 'negative', translations: { en: { text: 'Strongly Disagree' } } },
     ]
   } else {
     // short_text: no options
@@ -329,7 +359,7 @@ async function createQuestion(
   const r = await apiPost<QuestionCreated>(
     `${BASE}/api/v1/questions`,
     {
-      type,
+      type: QUESTION_TYPE_WIRE[type],
       category_id: categoryId,
       difficulty,
       default_locale: 'en',

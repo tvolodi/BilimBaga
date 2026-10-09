@@ -836,6 +836,31 @@ func TestPublish_NoRules_ReturnsErrNoQuestionRules(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoQuestionRules)
 }
 
+// ISS-151: an adaptive exam with zero rules is refused with the same error as non-adaptive.
+func TestPublish_Adaptive_NoRules_ReturnsErrNoQuestionRules(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.exams["exam-1"].Adaptive = true
+	svc := NewService(repo)
+	_, err := svc.Publish(context.Background(), "exam-1")
+	assert.ErrorIs(t, err, ErrNoQuestionRules)
+	assert.Equal(t, "draft", repo.exams["exam-1"].Status)
+}
+
+// ISS-151: an adaptive exam with a valid rule (>=5 per difficulty) still publishes.
+func TestPublish_Adaptive_WithValidRule_Succeeds(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.exams["exam-1"].Adaptive = true
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "random", Count: 5}
+	repo.countAvailableForRuleFn = func(_ context.Context, _ *ExamQuestionRule) (int, error) { return 15, nil }
+	repo.countQuestionsPerDifficultyFn = func(_ context.Context, _ *ExamQuestionRule, _ string) (int, error) { return 5, nil }
+	svc := NewService(repo)
+	e, err := svc.Publish(context.Background(), "exam-1")
+	require.NoError(t, err)
+	assert.Equal(t, "active", e.Status)
+}
+
 func TestPublish_UnsatisfiedRule_Returns422Error(t *testing.T) {
 	repo := newMockRepo()
 	seedExam(repo, "exam-1", "draft")

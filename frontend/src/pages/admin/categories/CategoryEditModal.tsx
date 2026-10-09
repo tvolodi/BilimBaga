@@ -100,7 +100,7 @@ export function CategoryEditModal({
     }
     const sortNum = parseInt(form.sort_order, 10)
     if (isNaN(sortNum)) {
-      next.sort_order = t('categories.errors.invalidName')
+      next.sort_order = t('categories.errors.invalidSortOrder')
     }
     setErrors(next)
     return Object.keys(next).length === 0

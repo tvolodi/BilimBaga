@@ -3,6 +3,7 @@ package exams
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -355,6 +356,10 @@ func (s *service) CreateRule(ctx context.Context, examID string, input QuestionR
 	// Persist manual questions if provided alongside the rule.
 	if input.Mode == "manual" && len(input.Questions) > 0 {
 		if err := s.repo.SetManualQuestions(ctx, rule.ID, input.Questions); err != nil {
+			// The rule and its questions are one unit: drop the rule row so a rejected request leaves nothing behind.
+			if delErr := s.repo.DeleteRule(ctx, rule.ID); delErr != nil {
+				err = errors.Join(err, fmt.Errorf("rollback rule %s: %w", rule.ID, delErr))
+			}
 			return nil, fmt.Errorf("exams: CreateRule: set manual questions: %w", err)
 		}
 	}

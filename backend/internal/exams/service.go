@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/bilimbaga/bilimbaga/internal/email"
 )
 
@@ -488,11 +489,13 @@ func (s *service) DeleteAssignment(ctx context.Context, examID, assignmentID str
 	return nil
 }
 
+// ListAssignments returns the exam's assignments. Assignee names and counts are
+// scoped to the caller's department subtree (ISS-183); the exam itself is not.
 func (s *service) ListAssignments(ctx context.Context, examID string) ([]*AssignmentDetail, error) {
 	if _, err := s.repo.GetByID(ctx, examID); err != nil {
 		return nil, fmt.Errorf("exams: ListAssignments: %w", err)
 	}
-	details, err := s.repo.ListAssignmentsWithStats(ctx, examID)
+	details, err := s.repo.ListAssignmentsWithStats(ctx, examID, deptscope.FromContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("exams: ListAssignments: %w", err)
 	}

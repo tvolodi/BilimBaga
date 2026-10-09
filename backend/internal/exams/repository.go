@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -61,7 +62,7 @@ type Repository interface {
 	// UserDepartmentID returns the department of a user ("" when none); ErrAssignmentNotFound is not used - unknown user yields "".
 	UserDepartmentID(ctx context.Context, userID string) (string, error)
 	DeleteAssignment(ctx context.Context, id string) error
-	ListAssignmentsWithStats(ctx context.Context, examID string) ([]*AssignmentDetail, error)
+	ListAssignmentsWithStats(ctx context.Context, examID string, sc deptscope.Scope) ([]*AssignmentDetail, error)
 
 	// CountActiveSessionsForExam returns the number of exam_sessions with status='in_progress'
 	// for the given exam. Used by UnpublishExam to block the transition (FR-BB318 AC-2).
@@ -688,9 +689,13 @@ func (r *postgresRepository) DeleteAssignment(ctx context.Context, id string) er
 //
 // Note: exam_sessions table does not exist yet (FR-BB35). The query returns 0 for
 // all stats until that migration is applied. The LEFT JOINs are safe with missing data.
-func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examID string) ([]*AssignmentDetail, error) {
-	const q = `
-	WITH assignment_base AS (
+func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examID string, sc deptscope.Scope) ([]*AssignmentDetail, error) {
+	q := `
+	WITH RECURSIVE sc_t(id) AS (
+	    SELECT sc_d.id FROM departments sc_d WHERE sc_d.id = $2::uuid
+	    UNION ALL
+	    SELECT sc_c.id FROM departments sc_c JOIN sc_t ON sc_c.parent_id = sc_t.id
+	), assignment_base AS (
 	    SELECT
 	        ea.id,
 	        ea.assignee_type,
@@ -714,10 +719,10 @@ func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examI
 	                    WHERE d3.id = ea.assignee_id
 	                ) AND u2.status = 'active'
 	            )
-	            ELSE (SELECT COUNT(*) FROM users WHERE status = 'active')
+	            ELSE (SELECT COUNT(*) FROM users WHERE status = 'active' AND @SCOPE_USERS@)
 	        END AS total_users
 	    FROM exam_assignments ea
-	    WHERE ea.exam_id = $1
+	    WHERE ea.exam_id = $1 AND @SCOPE_ASSIGNEE@
 	)
 	SELECT
 	    ab.id,
@@ -737,7 +742,7 @@ func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examI
 	              (ab.assignee_type = 'department' AND es.user_id IN (
 	                  SELECT id FROM users WHERE department_id = ab.assignee_id AND status = 'active'
 	              )) OR
-	              (ab.assignee_type = 'all')
+	              (ab.assignee_type = 'all' AND @SCOPE_SESSIONS@)
 	          )
 	    ), 0) AS completed_count,
 	    COALESCE((
@@ -749,11 +754,12 @@ func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examI
 	              (ab.assignee_type = 'department' AND es.user_id IN (
 	                  SELECT id FROM users WHERE department_id = ab.assignee_id AND status = 'active'
 	              )) OR
-	              (ab.assignee_type = 'all')
+	              (ab.assignee_type = 'all' AND @SCOPE_SESSIONS@)
 	          )
 	    ), 0) AS passed_count
 	FROM assignment_base ab
 	ORDER BY ab.assigned_at`
+	q = scopeAssignmentsQuery(q)
 
 	type row struct {
 		ID             string     `db:"id"`
@@ -767,11 +773,11 @@ func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examI
 		PassedCount    int        `db:"passed_count"`
 	}
 
-	rows, err := r.db.QueryxContext(ctx, q, examID)
+	rows, err := r.db.QueryxContext(ctx, q, examID, sc.Arg())
 	if err != nil {
 		// exam_sessions table may not exist yet — treat as empty stats rather than error
 		if strings.Contains(err.Error(), "exam_sessions") && strings.Contains(err.Error(), "does not exist") {
-			return r.listAssignmentsNoSessions(ctx, examID)
+			return r.listAssignmentsNoSessions(ctx, examID, sc)
 		}
 		return nil, fmt.Errorf("exams: ListAssignmentsWithStats: %w", err)
 	}
@@ -803,9 +809,33 @@ func (r *postgresRepository) ListAssignmentsWithStats(ctx context.Context, examI
 	return result, rows.Err()
 }
 
+// scopeAssignmentsQuery expands the department-scope markers of the assignment
+// list queries (ISS-183). $2 is deptscope.Scope.Arg(): NULL means unrestricted
+// (super_admin); otherwise the caller's department subtree root. The query must
+// define the recursive CTE sc_t (the subtree) and bind $2.
+//
+//   - @SCOPE_ASSIGNEE@: a restricted caller sees only assignments whose
+//     assignee is a user in scope, a department inside its subtree, or the
+//     name-less "all" assignment.
+//   - @SCOPE_USERS@ / @SCOPE_SESSIONS@: counts for an "all" assignment are
+//     limited to users in scope.
+func scopeAssignmentsQuery(q string) string {
+	assignee := `($2::uuid IS NULL OR ea.assignee_type = 'all'` +
+		` OR (ea.assignee_type = 'department' AND ea.assignee_id IN (SELECT id FROM sc_t))` +
+		` OR (ea.assignee_type = 'user' AND ` + deptscope.Predicate("ea.assignee_id", "$2") + `))`
+	q = strings.ReplaceAll(q, "@SCOPE_ASSIGNEE@", assignee)
+	q = strings.ReplaceAll(q, "@SCOPE_USERS@", deptscope.Predicate("users.id", "$2"))
+	return strings.ReplaceAll(q, "@SCOPE_SESSIONS@", deptscope.Predicate("es.user_id", "$2"))
+}
+
 // listAssignmentsNoSessions is used when exam_sessions does not yet exist (pre-FR-BB35).
-func (r *postgresRepository) listAssignmentsNoSessions(ctx context.Context, examID string) ([]*AssignmentDetail, error) {
-	const q = `
+func (r *postgresRepository) listAssignmentsNoSessions(ctx context.Context, examID string, sc deptscope.Scope) ([]*AssignmentDetail, error) {
+	q := `
+	WITH RECURSIVE sc_t(id) AS (
+	    SELECT sc_d.id FROM departments sc_d WHERE sc_d.id = $2::uuid
+	    UNION ALL
+	    SELECT sc_c.id FROM departments sc_c JOIN sc_t ON sc_c.parent_id = sc_t.id
+	)
 	SELECT
 	    ea.id,
 	    ea.assignee_type,
@@ -822,11 +852,12 @@ func (r *postgresRepository) listAssignmentsNoSessions(ctx context.Context, exam
 	        WHEN ea.assignee_type = 'department' THEN (
 	            SELECT COUNT(*) FROM users WHERE department_id = ea.assignee_id AND status = 'active'
 	        )
-	        ELSE (SELECT COUNT(*) FROM users WHERE status = 'active')
+	        ELSE (SELECT COUNT(*) FROM users WHERE status = 'active' AND @SCOPE_USERS@)
 	    END AS total_users
 	FROM exam_assignments ea
-	WHERE ea.exam_id = $1
+	WHERE ea.exam_id = $1 AND @SCOPE_ASSIGNEE@
 	ORDER BY ea.assigned_at`
+	q = scopeAssignmentsQuery(q)
 
 	type row struct {
 		ID           string     `db:"id"`
@@ -838,7 +869,7 @@ func (r *postgresRepository) listAssignmentsNoSessions(ctx context.Context, exam
 		TotalUsers   int        `db:"total_users"`
 	}
 
-	rows, err := r.db.QueryxContext(ctx, q, examID)
+	rows, err := r.db.QueryxContext(ctx, q, examID, sc.Arg())
 	if err != nil {
 		return nil, fmt.Errorf("exams: listAssignmentsNoSessions: %w", err)
 	}

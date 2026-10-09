@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,6 +14,7 @@ import (
 // ── Mock repository ──────────────────────────────────────────────────────────
 
 type mockRepo struct {
+	lastScope   deptscope.Scope
 	exams       map[string]*Exam
 	sections    map[string]*ExamSection
 	rules       map[string]*ExamQuestionRule
@@ -308,7 +310,8 @@ func (m *mockRepo) DeleteAssignment(ctx context.Context, id string) error {
 	return nil
 }
 
-func (m *mockRepo) ListAssignmentsWithStats(ctx context.Context, examID string) ([]*AssignmentDetail, error) {
+func (m *mockRepo) ListAssignmentsWithStats(ctx context.Context, examID string, sc deptscope.Scope) ([]*AssignmentDetail, error) {
+	m.lastScope = sc
 	if m.listAssignmentsWithStatsFn != nil {
 		return m.listAssignmentsWithStatsFn(ctx, examID)
 	}

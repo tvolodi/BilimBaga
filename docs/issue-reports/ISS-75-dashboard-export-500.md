@@ -31,7 +31,7 @@ Ruled out: empty DB (queries return empty slices, PDF builder handles empty data
 ## Fix Applied
 - Removed the tenant predicates from the 5 queries and renumbered placeholders (Postgres rejects unused parameters); interface signatures keep `tenantID` (documented as unused) to avoid touching mocks/service.
 - handler.go: log (slog.Error) BuildDashboardReport, PDF generation and the two CSV stream errors.
-- Overlap: PR #77 (swarm/38-reports-left-join) also edits the two completion-rate queries; this change there is limited to deleting the `WHERE e.tenant_id = $1` line and renumbering $2/$3 -> $1/$2 in the BETWEEN.
+- Delivered on the PR #77 branch (swarm/38-reports-left-join) on top of the #38 LEFT JOIN change; the two completion-rate queries now carry both changes.
 
 ## Files Changed
 | File | Change |

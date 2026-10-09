@@ -59,8 +59,8 @@ func TestGetDashboardCompletionRatesForRange_ExamWithoutAssignmentsReturnedWithZ
 	q := f.queries[0]
 	assert.Contains(t, q, "LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id")
 	assert.False(t, innerJoinAssignments.MatchString(q))
-	// Tenant/active filters on exams (base table); date filter stays in the ON clause of the sessions join.
-	where := q[strings.Index(q, "WHERE e.tenant_id"):]
+	// Active filter on exams (base table; no tenant column exists, ISS-75); date filter stays in the ON clause of the sessions join.
+	where := q[strings.Index(q, "WHERE e.status"):]
 	assert.Contains(t, where, "e.status = 'active'")
 	assert.NotContains(t, where, "submitted_at")
 }

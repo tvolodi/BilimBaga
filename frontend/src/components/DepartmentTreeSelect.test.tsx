@@ -370,18 +370,52 @@ describe('DepartmentTreeSelect keyboard focus', () => {
     expect(item('Finance')).toHaveFocus()
   })
 
-  it('gives the focused department a roving tab stop and clears it on blur', async () => {
+  it('moves the roving tab stop to the focused department and keeps exactly one tab stop on blur', async () => {
     const user = userEvent.setup()
     renderSelect()
     await openTree(user)
 
-    expect(item('Engineering')).toHaveAttribute('tabindex', '-1')
+    expect(item('Engineering')).toHaveAttribute('tabindex', '0')
     act(() => item('Engineering').focus())
     expect(item('Engineering')).toHaveAttribute('tabindex', '0')
     expect(item('Engineering').className).toMatch(/ring-2/)
 
-    act(() => item('Engineering').blur())
+    act(() => item('Finance').focus())
+    expect(item('Finance')).toHaveAttribute('tabindex', '0')
     expect(item('Engineering')).toHaveAttribute('tabindex', '-1')
+
+    act(() => item('Finance').blur())
+    expect(item('Engineering')).toHaveAttribute('tabindex', '0')
+    expect(item('Finance')).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('gives exactly one tab stop when the tree opens, on the first department (#360)', async () => {
+    const user = userEvent.setup()
+    renderSelect()
+    await openTree(user)
+
+    const tabStops = screen.getAllByRole('treeitem').filter((el) => el.getAttribute('tabindex') === '0')
+    expect(tabStops).toHaveLength(1)
+    expect(tabStops[0]).toBe(item('Engineering'))
+  })
+
+  it('puts the tab stop on the selected department when it is visible (#360)', async () => {
+    const user = userEvent.setup()
+    renderSelect({ value: 'd-fin' })
+    await openTree(user)
+
+    expect(item('Finance')).toHaveAttribute('tabindex', '0')
+    expect(item('Engineering')).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('lets Tab from the search input reach the tree tab stop (#360)', async () => {
+    const user = userEvent.setup()
+    renderSelect()
+    await openTree(user)
+
+    expect(screen.getByRole('textbox', { name: 'Search departments...' })).toHaveFocus()
+    await user.tab()
+    expect(item('Engineering')).toHaveFocus()
   })
 })
 

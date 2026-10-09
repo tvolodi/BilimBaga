@@ -55,6 +55,8 @@ any -> blocked                     comment with reason; Supervisor resolves
 
 **Label hygiene (retro-005)**: a worker setting a new `status:*` label removes the old one in the same command: `gh issue edit <n> --remove-label status:<old> --add-label status:<new>`. An issue never carries two `status:*` labels.
 
+**Finding contract rule (retro-004)**: a UAT/BA finding must cite the endpoint contract (requirements doc or code `file:line`) before it becomes a dev issue, to avoid false positives (e.g. a non-existent parameter).
+
 Claiming: **the Supervisor assigns** (changes `role:*` and sends a `task`). A worker only takes issues that carry its role label, status `ready` (or its own `in-progress`), ordered by prio then number. Dev1/Dev2 are distinguished by an assignee-free comment `claimed-by: bb-devN`; Supervisor never gives one issue to two devs. Exactly one dev per issue.
 
 ## 5. Merge and lock rules

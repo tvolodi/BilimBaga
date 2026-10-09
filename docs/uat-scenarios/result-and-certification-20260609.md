@@ -7,6 +7,8 @@ created: 2026-06-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Preconditions
 
 1. Platform is running at `http://localhost` (nginx port 80; API at `http://localhost/api/v1`).

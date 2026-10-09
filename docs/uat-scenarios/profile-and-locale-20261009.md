@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **Issue #42** (FR-BB116): `PATCH /users/me`, `preferred_locale` in `GET /users/me`, `/profile` route and `ProfilePage`, TopBar/PortalLayout links, login-time locale application, `profile.*` i18n keys. Status ready, no PR at authoring time.

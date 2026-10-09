@@ -9,7 +9,7 @@ Six LIVE interactive Claude Code sessions that run a perpetual cycle:
 | Dev1, Dev2 | `bb-dev1`, `bb-dev2` | implement/fix in separate git worktrees (`.claude/worktrees/dev1|dev2`) via the existing `requirement-implementation` / `issue-resolution` pipelines |
 | BA | `bb-ba` | requirements + UAT scenarios (`business-analyst`, `requirement-development/validation`) |
 | UAT | `bb-uat` | owns the live stack, runs UAT/E2E, files issues (`uat-runner`, `e2e-repair`) |
-| Infra | `ai-dala-infra-fc` (reused) or `bb-infra` | remote/test environment in the sibling `ai-dala-infra` repo, BilimBaga resources only |
+| Infra | `ai-dala-infra-fc` (reused) or `bb-infra` | QA environment (bilimbaga-qa, proposed) in the sibling `ai-dala-infra` repo, BilimBaga resources only; bilimbaga-test is frozen (customer demo) |
 
 ## Architecture
 - **Transport**: native cross-session messaging (`ListAgents`, `SendMessage`); addresses and message format in `PROTOCOL.md`. Scripts can list live sessions with `claude agents --json`.

@@ -41,7 +41,7 @@ Rules: messages carry pointers (issue numbers, file paths), not content. Everyth
 
 ## 4. GitHub label state machine
 
-Labels: `role:dev|ba|uat|infra`, `status:ready|in-progress|review|uat|blocked|done`, `type:bug|feature|infra|tech-debt|test`, `prio:p0|p1|p2`, plus `swarm`.
+Labels: `role:dev|ba|uat|infra`, `status:ready|in-progress|review|uat|blocked|done`, `type:bug|feature|infra|tech-debt|test`, `prio:p0|p1|p2`, plus `swarm`, and the optional marker `needs-live-db` (SQL-changing PR without a real-Postgres test; UAT verifies it first).
 
 ```
 (new) -> status:ready + role:X     Supervisor/BA/UAT files; Supervisor assigns role
@@ -76,17 +76,19 @@ Every worker must always have a next action: (a) assigned `task`; else (b) oldes
 
 ## 8. Infra scope
 
-Infra handles remote/test environments (hetzner-prod `bilimbaga-test`, QA Keycloak realm `bilimbaga`) through the ai-dala-infra repo workflows. Production always needs the user: Infra marks such issues `status:blocked` ("needs user") and moves on. Note: the ai-dala-infra `shared/agent-team.md` lists only the Letflow team; BilimBaga tasks follow its normal approval protocol unless the user extends that file (only the user edits it). The local `make dev` stack and migrations are handled by dev/UAT using `infra-configuration` pipeline inside this repo.
+**`bilimbaga-test.ai-dala.com` (hetzner-prod `bilimbaga-test`) is FROZEN: it is a customer demo and production-class (user decision, #107).** Per `docs/requirements/DEC-001.Environments-production-class-demo-and-qa.md`: no swarm role runs automated tests, UAT, seeds, load tests, `DISABLE_RATE_LIMIT=true`, destructive DB ops, account creation or ad-hoc config edits against it. Only the user (or Infra on explicit per-action user approval, with a verified off-volume DB backup and a stated rollback plan) may deploy to it; Infra's only default activity is a read-only health check (containers, certificate, disk, backup status, health endpoint). Swarm test traffic goes to local stacks (`make dev`) and to the QA instance `bilimbaga-qa.ai-dala.com` (proposed, NOT built yet; blocked on #106). Until it exists, Infra has no remote deploy target and builds QA only after the user confirms scope. UAT scenarios declare `Target: local | qa`. Scripts that write data (`scripts/seed-test-env.ts`) require an explicit `E2E_API_URL` and refuse the frozen host. Infra handles the QA Keycloak realm `bilimbaga` and the future QA instance through the ai-dala-infra repo workflows. Production always needs the user: Infra marks such issues `status:blocked` ("needs user") and moves on. Note: the ai-dala-infra `shared/agent-team.md` lists only the Letflow team; BilimBaga tasks follow its normal approval protocol unless the user extends that file (only the user edits it). The local `make dev` stack and migrations are handled by dev/UAT using `infra-configuration` pipeline inside this repo.
 
 ## 9. Durable state
 
 - GitHub issues + labels = source of truth for work.
 - `docs/handoffs/<run-id>/` = pipeline payloads.
+- **Report numbering (retro-002)**: issue/review report files use `ISS-<github issue number>` (e.g. issue #88 -> `docs/issue-reports/ISS-088-<slug>.md`, `docs/code-reviews/ISS-088-review.md`). Never take "highest existing + 1": parallel sessions collide. This overrides the numbering step of `.claude/commands/issue-resolution.md` in the swarm.
 - `swarm/state/*.json` (git-ignored runtime; examples committed): `workers.json`, `retro.json`, `escalations.json`.
 - `docs/retrospectives/retro-NNN.md` = audits.
 
 ## 10. Resources
 
+- **SQL-changing PRs**: a dev PR that adds or changes SQL must either include a test run against a real migrated Postgres, or be labelled `needs-live-db` (see `roles/uat.md`). The no-DB `internal/schemaguard` test (SQL column refs vs migrations, all backend packages) must stay green.
 - Devs run tests with capped parallelism: `npx vitest run --maxWorkers=2` (frontend), `go test -p 2 ./...` (backend).
 - UAT live runs (full stack + browsers) need >= 8 GB free memory; UAT checks before starting and defers the run if below.
 - The Supervisor checks free memory each tick while UAT is running and reports low memory in the tick report.

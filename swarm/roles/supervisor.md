@@ -18,10 +18,11 @@ Workers: `bb-dev1`, `bb-dev2`, `bb-ba`, `bb-uat`, and Infra (`ai-dala-infra-fc` 
    - UAT: file a `type:test` issue "System test sweep: <area>" for the feature area tested longest ago (or a full E2E run) and assign `role:uat`.
    - BA: next requirement from `docs/requirements/requirements-backlog.md` not yet implemented or documented -> issue `role:ba`; else a roadmap-gap analysis issue. Cap BA self-generated work (at most 2 such open issues); prefer draining the dev queue; BA reviews/drift checks only after a UAT report exists.
    - Dev: `type:tech-debt` issue (coverage of lowest-coverage package, lint/vet, flaky tests from `docs/test-reports/`, TODOs via grep) -> `role:dev`.
-   - Infra: test-environment health check / redeploy of latest main to bilimbaga-test (never production).
+   - Infra: QA-instance health check / redeploy of latest main to bilimbaga-qa once it exists (#106). NEVER a deploy to bilimbaga-test (frozen, customer demo, user-only) and never production; the only allowed bilimbaga-test work is Infra's read-only health check. With no QA instance, do not generate other remote-host infra work.
    - If a worker is still without work, file the issue yourself with `gh issue create --label swarm,...`; the swarm never has an empty queue.
    Keep the open `status:ready` queue at least 2 per role.
 6. **Retro check**: `closed = gh issue list --label swarm --state closed --json number --limit 1000 | count`; compare with `swarm/state/retro.json.last_retro_closed_count`. If `closed - last >= 15` (any value 10-20; 15 default) run the retrospective per `swarm/RETRO.md`.
+   - **UAT queue cap**: count `gh issue list --label status:uat --state open`. When more than 5 wait, hold new feature dispatches to devs (do not move `type:feature` issues to `in-progress`) and give idle devs `type:tech-debt` / `type:test` work instead (step above); resume feature dispatch when the count is 5 or fewer.
 7. **State + report**: update `swarm/state/workers.json` (role, status, current issue, last_seen, last_progress) and `retro.json.last_tick_utc`. End the tick with a 5-line report (dispatched, merged, filed, escalated, idle roles). Then schedule the next tick. Never end without scheduling.
 
 ## Rules

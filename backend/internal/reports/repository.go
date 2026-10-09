@@ -177,7 +177,7 @@ SELECT
                                                                                  AS completed_count,
     COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)               AS passed_count
 FROM exams e
-JOIN resolved_assignments ra ON ra.exam_id = e.id
+LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id
 LEFT JOIN exam_sessions es ON es.exam_id = e.id AND es.user_id = ra.user_id
 WHERE e.status = 'active'
 GROUP BY e.id, e.title
@@ -880,7 +880,7 @@ SELECT
                                                                                  AS completed_count,
   COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)                 AS passed_count
 FROM exams e
-JOIN resolved_assignments ra ON ra.exam_id = e.id
+LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id
 LEFT JOIN exam_sessions es
   ON es.exam_id = e.id
   AND es.user_id = ra.user_id

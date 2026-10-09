@@ -414,12 +414,17 @@ func (s *service) CreateAssignment(ctx context.Context, input CreateAssignmentIn
 	}
 
 	// AC-6: department admins may only assign within their own department.
-	if input.CallerRole == "department_admin" {
+	if !assignsOrgWide(input.CallerRole) {
 		if input.AssigneeType == "all" {
 			return nil, ErrForbidden
 		}
 		if input.AssigneeType == "department" && (input.AssigneeID == nil || *input.AssigneeID != input.CallerDeptID) {
 			return nil, ErrForbidden
+		}
+		if input.AssigneeType == "user" {
+			if err := s.checkUserInDept(ctx, input.AssigneeID, input.CallerDeptID); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -459,12 +464,17 @@ func (s *service) DeleteAssignment(ctx context.Context, examID, assignmentID str
 		return ErrAssignmentNotFound
 	}
 	// AC-6: department admins may only remove their own dept assignments.
-	if callerRole == "department_admin" {
+	if !assignsOrgWide(callerRole) {
 		if a.AssigneeType == "all" {
 			return ErrForbidden
 		}
 		if a.AssigneeType == "department" && (a.AssigneeID == nil || *a.AssigneeID != callerDeptID) {
 			return ErrForbidden
+		}
+		if a.AssigneeType == "user" {
+			if err := s.checkUserInDept(ctx, a.AssigneeID, callerDeptID); err != nil {
+				return err
+			}
 		}
 	}
 	if err := s.repo.DeleteAssignment(ctx, assignmentID); err != nil {
@@ -515,4 +525,27 @@ func (s *service) GetEligibleCounts(ctx context.Context, examID string) ([]RuleE
 		counts = append(counts, RuleEligibleCount{RuleID: rule.ID, Eligible: eligible})
 	}
 	return counts, nil
+}
+
+// assignsOrgWide reports whether the caller role may manage exam assignments
+// beyond its own department. Default-deny (FR-BB117): only the built-in
+// super_admin and examiner roles are org-wide; department_admin and every
+// custom role holding exams:assign are limited to their own department.
+func assignsOrgWide(callerRole string) bool {
+	return callerRole == "super_admin" || callerRole == "examiner"
+}
+
+// checkUserInDept returns ErrForbidden unless the assignee user belongs to the caller's department.
+func (s *service) checkUserInDept(ctx context.Context, userID *string, callerDeptID string) error {
+	if userID == nil || callerDeptID == "" {
+		return ErrForbidden
+	}
+	dept, err := s.repo.UserDepartmentID(ctx, *userID)
+	if err != nil {
+		return err
+	}
+	if dept != callerDeptID {
+		return ErrForbidden
+	}
+	return nil
 }

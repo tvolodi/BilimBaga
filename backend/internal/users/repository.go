@@ -236,7 +236,7 @@ func (r *pgRepository) GetDepartmentIDByName(ctx context.Context, name string) (
 
 // ListRoles returns all roles ordered by name.
 func (r *pgRepository) ListRoles(ctx context.Context) ([]RoleRow, error) {
-	const q = `SELECT id, name FROM roles ORDER BY name`
+	const q = `SELECT id, name, description, is_system FROM roles ORDER BY name`
 	var rows []RoleRow
 	if err := r.db.SelectContext(ctx, &rows, q); err != nil {
 		return nil, fmt.Errorf("users.ListRoles: %w", err)

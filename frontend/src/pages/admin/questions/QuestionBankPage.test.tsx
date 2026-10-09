@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -131,5 +131,54 @@ describe('QuestionBankPage', () => {
     await userEvent.type(searchInput, 'test query')
     // Input updates without crash
     expect(searchInput).toHaveValue('test query')
+  })
+})
+
+describe('QuestionBankPage bulk export (Bearer download)', () => {
+  function renderWithToken() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    qc.setQueryData(['auth', 'accessToken'], 'tok-q')
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <QuestionBankPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  async function selectFirstRowAndExport() {
+    await waitFor(() => screen.getByText('What is H2O?'))
+    await userEvent.click(screen.getAllByRole('checkbox')[1])
+    await userEvent.click(await screen.findByRole('button', { name: /export csv/i }))
+  }
+
+  it('sends the Authorization header when exporting', async () => {
+    let auth: string | null = null
+    server.use(
+      http.get('/api/v1/questions/export', ({ request }) => {
+        auth = request.headers.get('Authorization')
+        return new HttpResponse('id,q-1', { headers: { 'Content-Type': 'text/csv' } })
+      }),
+    )
+    URL.createObjectURL = vi.fn(() => 'blob:mock')
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderWithToken()
+    await selectFirstRowAndExport()
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock'))
+    expect(auth).toBe('Bearer tok-q')
+    vi.restoreAllMocks()
+  })
+
+  it('shows an error when the export fails', async () => {
+    server.use(
+      http.get('/api/v1/questions/export', () =>
+        HttpResponse.json({ data: null, error: { code: 'ERR_INTERNAL' } }, { status: 500 }),
+      ),
+    )
+    renderWithToken()
+    await selectFirstRowAndExport()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/download failed/i)
   })
 })

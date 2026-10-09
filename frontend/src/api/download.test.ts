@@ -79,6 +79,18 @@ describe('downloadFile', () => {
     expect(URL.createObjectURL).not.toHaveBeenCalled()
   })
 
+  it('does not retry a second time when the retried request is 401 again', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValueOnce(jsonResponse({ data: { access_token: 'new' }, error: null }, 200))
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+    await expect(downloadFile(makeQc('old'), '/api/v1/x', 'f.pdf')).rejects.toMatchObject({
+      code: 'ERR_UNAUTHORIZED',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(clicked).toHaveLength(0)
+  })
+
   it('throws the server error code on non-OK responses', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: { code: 'ERR_FORBIDDEN' } }, 403))
     await expect(downloadFile(makeQc(), '/api/v1/x', 'f.pdf')).rejects.toMatchObject({

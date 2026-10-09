@@ -56,6 +56,7 @@ export default defineConfig({
         '**/user-management.spec.ts',
         '**/accessibility.spec.ts',
         '**/loyalty-narrative.spec.ts',
+        '**/downloads-bearer.spec.ts',
         '**/grading/ai-grading.spec.ts',
       ],
       use: {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDebounceValue } from 'usehooks-ts'
 import { useQueryClient } from '@tanstack/react-query'
+import { downloadFile, downloadErrorKey } from '@/api/download'
 import {
   Search,
   Plus,
@@ -759,6 +760,8 @@ function BulkActionBar({
   archiveProgress,
 }: BulkActionBarProps) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [exportError, setExportError] = useState<string | null>(null)
   const count = selectedIds.length
 
   function buildExportUrl(format: 'csv' | 'json') {
@@ -777,12 +780,13 @@ function BulkActionBar({
     return `/api/v1/questions/export?${params.toString()}`
   }
 
-  function handleExport(format: 'csv' | 'json') {
-    const url = buildExportUrl(format)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `questions.${format}`
-    a.click()
+  async function handleExport(format: 'csv' | 'json') {
+    setExportError(null)
+    try {
+      await downloadFile(qc, buildExportUrl(format), `questions.${format}`)
+    } catch (err) {
+      setExportError(downloadErrorKey(err))
+    }
   }
 
   return (
@@ -791,6 +795,11 @@ function BulkActionBar({
         <span className="text-sm font-medium">
           {t('questionBank.bulk.selected', { count })}
         </span>
+        {exportError && (
+          <span role="alert" className="text-xs text-red-700">
+            {t(exportError)}
+          </span>
+        )}
         {count > 100 && (
           <span className="text-xs text-muted-foreground">
             {t('questionBank.bulk.exportLimit')}

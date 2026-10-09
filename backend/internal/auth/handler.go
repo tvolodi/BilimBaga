@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 )
 
@@ -86,12 +87,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	resp, cookie, err := h.svc.Login(r.Context(), &req, clientIP(r))
 	if err != nil {
-		h.writer.Write(r.Context(), r, "auth.login.failure", "user", nil, map[string]any{"email": req.Email})
+		h.writer.Write(r.Context(), r, "auth.login.failure", "user", nil, map[string]any{"email": api.NormalizeEmail(req.Email)})
 		handleServiceError(w, err)
 		return
 	}
 
-	h.writer.Write(r.Context(), r, "auth.login.success", "user", &resp.User.ID, map[string]any{"email": req.Email})
+	h.writer.Write(r.Context(), r, "auth.login.success", "user", &resp.User.ID, map[string]any{"email": api.NormalizeEmail(req.Email)})
 	http.SetCookie(w, cookie)
 	writeJSON(w, http.StatusOK, resp, nil)
 }

@@ -513,3 +513,43 @@ func TestListUsers_RoleIDFilter(t *testing.T) {
 		assert.Equal(t, "role-ex", u.RoleID)
 	}
 }
+
+// ISS-164: emails are normalised (trim + lowercase) on every write path.
+
+func TestCreateUser_NormalisesMixedCaseAndWhitespaceEmail(t *testing.T) {
+	repo := newMockRepo()
+	var got string
+	repo.createFn = func(_ context.Context, email, fullName, hash string, deptID *string, roleID string) (*User, error) {
+		got = email
+		return &User{ID: "new", Email: email, FullName: fullName}, nil
+	}
+	svc := NewService(repo)
+
+	resp, err := svc.CreateUser(context.Background(), CreateRequest{
+		Email: "  John.Doe@Corp.com ", FullName: "John", DepartmentID: strPtr("dept-1"), RoleID: "role-emp",
+	}, "super_admin", "", "caller-id", "127.0.0.1")
+
+	require.NoError(t, err)
+	assert.Equal(t, "john.doe@corp.com", got)
+	assert.Equal(t, "john.doe@corp.com", resp.Email)
+}
+
+func TestImportUsers_Commit_NormalisesEmail(t *testing.T) {
+	repo := newMockRepo()
+	var got []string
+	repo.createFn = func(_ context.Context, email, fullName, hash string, deptID *string, roleID string) (*User, error) {
+		got = append(got, email)
+		return &User{ID: "new" + email, Email: email, FullName: fullName}, nil
+	}
+	svc := NewService(repo)
+
+	rows := []CSVRow{
+		{RowNum: 2, Email: "Alice@Example.COM", FullName: "Alice", DepartmentName: "Engineering", RoleName: "employee"},
+		{RowNum: 3, Email: "  Bob@Example.com ", FullName: "Bob", DepartmentName: "Engineering", RoleName: "employee"},
+	}
+	preview, err := svc.ImportUsers(context.Background(), rows, true, "super_admin", "", "caller-id", "127.0.0.1")
+	require.NoError(t, err)
+	assert.Len(t, preview.Errors, 0)
+	assert.Equal(t, []string{"alice@example.com", "bob@example.com"}, got)
+	assert.Equal(t, "alice@example.com", preview.Valid[0].Email)
+}

@@ -1,0 +1,20 @@
+{
+  "run_id": "FR-BB115",
+  "step": 2,
+  "agent": "requirement-validation",
+  "requirement": "FR-BB115",
+  "result": "PASS",
+  "date": "2026-10-09",
+  "gap_evidence": [
+    "roadmap 1.4: unlock via admin or email link; roadmap 6.1: password reset link template",
+    "backend/internal/router/router.go has no forgot/reset/unlock route",
+    "FR-BB14, FR-BB110, FR-BB61 explicitly defer the flow; no FR defines it",
+    "auth/service.go locks accounts for 30 minutes with no early-unlock path"
+  ],
+  "checks": {
+    "acs_testable": "pass (10 ACs, API contract, audit events, tests incl. Mailhog E2E)",
+    "security": "pass: hashed single-use tokens, no enumeration, throttling, session revocation",
+    "conventions": "pass: envelope, UUID, UTC, migration-only schema, i18n en/ru/kk, no os.Getenv in handlers",
+    "dependencies": "FR-BB48 PublicAppURL config must land first or be included"
+  }
+}

@@ -24,6 +24,7 @@
 | FR-BB112 | Frontend-branding-settings | Frontend: Branding Settings | Implemented |
 | FR-BB113 | Frontend-department-management | Frontend: Department Management | Implemented |
 | FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Implemented |
+| FR-BB115 | Account-recovery | Account Recovery: Forgot Password and Lockout Unlock | Validated |
 | FR-BB21 | Categories-and-tags | Categories and Tags | Implemented |
 | FR-BB22 | Question-model | Question Model | Implemented |
 | FR-BB23 | Question-CRUD-API | Question CRUD API | Implemented |
@@ -67,7 +68,7 @@
 | FR-BB62 | Full-i18n-coverage | Full i18n Coverage | Implemented |
 | FR-BB63 | Accessibility | Accessibility | Implemented |
 | FR-BB64 | Security-hardening | Security Hardening | Validated |
-| FR-BB65 | Performance | Performance | Draft |
+| FR-BB65 | Performance | Performance | Validated |
 | FR-BB66 | Observability | Observability | Implemented |
 | FR-BB67 | e2e-coverage-employee-portal-exam-taking-grading | E2E Coverage: Employee Portal, Exam Taking, Result & Grading Flows | Implemented |
 | FR-BB71 | Question-generation-assist | Question Generation Assist | Implemented |

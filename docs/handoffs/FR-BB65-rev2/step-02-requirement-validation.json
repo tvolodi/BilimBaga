@@ -1,0 +1,17 @@
+{
+  "run_id": "FR-BB65-rev2",
+  "step": 2,
+  "agent": "requirement-validation",
+  "requirement": "FR-BB65",
+  "result": "PASS",
+  "date": "2026-10-09",
+  "checks": {
+    "acs_testable": "pass: every AC has a measurable threshold or file/test evidence",
+    "evidence_mapped_to_files": "pass: AC-1,4-8 cite shipped files; AC-2,3 have commands and report paths",
+    "owner_defined": "pass: UAT owns live-stack evidence; dev owns D1-D3",
+    "pass_thresholds": "pass: p95<200ms per group, failed<1%, Lighthouse median>=90, EXPLAIN index usage",
+    "conflicts": "none; DISABLE_RATE_LIMIT caveat documented"
+  },
+  "dev_issue": "D1 extend k6 script; D3 add scripts/perf/lighthouse.sh and bundle-check.sh; D2 Nginx gzip/cache only if Lighthouse < 90",
+  "uat_issue": "Run E1-E4 against live stack and commit reports to docs/test-reports/"
+}

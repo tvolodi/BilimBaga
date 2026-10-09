@@ -113,3 +113,10 @@ Delete or archive `UAT-Dash-*` exams and remove the extra assignment so later sc
 ## Out of Scope
 
 Overdue-employee, recent-activity and average-score groups; query performance; PDF layout.
+
+## Addendum (BA, after PRs #77/#83/#86 merged; see docs/requirements/conformance/PR77-PR83-PR86-conformance-20261009.md section 5)
+- Dashboard PDF export is mandatory: expect 200, `application/pdf`, and the unassigned exam listed with zero counts (previously a swallowed 500).
+- Also verify both CSV exports and date-range variants of the PDF; an employee token gets 403 on every export.
+- After each export the api logs must contain no `reports: ... failed` line.
+- AI insight smoke test (FR-BB74): the insight endpoint returns 200 without SQL errors.
+- Live-check in `cert-public-verification-20261009.md`: a malformed code (`not-a-uuid`) must show "not found or invalid", not "temporarily unavailable" (known p2 gap from PR #86 until the handler validates the UUID).

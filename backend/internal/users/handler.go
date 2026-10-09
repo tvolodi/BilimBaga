@@ -120,25 +120,27 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateMe handles PATCH /api/v1/users/me (FR-BB116). The body may contain only
-// preferred_locale; any other key is rejected with 400 VALIDATION_ERROR before anything is
+// preferred_locale; any other key is rejected with 400 INVALID_BODY before anything is
 // persisted (AC-3). A successful change of the value writes user.preferred_locale_updated.
 func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	var req UpdateMeRequest
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid body: only preferred_locale is accepted")
+		api.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "invalid body: only preferred_locale is accepted")
 		return
 	}
 	// Exactly one JSON object: anything after it is rejected, not silently ignored.
 	var trailing json.RawMessage
 	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
-		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid body: only preferred_locale is accepted")
+		api.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "invalid body: only preferred_locale is accepted")
 		return
 	}
+	// A bad locale value is a validation error: 422 VALIDATION_ERROR (api-conventions). Body shape
+	// errors above stay 400.
 	locale, err := parsePreferredLocale(req.PreferredLocale)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		api.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		return
 	}
 
@@ -149,7 +151,7 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrNotFound):
 			api.WriteError(w, http.StatusNotFound, "NOT_FOUND", "user not found")
 		case errors.Is(err, ErrValidation):
-			api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			api.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		default:
 			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update profile")
 		}

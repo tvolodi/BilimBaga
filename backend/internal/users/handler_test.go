@@ -883,8 +883,8 @@ func TestHandlerUpdateMe_UnchangedValue_NoAudit(t *testing.T) {
 	assert.Empty(t, aw.actions)
 }
 
-// AC-2: a code not in the tenant's available_locales is 400 VALIDATION_ERROR and not audited.
-func TestHandlerUpdateMe_UnavailableLocale_Returns400(t *testing.T) {
+// AC-2: a code not in the tenant's available_locales is 422 VALIDATION_ERROR and not audited.
+func TestHandlerUpdateMe_UnavailableLocale_Returns422(t *testing.T) {
 	aw := &fakeAudit{}
 	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
 		return nil, fmt.Errorf("%w: preferred_locale must be one of the tenant available locales", ErrValidation)
@@ -893,7 +893,7 @@ func TestHandlerUpdateMe_UnavailableLocale_Returns400(t *testing.T) {
 
 	w := patchMe(h, "u-caller", `{"preferred_locale":"de"}`)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code, w.Body.String())
 	_, apiErr := decodeHandlerEnvelope(t, w)
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
@@ -924,7 +924,7 @@ func TestHandlerUpdateMe_ExtraField_Returns400AndNothingPersisted(t *testing.T) 
 			assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 			_, apiErr := decodeHandlerEnvelope(t, w)
 			require.NotNil(t, apiErr)
-			assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
+			assert.Equal(t, "INVALID_BODY", apiErr.Code)
 			assert.False(t, called, "service must not be reached")
 			assert.Empty(t, aw.actions)
 		})
@@ -932,7 +932,8 @@ func TestHandlerUpdateMe_ExtraField_Returns400AndNothingPersisted(t *testing.T) 
 }
 
 // AC-2: preferred_locale is required; an absent key is not treated as a null that clears it.
-func TestHandlerUpdateMe_MissingKey_Returns400(t *testing.T) {
+// The locale value is invalid, so the status is 422 VALIDATION_ERROR.
+func TestHandlerUpdateMe_MissingKey_Returns422(t *testing.T) {
 	var called bool
 	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
 		called = true
@@ -942,7 +943,7 @@ func TestHandlerUpdateMe_MissingKey_Returns400(t *testing.T) {
 
 	w := patchMe(h, "u-caller", `{}`)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code, w.Body.String())
 	_, apiErr := decodeHandlerEnvelope(t, w)
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
@@ -961,11 +962,13 @@ func TestHandlerUpdateMe_TrailingData_Returns400(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code, body)
 		_, apiErr := decodeHandlerEnvelope(t, w)
 		require.NotNil(t, apiErr, body)
-		assert.Equal(t, "VALIDATION_ERROR", apiErr.Code, body)
+		assert.Equal(t, "INVALID_BODY", apiErr.Code, body)
 	}
 }
 
-func TestHandlerUpdateMe_NonStringLocale_Returns400(t *testing.T) {
+// AC-2: a non-string, non-null preferred_locale is a locale validation error: 422 VALIDATION_ERROR,
+// and the service is never reached.
+func TestHandlerUpdateMe_NonStringLocale_Returns422(t *testing.T) {
 	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
 		t.Fatal("service must not be reached")
 		return nil, nil
@@ -974,7 +977,7 @@ func TestHandlerUpdateMe_NonStringLocale_Returns400(t *testing.T) {
 
 	for _, body := range []string{`{"preferred_locale":5}`, `{"preferred_locale":["ru"]}`} {
 		w := patchMe(h, "u-caller", body)
-		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code, body)
 		_, apiErr := decodeHandlerEnvelope(t, w)
 		require.NotNil(t, apiErr, body)
 		assert.Equal(t, "VALIDATION_ERROR", apiErr.Code, body)
@@ -991,6 +994,9 @@ func TestHandlerUpdateMe_MalformedJSON_Returns400(t *testing.T) {
 	w := patchMe(h, "u-caller", `{"preferred_locale":`)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "INVALID_BODY", apiErr.Code)
 }
 
 func TestHandlerUpdateMe_UserNotFound_Returns404NoAudit(t *testing.T) {

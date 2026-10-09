@@ -529,14 +529,14 @@ func TestRouterUsersAuthz_PatchMeRejectsUnavailableLocale(t *testing.T) {
 	h, repo := newUsersRouter(t)
 
 	rec := call(h, http.MethodPatch, "/api/v1/users/me", tokenFor(t, idEmp, "employee", authzDeptA), map[string]any{"preferred_locale": "de"})
-	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, rec))
 	assert.Nil(t, repo.snapshot(idEmp).PreferredLocale)
 	assert.Zero(t, repo.writes)
 }
 
 // AC-3: role_id, department_id, email and status cannot ride along on the self-service endpoint.
-// Each attempt is 400 VALIDATION_ERROR and persists nothing, including the locale in the same body.
+// Each attempt is 400 INVALID_BODY and persists nothing, including the locale in the same body.
 func TestRouterUsersAuthz_PatchMeRejectsPrivilegeFields(t *testing.T) {
 	cases := map[string]map[string]any{
 		"role_id escalation":     {"preferred_locale": "ru", "role_id": roleSuperID},
@@ -550,7 +550,7 @@ func TestRouterUsersAuthz_PatchMeRejectsPrivilegeFields(t *testing.T) {
 			h, repo := newUsersRouter(t)
 			rec := call(h, http.MethodPatch, "/api/v1/users/me", tokenFor(t, idEmp, "employee", authzDeptA), body)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-			assert.Equal(t, "VALIDATION_ERROR", errCode(t, rec))
+			assert.Equal(t, "INVALID_BODY", errCode(t, rec))
 
 			after := repo.snapshot(idEmp)
 			assert.Equal(t, "employee", after.RoleName)

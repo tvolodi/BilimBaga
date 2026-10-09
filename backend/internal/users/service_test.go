@@ -639,6 +639,8 @@ func TestUpdateMyLocale_RejectsLocaleOutsideAvailable(t *testing.T) {
 		_, err := svc.UpdateMyLocale(context.Background(), "u1", strPtr(bad))
 		require.Error(t, err, bad)
 		assert.ErrorIs(t, err, ErrValidation, bad)
+		// The handler relays this message as the 422 body, so it must name the field.
+		assert.Contains(t, err.Error(), "preferred_locale", bad)
 	}
 	assert.Nil(t, repo.users["u1"].PreferredLocale, "rejected value must not be persisted")
 }

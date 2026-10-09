@@ -349,13 +349,13 @@ func parseJSONImport(r io.Reader) ([]ImportRow, error) {
 	for i, jr := range raw {
 		translations := make(map[string]TranslationInput, len(jr.Translations))
 		for locale, td := range jr.Translations {
-			translations[locale] = TranslationInput{Stem: td.Stem, Explanation: td.Explanation}
+			translations[locale] = TranslationInput(td)
 		}
 		options := make([]AnswerOptionInput, 0, len(jr.AnswerOptions))
 		for _, opt := range jr.AnswerOptions {
 			optTr := make(map[string]AnswerTranslationInput, len(opt.Translations))
 			for locale, at := range opt.Translations {
-				optTr[locale] = AnswerTranslationInput{Text: at.Text}
+				optTr[locale] = AnswerTranslationInput(at)
 			}
 			options = append(options, AnswerOptionInput{
 				SortOrder:      opt.SortOrder,

@@ -456,7 +456,7 @@ func applySubObjects(ctx context.Context, tx *sqlx.Tx, questionID string, transl
 		if _, err := tx.ExecContext(ctx, insertTr, questionID, locale, t.Stem, t.Explanation); err != nil {
 			return nil, fmt.Errorf("insert translation %s: %w", locale, err)
 		}
-		result.translations[locale] = TranslationDetail{Stem: t.Stem, Explanation: t.Explanation}
+		result.translations[locale] = TranslationDetail(t)
 	}
 
 	// Answer options + their translations.
@@ -487,7 +487,7 @@ func applySubObjects(ctx context.Context, tx *sqlx.Tx, questionID string, transl
 			if _, err := tx.ExecContext(ctx, insertAt, opt.ID, locale, at.Text); err != nil {
 				return nil, fmt.Errorf("insert answer_translation: %w", err)
 			}
-			optTranslations[locale] = AnswerTranslationDetail{Text: at.Text}
+			optTranslations[locale] = AnswerTranslationDetail(at)
 		}
 		result.answerOptions = append(result.answerOptions, AnswerOptionDetail{
 			ID:             opt.ID,

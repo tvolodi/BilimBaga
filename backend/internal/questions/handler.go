@@ -236,13 +236,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	translations := make(map[string]TranslationInput, len(req.Translations))
 	for locale, t := range req.Translations {
-		translations[locale] = TranslationInput{Stem: t.Stem, Explanation: t.Explanation}
+		translations[locale] = TranslationInput(t)
 	}
 	options := make([]AnswerOptionInput, 0, len(req.AnswerOptions))
 	for _, opt := range req.AnswerOptions {
 		optTr := make(map[string]AnswerTranslationInput, len(opt.Translations))
 		for locale, at := range opt.Translations {
-			optTr[locale] = AnswerTranslationInput{Text: at.Text}
+			optTr[locale] = AnswerTranslationInput(at)
 		}
 		options = append(options, AnswerOptionInput{
 			SortOrder:      opt.SortOrder,
@@ -311,13 +311,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	translations := make(map[string]TranslationInput, len(req.Translations))
 	for locale, t := range req.Translations {
-		translations[locale] = TranslationInput{Stem: t.Stem, Explanation: t.Explanation}
+		translations[locale] = TranslationInput(t)
 	}
 	options := make([]AnswerOptionInput, 0, len(req.AnswerOptions))
 	for _, opt := range req.AnswerOptions {
 		optTr := make(map[string]AnswerTranslationInput, len(opt.Translations))
 		for locale, at := range opt.Translations {
-			optTr[locale] = AnswerTranslationInput{Text: at.Text}
+			optTr[locale] = AnswerTranslationInput(at)
 		}
 		options = append(options, AnswerOptionInput{
 			SortOrder:      opt.SortOrder,

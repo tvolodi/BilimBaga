@@ -50,8 +50,11 @@ func (r *recoveryRepo) GetUserByEmail(_ context.Context, email string) (*User, e
 	r.mu.Lock()
 	r.calls = append(r.calls, "GetUserByEmail")
 	r.mu.Unlock()
-	if u, ok := r.users[email]; ok {
-		return u, nil
+	// mirrors the SQL "WHERE lower(u.email) = $1" (input is already normalised)
+	for stored, u := range r.users {
+		if strings.ToLower(stored) == email {
+			return u, nil
+		}
 	}
 	return nil, ErrNotFound
 }

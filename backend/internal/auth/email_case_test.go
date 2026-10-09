@@ -19,7 +19,7 @@ func strictLowercaseRepo(t *testing.T, stored string, hash []byte) *mockReposito
 	t.Helper()
 	return &mockRepository{
 		getUserByEmailFn: func(_ context.Context, email string) (*User, error) {
-			if email != stored { // exact match like the SQL "WHERE email = $1"
+			if strings.ToLower(stored) != email { // mirrors the SQL "WHERE lower(u.email) = $1"
 				return nil, ErrNotFound
 			}
 			return &User{ID: "u1", Email: stored, PasswordHash: string(hash), RoleName: "employee", Status: "active"}, nil
@@ -81,4 +81,29 @@ func TestForgotPassword_MixedCaseUnknownEmail_StaysNeutral(t *testing.T) {
 	assert.Empty(t, id)
 	assert.Empty(t, f.mailer.calls)
 	assert.Empty(t, f.repo.resets)
+}
+
+// Cycle 2: legacy rows whose stored email is mixed case must stay reachable.
+
+func TestService_Login_LegacyMixedCaseStoredRow_Succeeds(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("ValidPass123!"), 4)
+	require.NoError(t, err)
+	svc := NewService(ServiceConfig{
+		JWTSecret: "a-secret-that-is-at-least-32-chars!!", JWTAccessTTLMin: 15, JWTRefreshTTLDays: 7, BcryptCost: 4,
+	}, strictLowercaseRepo(t, "John.Doe@Corp.com", hash))
+
+	for _, typed := range []string{"john.doe@corp.com", "JOHN.DOE@CORP.COM", " John.Doe@Corp.com "} {
+		resp, _, err := svc.Login(context.Background(), &LoginRequest{Email: typed, Password: "ValidPass123!"}, "127.0.0.1")
+		require.NoError(t, err, typed)
+		assert.Equal(t, "John.Doe@Corp.com", resp.User.Email)
+	}
+}
+
+func TestForgotPassword_LegacyMixedCaseStoredRow_IssuesTokenAndMails(t *testing.T) {
+	f := newRecoveryFixture(t)
+	f.repo.addUser(&User{ID: "u9", Email: "John.Doe@Corp.com", Status: "active", RoleName: "employee"})
+	id, err := f.svc.ForgotPassword(context.Background(), &ForgotPasswordRequest{Email: "john.doe@corp.com"}, "1.2.3.4")
+	require.NoError(t, err)
+	assert.Equal(t, "u9", id)
+	assert.Len(t, f.mailer.calls, 1)
 }

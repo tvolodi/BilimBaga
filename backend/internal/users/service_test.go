@@ -1,6 +1,7 @@
 package users
 
 import (
+	"strings"
 	"context"
 	"errors"
 	"fmt"
@@ -76,7 +77,7 @@ func (m *mockRepo) Create(ctx context.Context, email, fullName, hash string, dep
 		return m.createFn(ctx, email, fullName, hash, deptID, roleID)
 	}
 	for _, u := range m.users {
-		if u.Email == email {
+		if strings.EqualFold(u.Email, email) { // mirrors the lower(email) duplicate probe
 			return nil, ErrDuplicateEmail
 		}
 	}
@@ -552,4 +553,17 @@ func TestImportUsers_Commit_NormalisesEmail(t *testing.T) {
 	assert.Len(t, preview.Errors, 0)
 	assert.Equal(t, []string{"alice@example.com", "bob@example.com"}, got)
 	assert.Equal(t, "alice@example.com", preview.Valid[0].Email)
+}
+
+// ISS-164 cycle 2: a legacy mixed-case row must still block its lowercase twin.
+func TestCreateUser_LegacyMixedCaseRow_BlocksLowercaseTwin(t *testing.T) {
+	repo := newMockRepo()
+	repo.users["legacy"] = &User{ID: "legacy", Email: "John.Doe@Corp.com"}
+	svc := NewService(repo)
+
+	_, err := svc.CreateUser(context.Background(), CreateRequest{
+		Email: "john.doe@corp.com", FullName: "John", DepartmentID: strPtr("dept-1"), RoleID: "role-emp",
+	}, "super_admin", "", "caller-id", "127.0.0.1")
+
+	assert.True(t, errors.Is(err, ErrDuplicateEmail))
 }

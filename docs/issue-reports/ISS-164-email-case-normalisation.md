@@ -40,6 +40,19 @@ Added the shared leaf helper `api.NormalizeEmail` (trim + lowercase) in `backend
 - Migration applied: no
 - Build clean: yes
 
+## Cycle 2 (supervisor decision): legacy mixed-case rows
+
+Cycle 1 assumed no mixed-case rows exist. The production-class instance may hold legacy ones, which the lowercased input would never match with `WHERE email = $1`. Changes (no migration, no index; migration lock held):
+
+- `auth.pgRepository.GetUserByEmail` (login + forgot-password): `WHERE lower(u.email) = $1` with the already-normalised input.
+- `auth.pgBootstrapStore.GetAdminCredentials`: `WHERE lower(email) = lower($1)`.
+- `users.pgRepository.Create`: the table's UNIQUE(email) is case-sensitive, so a legacy `John@X.com` would not block `john@x.com`. Added a pre-check `SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = lower($1))` returning ErrDuplicateEmail (also covers CSV import, which goes through Create). The UNIQUE constraint remains the backstop for concurrent inserts (small race window, mixed-case twin only).
+- Other email lookups (`internal/email`) are by id/status, not by address.
+
+Tests: `auth/email_sql_test.go` (recording fake driver asserts exact SQL and bound param), `users/email_sql_test.go` (probe SQL; no INSERT when twin exists), service tests with stored `John.Doe@Corp.com` for login, forgot-password and create-duplicate. Fakes now mirror the lower() semantics. schemaguard green.
+
+Follow-up (needs migration): `CREATE INDEX ... ON users (lower(email))` (ideally UNIQUE, after de-duplicating legacy rows), otherwise lower() lookups cannot use idx_users_email and seq-scan (fine at current table sizes).
+
 ## Recurrence Log
 | Date | Trigger | Action Taken |
 |------|---------|-------------- |

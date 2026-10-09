@@ -7,7 +7,7 @@ Corporate exam platform for organizations — multilingual question banks, confi
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) with Docker Compose
-- Ports **80**, **5432**, and **8080** must be free
+- Ports **80**, **5432**, and **8080** must be free (or override them, see below)
 
 ---
 
@@ -23,6 +23,19 @@ This builds all services (PostgreSQL, API, frontend, Nginx) and starts them. The
 |----------|------------------------|
 | Frontend | http://localhost       |
 | API      | http://localhost:8080  |
+
+### Running on a free port
+
+If 8080 is taken by another process, set `BB_API_PORT` (host API port) before starting:
+
+```bash
+BB_API_PORT=18080 make dev
+# E2E / scripts: same var, or a full URL override
+BB_API_PORT=18080 npm run test:e2e:live     # in frontend/
+E2E_API_URL=http://localhost:18080 npm run test:e2e:live
+```
+
+The Vite dev proxy honours `BB_API_PORT` / `E2E_API_URL` too. `HOST_DB_PORT` / `HOST_HTTP_PORT` work likewise.
 
 ---
 

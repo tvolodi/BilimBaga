@@ -8,6 +8,8 @@
 import { test, expect } from '@playwright/test'
 import { getSeedData, createTestExam, deleteTestExam, createTestQuestion, deleteTestQuestion } from './fixtures/seed'
 
+const API_URL = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
+
 async function waitForContent(page: import('@playwright/test').Page) {
   await page.waitForFunction(() => !document.querySelector('[aria-label="loading"], .animate-spin'), { timeout: 10_000 }).catch(() => {})
   await page.waitForLoadState('networkidle').catch(() => {})
@@ -89,7 +91,7 @@ test.describe('Exam Lifecycle — Archive via API', () => {
     const exam = await createTestExam(adminToken, `E2E Archive Test ${Date.now()}`, question.id)
 
     // Archive the exam via API
-    await fetch(`http://localhost:8080/api/v1/exams/${exam.id}/archive`, {
+    await fetch(`${API_URL}/api/v1/exams/${exam.id}/archive`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
     })

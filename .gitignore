@@ -32,3 +32,9 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Swarm runtime
+.claude/worktrees/
+swarm/state/*.json
+!swarm/state/*.example.json
+swarm/locks/

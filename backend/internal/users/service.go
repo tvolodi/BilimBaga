@@ -548,7 +548,13 @@ func (s *service) permissionSubset(roleName, callerRole string) error {
 	if s.permsFor == nil || s.canPerm == nil {
 		return ErrForbidden
 	}
-	for _, p := range s.permsFor(roleName) {
+	rolePerms := s.permsFor(roleName)
+	if len(rolePerms) == 0 {
+		// Unknown/stale role (absent from the permission cache) or a role without
+		// permissions: not provably a subset, so fail closed.
+		return ErrForbidden
+	}
+	for _, p := range rolePerms {
 		res, act, _ := strings.Cut(p, ":")
 		if !s.canPerm(callerRole, res, act) {
 			return ErrForbidden

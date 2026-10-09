@@ -13,3 +13,18 @@ Only users mutation paths are in internal/users: Create, Update, Deactivate, Res
 
 ## Tests
 Table-driven, covers 4 actions x forbidden/allowed matrix, no-write and no-temp-password assertions, cross-dept, self-service, handler 403 bodies. Gaps: no test for a stale/unknown non-built-in role name, nor nil permsFor; allowed "update/legacy" branch is weakly asserted.
+
+## Cycle 2 (rank rule, FR-BB117 D-1 amended; commit d0012b2 + follow-up)
+
+Verdict: PASS (0 Critical, 0 High, 2 Medium, 3 Low). `go vet` and `go test -count=1 -p 1 ./internal/users/...` clean.
+
+Scope: explicit `builtinRank` table and single decision function `canReachRole`; target checks (reset, update, deactivate, unlock), assignment checks (create, update, import), self-service, fail-closed.
+
+Verified: strictly-lower-rank rule for built-in pairs (peer department_admin, examiner vs examiner/department_admin, employee vs anyone all 403); custom callers refused department_admin/super_admin targets and otherwise bound by permission subset; no path lets a lower-rank caller affect a higher-rank target; update with unchanged role skips only the assignment check (target check still runs); self-service requires same id and stored role equal to token role; authorisation precedes password generation, writes and email; missing permission lookup or empty/unknown names give 403.
+
+Findings:
+- Medium (fixed): unknown/stale role with empty permission list counted as a subset. `permissionSubset` now refuses an empty permission list.
+- Medium (accepted): sensitive-permission ban (roles:read/roles:manage/tenant:manage) applies to assignment only; a custom caller can still act on a same-role peer, as D-1 allows equal permission subsets.
+- Low: custom peers manageable while built-in peers are not (matches D-1 wording); self-deactivation still allowed (unchanged); RevokeAllTokens error ignored (pre-existing).
+
+Cycle 1 Medium (department_admin acting on peers/examiners via blanket built-in skip) is resolved by the rank table.

@@ -141,6 +141,11 @@ func validateCreateRequest(req createQuestionReq) []fieldError {
 		}
 	}
 
+	// Every option of a choice question needs non-blank text in the default locale.
+	if validTypes[req.Type] {
+		errs = append(errs, optionTextFieldErrors(req.Type, req.DefaultLocale, answerOptionInputsFromReq(req.AnswerOptions))...)
+	}
+
 	// auto_grade / model_answer are only valid for shorttext questions.
 	if req.AutoGrade || (req.ModelAnswer != nil && strings.TrimSpace(*req.ModelAnswer) != "") {
 		if req.Type != "shorttext" {
@@ -246,20 +251,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	for locale, t := range req.Translations {
 		translations[locale] = TranslationInput(t)
 	}
-	options := make([]AnswerOptionInput, 0, len(req.AnswerOptions))
-	for _, opt := range req.AnswerOptions {
-		optTr := make(map[string]AnswerTranslationInput, len(opt.Translations))
-		for locale, at := range opt.Translations {
-			optTr[locale] = AnswerTranslationInput(at)
-		}
-		options = append(options, AnswerOptionInput{
-			SortOrder:      opt.SortOrder,
-			IsCorrect:      opt.IsCorrect,
-			LikertWeight:   opt.LikertWeight,
-			LikertPolarity: opt.LikertPolarity,
-			Translations:   optTr,
-		})
-	}
+	options := answerOptionInputsFromReq(req.AnswerOptions)
 	tagIDs := req.TagIDs
 	if tagIDs == nil {
 		tagIDs = []string{}
@@ -278,6 +270,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		TagIDs:        tagIDs,
 	})
 	if err != nil {
+		var optErr *OptionValidationError
+		if errors.As(err, &optErr) {
+			writeValidationErrors(w, optErr.Fields)
+			return
+		}
 		api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to create question")
 		return
 	}
@@ -321,20 +318,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	for locale, t := range req.Translations {
 		translations[locale] = TranslationInput(t)
 	}
-	options := make([]AnswerOptionInput, 0, len(req.AnswerOptions))
-	for _, opt := range req.AnswerOptions {
-		optTr := make(map[string]AnswerTranslationInput, len(opt.Translations))
-		for locale, at := range opt.Translations {
-			optTr[locale] = AnswerTranslationInput(at)
-		}
-		options = append(options, AnswerOptionInput{
-			SortOrder:      opt.SortOrder,
-			IsCorrect:      opt.IsCorrect,
-			LikertWeight:   opt.LikertWeight,
-			LikertPolarity: opt.LikertPolarity,
-			Translations:   optTr,
-		})
-	}
+	options := answerOptionInputsFromReq(req.AnswerOptions)
 	tagIDs := req.TagIDs
 	if tagIDs == nil {
 		tagIDs = []string{}
@@ -357,6 +341,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, ErrMissingModelAnswer) {
 			api.WriteError(w, http.StatusBadRequest, "MISSING_MODEL_ANSWER", "model_answer is required when auto_grade is true")
+			return
+		}
+		var optErr *OptionValidationError
+		if errors.As(err, &optErr) {
+			writeValidationErrors(w, optErr.Fields)
 			return
 		}
 		if errors.Is(err, ErrInvalidFieldForType) {

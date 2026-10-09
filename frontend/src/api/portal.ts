@@ -46,6 +46,10 @@ interface ApiResponse<T> {
   error: null | { code: string; message: string }
 }
 
+export interface PortalApiError extends Error {
+  code: string
+}
+
 async function apiFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
   const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
   const res = await fetch(url, {
@@ -53,12 +57,22 @@ async function apiFetch<T>(url: string, token?: string | null, options?: Request
     credentials: 'include',
     headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
   })
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) {
-    throw new Error(body.error.message)
+  // A proxy/gateway error (502, HTML body) must still surface as a normal Error, not a JSON SyntaxError.
+  let body: ApiResponse<T> | null = null
+  try {
+    body = (await res.json()) as ApiResponse<T>
+  } catch {
+    body = null
   }
-  if (!res.ok) {
-    throw new Error(`Request failed: ${res.status}`)
+  if (body?.error) {
+    const err = new Error(body.error.message) as PortalApiError
+    err.code = body.error.code
+    throw err
+  }
+  if (!res.ok || !body) {
+    const err = new Error(`Request failed: ${res.status}`) as PortalApiError
+    err.code = 'ERR_HTTP'
+    throw err
   }
   return body.data
 }

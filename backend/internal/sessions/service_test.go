@@ -355,6 +355,18 @@ func fixNow(t *testing.T, fixed time.Time) {
 	t.Cleanup(func() { nowFn = orig })
 }
 
+// withOneManualQuestion makes the mock repo resolve exactly one manual question (ISS-132: an exam
+// that resolves to zero questions is refused, so happy-path tests need at least one).
+func withOneManualQuestion(m *mockRepo) *mockRepo {
+	m.getRulesFn = func(_ context.Context, _ string) ([]questionRule, error) {
+		return []questionRule{{ID: "rule-1", Mode: "manual", Count: 1}}, nil
+	}
+	m.getManualQuestionsFn = func(_ context.Context, _ string) ([]poolQuestion, error) {
+		return []poolQuestion{{ID: "q1", Type: "single_choice"}}, nil
+	}
+	return m
+}
+
 func twoManualQuestions() []poolQuestion {
 	return []poolQuestion{
 		{ID: "q1", Type: "single_choice"},
@@ -474,8 +486,8 @@ func TestCreateSession_WithinWindow(t *testing.T) {
 			return cfg, nil
 		},
 	}
+	withOneManualQuestion(repo)
 	svc := NewService(repo)
-	// No rules → session creates with zero questions.
 	resp, err := svc.CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -511,6 +523,7 @@ func TestCreateSession_AttemptsNotYetExhausted(t *testing.T) {
 			return 2, nil
 		},
 	}
+	withOneManualQuestion(repo)
 	svc := NewService(repo)
 	resp, err := svc.CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
 	require.NoError(t, err)
@@ -559,6 +572,48 @@ func TestCreateSession_ManualRule_ResolvedQuestions(t *testing.T) {
 	resp, err := svc.CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
 	require.NoError(t, err)
 	assert.Len(t, resp.Questions, 2)
+}
+
+// ── ISS-132: zero resolved questions must not start an empty session ─────────
+
+func TestCreateSession_NoRules_ReturnsInsufficientQuestions(t *testing.T) {
+	created := false
+	repo := &mockRepo{
+		createSessionFn: func(_ context.Context, _ createSessionInput) (string, time.Time, time.Time, error) {
+			created = true
+			return "sess-1", time.Now().UTC(), time.Now().UTC().Add(time.Hour), nil
+		},
+	}
+	_, err := NewService(repo).CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInsufficientQuestions)
+	assert.False(t, created, "no exam_sessions row may be inserted for an empty exam")
+}
+
+func TestCreateSession_ManualRuleAllQuestionsArchived_ReturnsInsufficientQuestions(t *testing.T) {
+	repo := &mockRepo{
+		getRulesFn: func(_ context.Context, _ string) ([]questionRule, error) {
+			return []questionRule{{ID: "rule-1", Mode: "manual", Count: 2}}, nil
+		},
+		getManualQuestionsFn: func(_ context.Context, _ string) ([]poolQuestion, error) {
+			return []poolQuestion{}, nil
+		},
+	}
+	_, err := NewService(repo).CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
+	assert.ErrorIs(t, err, ErrInsufficientQuestions)
+}
+
+func TestCreateSession_AdaptiveExamWithoutRules_Starts(t *testing.T) {
+	repo := &mockRepo{
+		getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
+			cfg := defaultConfig()
+			cfg.Adaptive = true
+			return cfg, nil
+		},
+	}
+	resp, err := NewService(repo).CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
 }
 
 // ── AC-6: random rule — insufficient questions ────────────────────────────────
@@ -619,6 +674,7 @@ func TestCreateSession_RemainingSecondsComputed(t *testing.T) {
 			return "sess-1", current, expiresAt, nil
 		},
 	}
+	withOneManualQuestion(repo)
 	svc := NewService(repo)
 	resp, err := svc.CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
 	require.NoError(t, err)
@@ -691,6 +747,7 @@ func TestCreateSession_SeedStoredInInput(t *testing.T) {
 			return "sess-1", now, now.Add(60 * time.Minute), nil
 		},
 	}
+	withOneManualQuestion(repo)
 	svc := NewService(repo)
 	_, err := svc.CreateSession(context.Background(), "exam-1", "user-1", "dept-1")
 	require.NoError(t, err)

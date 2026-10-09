@@ -177,6 +177,13 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 		}
 	}
 
+	// ISS-132: a fixed-form exam that resolves to zero questions (no rules, empty manual rule, or
+	// all manual questions archived) must not start: the employee would land on an empty session.
+	// Adaptive exams pick questions at runtime, so they legitimately have none up front.
+	if len(resolvedIDs) == 0 && !cfg.Adaptive {
+		return nil, fmt.Errorf("sessions: CreateSession: exam %s resolved to zero questions: %w", examID, ErrInsufficientQuestions)
+	}
+
 	// Collect type info alongside IDs so we can build poolQuestion slices for shuffle.
 	type qWithType struct {
 		id     string

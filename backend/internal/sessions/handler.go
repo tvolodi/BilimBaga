@@ -32,6 +32,10 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.svc.CreateSession(r.Context(), examID, userID, deptID)
 	if err != nil {
+		// ISS-132: every refused start is logged with its (wrapped) cause so a "Start does nothing"
+		// report can be traced to a specific rule instead of an anonymous 4xx/5xx.
+		slog.Warn("sessions: create session refused",
+			"exam_id", examID, "user_id", userID, "department_id", deptID, "error", err)
 		switch {
 		case errors.Is(err, ErrNotAssigned):
 			api.WriteError(w, http.StatusForbidden, "EXAM_NOT_ASSIGNED",

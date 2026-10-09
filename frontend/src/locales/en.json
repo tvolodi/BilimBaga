@@ -677,6 +677,16 @@
       "deadline": "Due {{countdown}}",
       "noDeadline": "No deadline"
     },
+    "startError": {
+      "EXAM_NOT_ASSIGNED": "This exam is not assigned to you.",
+      "EXAM_ARCHIVED": "This exam has been archived and is no longer available.",
+      "EXAM_NOT_ACTIVE": "This exam is not currently active.",
+      "EXAM_OUTSIDE_WINDOW": "This exam is not available at this time.",
+      "ATTEMPTS_EXHAUSTED": "You have used all allowed attempts for this exam.",
+      "SESSION_ALREADY_OPEN": "You already have an exam in progress. Open it from the list to continue.",
+      "INSUFFICIENT_QUESTIONS": "This exam cannot be started because it has too few questions. Please contact your administrator.",
+      "generic": "Could not start the exam. Please try again or contact your administrator."
+    },
     "modal": {
       "title": "Start exam",
       "timeLimit": "You will have {{minutes}} minutes.",

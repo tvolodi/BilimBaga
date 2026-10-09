@@ -227,6 +227,15 @@ func seedTypedQuestion(repo *mockTranslationRepo, id, qType, defLocale string, o
 	repo.questions[id].Type = qType
 }
 
+// stemFor returns a stem for the default locale only, so non-default locales
+// under test are "present" purely through their option texts.
+func stemFor(locale, def string) string {
+	if locale == def {
+		return "Stem"
+	}
+	return ""
+}
+
 func TestTranslationUpsert_DefaultLocaleOptionText(t *testing.T) {
 	tenant := &mockTenant{defaultLocale: "kk", availableLocales: []string{"kk", "en"}}
 	cases := []struct {
@@ -240,7 +249,7 @@ func TestTranslationUpsert_DefaultLocaleOptionText(t *testing.T) {
 		{"whitespace default rejected", "multiple", "kk", []string{"  ", "B"}, []int{0}},
 		{"truefalse blank rejected", "truefalse", "kk", []string{"", ""}, []int{0, 1}},
 		{"likert blank rejected", "likert", "kk", []string{"x", ""}, []int{1}},
-		{"blank non-default ok", "single", "en", []string{"", " "}, nil},
+		{"fully blank non-default ok", "single", "en", []string{"", " "}, nil},
 		{"valid default passes", "single", "kk", []string{"A", "B"}, nil},
 		{"shorttext unaffected", "shorttext", "kk", []string{"", ""}, nil},
 	}
@@ -250,7 +259,7 @@ func TestTranslationUpsert_DefaultLocaleOptionText(t *testing.T) {
 			seedTypedQuestion(repo, "q-1", tc.qType, "kk", "o1", "o2")
 			svc := NewTranslationService(repo, tenant)
 			_, _, err := svc.Upsert(context.Background(), "q-1", tc.locale, UpsertTranslationInput{
-				Stem: "Stem",
+				Stem: stemFor(tc.locale, "kk"),
 				Options: []AnswerTextTranslation{
 					{OptionID: "o1", Text: tc.texts[0]}, {OptionID: "o2", Text: tc.texts[1]},
 				},
@@ -349,11 +358,62 @@ func TestTransitionStatus_ActivateBlankOptionText(t *testing.T) {
 
 func TestTransitionStatus_NonActivateTargetsIgnoreBlankOptions(t *testing.T) {
 	blank := []AnswerOptionDetail{optDetail(map[string]string{"kk": ""})}
-	for _, tc := range []struct{ from, to string }{{"draft", "review"}, {"active", "archived"}, {"archived", "draft"}} {
+	for _, tc := range []struct{ from, to string }{{"active", "archived"}, {"archived", "draft"}} {
 		svc, _ := activateSvc("single", tc.from, blank)
 		_, err := svc.TransitionStatus(context.Background(), "q-1", tc.to)
 		require.NoError(t, err, tc.from+"->"+tc.to)
 	}
+}
+
+func TestTransitionStatus_ReviewBlankOptionText(t *testing.T) {
+	cases := []struct {
+		name    string
+		qType   string
+		opts    []AnswerOptionDetail
+		wantIdx []int
+	}{
+		{"blank default rejected", "single", []AnswerOptionDetail{optDetail(map[string]string{"kk": "A"}), optDetail(map[string]string{"kk": " "})}, []int{1}},
+		{"valid moves to review", "single", []AnswerOptionDetail{optDetail(map[string]string{"kk": "A"}), optDetail(map[string]string{"kk": "B"})}, nil},
+		{"shorttext unaffected", "shorttext", []AnswerOptionDetail{optDetail(map[string]string{"kk": ""})}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, repo := activateSvc(tc.qType, "draft", tc.opts)
+			q, err := svc.TransitionStatus(context.Background(), "q-1", "review")
+			if tc.wantIdx == nil {
+				require.NoError(t, err)
+				assert.Equal(t, "review", q.Status)
+				return
+			}
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, ErrInvalidOptionText))
+			var oe *OptionValidationError
+			require.True(t, errors.As(err, &oe))
+			require.Len(t, oe.Fields, len(tc.wantIdx))
+			assert.Equal(t, "draft", repo.questions["q-1"].Status, "status must not change on rejection")
+		})
+	}
+}
+
+func TestQHandlerTransitionStatus_ReviewBlankOptions_Returns422(t *testing.T) {
+	svc := &mockQService{
+		transitionStatusFn: func(_ context.Context, _, status string) (*Question, error) {
+			if status != "review" {
+				t.Fatalf("unexpected status %q", status)
+			}
+			return nil, fmt.Errorf("wrap: %w", &OptionValidationError{Fields: []fieldError{
+				{Field: "answer_options[0].translations.kk.text", Message: "blank"},
+			}})
+		},
+	}
+	h := NewHandler(svc, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/q-1/status", strings.NewReader(`{"status":"review"}`))
+	req = withQChiParam(req, "id", "q-1")
+	w := httptest.NewRecorder()
+	h.TransitionStatus(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, w.Body.String(), `"ERR_VALIDATION"`)
+	assert.Contains(t, w.Body.String(), `"data":null`)
 }
 
 func TestQHandlerTransitionStatus_BlankOptions_Returns422WithFields(t *testing.T) {
@@ -371,5 +431,139 @@ func TestQHandlerTransitionStatus_BlankOptions_Returns422WithFields(t *testing.T
 	h.TransitionStatus(w, req)
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 	assert.Contains(t, w.Body.String(), `"ERR_VALIDATION"`)
+	assert.Contains(t, w.Body.String(), "answer_options[1].translations.kk.text")
+}
+
+// ── #228 item 1 / FR-BB24 AC-11: partial non-default locale ───────────────────
+
+func fieldNames(oe *OptionValidationError) []string {
+	var out []string
+	for _, f := range oe.Fields {
+		out = append(out, f.Field)
+	}
+	return out
+}
+
+func TestTranslationUpsert_NonDefaultLocalePartial(t *testing.T) {
+	tenant := &mockTenant{defaultLocale: "kk", availableLocales: []string{"kk", "en"}}
+	cases := []struct {
+		name    string
+		stem    string
+		texts   []string
+		wantIdx []int // nil = accepted
+	}{
+		{"partial options rejected with index", "", []string{"A", ""}, []int{1}},
+		{"whitespace counts as blank", "", []string{" ", "B"}, []int{0}},
+		{"stem only (no option text) rejected", "Stem", []string{"", ""}, []int{0, 1}},
+		{"fully empty accepted (falls back)", "", []string{"", "  "}, nil},
+		{"fully filled accepted", "Stem", []string{"A", "B"}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newMockTranslationRepo()
+			seedTypedQuestion(repo, "q-1", "single", "kk", "o1", "o2")
+			svc := NewTranslationService(repo, tenant)
+			_, _, err := svc.Upsert(context.Background(), "q-1", "en", UpsertTranslationInput{
+				Stem:    tc.stem,
+				Options: []AnswerTextTranslation{{OptionID: "o1", Text: tc.texts[0]}, {OptionID: "o2", Text: tc.texts[1]}},
+			})
+			if tc.wantIdx == nil {
+				require.NoError(t, err)
+				assert.Equal(t, 1, repo.upsertCalls)
+				return
+			}
+			require.ErrorIs(t, err, ErrInvalidOptionText)
+			var oe *OptionValidationError
+			require.True(t, errors.As(err, &oe))
+			var want []string
+			for _, i := range tc.wantIdx {
+				want = append(want, fmt.Sprintf("answer_options[%d].translations.en.text", i))
+			}
+			assert.Equal(t, want, fieldNames(oe))
+			assert.Equal(t, 0, repo.upsertCalls)
+		})
+	}
+}
+
+func TestTranslationUpsert_ShortTextNonDefaultUnaffected(t *testing.T) {
+	repo := newMockTranslationRepo()
+	seedTypedQuestion(repo, "q-1", "shorttext", "kk")
+	svc := NewTranslationService(repo, &mockTenant{defaultLocale: "kk", availableLocales: []string{"kk", "en"}})
+	_, _, err := svc.Upsert(context.Background(), "q-1", "en", UpsertTranslationInput{Stem: "Stem"})
+	require.NoError(t, err)
+}
+
+func TestTranslationHandlerUpsert_PartialLocale_Returns422WithDetails(t *testing.T) {
+	repo := newMockTranslationRepo()
+	seedTypedQuestion(repo, "q-1", "single", "kk", "o1", "o2")
+	svc := NewTranslationService(repo, &mockTenant{defaultLocale: "kk", availableLocales: []string{"kk", "en"}})
+	h := NewTranslationHandler(svc, nil)
+	body := `{"stem":"S","options":[{"option_id":"o1","text":"A"},{"option_id":"o2","text":""}]}`
+	req := withIDLocaleParam(httptest.NewRequest(http.MethodPut, "/api/v1/questions/q-1/translations/en", strings.NewReader(body)), "q-1", "en")
+	w := httptest.NewRecorder()
+	h.Upsert(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, w.Body.String(), `"ERR_VALIDATION"`)
+	assert.Contains(t, w.Body.String(), `"data":null`)
+	assert.Contains(t, w.Body.String(), `"details"`)
+	assert.Contains(t, w.Body.String(), "answer_options[1].translations.en.text")
+	assert.NotContains(t, w.Body.String(), "answer_options[0]")
+}
+
+func TestCreateQuestionFull_PartialNonDefaultLocale(t *testing.T) {
+	svc := NewService(newMockRepo())
+	in := createInput(
+		optInput(1, map[string]string{"en": "A", "kk": "A-kk"}),
+		optInput(2, map[string]string{"en": "B", "kk": " "}),
+		optInput(3, map[string]string{"en": "C"}))
+	_, err := svc.CreateQuestionFull(context.Background(), in)
+	require.ErrorIs(t, err, ErrInvalidOptionText)
+	var oe *OptionValidationError
+	require.True(t, errors.As(err, &oe))
+	assert.Equal(t, []string{"answer_options[1].translations.kk.text", "answer_options[2].translations.kk.text"}, fieldNames(oe))
+}
+
+func TestCreateQuestionFull_NonDefaultStemWithoutOptionsRejected(t *testing.T) {
+	svc := NewService(newMockRepo())
+	in := createInput(optInput(1, map[string]string{"en": "A"}), optInput(2, map[string]string{"en": "B"}))
+	in.Translations["kk"] = TranslationInput{Stem: "Сұрақ"}
+	_, err := svc.CreateQuestionFull(context.Background(), in)
+	require.ErrorIs(t, err, ErrInvalidOptionText)
+}
+
+func TestCreateQuestionFull_NonDefaultLocaleEmptyOrFull_Accepted(t *testing.T) {
+	svc := NewService(newMockRepo())
+	_, err := svc.CreateQuestionFull(context.Background(), createInput(
+		optInput(1, map[string]string{"en": "A", "kk": ""}), optInput(2, map[string]string{"en": "B", "kk": ""})))
+	require.NoError(t, err)
+	_, err = svc.CreateQuestionFull(context.Background(), createInput(
+		optInput(1, map[string]string{"en": "A", "kk": "a"}), optInput(2, map[string]string{"en": "B", "kk": "b"})))
+	require.NoError(t, err)
+}
+
+func TestUpdateQuestion_PartialNonDefaultLocale(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	seedSingleQuestion(repo, "q-single")
+	_, err := svc.UpdateQuestion(context.Background(), "q-single", UpdateQuestionInput{
+		CategoryID: "cat-1", Difficulty: "easy", UpdatedBy: "u",
+		AnswerOptions: []AnswerOptionInput{optInput(1, map[string]string{"en": "A", "kk": "a"}), optInput(2, map[string]string{"en": "B", "kk": ""})},
+	})
+	require.ErrorIs(t, err, ErrInvalidOptionText)
+	var oe *OptionValidationError
+	require.True(t, errors.As(err, &oe))
+	assert.Equal(t, []string{"answer_options[1].translations.kk.text"}, fieldNames(oe))
+}
+
+func TestQHandlerCreate_PartialNonDefaultLocale_Returns422WithDetails(t *testing.T) {
+	h := NewHandler(NewService(newMockRepo()), nil)
+	w := postCreate(h, `{"category_id":"cat-1","difficulty":"easy","type":"single","default_locale":"en",
+		"translations":{"en":{"stem":"Q?"}},
+		"answer_options":[
+			{"sort_order":1,"is_correct":true,"translations":{"en":{"text":"A"},"kk":{"text":"a"}}},
+			{"sort_order":2,"is_correct":false,"translations":{"en":{"text":"B"},"kk":{"text":""}}}]}`)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), `"ERR_VALIDATION"`)
+	assert.Contains(t, w.Body.String(), `"details"`)
 	assert.Contains(t, w.Body.String(), "answer_options[1].translations.kk.text")
 }

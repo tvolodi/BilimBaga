@@ -1,6 +1,6 @@
 # Retrospective / audit procedure
 
-Owner: Supervisor. Trigger: every 15 newly closed `swarm` issues (configurable 10-20 via `swarm/state/retro.json.interval`), checked each tick. Counter state: `swarm/state/retro.json`:
+Owner: Supervisor. Trigger: `closed_count - retro.json.last_retro_closed_count >= interval` (default 15, configurable 10-20 via `swarm/state/retro.json.interval`), checked each tick. Always compare the difference, never an absolute count (retro-003). Counter state: `swarm/state/retro.json`:
 
 ```json
 {"last_retro_closed_count": 0, "retro_number": 0, "interval": 15, "last_tick_utc": null}

@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
+import { endRevokedSession, refreshAccessTokenOnce, TOKEN_REVOKED } from '@/lib/sessionRevoked'
 
 interface ApiResponse<T> {
   data: T
@@ -17,8 +18,39 @@ export interface ApiError extends Error {
  * attaches it as a Bearer token. Every API module MUST use this function instead
  * of rolling its own fetch wrapper — that is the only way to guarantee the
  * Authorization header is always sent.
+ *
+ * ISS-249: a 401 TOKEN_REVOKED means the JWT claims (role/department/status) no longer match
+ * the DB. The token is refreshed once and the request retried once; if the refresh fails, or
+ * yields the same token, or the retry is revoked again, the session ends (token cleared,
+ * RequireAuth redirects to /login, LoginPage shows a localized notice). Never loops.
  */
 export async function apiFetch<T>(
+  qc: QueryClient,
+  url: string,
+  options?: RequestInit,
+): Promise<T> {
+  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+  try {
+    return await apiFetchOnce<T>(qc, url, options)
+  } catch (err) {
+    if ((err as { code?: unknown } | null)?.code !== TOKEN_REVOKED) throw err
+    // A concurrent request may already have refreshed the token since this one started.
+    const current = qc.getQueryData<string | null>(['auth', 'accessToken'])
+    const fresh = current && current !== token ? current : await refreshAccessTokenOnce(qc)
+    if (!fresh || fresh === token) {
+      endRevokedSession(qc)
+      throw err
+    }
+    try {
+      return await apiFetchOnce<T>(qc, url, options)
+    } catch (retryErr) {
+      if ((retryErr as { code?: unknown } | null)?.code === TOKEN_REVOKED) endRevokedSession(qc)
+      throw retryErr
+    }
+  }
+}
+
+async function apiFetchOnce<T>(
   qc: QueryClient,
   url: string,
   options?: RequestInit,

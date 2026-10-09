@@ -36,7 +36,7 @@
 5. Dev: needs-live-db PRs must include the UAT recipe in a PR comment (already practice; make it a rule).
 
 ## Applied changes
-Pending: issue "retro-004: apply swarm improvements".
+Applied in #193: decisions 1-5 in swarm/roles/supervisor.md, uat.md, dev1.md, dev2.md and PROTOCOL.md section 4 (plus dev rule: check claimed-by and git worktree list before claiming).
 
 ## Open recommendations for the user
 - bilimbaga-test (customer demo): scheduled DB backup missing; possible default admin credential; legacy mixed-case emails check; next deploy needs migrations 031-034 (api self-migrates).

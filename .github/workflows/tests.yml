@@ -79,3 +79,7 @@ jobs:
         run: npm run check:i18n
       - name: Unit tests
         run: npx vitest run
+      - name: Build
+        run: npm run build
+      - name: Bundle budget (FR-BB65, #200)
+        run: bash ../scripts/perf/bundle-check.sh

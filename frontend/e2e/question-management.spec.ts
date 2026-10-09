@@ -320,20 +320,20 @@ test.describe('Question Management — AI Generate', () => {
   test('AI Generate button is visible for examiner+ roles', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    await expect(page.getByRole('button', { name: /генерация ии|generate|ai/i })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('ai-generate-button')).toBeVisible({ timeout: 10_000 })
   })
 
   test('clicking AI Generate opens the generation dialog', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    await page.getByRole('button', { name: /генерация ии|generate|ai/i }).click()
+    await page.getByTestId('ai-generate-button').click()
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
   })
 
   test('AI Generate dialog has category, difficulty, count, and context fields', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    await page.getByRole('button', { name: /генерация ии|generate|ai/i }).click()
+    await page.getByTestId('ai-generate-button').click()
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
     const dialog = page.getByRole('dialog')
     await expect(dialog.locator('select').first()).toBeVisible()
@@ -345,7 +345,7 @@ test.describe('Question Management — AI Generate', () => {
   test('AI Generate dialog can be cancelled', async ({ page }) => {
     await page.goto('/admin/questions')
     await waitForContent(page)
-    await page.getByRole('button', { name: /генерация ии|generate|ai/i }).click()
+    await page.getByTestId('ai-generate-button').click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible({ timeout: 5_000 })
     await dialog.getByRole('button', { name: /\u043e\u0442\u043c\u0435\u043d\u0430|cancel/i }).click()

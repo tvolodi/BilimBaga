@@ -184,6 +184,11 @@ func (h *Handler) ExamResultsCSV(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "NOT_FOUND", "exam not found")
 			return
 		}
+		if errors.Is(err, ErrExportTooLarge) {
+			api.WriteError(w, http.StatusUnprocessableEntity, "EXPORT_TOO_LARGE",
+				"too many results to export in one file (row limit exceeded); ask an administrator to raise EXPORT_MAX_ROWS or export a smaller data set")
+			return
+		}
 		slog.Error("reports: exam results CSV export failed", "error", err, "examId", examID)
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to export exam results")
 	}

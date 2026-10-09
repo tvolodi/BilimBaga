@@ -1086,7 +1086,7 @@ export function QuestionBankPage() {
             {t('questionBank.importButton')}
           </Button>
           {canUseAI && (
-            <Button variant="outline" onClick={() => setAIGenerateOpen(true)}>
+            <Button variant="outline" data-testid="ai-generate-button" onClick={() => setAIGenerateOpen(true)}>
               <Sparkles size={16} className="mr-1" />
               {t('question.aiGenerate')}
             </Button>

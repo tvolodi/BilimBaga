@@ -41,7 +41,7 @@ const DRAFTS = [
 
 async function openDialog(page: Page) {
   await page.goto('/admin/questions')
-  const trigger = page.getByRole('button', { name: /генерация ии|ai generate/i })
+  const trigger = page.getByTestId('ai-generate-button')
   await expect(trigger).toBeVisible({ timeout: 20_000 })
   await trigger.click()
   const dialog = page.getByRole('dialog')

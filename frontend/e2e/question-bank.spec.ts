@@ -64,6 +64,6 @@ test.describe('Question Bank page', () => {
     await page.goto('/admin/questions')
     await waitForContent(page)
     await expect(page.getByRole('button', { name: /импорт|import/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /генерация ИИ|генерация|generate|ai/i })).toBeVisible()
+    await expect(page.getByTestId('ai-generate-button')).toBeVisible()
   })
 })

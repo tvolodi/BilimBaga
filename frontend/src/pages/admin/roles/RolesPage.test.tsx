@@ -41,8 +41,8 @@ const custom: AdminRole = {
   permissions: ['exams:read'], created_at: '2026-01-02T00:00:00Z',
 }
 
-function codedError(code: string, message = code) {
-  return Object.assign(new Error(message), { code })
+function codedError(code: string, message = code, details?: Record<string, unknown>) {
+  return Object.assign(new Error(message), { code, details })
 }
 
 beforeEach(() => {
@@ -202,7 +202,7 @@ describe('RolesPage delete flow', () => {
   })
 
   it('ROLE_IN_USE shows the translated message with the user count and keeps the role listed', async () => {
-    hooks.del.mutateAsync.mockRejectedValue(codedError('ROLE_IN_USE', 'role is assigned to 2 user(s)'))
+    hooks.del.mutateAsync.mockRejectedValue(codedError('ROLE_IN_USE', 'role is assigned to 7 user(s)', { count: 2 }))
     render(<RolesPage />)
     await userEvent.click(screen.getByRole('button', { name: 'Delete role qa_reviewer' }))
     const dialog = screen.getByRole('dialog')

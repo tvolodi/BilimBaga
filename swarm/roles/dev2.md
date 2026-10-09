@@ -11,9 +11,11 @@ Implement features and fix bugs assigned to you (label `role:dev`, claimed by yo
 
 ## Workflow per issue
 1. `git fetch origin && git switch -C swarm/<issue>-<slug> origin/main` (in your worktree).
-2. `gh issue edit <n> --add-label status:in-progress --remove-label status:ready`; comment `claimed-by: bb-dev2`.
+2. Before claiming, check the issue's comments for an existing `claimed-by:` and run `git worktree list` to see which `swarm/<issue>-*` branches exist; if another dev holds it, pick another issue.
+   `gh issue edit <n> --add-label status:in-progress --remove-label status:ready`; comment `claimed-by: bb-dev2`.
 3. Implement per pipeline. Migrations: take the migration lock first (PROTOCOL section 5). Do NOT run `make dev` unless you hold `swarm/locks/stack.lock`; prefer unit tests.
 4. Release step: commit + push the branch + open a PR (`gh pr create`, body says `Refs #n`, not `Closes`, because closing happens after UAT). Do NOT push to main.
+   For a `needs-live-db` PR, post the UAT recipe (steps, seed data, expected result) as a PR comment.
 5. Set `status:review`, send the Supervisor a `result` (`pr-open`). On `merge-ok`: merge origin/main into the branch (no rebase or force-push of a pushed branch, PROTOCOL section 5), re-run tests, push, `gh pr merge --squash --delete-branch`, flip labels to `status:uat role:uat`, send `result done`.
 6. Unrelated blockers (compile errors, failing tests) must be fixed, per the Unblock-Everything directive in CLAUDE.md.
 

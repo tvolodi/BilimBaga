@@ -6,6 +6,10 @@
 // on a role NAME other than the single unrestricted one, so a custom role with
 // reports:read or grading:* cannot read org-wide data.
 //
+// Not covered by this package: GET /users and the user mutations are scoped to the
+// caller's own department only, without descendants (internal/users, ISS-184,
+// FR-BB117 D-5). Do not add a user-record guard here without changing that rule.
+//
 // The scope is derived from the authenticated principal carried in the request
 // context (role + department id set by auth.Authenticate), so a handler,
 // service or repository cannot forget to forward it.

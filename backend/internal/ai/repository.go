@@ -35,6 +35,10 @@ type Repository interface {
 	// UpsertInsightCache writes (or overwrites) the cache entry for the exam.
 	UpsertInsightCache(ctx context.Context, examID, userID string, insights []string) error
 
+	// CountAIUsageLastDay returns the number of AI calls made by userID for
+	// feature in the last 24 hours (ISS-232 daily cap).
+	CountAIUsageLastDay(ctx context.Context, userID, feature string) (int, error)
+
 	// GetScopeDepartmentIDs returns the sorted department ids of the caller's
 	// scope (its subtree; nil for an unrestricted scope). The AI service hashes
 	// them into the scoped insight-cache key (ISS-218).
@@ -85,6 +89,19 @@ func (r *postgresRepository) CountAIUsageLastHour(ctx context.Context, userID, f
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("ai: CountAIUsageLastHour: %w", err)
+	}
+	return count, nil
+}
+
+func (r *postgresRepository) CountAIUsageLastDay(ctx context.Context, userID, feature string) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM ai_usage_log
+		 WHERE user_id = $1 AND feature = $2 AND created_at >= $3`,
+		userID, feature, time.Now().UTC().Add(-24*time.Hour),
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("ai: CountAIUsageLastDay: %w", err)
 	}
 	return count, nil
 }

@@ -172,9 +172,8 @@ func TestScopedInsights_ScopeLookupFailureSkipsCache(t *testing.T) {
 	}
 }
 
-// GetInsights has no per-user rate limit today (only GenerateQuestions calls
-// checkRateLimit); this change leaves that untouched. Usage logging, which the
-// limiter counts, is still written per paid call and not on cache hits.
+// Usage logging, which the ISS-232 daily cap counts, is written per paid
+// call and not on cache hits.
 func TestScopedInsights_UsageLoggedPerPaidCallOnly(t *testing.T) {
 	repo, cl := scopeRepo(), &countingClient{}
 	svc := NewService(repo, cl, "m", newLogger())

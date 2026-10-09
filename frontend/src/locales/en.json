@@ -377,6 +377,7 @@
     },
     "login": {
       "title": "Sign in to {{appName}}",
+      "sessionRevoked": "Your account was changed or your session was revoked. Please sign in again.",
       "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Password",
@@ -496,6 +497,7 @@
     },
     "error": {
       "saveFailed": "Save failed. Please try again.",
+      "partialLocale": "Translation incomplete for {{locales}}: fill every answer option or clear the stem in that language.",
       "statusTransitionFailed": "Status transition failed."
     }
   },
@@ -1082,7 +1084,9 @@
   },
   "download": {
     "failed": "Download failed. Please try again.",
-    "session_expired": "Your session has expired. Please sign in again."
+    "session_expired": "Your session has expired. Please sign in again.",
+    "session_not_passed": "Certificate unavailable: the exam session was not passed.",
+    "exam_not_certifiable": "This exam does not issue certificates."
   },
   "roles": {
     "title": "Roles",

@@ -191,7 +191,7 @@ func (s *service) GetQuestionTags(ctx context.Context, questionID string) ([]str
 // ── FR-BB23 additions ────────────────────────────────────────────────────────
 
 func (s *service) CreateQuestionFull(ctx context.Context, input CreateQuestionFullInput) (*QuestionDetail, error) {
-	if err := validateOptionTexts(input.Type, input.DefaultLocale, input.AnswerOptions); err != nil {
+	if err := validateOptionTextsWithStems(input.Type, input.DefaultLocale, input.Translations, input.AnswerOptions); err != nil {
 		return nil, fmt.Errorf("questions: CreateQuestionFull: %w", err)
 	}
 	detail, err := s.repo.CreateFull(ctx, input)
@@ -237,7 +237,7 @@ func (s *service) UpdateQuestion(ctx context.Context, id string, input UpdateQue
 	}
 
 	// Choice options must carry non-blank text in the question's default locale.
-	if err := validateOptionTexts(q.Type, q.DefaultLocale, input.AnswerOptions); err != nil {
+	if err := validateOptionTextsWithStems(q.Type, q.DefaultLocale, input.Translations, input.AnswerOptions); err != nil {
 		return nil, fmt.Errorf("questions: UpdateQuestion: %w", err)
 	}
 
@@ -298,10 +298,10 @@ func (s *service) TransitionStatus(ctx context.Context, id, newStatus string) (*
 		}
 	}
 
-	// Activating a choice question requires non-blank default-locale option text,
-	// so legacy rows with blank options cannot be presented to examinees (ISS-173b).
-	// Already-active questions and other transitions are untouched.
-	if newStatus == "active" {
+	// Moving a choice question to review or active requires non-blank default-locale
+	// option text, so legacy rows with blank options are caught early and cannot be
+	// presented to examinees (ISS-173b, ISS-228). Other transitions are untouched.
+	if newStatus == "review" || newStatus == "active" {
 		detail, err := s.repo.GetWithDetails(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("questions: TransitionStatus: load options: %w", err)

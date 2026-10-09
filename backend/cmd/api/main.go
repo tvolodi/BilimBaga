@@ -251,13 +251,13 @@ func serve() {
 
 	// Wire up dashboard metrics (FR-BB51) and export API (FR-BB54).
 	reportsRepo := reports.NewRepository(db)
-	reportsSvc := reports.NewService(reportsRepo)
+	reportsSvc := reports.NewService(reportsRepo, reports.WithMaxExportRows(cfg.ExportMaxRows))
 	reportsHandler := reports.NewHandler(reportsSvc, tenantSvc)
 
 	// Wire up AI question generation (FR-BB71).
 	aiRepo := ai.NewRepository(db)
 	aiClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, slogger)
-	aiSvc := ai.NewService(aiRepo, aiClient, cfg.AnthropicModel, slogger)
+	aiSvc := ai.NewService(aiRepo, aiClient, cfg.AnthropicModel, slogger, ai.WithInsightsDailyLimit(cfg.AIInsightsDailyLimit))
 	aiHandler := ai.NewHandler(aiSvc)
 
 	// Wire up role management (FR-BB117); the cache is rebuilt after every mutation.

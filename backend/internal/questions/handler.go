@@ -88,6 +88,7 @@ func writeValidationErrors(w http.ResponseWriter, errs []fieldError) {
 			"code":    "ERR_VALIDATION",
 			"message": "validation failed",
 			"fields":  errs,
+			"details": errs,
 		},
 	})
 }

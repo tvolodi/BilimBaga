@@ -191,7 +191,7 @@ func (s *service) GetQuestionTags(ctx context.Context, questionID string) ([]str
 // ── FR-BB23 additions ────────────────────────────────────────────────────────
 
 func (s *service) CreateQuestionFull(ctx context.Context, input CreateQuestionFullInput) (*QuestionDetail, error) {
-	if err := validateOptionTexts(input.Type, input.DefaultLocale, input.AnswerOptions); err != nil {
+	if err := validateOptionTextsWithStems(input.Type, input.DefaultLocale, input.Translations, input.AnswerOptions); err != nil {
 		return nil, fmt.Errorf("questions: CreateQuestionFull: %w", err)
 	}
 	detail, err := s.repo.CreateFull(ctx, input)
@@ -237,7 +237,7 @@ func (s *service) UpdateQuestion(ctx context.Context, id string, input UpdateQue
 	}
 
 	// Choice options must carry non-blank text in the question's default locale.
-	if err := validateOptionTexts(q.Type, q.DefaultLocale, input.AnswerOptions); err != nil {
+	if err := validateOptionTextsWithStems(q.Type, q.DefaultLocale, input.Translations, input.AnswerOptions); err != nil {
 		return nil, fmt.Errorf("questions: UpdateQuestion: %w", err)
 	}
 

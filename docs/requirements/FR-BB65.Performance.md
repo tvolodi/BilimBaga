@@ -39,7 +39,7 @@ The implementation is largely shipped. This revision turns the requirement into 
 - [x] AC-8: DB pool `MaxOpenConns=25`, `MaxIdleConns=10`, `ConnMaxLifetime=5m` from env with those defaults. (Shipped.)
 
 ## Delta Work Items
-- **D1 (dev)**: Extend `docs/test-reports/k6-load-test.js` to the AC-2 endpoint groups with tags and per-group `p(95)<200` thresholds; add `setup()` that logs in via `POST /api/v1/auth/login` (env `K6_BASE_URL` default `http://localhost:8080`, `K6_ADMIN_EMAIL/PASS`, `K6_EMPLOYEE_EMAIL/PASS`); keep `TEST_TOKEN` as a fallback for `/exams`.
+- **D1 (dev)**: Extend `docs/test-reports/k6-load-test.js` to the AC-2 endpoint groups with tags and per-group `p(95)<200` thresholds; add `setup()` that logs in via `POST /api/v1/auth/login` (env `BASE_URL`, alias `K6_BASE_URL`: REQUIRED, no default; non-local hosts are refused unless `ALLOW_REMOTE=1`, and `bilimbaga-test.ai-dala.com` is always refused; `K6_ADMIN_EMAIL/PASS`, `K6_EMPLOYEE_EMAIL/PASS`); keep `TEST_TOKEN` as a fallback for `/exams`. Fallback needs `ALLOW_PARTIAL=1` because the other five groups are skipped.
 - **D2 (dev, only if Lighthouse < 90)**: in `deploy/nginx.conf` and `deploy/nginx/*.conf` add `gzip on` with text/JS/CSS/JSON/SVG types, `Cache-Control: public, max-age=31536000, immutable` for `/assets/*`, and `no-cache` for `index.html`. Lazy-load `ExamTakingPage`/`EmployeePortal` only if bundle analysis shows > 170 kB gzipped initial JS. No behavior changes otherwise.
 - **D3 (dev)**: add `scripts/perf/lighthouse.sh` (uses `npx lighthouse@11`, headless Chrome, `--output=json,html`, writes to `docs/test-reports/lighthouse/`) and `scripts/perf/bundle-check.sh` (inspects `frontend/dist/assets`). Project-local only; no global installs.
 - **D4 (UAT)**: executes the Evidence Plan below.
@@ -50,7 +50,7 @@ Prerequisites: stack up via `make dev` or `docker compose up -d --build` (Nginx 
 | # | Evidence | Command | Report path |
 |---|----------|---------|-------------|
 | E1 | EXPLAIN ANALYZE (AC-1) | `docker compose exec -T db psql -U $POSTGRES_USER -d $POSTGRES_DB` with the seven queries | `docs/test-reports/explain-analyze-FR-BB65.md` |
-| E2 | k6 (AC-2) | `docker run --rm -i --network host -e K6_BASE_URL=http://localhost:8080 -v "$PWD/docs/test-reports:/out" grafana/k6 run --summary-export=/out/k6-summary-<date>.json /out/k6-load-test.js` (console output teed to `.txt`) | `docs/test-reports/k6-summary-<date>.{json,txt}` |
+| E2 | k6 (AC-2) | `docker run --rm -i --network host -e BASE_URL=http://localhost:8080 -v "$PWD/docs/test-reports:/out" grafana/k6 run --summary-export=/out/k6-summary-<date>.json /out/k6-load-test.js` (console output teed to `.txt`) | `docs/test-reports/k6-summary-<date>.{json,txt}` |
 | E3 | Lighthouse (AC-3) | `bash scripts/perf/lighthouse.sh <url>` for `/portal` and the exam-taking URL, 3 runs each, mobile and desktop | `docs/test-reports/lighthouse/*.{json,html}` plus `docs/test-reports/lighthouse-FR-BB65-<date>.md` (median table) |
 | E4 | Bundle split (AC-7) | `cd frontend && npm run build && bash ../scripts/perf/bundle-check.sh` | appended to the Lighthouse summary |
 
@@ -231,3 +231,5 @@ export default function () {
 - The in-memory tenant config cache is process-local; in a future multi-replica deployment, a Redis cache with pub/sub invalidation would be required.
 - `EXPLAIN ANALYZE` results for the six indexed queries should be captured and committed alongside the migration as evidence of AC-1 compliance.
 - Connection pool sizing (`MaxOpenConns=25`) is calibrated for a single-instance PostgreSQL server; revisit when scaling horizontally.
+
+**Bundle budget finding (D3/E4)**: the Supervisor reported the initial JS as over the 170 kB gzip budget (174.2 kB) in issue #200. That figure is taken from #200 and was not re-measured by this change; `scripts/perf/bundle-check.sh` has not been run on the final tree.

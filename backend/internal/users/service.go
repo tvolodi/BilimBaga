@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 

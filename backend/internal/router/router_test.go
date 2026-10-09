@@ -165,7 +165,7 @@ func TestRouter_SessionKeyedAdminRoutesAreDepartmentScoped(t *testing.T) {
 	cache := rbac.NewCache()
 	perms := rbac.PermissionSet{"exams:read": true, "grading:read": true, "grading:write": true}
 	cache.LoadFromMap(map[string]rbac.PermissionSet{"department_admin": perms})
-	h := router.New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	h := router.New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		"test-secret", cache, nil, "test", zerolog.Nop())
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{

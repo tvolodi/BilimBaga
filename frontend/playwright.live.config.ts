@@ -59,6 +59,10 @@ export default defineConfig({
         '**/loyalty-narrative.spec.ts',
         '**/downloads-bearer.spec.ts',
         '**/grading/ai-grading.spec.ts',
+        '**/employee-record.spec.ts',
+        '**/certificates.spec.ts',
+        '**/ai-assist.spec.ts',
+        '**/password-reset.spec.ts',
       ],
       use: {
         ...devices['Desktop Chrome'],
@@ -73,6 +77,8 @@ export default defineConfig({
         '**/exam-taking.spec.ts',
         '**/exam-result.spec.ts',
         '**/my-results.spec.ts',
+        '**/tab-switch.spec.ts',
+        '**/locale-switcher.spec.ts',
       ],
       use: {
         ...devices['Desktop Chrome'],

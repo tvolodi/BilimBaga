@@ -66,10 +66,13 @@ async function apiGet<T>(url: string, token?: string | null): Promise<T> {
 
 // ---- API client functions ----------------------------------------------------
 
-async function generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
+async function generateQuestions(
+  req: GenerateQuestionsRequest,
+  token?: string | null,
+): Promise<GenerateQuestionsResponse> {
   const response = await fetch('/api/v1/admin/ai/generate-questions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     credentials: 'include',
     body: JSON.stringify(req),
   })
@@ -99,8 +102,9 @@ export function fetchLoyaltyNarrative(sessionId: string): Promise<LoyaltyNarrati
 // ---- React Query hooks -------------------------------------------------------
 
 export function useGenerateQuestions() {
+  const qc = useQueryClient()
   return useMutation<GenerateQuestionsResponse, Error & { code?: string }, GenerateQuestionsRequest>({
-    mutationFn: generateQuestions,
+    mutationFn: (req) => generateQuestions(req, qc.getQueryData<string | null>(['auth', 'accessToken'])),
   })
 }
 

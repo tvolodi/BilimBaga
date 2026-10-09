@@ -191,3 +191,31 @@ func TestLoad_SMTPFrom(t *testing.T) {
 		})
 	}
 }
+
+func TestLoad_BootstrapAdminSettings(t *testing.T) {
+	t.Setenv("JWT_SECRET", "this-is-a-valid-32-character-secret!")
+	t.Setenv("BOOTSTRAP_ADMIN_PASSWORD", "")
+	t.Setenv("BOOTSTRAP_ADMIN_GENERATE", "")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.BootstrapAdminPassword != "" || cfg.BootstrapAdminGenerate {
+		t.Errorf("expected bootstrap settings empty by default")
+	}
+
+	t.Setenv("BOOTSTRAP_ADMIN_PASSWORD", "Str0ngInitial!")
+	t.Setenv("BOOTSTRAP_ADMIN_GENERATE", "true")
+	cfg, err = config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.BootstrapAdminPassword != "Str0ngInitial!" || !cfg.BootstrapAdminGenerate {
+		t.Errorf("bootstrap settings not loaded")
+	}
+
+	t.Setenv("BOOTSTRAP_ADMIN_GENERATE", "maybe")
+	if _, err := config.Load(); err == nil {
+		t.Errorf("expected error for invalid BOOTSTRAP_ADMIN_GENERATE")
+	}
+}

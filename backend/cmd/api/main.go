@@ -151,6 +151,36 @@ func main() {
 	}, authRepo, emailSvc)
 	authHandler := auth.NewHandler(authSvc, auditWriter)
 
+	// ISS-150/ISS-152: make the seeded super_admin safe. Applies BOOTSTRAP_ADMIN_PASSWORD (or a
+	// generated one-time password) while the admin still has the default password, otherwise
+	// forces a password change and warns. Secrets are never logged except the generated
+	// one-time password, once.
+	bootCtx, cancelBoot := context.WithTimeout(appCtx, 30*time.Second)
+	bootRes, err := auth.BootstrapAdmin(bootCtx, auth.NewBootstrapStore(db), auth.BootstrapOptions{
+		Password: cfg.BootstrapAdminPassword,
+		Generate: cfg.BootstrapAdminGenerate,
+		Cost:     cfg.BcryptCost,
+	})
+	cancelBoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "startup error: bootstrap admin: %v\n", err)
+		os.Exit(1)
+	}
+	switch bootRes.Outcome {
+	case auth.BootstrapPasswordGenerated:
+		zlog.Warn().Str("admin_email", auth.BootstrapAdminEmail).Str("one_time_password", bootRes.GeneratedPassword).
+			Msg("generated one-time admin password (shown once; change required at first login)")
+	case auth.BootstrapPasswordApplied:
+		zlog.Info().Str("admin_email", auth.BootstrapAdminEmail).Msg("admin password set from BOOTSTRAP_ADMIN_PASSWORD")
+	}
+	if bootRes.EnvPasswordInvalid {
+		zlog.Warn().Msg("BOOTSTRAP_ADMIN_PASSWORD is set but invalid (needs 8-72 bytes, upper, lower, digit, not the default) and is ignored: admin password already changed or admin absent")
+	}
+	if bootRes.StillDefault {
+		zlog.Warn().Str("admin_email", auth.BootstrapAdminEmail).
+			Msg("SECURITY: seeded admin still has the default password; a password change is forced at first login. Set BOOTSTRAP_ADMIN_PASSWORD or change it now")
+	}
+
 	// Load the RBAC permission cache.
 	rbacCache := rbac.NewCache()
 	if err := rbacCache.Load(db); err != nil {

@@ -749,7 +749,7 @@ func (r *postgresRepository) GetExamQuestions(ctx context.Context, examID, tenan
 	const q = `
 SELECT
   sq.question_id,
-  ROW_NUMBER() OVER (ORDER BY MIN(sq.question_id)) AS position
+  ROW_NUMBER() OVER (ORDER BY MIN(sq.sort_order), sq.question_id::text) AS position
 FROM session_questions sq
 JOIN exam_sessions es ON es.id = sq.session_id
 WHERE es.exam_id = $1

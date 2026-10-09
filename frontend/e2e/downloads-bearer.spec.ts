@@ -28,11 +28,24 @@ test.describe('Authenticated downloads send Authorization (#37)', () => {
     await page.goto('/admin/reports')
     const csvBtn = page.getByRole('button', { name: /csv/i }).first()
     await expect(csvBtn).toBeVisible({ timeout: 10_000 })
-    const [request] = await Promise.all([
-      page.waitForRequest(req => /\/api\/v1\/admin\/exams\/[^/]+\/results\/export/.test(req.url())),
+    const [response] = await Promise.all([
+      page.waitForResponse(res => /\/api\/v1\/admin\/exams\/[^/]+\/results\/export/.test(res.url())),
       csvBtn.click(),
     ])
-    expect(request.headers()['authorization']).toMatch(/^Bearer /)
+    expect(response.request().headers()['authorization']).toMatch(/^Bearer /)
+    // ISS-163: a 200 with an empty body is a failure (a min(uuid) SQL error used to yield that).
+    expect(response.status()).toBe(200)
+    expect(response.headers()['content-type']).toContain('text/csv')
+    const body = (await response.text()).trim()
+    expect(body.length).toBeGreaterThan(0)
+    const lines = body.split(/\r?\n/)
+    expect(lines[0]).toMatch(/^employee_name,department,started_at,submitted_at,score_pct,passed,time_taken_seconds/)
+    // Data rows (one per submitted session) depend on seeded sessions; when present
+    // each must have at least as many cells as the header.
+    const cols = lines[0].split(',').length
+    for (const row of lines.slice(1)) {
+      expect(row.split(',').length).toBeGreaterThanOrEqual(cols)
+    }
   })
 
   test('API rejects the export endpoint without a token (sanity check)', async ({ request }) => {

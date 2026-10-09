@@ -22,7 +22,12 @@
     "actions": "Действия",
     "language": "Язык",
     "aiGenerated": "Создано ИИ",
-    "toggleExpand": "Развернуть/свернуть"
+    "toggleExpand": "Развернуть/свернуть",
+    "errorBoundary": {
+      "title": "Что-то пошло не так",
+      "message": "Произошла непредвиденная ошибка. Пожалуйста, перезагрузите страницу.",
+      "reload": "Перезагрузить страницу"
+    }
   },
   "nav": {
     "dashboard": "Главная",
@@ -45,7 +50,8 @@
       "role": "Роль",
       "status": "Статус",
       "created_at": "Создан",
-      "actions": "Действия"
+      "actions": "Действия",
+      "error": "Ошибка"
     },
     "roles": {
       "super_admin": "Супер-Администратор",
@@ -201,10 +207,14 @@
       "confirm": "Подтвердить импорт",
       "dropzone": "Перетащите файл сюда или нажмите для выбора",
       "cancel": "Отмена",
-      "progress": "Обработка {{n}} / {{total}}"
+      "progress": "Обработка {{n}} / {{total}}",
+      "row": "Строка {{row}}:",
+      "similarTo": "Похоже на: «{{stem}}» ({{score}}%)"
     },
     "versions": {
-      "title": "История версий"
+      "title": "История версий",
+      "empty": "История версий отсутствует.",
+      "label": "v{{version}}"
     },
     "actions": {
       "edit": "Редактировать",
@@ -475,7 +485,10 @@
         "eligibleCountError": "Не удалось загрузить",
         "ruleStatusOk": "Достаточно",
         "ruleStatusInsufficient": "Недостаточно",
-        "ruleStatusNone": "Нет подходящих вопросов"
+        "ruleStatusNone": "Нет подходящих вопросов",
+        "ruleUnsatisfied": "Правило {{id}}…: нужно {{required}}, доступно только {{available}}",
+        "ruleSummary": "Правило {{n}}: {{mode}}, вопросов: {{count}}",
+        "published": "Опубликовано"
       },
       "validationWarning": "Некоторые правила вопросов не могут быть выполнены. Исправьте их перед публикацией.",
       "validationWarningHint": "Учитываются только вопросы со статусом «активный». Перейдите в Банк вопросов и активируйте вопросы перед публикацией.",
@@ -785,7 +798,7 @@
     "ai_reasoning_hide": "Скрыть обоснование ИИ",
     "filter_by_exam": "Фильтр по экзамену",
     "filter_all_exams": "Все экзамены",
-    "showing_range": "Показаны {{start}}\u2013{{end}} из {{total}}",
+    "showing_range": "Показаны {{start}}–{{end}} из {{total}}",
     "prev_page": "Назад",
     "next_page": "Вперёд",
     "nav": "Ручная проверка"

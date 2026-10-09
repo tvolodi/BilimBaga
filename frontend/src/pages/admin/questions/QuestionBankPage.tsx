@@ -454,7 +454,7 @@ function VersionHistorySlideover({ questionId, onClose }: VersionHistorySlideove
             </div>
           )}
           {versions && versions.length === 0 && (
-            <p className="text-sm text-muted-foreground">No version history.</p>
+            <p className="text-sm text-muted-foreground">{t('questionBank.versions.empty')}</p>
           )}
           {versions && versions.length > 0 && (
             <div className="space-y-3">
@@ -464,7 +464,7 @@ function VersionHistorySlideover({ questionId, onClose }: VersionHistorySlideove
                   className="border rounded-md p-3 text-sm space-y-1"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">v{v.version}</span>
+                    <span className="font-medium">{t('questionBank.versions.label', { version: v.version })}</span>
                     <span className="text-muted-foreground text-xs">
                       {formatRelativeTime(v.created_at)}
                     </span>
@@ -546,8 +546,16 @@ function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
         <div className="space-y-4">
           {/* File picker */}
           <div
+            role="button"
+            tabIndex={0}
             className="border-2 border-dashed border-input rounded-md p-6 text-center cursor-pointer hover:border-primary transition-colors"
             onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                fileInputRef.current?.click()
+              }
+            }}
           >
             <Upload size={24} className="mx-auto mb-2 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
@@ -592,7 +600,7 @@ function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
                         key={row.row}
                         className="text-xs bg-red-50 border border-red-200 rounded px-2 py-1.5"
                       >
-                        <span className="font-medium">Row {row.row}:</span>{' '}
+                        <span className="font-medium">{t('questionBank.import.row', { row: row.row })}</span>{' '}
                         {row.errors.join(', ')}
                       </div>
                     ))}
@@ -611,9 +619,11 @@ function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
                         key={row.row}
                         className="text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5"
                       >
-                        <span className="font-medium">Row {row.row}:</span>{' '}
-                        Similar to: &ldquo;{row.similarity_match.stem_preview}&rdquo; (
-                        {Math.round(row.similarity_match.score * 100)}%)
+                        <span className="font-medium">{t('questionBank.import.row', { row: row.row })}</span>{' '}
+                        {t('questionBank.import.similarTo', {
+                          stem: row.similarity_match.stem_preview,
+                          score: Math.round(row.similarity_match.score * 100),
+                        })}
                       </div>
                     ))}
                   </div>

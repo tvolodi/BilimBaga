@@ -99,7 +99,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                         <TableHead>#</TableHead>
                         <TableHead>{t('users.columns.email')}</TableHead>
                         <TableHead>{t('users.columns.name')}</TableHead>
-                        <TableHead>Error</TableHead>
+                        <TableHead>{t('users.columns.error')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

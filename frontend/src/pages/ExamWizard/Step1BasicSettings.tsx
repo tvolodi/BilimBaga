@@ -152,6 +152,9 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
 
   useEffect(() => {
     setForm(formFromExam(exam))
+    // Intentionally keyed on the exam id only: re-sync the form when a different exam loads,
+    // not on every refetch of the same exam (which would discard unsaved edits).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exam?.id])
 
   const createExam = useCreateExam()

@@ -80,7 +80,7 @@
 | FR-BB75 | Loyalty-profile-narrative | Loyalty Profile Narrative | Implemented |
 | FR-BB315 | exam-step4-eligible-question-counts | Exam Step 4: Eligible Question Counts per Rule | Implemented |
 | FR-BB316 | FR-BB316-portal-locale-switcher | Portal Locale Switcher | Implemented |
-| FR-BB317 | department-treeview | Department Treeview Selector | Partial |
+| FR-BB317 | department-treeview | Department Treeview Selector | Implemented (Users List filter shipped, #40) |
 | FR-BB318 | exam-unpublish | Unpublish Exam | Implemented |
 | FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Implemented |
 | FR-BB510 | Overdue-reminder-action | Overdue Employee Reminder: Real "Send Reminder" Action | Validated |

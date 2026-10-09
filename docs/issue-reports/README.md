@@ -46,3 +46,4 @@
 | [ISS-051](ISS-051-frontend-lint-config-coverage.md) | Frontend lint cannot parse TypeScript; low coverage; unlocalized strings and a11y warnings | medium | frontend | tenant | resolved | 2026-10-09 |
 | [ISS-052](ISS-052-admin-audit-reports-route-guards.md) | /admin/audit and /admin/reports route guards disagree with RBAC | medium | frontend | audit / reports | resolved | 2026-10-09 |
 | [ISS-053](ISS-053-users-list-department-tree-filter.md) | Users List department filter is a flat select that ignores the department tree | low | frontend | users | resolved | 2026-10-09 |
+| [ISS-054](ISS-054-auditlogtable-react-key-warning.md) | AuditLogTable logs React "unique key" warning (bare fragment in map) | low | frontend | audit | resolved | 2026-10-09 |

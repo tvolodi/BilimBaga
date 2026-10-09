@@ -15,7 +15,7 @@ Six LIVE interactive Claude Code sessions that run a perpetual cycle:
 - **Transport**: native cross-session messaging (`ListAgents`, `SendMessage`); addresses and message format in `PROTOCOL.md`. Scripts can list live sessions with `claude agents --json`.
 - **Durable state**: GitHub issues + labels (state machine in PROTOCOL.md), `docs/handoffs/`, `swarm/state/*.json`. A crashed session loses nothing: it restarts, reads its labeled queue and resumes.
 - **Anti-idle**: every worker runs a `/loop` tick that polls its label queue and falls back to default work; the Supervisor additionally generates work for any role with an empty queue.
-- **One permission mode** (`bypassPermissions`) for all sessions so cross-session messages are never held for approval; protection comes from deny rules in `roles/*.settings.json` and from PROTOCOL rules.
+- **One permission mode** (`bypassPermissions`) for all sessions so cross-session messages are never held for approval.
 - **Audit**: `RETRO.md`, retrospective every ~15 closed issues, output in `docs/retrospectives/`.
 
 ## Start / stop

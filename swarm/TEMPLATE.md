@@ -11,9 +11,8 @@ Copy `swarm/`, `.github/ISSUE_TEMPLATE/swarm-task.md`, and run the label creatio
 | `swarm/roles/dev1.md`, `dev2.md` | mostly generic | pipeline prompt names under `.claude/commands/`, test commands |
 | `swarm/roles/ba.md`, `uat.md` | project-specific | doc paths, test commands (`npm run test:e2e:live`), stack health URL |
 | `swarm/roles/infra.md` | project-specific | infra repo, resources |
-| `swarm/roles/*.settings.json` | project-specific | path deny lists, migration range, infra patterns |
-| `swarm/up.ps1`, `ensure-up.ps1`, `down.ps1`, `install-ensure-task.ps1`, `lib.ps1` | generic launcher + watchdog | nothing: all project data is in `swarm/roster.json` |
-| `swarm/roster.json` | project-specific | roles (names, cwd, prompts, settings paths, model, permission mode), infra reuse prefix |
+| `swarm/roles/*.settings.json` | project-specific | permission mode only (no deny lists) |
+| `swarm/up.ps1`, `down.ps1` | generic launcher | `$def` table (names, cwd, prompts), repo/infra paths |
 | `swarm/state/*.example.json` | generic | none |
 | `.gitignore` additions | generic | `.claude/worktrees/`, `swarm/state/*.json`, `swarm/locks/` |
 | `.github/ISSUE_TEMPLATE/swarm-task.md` | generic | none |

@@ -11,7 +11,7 @@ Line 1: a self-contained sentence. Then one JSON object. Types: `task` (issue, a
 ## Label state machine
 Labels: `needs-architect` (request marker, see Architect), `role:dev|ba|uat|infra`, `status:ready|in-progress|review|uat|blocked|done`, `type:bug|feature|infra|tech-debt|test`, `prio:p0|p1|p2`, `swarm`, `needs-live-db`.
 new -> ready; ready -> in-progress (worker starts); in-progress -> review (PR open, review passed); review -> uat (merged, role flips to `role:uat`); uat -> done (closed), only after the PR is merged to main and the UAT check ran on main; a PASS on a branch build is a comment and does not change status; uat -> ready + `role:dev` on FAIL or PARTIAL, and on any BA or Supervisor send-back (reopen +1 comment each time); any -> blocked with a reason comment. Every status change is one `gh issue edit` that also removes the previous `status:*` label.
-Claiming: Supervisor assigns and posts `supervisor: assigned to bb-devN` on the issue before sending the task; workers take only matching role + `ready` (or own `in-progress`), by prio then number; before posting `claimed-by: bb-devN`, read the issue comments and skip the issue if another dev holds a claim without a later release; one dev per issue. While more than 5 `status:uat` issues are open, workers do not self-claim `type:feature`.
+Claiming: Supervisor assigns and posts `supervisor: assigned to bb-devN` on the issue before sending the task; workers take only matching role + `ready` (or own `in-progress`), by prio then number; before posting `claimed-by: bb-devN`, read the issue comments and skip the issue if another dev holds a claim without a later release; one dev per issue. The claim comment is the ack for a task: the Supervisor re-sends the task once after `deadline_min` if no claim comment exists, then treats the session as dead. While more than 5 `status:uat` issues are open, workers do not self-claim `type:feature`.
 
 ## Branches, merges, migrations
 - Branches `swarm/<issue>-<slug>`.
@@ -42,7 +42,7 @@ Not routed: routine bugs, docs-only fixes, test-only changes, UAT scenario edits
 Max 3 attempts per issue, then `result: failed`. Supervisor: reassign to the other dev; then swap role; then `status:blocked` + tech-debt investigation issue + retro entry. The user is informed through reports only.
 
 ## Anti-idle
-Order: assigned task, oldest ready issue with own role label, role's self-generated default work. Every worker except `bb-architect` runs a dynamic `/loop` (5-10 min).
+Order: assigned task, then the oldest ready issue with own role label once the Supervisor assigns it. Workers run no `/loop` and no periodic tick. The Supervisor owns idle monitoring and default work (BA audits, UAT sweeps, dev tech-debt) and sends it as a `task`. `bb-architect` is event-driven too.
 
 ## Durable state
 GitHub issues and labels are the truth. `docs/handoffs/<run-id>/` payloads. Report files are numbered by GitHub issue: `docs/issue-reports/ISS-088-<slug>.md`, `docs/code-reviews/ISS-088-review.md`. `swarm/state/*.json`: workers, retro, escalations. `docs/retrospectives/retro-NNN.md`.
@@ -57,7 +57,7 @@ GitHub issues and labels are the truth. `docs/handoffs/<run-id>/` payloads. Repo
 Test traffic goes to local stacks and the QA instance `bilimbaga-qa.ai-dala.com` (not built yet, #106). UAT scenarios declare `Target: local | qa`; seed scripts need an explicit `E2E_API_URL`. See `docs/requirements/DEC-001.Environments-production-class-demo-and-qa.md`.
 
 ## Checkpoints and heartbeats
-File `swarm/state/<role>.json`: `{role,status busy|idle|blocked,issue,branch,step,next_action,last_tick_utc,blockers}`. Write at every step change and once per tick (idle workers too) through `swarm/bin/checkpoint.sh <role> <issue> <branch> <step> <next_action> [blockers]` (atomic; `SWARM_STATUS` override). Step changes also get a short issue comment; heartbeats are file-only. A `busy` heartbeat older than 45 min (`stale_heartbeat_min`) means stalled; idle/blocked older than 2x that means a dead session. Issue comments win over the file.
+File `swarm/state/<role>.json`: `{role,status busy|idle|blocked,issue,branch,step,next_action,last_tick_utc,blockers}`. Write at every step change (no per-tick heartbeat) through `swarm/bin/checkpoint.sh <role> <issue> <branch> <step> <next_action> [blockers]` (atomic; `SWARM_STATUS` override). Step changes also get a short issue comment; heartbeats are file-only. Liveness is on demand: the Supervisor sends `ping`, the worker answers `pong` with its status. No `pong` within one Supervisor tick means a dead session (restart via the ensure-up watchdog #145, or reassign). Issue comments win over the file.
 
 ## One caution
 `bilimbaga-test.ai-dala.com` is the customer demo. Do not run tests, seeds or deploys against it unless the owner orders it. Test on local stacks.

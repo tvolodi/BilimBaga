@@ -6,7 +6,7 @@
 | ID | FR-BB117 |
 | Phase | 1 — Foundation (gap closure; extends FR-BB16 "static roles in Phase 1" to admin-managed roles; GitHub issue #135) |
 | Priority | 2 |
-| Status | Implemented (backend #137, frontend #138; live UAT pending) |
+| Status | Implemented (backend issue #137 / PR #185 `ed22fd5`, frontend issue #138 / PR #206 `147b069`); static conformance reviewed 2026-10-09, see `conformance/FR-BB117-PR204-PR211-PR205-conformance-20261009.md`; live UAT pending; open gaps G1/G2 there |
 | Depends On | FR-BB16, FR-BB18, FR-BB19, FR-BB111, FR-BB62 |
 
 ## Description
@@ -16,7 +16,7 @@ This requirement adds a Roles admin page (super_admin only) and the supporting A
 
 ## Acceptance Criteria
 Backend
-- [ ] AC-1: Migration `032_role_management` adds `roles.description TEXT NOT NULL DEFAULT ''` and `roles.is_system BOOLEAN NOT NULL DEFAULT false`, sets `is_system = true` for the four built-in names, and seeds permissions `roles:read` and `roles:manage`, granted to `super_admin` only. Migration is idempotent and has a working `.down.sql`. Existing migrations are not edited.
+- [ ] AC-1: Migration `034_role_management` (shipped number; 032/033 were already taken, the `032_` in the SQL example below is illustrative) adds `roles.description TEXT NOT NULL DEFAULT ''` and `roles.is_system BOOLEAN NOT NULL DEFAULT false`, sets `is_system = true` for the four built-in names, and seeds permissions `roles:read` and `roles:manage`, granted to `super_admin` only. Migration is idempotent and has a working `.down.sql`. Existing migrations are not edited.
 - [ ] AC-2: `GET /api/v1/roles` (requires `roles:read`) returns every role as `{id, name, description, is_system, user_count, permissions: ["resource:action", ...]}` ordered system roles first, then by name. `GET /api/v1/roles/{id}` returns one role (404 `NOT_FOUND` if unknown). `GET /api/v1/roles/permissions` returns the full catalogue `[{id, resource, action}]` for the matrix.
 - [ ] AC-3: `POST /api/v1/roles` (requires `roles:manage`) with `{name, description?, permissions: [permission_id...]}` creates a custom role (`is_system=false`) and returns 201. `name` must match `^[a-z][a-z0-9_]{2,31}$`; otherwise 400 `VALIDATION_ERROR`. Duplicate name returns 409 `ROLE_NAME_TAKEN`. Unknown permission id returns 400 `VALIDATION_ERROR`. Role and its role_permissions rows are written in one transaction.
 - [ ] AC-4: `PUT /api/v1/roles/{id}` (requires `roles:manage`) updates `description` and the permission set of a custom role (replace semantics, one transaction). `name` is immutable for all roles (a differing `name` in the body returns 400 `VALIDATION_ERROR`). For a system role the call returns 409 `ROLE_SYSTEM_IMMUTABLE` and changes nothing.
@@ -43,7 +43,7 @@ Tests
 
 ### Database Schema
 ```sql
--- 032_role_management.up.sql
+-- 034_role_management.up.sql (shipped number; originally drafted as 032)
 ALTER TABLE roles
     ADD COLUMN description TEXT    NOT NULL DEFAULT '',
     ADD COLUMN is_system   BOOLEAN NOT NULL DEFAULT false;
@@ -108,3 +108,11 @@ UAT hook: `docs/uat-scenarios/role-management-20261009.md`.
 - `PUT /roles/{id}` requires the `permissions` field (replace semantics); omitting it is a validation error.
 - Default-deny scoping: only `super_admin` is org-wide in the users service; every other role (custom included) is limited to its own department. Exam assignment is org-wide only for `super_admin` and `examiner`.
 - A cache-reload failure after a committed mutation returns 500 `INTERNAL` and writes no audit entry (per AC-7/AC-8).
+- Shipped deviations confirmed by BA static review (2026-10-09, PR #185 / #206): validation errors in AC-3, AC-4 and AC-6 are HTTP 422 (not 400); `POST` audit metadata also carries the granted `permissions`; the create/update/delete audit entry is written only after the cache reload succeeds, so a reload failure leaves a committed change with a 500 and no audit row (accepted per AC-7/AC-8, noted as p3 in the conformance report); `PUT` of a differing `name` is checked before the system-role check, so it answers 422 even for a system role.
+- Scoping caveat (open, see conformance report G1/G2): the default-deny department scoping covers the `users` service and exam assignment only. `deptscope` (reports, sessions grading detail, AI) still restricts by the literal role name `department_admin`, and `ResetPassword` / `UpdateUser` / `Deactivate` do not compare the target user's role with the caller's.
+
+## Decisions 2026-10-09 (BA, conformance review of PR #185/#206)
+
+- **D-1 (privilege escalation, p1):** a caller who is not `super_admin` may reset the password of, edit, or deactivate a user only if the target's role is not `super_admin`, and the target's role permission set is a subset of the caller's own permission set (a `department_admin` may act on `examiner` and `employee` users; a custom role only on roles whose permissions it already holds). A violation returns 403 `FORBIDDEN`. The same subset rule applies to assigning a role (`role_id`) on create/update. The temporary password must never be returned for a target the caller may not act on.
+- **D-2 (scoping, p1):** department scoping of reports, grading detail, AI checks and employee records applies to every role except `super_admin`, by default. A custom role with `reports:read` or `grading:*` therefore sees only its own department subtree (and its own record), exactly like `department_admin`; a role without a department sees nothing (empty data). Scoping must not depend on the literal role name `department_admin`.
+- **D-3:** `audit:read`, `users:manage` and `exams:assign` stay assignable to custom roles; `audit:read` is org-wide by design (audit log is not department-scoped) and the role editor shows a warning for it.

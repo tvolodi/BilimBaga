@@ -27,7 +27,7 @@ Status is what the code returns today. "Where" gives representative source locat
 | UNAUTHORIZED | 401 | `audit/handler.go:30,67`, `auth/handler.go:147`, `email/handler.go:27` (missing user/tenant in context) |
 | FORBIDDEN | 403 | `rbac/middleware.go:23`; in-handler scope checks `users/handler.go:102`, `sessions/handler.go:178`, `ai/handler.go:142` |
 | NOT_FOUND | 404 | `api/uuid.go:89` (malformed path id), `users/handler.go:100`, `departments/handler.go:56` |
-| VALIDATION_ERROR | 422 or 400 | 422: `api/uuid.go:53,65`, `users/handler.go:137,173`. 400: `auth/recovery_handler.go:24,70`, `auth/recovery_service.go:56,105`, `ai/handler.go:49` (I-1) |
+| VALIDATION_ERROR | 422 | `api/uuid.go`, `users/handler.go`, `auth/recovery_handler.go`, `auth/recovery_service.go`, `ai/handler.go` (all aligned to 422, I-1 resolved by #176) |
 | INVALID_BODY | 400 | undecodable JSON/multipart: `ai/handler.go:41`, `auth/handler.go:83`, `departments/handler.go:41`, `users/handler.go:257` |
 | RATE_LIMITED | 429 | `ratelimit/middleware.go:72` (sets `Retry-After: 60`, line 68) |
 | INTERNAL_ERROR | 500 | catch-all: `auth/handler.go:59`, `auth/middleware.go:81` (fails closed), `audit/handler.go:44` |
@@ -161,15 +161,15 @@ There is no `ROLE_*` family of codes in the code; role-related endpoints use the
 
 - Limiters (`internal/ratelimit/middleware.go`): `AuthLimiter` 10 req/min per IP on `/health` and `/auth/*` (line 81; `router.go:57-66`); `GlobalLimiter` 300 req/min per IP on the public and protected groups (line 95); `AnswerSaveLimiter` 60 req/min keyed by session id on `PUT /portal/sessions/{id}/answers/{questionId}` (line 110; `router.go:241-243`). AI generation has its own hourly cap in the service (`AI_RATE_LIMITED`, 429).
 - 429 response: the envelope with `RATE_LIMITED` / "Too many requests" and header `Retry-After: 60`, a constant (`middleware.go:68`). The repo sets no `X-RateLimit-*` headers itself; the `httprate` library (v0.15.0, `go.mod:12`) may add its own, which this document does not guarantee.
-- `DISABLE_RATE_LIMIT=true|1` disables the Auth and Global limiters for E2E (`middleware.go:46-49`). `AnswerSaveLimiter` ignores it (I-11).
+- `DISABLE_RATE_LIMIT=true|1` disables the Auth, Global and AnswerSave limiters (test-only: E2E and k6 load runs; never set on shared or production-class instances; default is rate limiting ON). I-11 resolved by #176.
 - Client IP comes from `chimw.RealIP` (`router.go:49`); `auth` additionally parses `X-Forwarded-For` itself (`auth/handler.go:62-72`).
 
 ## 8. Uploads
 
 | Endpoint | Field | Parse limit | Content limit | Validation | Errors |
 |----------|-------|-------------|---------------|------------|--------|
-| `POST /users/import[?commit=true]` | `file` (CSV) | `ParseMultipartForm(10<<20)`, `users/handler.go:255` | 10 MiB `upload.MaxCSVBytes` (`upload/validate.go:16`); 500 rows | magic-byte check `upload.ValidateCSVFile` | `MISSING_FILE`, `FILE_TOO_LARGE` 413, `INVALID_FILE_TYPE` 415, `INVALID_CSV`, `TOO_MANY_ROWS` |
-| `POST /questions/import[?dry_run=true]` | `file` (CSV, or JSON by `.json` extension) | `ParseMultipartForm(32<<20)`, `questions/import_export_handler.go:23` | 10 MiB, bounded read via `io.LimitReader` | same magic-byte check | `ERR_INVALID_BODY`, `ERR_FILE_TOO_LARGE` 413, `ERR_INVALID_FILE_TYPE` 415 |
+| `POST /users/import[?commit=true]` | `file` (CSV) | `upload.ParseImportMultipart` (same cap as questions import; over-cap body gives 413 `FILE_TOO_LARGE`) | 10 MiB `upload.MaxCSVBytes` (`upload/validate.go:16`); 500 rows | magic-byte check `upload.ValidateCSVFile` | `MISSING_FILE`, `FILE_TOO_LARGE` 413, `INVALID_FILE_TYPE` 415, `INVALID_CSV`, `TOO_MANY_ROWS` |
+| `POST /questions/import[?dry_run=true]` | `file` (CSV, or JSON by `.json` extension) | `upload.ParseImportMultipart`: body capped at `upload.MaxImportBodyBytes` (10 MiB + 1 MiB multipart overhead) via `http.MaxBytesReader`, memory limited to 10 MiB; over-cap body gives 413 `ERR_FILE_TOO_LARGE` | 10 MiB, bounded read via `io.LimitReader` | same magic-byte check | `ERR_INVALID_BODY`, `ERR_FILE_TOO_LARGE` 413, `ERR_INVALID_FILE_TYPE` 415 |
 | `PUT /tenant/config` (logo) | key inside the JSON update map (`tenant/handler.go:50`), not multipart | n/a | 2 MiB `upload.MaxLogoBytes` (`upload/validate.go:13`) | PNG/JPEG magic bytes, never the client Content-Type | `LOGO_TOO_LARGE` 413, `INVALID_LOGO_TYPE` 400 |
 
 File type is always detected from magic bytes (`upload/validate.go`, `DetectMIME`).
@@ -214,7 +214,7 @@ All download endpoints are ordinary GETs inside the protected group, so **Bearer
 
 ## 13. Inconsistencies in the code (not fixed here)
 
-- I-1 `VALIDATION_ERROR` status: 422 in `users/handler.go:137,173` and `api/uuid.go`, 400 in `auth/recovery_*` and `ai/handler.go:49`. Questions and exams use `ERR_VALIDATION` (422) instead.
+- I-1 (RESOLVED by #176: all 422) `VALIDATION_ERROR` status: 422 in `users/handler.go:137,173` and `api/uuid.go`, 400 in `auth/recovery_*` and `ai/handler.go:49`. Questions and exams use `ERR_VALIDATION` (422) instead.
 - I-2 `INVALID_TOKEN` is 401 for a bad JWT (`auth/middleware.go`) and 400 for an invalid reset link (`auth/recovery_service.go:98`).
 - I-3 `USER_NOT_FOUND` is 404 in `reports/handler.go:97` but 500 in `email/handler.go:33`; the users domain itself uses `NOT_FOUND`.
 - I-4 Two code families coexist: `ERR_*` (categories, tags, questions, exam CRUD, certificates 500, reports params) and unprefixed (auth, users, departments, sessions, ai, tenant). Pairs for the same meaning: `ERR_NOT_FOUND` / `EXAM_NOT_FOUND` for the same exam resource (`exams/handler.go:264` vs `:823`), `ERR_INVALID_PARAM` / `INVALID_PARAM`, `ERR_INVALID_BODY` / `INVALID_BODY`, `ERR_INTERNAL` / `INTERNAL_ERROR`, `ERR_FORBIDDEN` / `FORBIDDEN`. `certificates/handler.go` uses both `INTERNAL_ERROR` (line 69) and `ERR_INTERNAL` (line 97).
@@ -223,8 +223,8 @@ All download endpoints are ordinary GETs inside the protected group, so **Bearer
 - I-7 Permission verbs: `write` (questions, exams, grading) versus `manage` (users, departments, tags, categories, tenant) with no documented rule; `exams:read` also gates the admin session result and certificate routes (`router.go:256,296`).
 - I-8 Sort params: `sort`+`order` (exams, questions) versus `sort`+`dir` (My Results). Invalid sort values silently default instead of 422.
 - I-9 Date filters: RFC 3339 `from`/`to` (invalid value silently ignored on audit) versus `date_from`/`date_to` `YYYY-MM-DD` (400 `INVALID_DATE` on grading).
-- I-10 Invalid pagination input silently falls back; request-body size limits exist only on recovery endpoints; the questions import parses up to 32 MiB although its content cap is 10 MiB.
-- I-11 `DISABLE_RATE_LIMIT` does not disable `AnswerSaveLimiter` (`ratelimit/middleware.go:110-123`), and it is read with `os.Getenv` in middleware (`middleware.go:46-49`), contrary to the typed-Config rule in `CLAUDE.md`.
+- I-10 (import part RESOLVED by #176: body capped before parse, 413) Invalid pagination input silently falls back; request-body size limits exist only on recovery endpoints; the questions import parses up to 32 MiB although its content cap is 10 MiB.
+- I-11 (RESOLVED by #176: answer-save limiter now honours it; `os.Getenv` in middleware remains) `DISABLE_RATE_LIMIT` did not disable `AnswerSaveLimiter` (`ratelimit/middleware.go:110-123`), and it is read with `os.Getenv` in middleware (`middleware.go:46-49`), contrary to the typed-Config rule in `CLAUDE.md`.
 - I-12 Envelope construction is duplicated (`auth`, `tenant`, `ratelimit`), and `exams`/`questions` hand-build envelopes with `map[string]any` instead of `api.WriteError`. The error object gains extra keys (`details`, `fields`) with no declared schema.
 - I-13 Duplicate-name conflict codes differ: `DUPLICATE_NAME` (departments), `ERR_TAG_DUPLICATE` (tags), `DUPLICATE_EMAIL` (users).
 - I-14 `Retry-After` is a fixed 60; `AI_RATE_LIMITED` returns 429 without `Retry-After`.

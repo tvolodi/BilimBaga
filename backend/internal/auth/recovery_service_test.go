@@ -64,12 +64,12 @@ func (r *recoveryRepo) GetUserByID(_ context.Context, id string) (*User, error) 
 	}
 	return nil, ErrNotFound
 }
-func (r *recoveryRepo) UpdateFailedAttempts(context.Context, string, int) error     { return nil }
-func (r *recoveryRepo) LockAccount(context.Context, string, time.Time) error        { return nil }
-func (r *recoveryRepo) ResetFailedAttempts(context.Context, string) error            { return nil }
-func (r *recoveryRepo) CreateRefreshToken(context.Context, *RefreshToken) error      { return nil }
-func (r *recoveryRepo) RevokeRefreshToken(context.Context, string) error             { return nil }
-func (r *recoveryRepo) RevokeAllUserRefreshTokens(context.Context, string) error     { return nil }
+func (r *recoveryRepo) UpdateFailedAttempts(context.Context, string, int) error         { return nil }
+func (r *recoveryRepo) LockAccount(context.Context, string, time.Time) error            { return nil }
+func (r *recoveryRepo) ResetFailedAttempts(context.Context, string) error               { return nil }
+func (r *recoveryRepo) CreateRefreshToken(context.Context, *RefreshToken) error         { return nil }
+func (r *recoveryRepo) RevokeRefreshToken(context.Context, string) error                { return nil }
+func (r *recoveryRepo) RevokeAllUserRefreshTokens(context.Context, string) error        { return nil }
 func (r *recoveryRepo) UpdatePassword(context.Context, string, string, time.Time) error { return nil }
 func (r *recoveryRepo) GetRefreshTokenByHash(context.Context, string) (*RefreshToken, error) {
 	return nil, ErrNotFound
@@ -150,10 +150,13 @@ func (r *recoveryRepo) CompleteReset(_ context.Context, hash, pwHash string, now
 }
 
 type fakeMailer struct {
+	mu    sync.Mutex // ForgotPassword is exercised concurrently in hardening_test.go
 	calls []struct{ userID, token string }
 }
 
 func (m *fakeMailer) TriggerPasswordResetLink(userID, token string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.calls = append(m.calls, struct{ userID, token string }{userID, token})
 }
 

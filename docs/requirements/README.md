@@ -84,6 +84,14 @@
 | FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Implemented |
 | FR-BB510 | Overdue-reminder-action | Overdue Employee Reminder: Real "Send Reminder" Action | Validated |
 
+## Decisions
+
+Decision records (not FR-BB requirements).
+
+| ID | File | Title | Status |
+|----|------|-------|--------|
+| DEC-001 | DEC-001.Environments-production-class-demo-and-qa.md | Environments: Production-Class Demo and Separate QA | Accepted |
+
 ## Status Values
 
 | Status | Meaning |

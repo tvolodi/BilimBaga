@@ -69,7 +69,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 | 2 | Tester | Same with unknown email | 200, body byte-identical to step 1 | |
 | 3 | Tester | Same with `uat.inactive@test.com` | 200, same body | |
 | 4 | Tester | Time 5 calls each for known and unknown email | Every response (known, unknown, inactive) takes >= ~400 ms (response floor); known vs unknown medians differ by < ~100 ms or ratio < 1.5 | |
-| 5 | Tester | Body `{}` and `{"email":"not-an-email"}` | 400 `VALIDATION_ERROR` | |
+| 5 | Tester | Body `{}` and `{"email":"not-an-email"}` | 422 `VALIDATION_ERROR` (was 400 before PR #197) | |
 | 6 | Tester | Check Mailhog | Mail only for the active known user | |
 
 ## Scenario S3: Token properties and email content
@@ -96,7 +96,7 @@ Use the newest valid token `T2` from S3.
 | 1 | Anonymous | Open `{public_app_url}/reset-password?token=T2` | New password + confirm form; no nav; no Authorization header | |
 | 1a | Tester | `GET {public_app_url}/reset-password?token=x` (response headers) and inspect DOM while the page is open and after navigating away | `Referrer-Policy: no-referrer` and `Cache-Control: no-store` headers; `<meta name="referrer" content="no-referrer">` present while the page is mounted and removed after leaving; no outbound `Referer` carries the token | |
 | 2 | Anonymous | Enter `abc` / mismatched confirmation | Client-side rules block submit (same as change-password) | |
-| 3 | Tester | API: `POST /auth/reset-password {token:T2,new_password:"alllowercase1"}` | 400 `VALIDATION_ERROR`; token NOT consumed (DB `used_at` NULL; step 4 still works) | |
+| 3 | Tester | API: `POST /auth/reset-password {token:T2,new_password:"alllowercase1"}` | 422 `VALIDATION_ERROR` (was 400 before PR #197); token NOT consumed (DB `used_at` NULL; step 4 still works) | |
 | 4 | Anonymous | Enter `ResetPass123!` twice, submit | Redirect to `/login` with success notice | |
 | 5 | Anonymous | Log in as `uat.recovery@test.com` / `ResetPass123!` | Success; no forced password change | |
 | 6 | Anonymous | Log in with old `NewPass123!` | 401 | |

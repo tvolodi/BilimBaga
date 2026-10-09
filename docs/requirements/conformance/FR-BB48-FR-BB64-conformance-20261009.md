@@ -35,7 +35,7 @@ No p1 gaps for FR-BB48. The verify endpoint exposes only name, exam, score and d
 |------|----------------------|----------|
 | AC-1 rate limiting tests | MERGED (bbbb565, #13) | `backend/internal/ratelimit/middleware_test.go`: block after limit for auth (10) and global (300), Retry-After "60" and `RATE_LIMITED` envelope (lines ~77-90), disabled pass-through, answer-save per session, fallback to IP. |
 | AC-2 HSTS | OPEN | `grep -i strict-transport|hsts` over `deploy/` returns nothing. `deploy/nginx.conf:5-8` has CSP, X-Frame-Options, nosniff, Referrer-Policy only. No commit touched it since the audit. |
-| AC-3 question import validation | OPEN | `questions/import_export_handler.go:21` still `ParseMultipartForm(32<<20)`; `ValidateCSVFile` is called only in `users/handler.go:234`. No 10 MB cap or 413 for question import. |
+| AC-3 question import validation | RESOLVED (2026-10-09 re-check: `ValidateCSVFile` and a bounded read exist at `questions/import_export_handler.go:44-57`; PR #197 adds the pre-parse 10 MiB body cap, see `PR197-PR196-PR186-conformance-20261009.md`). Original finding: OPEN | `questions/import_export_handler.go:21` still `ParseMultipartForm(32<<20)`; `ValidateCSVFile` is called only in `users/handler.go:234`. No 10 MB cap or 413 for question import. |
 | AC-7 CI workflow | OPEN | `.github/` has no `workflows/` directory; `Makefile:21` `security-check` target only. |
 | Tests: temp password vs ValidateComplexity | PARTIAL | `users/service_test.go:409` `TestGenerateTempPassword` (10 iterations) checks length and character classes directly but does not call `auth.ValidateComplexity` or loop many times. Acceptable equivalent; weaker than the spec's "many iterations". |
 | Tests: question import upload validation | OPEN | blocked by the AC-3 code change. |
@@ -46,7 +46,7 @@ Open work is tracked by dev issue #19.
 ### FR-BB64 gaps and severity
 | ID | Gap | Severity | Rationale |
 |----|-----|----------|-----------|
-| S1 | Question import has no magic-byte check and no 10 MB cap (only 32 MB multipart memory parse; body size otherwise unbounded by the handler) | p1 | Security/data-exposure class: authenticated upload endpoint without the required validation or size limit (resource exhaustion). Mitigation: it needs an authenticated admin or author role, so exploitability is limited; keep p1 only because the requirement classifies upload validation as a security AC and the fix is small. |
+| S1 (RESOLVED, see PR197 conformance review) | Question import has no magic-byte check and no 10 MB cap (only 32 MB multipart memory parse; body size otherwise unbounded by the handler) | p1 | Security/data-exposure class: authenticated upload endpoint without the required validation or size limit (resource exhaustion). Mitigation: it needs an authenticated admin or author role, so exploitability is limited; keep p1 only because the requirement classifies upload validation as a security AC and the fix is small. |
 | S2 | No HSTS header | p2 | Behind a TLS-terminating proxy that can add HSTS itself; AC-2 is unmet as written. |
 | S3 | No CI workflow running `security-check` | p2 | Process control; the checks exist locally. |
 | S4 | Temp-password test does not call `ValidateComplexity` | p3 | Rule is satisfied by construction. |
@@ -59,4 +59,4 @@ Open work is tracked by dev issue #19.
 5. Tick the FR-BB48 AC checkboxes (all `[ ]` although Status is Implemented) and keep FR-BB64 at Validated until S1-S3 merge.
 
 ## Summary
-FR-BB48: 8 PASS, 0 GAP at p1/p2, 3 p3 notes, 1 verification pending. FR-BB64: 1 test item merged (ratelimit), 3 open (AC-2, AC-3, AC-7), 1 partial test. p1 gaps: S1 only.
+FR-BB48: 8 PASS, 0 GAP at p1/p2, 3 p3 notes, 1 verification pending. FR-BB64: 1 test item merged (ratelimit), 3 open (AC-2, AC-3, AC-7), 1 partial test. p1 gaps: S1 only (resolved by #70 / PR #197, re-checked 2026-10-09: none open).

@@ -63,6 +63,7 @@ export default defineConfig({
         '**/certificates.spec.ts',
         '**/ai-assist.spec.ts',
         '**/password-reset.spec.ts',
+        '**/dept-admin-scoping.spec.ts',
       ],
       use: {
         ...devices['Desktop Chrome'],

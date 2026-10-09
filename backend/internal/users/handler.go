@@ -272,7 +272,11 @@ func (h *Handler) UnlockUser(w http.ResponseWriter, r *http.Request) {
 // Accepts multipart/form-data with a "file" field containing a CSV.
 // Without ?commit=true, returns a preview only; with ?commit=true, writes valid rows.
 func (h *Handler) ImportUsers(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	if err := upload.ParseImportMultipart(w, r); err != nil {
+		if errors.Is(err, upload.ErrFileTooLarge) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "CSV file must not exceed 10 MB")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "failed to parse multipart form")
 		return
 	}

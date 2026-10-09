@@ -27,6 +27,7 @@ type mockRepo struct {
 	getSummaryStatsFn                    func(ctx context.Context, examID string) (*examSummaryRow, error)
 	getPerQuestionStatsFn                func(ctx context.Context, examID string) ([]questionStatRow, error)
 	getAnswerDistFn                      func(ctx context.Context, examID string) ([]answerDistRow, error)
+	userInScopeFn                        func(ctx context.Context, userID string) (bool, error)
 	getUserInfoFn                        func(ctx context.Context, userID string) (*userInfoRow, error)
 	getUserSessionHistoryFn              func(ctx context.Context, userID string, limit, offset int) ([]SessionRecord, error)
 	getUserSessionCountFn                func(ctx context.Context, userID string) (int, error)
@@ -101,6 +102,13 @@ func (m *mockRepo) GetAnswerDistribution(ctx context.Context, examID string) ([]
 		return m.getAnswerDistFn(ctx, examID)
 	}
 	return []answerDistRow{}, nil
+}
+
+func (m *mockRepo) UserInScope(ctx context.Context, userID string) (bool, error) {
+	if m.userInScopeFn != nil {
+		return m.userInScopeFn(ctx, userID)
+	}
+	return true, nil
 }
 
 func (m *mockRepo) GetUserInfo(ctx context.Context, userID string) (*userInfoRow, error) {

@@ -111,8 +111,22 @@ func (r *pgRepository) GetByID(ctx context.Context, id string) (*User, error) {
 	return &u, nil
 }
 
+// existsEmailQuery is the case-insensitive duplicate probe used by Create.
+const existsEmailQuery = `SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = lower($1))`
+
 // Create inserts a new user with a pre-hashed password and returns the persisted record.
 func (r *pgRepository) Create(ctx context.Context, email, fullName, passwordHash string, departmentID *string, roleID string) (*User, error) {
+	// The UNIQUE(email) constraint is case-sensitive, so a legacy mixed-case row would not
+	// block its lowercase twin. Check case-insensitively first (ISS-164); the constraint
+	// below still catches concurrent inserts.
+	var taken bool
+	if err := r.db.GetContext(ctx, &taken, existsEmailQuery, email); err != nil {
+		return nil, fmt.Errorf("users.Create: check duplicate email: %w", err)
+	}
+	if taken {
+		return nil, ErrDuplicateEmail
+	}
+
 	const q = `
 		INSERT INTO users (email, password_hash, full_name, department_id, role_id, force_password_change)
 		VALUES ($1, $2, $3, $4, $5, true)

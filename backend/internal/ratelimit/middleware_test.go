@@ -57,6 +57,7 @@ func TestLimiters_BlockAfterLimit(t *testing.T) {
 	}{
 		{"auth", AuthLimiter, 10},
 		{"global", GlobalLimiter, 300},
+		{"answer", AnswerSaveLimiter, 60},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -103,6 +104,7 @@ func TestLimiters_DisabledPassThrough(t *testing.T) {
 	for name, build := range map[string]func() func(http.Handler) http.Handler{
 		"auth":   AuthLimiter,
 		"global": GlobalLimiter,
+		"answer": AnswerSaveLimiter,
 	} {
 		t.Run(name, func(t *testing.T) {
 			h := build()(okHandler())

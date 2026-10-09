@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { TenantProvider } from '@/components/TenantProvider'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
@@ -12,6 +12,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useRefreshToken } from '@/api/auth'
 import { useLocaleDirection } from '@/hooks/useLocaleDirection'
 import { SkipLink } from '@/components/SkipLink'
+import { PasswordChangeGuard } from '@/components/PasswordChangeGuard'
+import { createAppQueryClient } from '@/lib/passwordChangeRequired'
 
 // Non-admin routes — eagerly loaded (employee-facing, on the critical path)
 import { LoginPage } from '@/pages/auth/LoginPage'
@@ -90,7 +92,7 @@ const VerifyCertificatePage = lazy(() =>
   import('@/pages/VerifyCertificatePage').then((m) => ({ default: m.VerifyCertificatePage })),
 )
 
-const queryClient = new QueryClient()
+const queryClient = createAppQueryClient()
 
 // FR-BB48 AC-2/AC-7: /verify/* is fully public — it is rendered outside the auth
 // bootstrap so no token refresh is attempted and no RequireAuth/RequireRole wraps it.
@@ -129,191 +131,194 @@ function AuthedRoutes() {
     )
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/change-password"
-        element={
-          <RequireAuth>
-            <ChangePasswordPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
-            <Suspense fallback={<FullPageSpinner />}>
-              <AdminLayout />
-            </Suspense>
-          </RequireRole>
-        }
-      >
-        <Route index element={<Navigate to="dashboard" replace />} />
+    <>
+      <PasswordChangeGuard />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route
-          path="dashboard"
+          path="/change-password"
           element={
-            <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']}>
-              <AdminDashboardPage />
-            </RequireRole>
-          }
-        />
-        <Route path="users" element={<UsersListPage />} />
-        <Route
-          path="users/:userId/record"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <EmployeeRecordPage />
-            </RequireRole>
-          }
-        />
-        <Route path="departments" element={<DepartmentsPage />} />
-        <Route
-          path="questions"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <QuestionBankPage />
-            </RequireRole>
+            <RequireAuth>
+              <ChangePasswordPage />
+            </RequireAuth>
           }
         />
         <Route
-          path="questions/new"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <QuestionEditorPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="questions/:id/edit"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <QuestionEditorPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="categories"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <CategoriesPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="tags"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <TagsPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="exams"
+          path="/admin"
           element={
             <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
-              <ExamsListPage />
+              <Suspense fallback={<FullPageSpinner />}>
+                <AdminLayout />
+              </Suspense>
+            </RequireRole>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route
+            path="dashboard"
+            element={
+              <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']}>
+                <AdminDashboardPage />
+              </RequireRole>
+            }
+          />
+          <Route path="users" element={<UsersListPage />} />
+          <Route
+            path="users/:userId/record"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <EmployeeRecordPage />
+              </RequireRole>
+            }
+          />
+          <Route path="departments" element={<DepartmentsPage />} />
+          <Route
+            path="questions"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <QuestionBankPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="questions/new"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <QuestionEditorPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="questions/:id/edit"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <QuestionEditorPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="categories"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <CategoriesPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="tags"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <TagsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="exams"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
+                <ExamsListPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="exams/new"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <ExamWizardCreatePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="exams/:id/edit"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <ExamWizardEditPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="exams/:examId/analytics"
+            element={<ExamAnalyticsPage />}
+          />
+          <Route
+            path="settings/branding"
+            element={
+              <RequireSuperAdmin>
+                <BrandingSettingsPage />
+              </RequireSuperAdmin>
+            }
+          />
+          <Route
+            path="grading"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <GradingQueuePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="grading/:sessionId"
+            element={
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+                <GradingDetailPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="audit"
+            element={
+              <RequireRole roles={AUDIT_READ_ROLES} unauthorizedRedirect="/login">
+                <AuditLogPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <RequireRole roles={REPORTS_READ_ROLES} unauthorizedRedirect="/login">
+                <ReportsPage />
+              </RequireRole>
+            }
+          />
+        </Route>
+        <Route
+          path="/portal/exams/:examId/result"
+          element={
+            <RequireRole roles={['employee']}>
+              <ExamResultRedirectPage />
             </RequireRole>
           }
         />
         <Route
-          path="exams/new"
+          path="/portal/sessions/:sessionId/result"
           element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <ExamWizardCreatePage />
+            <RequireRole roles={['employee']}>
+              <ResultPage />
             </RequireRole>
           }
         />
         <Route
-          path="exams/:id/edit"
+          path="/portal/sessions/:sessionId"
           element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <ExamWizardEditPage />
+            <RequireRole roles={['employee']}>
+              <ExamTakingPage />
             </RequireRole>
           }
         />
         <Route
-          path="exams/:examId/analytics"
-          element={<ExamAnalyticsPage />}
-        />
-        <Route
-          path="settings/branding"
+          path="/portal"
           element={
-            <RequireSuperAdmin>
-              <BrandingSettingsPage />
-            </RequireSuperAdmin>
-          }
-        />
-        <Route
-          path="grading"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <GradingQueuePage />
+            <RequireRole roles={['employee']}>
+              <PortalLayout />
             </RequireRole>
           }
-        />
-        <Route
-          path="grading/:sessionId"
-          element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
-              <GradingDetailPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="audit"
-          element={
-            <RequireRole roles={AUDIT_READ_ROLES} unauthorizedRedirect="/login">
-              <AuditLogPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="reports"
-          element={
-            <RequireRole roles={REPORTS_READ_ROLES} unauthorizedRedirect="/login">
-              <ReportsPage />
-            </RequireRole>
-          }
-        />
-      </Route>
-      <Route
-        path="/portal/exams/:examId/result"
-        element={
-          <RequireRole roles={['employee']}>
-            <ExamResultRedirectPage />
-          </RequireRole>
-        }
-      />
-      <Route
-        path="/portal/sessions/:sessionId/result"
-        element={
-          <RequireRole roles={['employee']}>
-            <ResultPage />
-          </RequireRole>
-        }
-      />
-      <Route
-        path="/portal/sessions/:sessionId"
-        element={
-          <RequireRole roles={['employee']}>
-            <ExamTakingPage />
-          </RequireRole>
-        }
-      />
-      <Route
-        path="/portal"
-        element={
-          <RequireRole roles={['employee']}>
-            <PortalLayout />
-          </RequireRole>
-        }
-      >
-        <Route index element={<EmployeePortal />} />
-        <Route path="results" element={<MyResultsPage />} />
-      </Route>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-    </Routes>
+        >
+          <Route index element={<EmployeePortal />} />
+          <Route path="results" element={<MyResultsPage />} />
+        </Route>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </>
   )
 }
 

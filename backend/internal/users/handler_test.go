@@ -708,3 +708,19 @@ func TestHandlerListUsers_DepartmentIDFilter_NonUUID_Returns422(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
 	assert.False(t, called)
 }
+
+func TestHandlerImportUsers_BodyOverCap_Returns413(t *testing.T) {
+	h := NewHandler(&mockUserService{}, nil)
+
+	body, ct := buildCSVMultipart(t, strings.Repeat("a", 13<<20))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/import", body)
+	req.Header.Set("Content-Type", ct)
+	req = withAuthCtx(req, "caller", "super_admin", "")
+	w := httptest.NewRecorder()
+	h.ImportUsers(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "FILE_TOO_LARGE", apiErr.Code)
+}

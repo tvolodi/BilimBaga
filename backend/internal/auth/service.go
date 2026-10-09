@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -59,7 +60,7 @@ func NewService(cfg ServiceConfig, repo Repository, mailer ...ResetMailer) Servi
 // AC-4: increments failed_attempts on bad password; locks after 5 failures.
 // AC-5: locked accounts are rejected before password validation.
 func (s *service) Login(ctx context.Context, req *LoginRequest, ipAddr string) (*LoginResponse, *http.Cookie, error) {
-	user, err := s.repo.GetUserByEmail(ctx, req.Email)
+	user, err := s.repo.GetUserByEmail(ctx, api.NormalizeEmail(req.Email))
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			// Run a dummy bcrypt comparison to prevent user-enumeration via timing.

@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
-	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/email"
 )
 
@@ -159,6 +159,7 @@ func (s *service) GetMe(ctx context.Context, userID string) (*User, error) {
 // CreateUser creates a new user with a generated temporary password.
 // Department admins may only create users within their own department.
 func (s *service) CreateUser(ctx context.Context, req CreateRequest, callerRole, callerDeptID, callerUserID, ip string) (*CreateResponse, error) {
+	req.Email = api.NormalizeEmail(req.Email)
 	if req.Email == "" || !emailRegex.MatchString(req.Email) {
 		return nil, fmt.Errorf("%w: email is required and must be a valid email address", ErrValidation)
 	}
@@ -188,7 +189,7 @@ func (s *service) CreateUser(ctx context.Context, req CreateRequest, callerRole,
 		return nil, fmt.Errorf("users.CreateUser: hash password: %w", err)
 	}
 
-	u, err := s.repo.Create(ctx, strings.ToLower(req.Email), req.FullName, string(hash), req.DepartmentID, req.RoleID)
+	u, err := s.repo.Create(ctx, req.Email, req.FullName, string(hash), req.DepartmentID, req.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("users.CreateUser: %w", err)
 	}
@@ -315,6 +316,7 @@ func (s *service) ImportUsers(ctx context.Context, rows []CSVRow, commit bool, c
 	}
 
 	for _, row := range rows {
+		row.Email = api.NormalizeEmail(row.Email)
 		errStr := s.validateImportRow(ctx, row, callerRole, callerDeptID)
 		if errStr != "" {
 			errCopy := errStr
@@ -414,7 +416,7 @@ func (s *service) commitImportRow(ctx context.Context, row CSVRow, callerUserID,
 		return fmt.Errorf("hash password: %w", err)
 	}
 
-	u, err := s.repo.Create(ctx, strings.ToLower(row.Email), row.FullName, string(hash), &deptID, roleID)
+	u, err := s.repo.Create(ctx, row.Email, row.FullName, string(hash), &deptID, roleID)
 	if err != nil {
 		if errors.Is(err, ErrDuplicateEmail) {
 			return fmt.Errorf("email already exists: %s", row.Email)

@@ -20,7 +20,11 @@ const maxImportBatch = 500
 
 // Import handles POST /api/v1/questions/import[?dry_run=true].
 func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	if err := upload.ParseImportMultipart(w, r); err != nil {
+		if errors.Is(err, upload.ErrFileTooLarge) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, "ERR_FILE_TOO_LARGE", "import file must not exceed 10 MB")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, "ERR_INVALID_BODY", "multipart/form-data required")
 		return
 	}
@@ -255,7 +259,8 @@ func parseCSVImport(r io.Reader) ([]ImportRow, error) {
 			if !ok || idx >= len(record) {
 				return ""
 			}
-			return strings.TrimSpace(record[idx])
+			// ISS-191: undo the export-side formula guard so exports re-import cleanly.
+			return api.CSVUnsafe(strings.TrimSpace(record[idx]))
 		}
 
 		locale := get("default_locale")
@@ -425,6 +430,7 @@ func rowToCSV(row *ExportRow) []string {
 	maxOpts := len(row.AnswerOptions)
 
 	var rec []string
+	// ISS-191: all cells are text; guard against spreadsheet formula injection.
 	rec = append(rec, row.Type, row.Difficulty, row.CategoryPath, row.DefaultLocale)
 
 	for _, loc := range locales {
@@ -457,7 +463,7 @@ func rowToCSV(row *ExportRow) []string {
 	}
 	rec = append(rec, strings.Join(correctIdxs, ","))
 	rec = append(rec, strings.Join(row.Tags, ";"))
-	return rec
+	return api.CSVSafeRecord(rec)
 }
 
 func sortedLocales(m map[string]TranslationDetail) []string {

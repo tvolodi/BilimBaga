@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -59,6 +61,11 @@ type Repository interface {
 	// Returns ErrNotFound if no user with that ID exists.
 	GetUserInfo(ctx context.Context, userID string) (*userInfoRow, error)
 
+	// UserInScope reports whether userID belongs to the department subtree the
+	// caller (from ctx) is restricted to. It is true for unrestricted callers
+	// when the user exists, and false for users that do not exist (ISS-165).
+	UserInScope(ctx context.Context, userID string) (bool, error)
+
 	// GetUserSessionHistory returns a page of session history for one employee,
 	// excluding in_progress sessions, ordered by started_at DESC (AC-3).
 	GetUserSessionHistory(ctx context.Context, userID string, limit, offset int) ([]SessionRecord, error)
@@ -87,7 +94,7 @@ type Repository interface {
 	// of an exam, used to build the dynamic CSV header (AC-3).
 	GetExamQuestions(ctx context.Context, examID, tenantID string) ([]ExamQuestion, error)
 
-	// StreamExamResultSessions returns all submitted/grading_pending sessions for
+	// StreamExamResultSessions returns all submitted/auto_submitted/grading_pending sessions for
 	// one exam scoped to the given tenant (AC-3, AC-8). The caller must close the
 	// returned *sqlx.Rows.
 	StreamExamResultSessions(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error)
@@ -108,6 +115,13 @@ type Repository interface {
 	// GetTopBottomQuestions returns top 5 and bottom 5 questions by correct_rate
 	// across all exams in the range for the PDF export (AC-7).
 	GetTopBottomQuestions(ctx context.Context, tenantID string, from, to time.Time) (top []QuestionStat, bottom []QuestionStat, err error)
+}
+
+// withScope substitutes the @SCOPE@ placeholder with the department-subtree
+// predicate for userCol bound to the uuid parameter param (ISS-165). The bound
+// value comes from deptscope.FromContext(ctx).Arg(): NULL means unrestricted.
+func withScope(q, userCol, param string) string {
+	return strings.ReplaceAll(q, "@SCOPE@", deptscope.Predicate(userCol, param))
 }
 
 type postgresRepository struct {
@@ -139,7 +153,7 @@ type completionRateRow struct {
 // Using a CTE that resolves assignments to individual users lets the outer
 // query run a single GROUP BY without correlated sub-queries.
 func (r *postgresRepository) GetCompletionRateByExam(ctx context.Context) ([]*ExamCompletionRate, error) {
-	const q = `
+	q := withScope(`
 WITH RECURSIVE dept_tree(id, root_id) AS (
     SELECT d.id, d.id AS root_id FROM departments d
     UNION ALL
@@ -180,13 +194,14 @@ SELECT
                                                                                  AS completed_count,
     COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)               AS passed_count
 FROM exams e
-LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id
+LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id AND @SCOPE@
 LEFT JOIN exam_sessions es ON es.exam_id = e.id AND es.user_id = ra.user_id
 WHERE e.status = 'active'
 GROUP BY e.id, e.title
-ORDER BY e.title`
+HAVING ($1::uuid IS NULL OR COUNT(DISTINCT ra.user_id) > 0)
+ORDER BY e.title`, "ra.user_id", "$1")
 
-	rows, err := r.db.QueryxContext(ctx, q)
+	rows, err := r.db.QueryxContext(ctx, q, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetCompletionRateByExam: %w", err)
 	}
@@ -228,7 +243,7 @@ type overdueRow struct {
 // identical to GetCompletionRateByExam).  We limit to 20 rows ordered by deadline ASC
 // so the most-overdue appear first (AC-3).
 func (r *postgresRepository) GetOverdueEmployees(ctx context.Context) ([]*OverdueEmployee, error) {
-	const q = `
+	q := withScope(`
 WITH RECURSIVE dept_tree(id, root_id) AS (
     SELECT d.id, d.id AS root_id FROM departments d
     UNION ALL
@@ -266,6 +281,7 @@ FROM resolved_assignments ra
 JOIN users u ON u.id = ra.user_id
 JOIN exams e ON e.id = ra.exam_id
 WHERE ra.deadline IS NOT NULL
+  AND @SCOPE@
   AND ra.deadline < NOW()
   AND NOT EXISTS (
       SELECT 1 FROM exam_sessions es
@@ -274,9 +290,9 @@ WHERE ra.deadline IS NOT NULL
         AND es.passed = TRUE
   )
 ORDER BY ra.user_id, ra.exam_id, ra.deadline ASC
-LIMIT 20`
+LIMIT 20`, "ra.user_id", "$1")
 
-	rows, err := r.db.QueryxContext(ctx, q)
+	rows, err := r.db.QueryxContext(ctx, q, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetOverdueEmployees: %w", err)
 	}
@@ -315,7 +331,7 @@ type recentActivityRow struct {
 
 // GetRecentActivity returns the 20 most recently completed sessions (AC-4).
 func (r *postgresRepository) GetRecentActivity(ctx context.Context) ([]*RecentActivity, error) {
-	const q = `
+	q := withScope(`
 SELECT
     es.id           AS session_id,
     u.full_name     AS employee_name,
@@ -327,10 +343,11 @@ FROM exam_sessions es
 JOIN users u ON u.id = es.user_id
 JOIN exams e ON e.id = es.exam_id
 WHERE es.status IN ('submitted', 'grading_pending')
+  AND @SCOPE@
 ORDER BY es.submitted_at DESC
-LIMIT 20`
+LIMIT 20`, "es.user_id", "$1")
 
-	rows, err := r.db.QueryxContext(ctx, q)
+	rows, err := r.db.QueryxContext(ctx, q, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetRecentActivity: %w", err)
 	}
@@ -368,7 +385,7 @@ type trackScoreRow struct {
 // GetAvgScoreByTrack returns a map of track → average score for sessions submitted
 // within the last 90 days (AC-5/AC-6).  Tracks absent from the result had no data.
 func (r *postgresRepository) GetAvgScoreByTrack(ctx context.Context) (map[string]*float64, error) {
-	const q = `
+	q := withScope(`
 SELECT
     c.track,
     ROUND(AVG(es.score_pct)::numeric, 1) AS avg_score
@@ -377,11 +394,12 @@ JOIN session_question_scores sqs ON sqs.session_id = es.id
 JOIN questions q                  ON q.id = sqs.question_id
 JOIN categories c                 ON c.id = q.category_id
 WHERE es.status = 'submitted'
+  AND @SCOPE@
   AND es.submitted_at >= NOW() - INTERVAL '90 days'
   AND c.track IN ('security', 'safety', 'loyalty')
-GROUP BY c.track`
+GROUP BY c.track`, "es.user_id", "$1")
 
-	rows, err := r.db.QueryxContext(ctx, q)
+	rows, err := r.db.QueryxContext(ctx, q, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetAvgScoreByTrack: %w", err)
 	}
@@ -441,7 +459,7 @@ func (r *postgresRepository) GetExamTitle(ctx context.Context, examID string) (s
 
 // GetExamScoreDistribution returns raw (non-zero) bucket counts.
 func (r *postgresRepository) GetExamScoreDistribution(ctx context.Context, examID string) ([]BucketCount, error) {
-	const q = `
+	q := withScope(`
 SELECT
   CASE
     WHEN score_pct >= 90 THEN '90-100'
@@ -458,15 +476,15 @@ SELECT
   COUNT(*) AS count
 FROM exam_sessions
 WHERE exam_id = $1
-  AND status IN ('submitted','auto_submitted','grading_pending')
-GROUP BY bucket`
+  AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@
+GROUP BY bucket`, "user_id", "$2")
 
 	type bucketRow struct {
 		Bucket string `db:"bucket"`
 		Count  int    `db:"count"`
 	}
 
-	rows, err := r.db.QueryxContext(ctx, q, examID)
+	rows, err := r.db.QueryxContext(ctx, q, examID, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetExamScoreDistribution: %w", err)
 	}
@@ -485,7 +503,7 @@ GROUP BY bucket`
 
 // GetExamSummaryStats returns aggregate stats for completed sessions.
 func (r *postgresRepository) GetExamSummaryStats(ctx context.Context, examID string) (*examSummaryRow, error) {
-	const q = `
+	q := withScope(`
 SELECT
   ROUND(AVG(score_pct)::numeric, 1)                                           AS avg_score,
   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score_pct)                      AS median_score,
@@ -496,10 +514,10 @@ SELECT
   )                                                                            AS pass_rate
 FROM exam_sessions
 WHERE exam_id = $1
-  AND status IN ('submitted','auto_submitted','grading_pending')`
+  AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@`, "user_id", "$2")
 
 	var row examSummaryRow
-	if err := r.db.QueryRowxContext(ctx, q, examID).StructScan(&row); err != nil {
+	if err := r.db.QueryRowxContext(ctx, q, examID, deptscope.FromContext(ctx).Arg()).StructScan(&row); err != nil {
 		return nil, fmt.Errorf("reports: GetExamSummaryStats: %w", err)
 	}
 	return &row, nil
@@ -508,7 +526,7 @@ WHERE exam_id = $1
 // GetPerQuestionStats returns per-question analytics for all questions that
 // appeared in at least one completed session.
 func (r *postgresRepository) GetPerQuestionStats(ctx context.Context, examID string) ([]questionStatRow, error) {
-	const q = `
+	q := withScope(`
 SELECT
   q.id                                                                AS question_id,
   LEFT(qt.stem, 100)                                                  AS stem_preview,
@@ -522,19 +540,19 @@ JOIN question_translations qt ON qt.question_id = q.id AND qt.locale = q.default
 LEFT JOIN session_question_scores sqs ON sqs.question_id = q.id
   AND sqs.session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@
   )
 WHERE q.id IN (
   SELECT DISTINCT question_id FROM session_questions
   WHERE session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@
   )
 )
 GROUP BY q.id, qt.stem
-ORDER BY q.id`
+ORDER BY q.id`, "user_id", "$2")
 
-	rows, err := r.db.QueryxContext(ctx, q, examID)
+	rows, err := r.db.QueryxContext(ctx, q, examID, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetPerQuestionStats: %w", err)
 	}
@@ -554,7 +572,7 @@ ORDER BY q.id`
 // GetAnswerDistribution returns option-level selection counts across all completed
 // sessions for every question that appeared in those sessions.
 func (r *postgresRepository) GetAnswerDistribution(ctx context.Context, examID string) ([]answerDistRow, error) {
-	const q = `
+	q := withScope(`
 SELECT
   q.id                                                               AS question_id,
   ao.id                                                              AS option_id,
@@ -567,19 +585,19 @@ LEFT JOIN session_answers sa
   ON sa.selected_option_ids @> jsonb_build_array(ao.id::text)
   AND sa.session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@
   )
 WHERE q.id IN (
   SELECT DISTINCT question_id FROM session_questions
   WHERE session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending')
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@
   )
 )
 GROUP BY q.id, ao.id, at_t.text, ao.sort_order
-ORDER BY q.id, ao.sort_order`
+ORDER BY q.id, ao.sort_order`, "user_id", "$2")
 
-	rows, err := r.db.QueryxContext(ctx, q, examID)
+	rows, err := r.db.QueryxContext(ctx, q, examID, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetAnswerDistribution: %w", err)
 	}
@@ -621,6 +639,15 @@ WHERE u.id = $1`
 		return nil, fmt.Errorf("reports: GetUserInfo: %w", err)
 	}
 	return &row, nil
+}
+
+// UserInScope implements Repository.UserInScope.
+func (r *postgresRepository) UserInScope(ctx context.Context, userID string) (bool, error) {
+	inScope, found, err := deptscope.NewStore(r.db).UserInScope(ctx, deptscope.FromContext(ctx), userID)
+	if err != nil {
+		return false, fmt.Errorf("reports: UserInScope: %w", err)
+	}
+	return found && inScope, nil
 }
 
 // GetUserSessionHistory returns a page of non-in_progress sessions for one
@@ -746,29 +773,30 @@ GROUP BY e.id, e.title, exam_track.track`
 // GetExamQuestions returns the ordered distinct questions that appeared in
 // completed sessions of an exam, used to build the dynamic CSV header.
 func (r *postgresRepository) GetExamQuestions(ctx context.Context, examID, tenantID string) ([]ExamQuestion, error) {
-	const q = `
+	q := withScope(`
 SELECT
   sq.question_id,
   ROW_NUMBER() OVER (ORDER BY MIN(sq.sort_order), sq.question_id::text) AS position
 FROM session_questions sq
 JOIN exam_sessions es ON es.id = sq.session_id
 WHERE es.exam_id = $1
-  AND es.status IN ('submitted', 'grading_pending')
+  AND es.status IN ('submitted', 'auto_submitted', 'grading_pending')
+  AND @SCOPE@
 GROUP BY sq.question_id
-ORDER BY position`
+ORDER BY position`, "es.user_id", "$2")
 
 	var result []ExamQuestion
-	if err := r.db.SelectContext(ctx, &result, q, examID); err != nil {
+	if err := r.db.SelectContext(ctx, &result, q, examID, deptscope.FromContext(ctx).Arg()); err != nil {
 		return nil, fmt.Errorf("reports: GetExamQuestions: %w", err)
 	}
 	return result, nil
 }
 
 // StreamExamResultSessions returns an open *sqlx.Rows cursor over
-// submitted/grading_pending sessions for one exam scoped to the tenant.
+// submitted/auto_submitted/grading_pending sessions for one exam scoped to the tenant.
 // The caller is responsible for closing the rows.
 func (r *postgresRepository) StreamExamResultSessions(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error) {
-	const q = `
+	q := withScope(`
 SELECT
   u.full_name                                                                AS employee_name,
   COALESCE(d.name, '')                                                       AS department,
@@ -782,10 +810,11 @@ FROM exam_sessions es
 JOIN users u ON u.id = es.user_id
 LEFT JOIN departments d ON d.id = u.department_id
 WHERE es.exam_id = $1
-  AND es.status IN ('submitted', 'grading_pending')
-ORDER BY es.started_at`
+  AND es.status IN ('submitted', 'auto_submitted', 'grading_pending')
+  AND @SCOPE@
+ORDER BY es.started_at`, "es.user_id", "$2")
 
-	rows, err := r.db.QueryxContext(ctx, q, examID)
+	rows, err := r.db.QueryxContext(ctx, q, examID, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: StreamExamResultSessions: %w", err)
 	}
@@ -849,7 +878,7 @@ ORDER BY es.started_at DESC`
 // GetDashboardCompletionRatesForRange returns completion stats per exam within
 // the given UTC date range (inclusive), scoped to the tenant.
 func (r *postgresRepository) GetDashboardCompletionRatesForRange(ctx context.Context, tenantID string, from, to time.Time) ([]*ExamCompletionRate, error) {
-	const q = `
+	q := withScope(`
 WITH RECURSIVE dept_tree(id, root_id) AS (
     SELECT d.id, d.id AS root_id FROM departments d
     UNION ALL
@@ -880,16 +909,17 @@ SELECT
                                                                                  AS completed_count,
   COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)                 AS passed_count
 FROM exams e
-LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id
+LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id AND @SCOPE@
 LEFT JOIN exam_sessions es
   ON es.exam_id = e.id
   AND es.user_id = ra.user_id
   AND es.submitted_at BETWEEN $1 AND $2
 WHERE e.status = 'active'
 GROUP BY e.id, e.title
-ORDER BY e.title`
+HAVING ($3::uuid IS NULL OR COUNT(DISTINCT ra.user_id) > 0)
+ORDER BY e.title`, "ra.user_id", "$3")
 
-	rows, err := r.db.QueryxContext(ctx, q, from, to)
+	rows, err := r.db.QueryxContext(ctx, q, from, to, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetDashboardCompletionRatesForRange: %w", err)
 	}
@@ -926,7 +956,7 @@ ORDER BY e.title`
 // GetTopBottomQuestions returns the top 5 and bottom 5 questions by correct_rate
 // across all exams in the date range, scoped to the tenant.
 func (r *postgresRepository) GetTopBottomQuestions(ctx context.Context, tenantID string, from, to time.Time) ([]QuestionStat, []QuestionStat, error) {
-	const q = `
+	q := withScope(`
 WITH question_rates AS (
   SELECT
     q.id                                                                AS question_id,
@@ -941,6 +971,7 @@ WITH question_rates AS (
   JOIN question_translations qt     ON qt.question_id = q.id AND qt.locale = q.default_locale
   WHERE es.status IN ('submitted', 'grading_pending')
     AND es.submitted_at BETWEEN $1 AND $2
+    AND @SCOPE@
   GROUP BY q.id, qt.stem
 ),
 ranked AS (
@@ -952,7 +983,7 @@ SELECT question_id, stem_preview, correct_rate,
        CASE WHEN top_rank <= 5 THEN 'top' ELSE 'bottom' END AS bucket
 FROM ranked
 WHERE top_rank <= 5 OR bot_rank <= 5
-ORDER BY bucket DESC, correct_rate DESC`
+ORDER BY bucket DESC, correct_rate DESC`, "es.user_id", "$3")
 
 	type qRateRow struct {
 		QuestionID  string   `db:"question_id"`
@@ -961,7 +992,7 @@ ORDER BY bucket DESC, correct_rate DESC`
 		Bucket      string   `db:"bucket"`
 	}
 
-	rows, err := r.db.QueryxContext(ctx, q, from, to)
+	rows, err := r.db.QueryxContext(ctx, q, from, to, deptscope.FromContext(ctx).Arg())
 	if err != nil {
 		return nil, nil, fmt.Errorf("reports: GetTopBottomQuestions: %w", err)
 	}

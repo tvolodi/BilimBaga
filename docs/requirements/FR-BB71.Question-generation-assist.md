@@ -18,7 +18,7 @@ Enables HR admins and examiners to generate draft exam questions using Anthropic
 - [ ] AC-3: When the Anthropic API is unreachable or returns a non-200 response, the endpoint returns HTTP 503 with error code `AI_UNAVAILABLE`; the error never bubbles through as a 500.
 - [ ] AC-4: Every successful AI call is recorded in the `ai_usage_log` table with `user_id`, `feature = "question_generation"`, `tokens_used` from the API response usage object, and `model` name.
 - [ ] AC-5: The endpoint enforces a rate limit of 20 AI-generate requests per hour per authenticated user; requests beyond this limit return `429` with error code `AI_RATE_LIMITED`.
-- [ ] AC-6: `count` is validated to be between 1 and 10 inclusive; `context_text` is validated to be at most 2000 characters; `difficulty` must be one of `"easy"`, `"medium"`, `"hard"`; invalid inputs return `400 Bad Request`.
+- [ ] AC-6: `count` is validated to be between 1 and 10 inclusive; `context_text` is validated to be at most 2000 characters; `difficulty` must be one of `"easy"`, `"medium"`, `"hard"`; invalid inputs return `422 Unprocessable Entity` with code `VALIDATION_ERROR` (aligned from 400 by PR #197; an undecodable JSON body is still 400 `INVALID_BODY`).
 - [ ] AC-7: The frontend question editor displays an "AI Generate" button (examiner+ only) that opens a generation dialog; after the API returns, draft questions are shown in a preview list; the user can individually select and confirm each question, which triggers `POST /api/v1/questions` for each confirmed draft.
 - [ ] AC-8: Draft questions returned by the generate endpoint are never automatically inserted into the database; they exist only in the API response and the frontend's local state until the user explicitly confirms them.
 
@@ -90,7 +90,7 @@ CREATE INDEX idx_ai_usage_log_user_created
   }
   ```
 - **Error responses**:
-  - `400` — validation failure
+  - `422` — validation failure (`VALIDATION_ERROR`; PR #197); `400` — undecodable body (`INVALID_BODY`)
   - `403` — insufficient role
   - `429` — AI rate limit exceeded (`AI_RATE_LIMITED`)
   - `503` — Anthropic API unavailable (`AI_UNAVAILABLE`)

@@ -305,7 +305,7 @@ func TestGetInsights_CacheHit_NoChatCall(t *testing.T) {
 	client := &mockClient{} // must not be called
 	svc := NewService(repo, client, "model", newLogger())
 
-	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	result, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", false)
 	if err != nil {
 		t.Fatalf("expected no error on cache hit, got: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestGetInsights_ForceRefresh_BypassesFreshCache(t *testing.T) {
 	client := &mockClient{text: validInsightJSON, tokens: 100}
 	svc := NewService(repo, client, "model", newLogger())
 
-	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", true)
+	result, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -358,7 +358,7 @@ func TestGetInsights_CacheMiss_CallsAnthropic(t *testing.T) {
 	client := &mockClient{text: validInsightJSON, tokens: 200}
 	svc := NewService(repo, client, "model", newLogger())
 
-	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	result, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -382,7 +382,7 @@ func TestGetInsights_AnthropicError_ReturnsUnavailable(t *testing.T) {
 	client := &mockClient{err: ErrAIUnavailable}
 	svc := NewService(repo, client, "model", newLogger())
 
-	_, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	_, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", false)
 	if !errors.Is(err, ErrAIUnavailable) {
 		t.Errorf("expected ErrAIUnavailable, got %v", err)
 	}
@@ -397,7 +397,7 @@ func TestGetInsights_ExamNotFound(t *testing.T) {
 	client := &mockClient{}
 	svc := NewService(repo, client, "model", newLogger())
 
-	_, err := svc.GetInsights(context.Background(), "bad-exam", "tenant-1", "user-1", false)
+	_, err := svc.GetInsights(scopedCtx("super_admin"), "bad-exam", "tenant-1", "user-1", false)
 	if !errors.Is(err, ErrExamNotFound) {
 		t.Errorf("expected ErrExamNotFound, got %v", err)
 	}

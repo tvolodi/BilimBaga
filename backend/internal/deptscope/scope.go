@@ -1,6 +1,10 @@
 // Package deptscope implements department-subtree scoping for admin read APIs
-// (ISS-165). A department_admin may only see data about employees of its own
-// department and that department's descendants; every other role is unchanged.
+// (ISS-165, ISS-218). Every role except super_admin (department_admin,
+// examiner, every custom role, and an empty/unknown role) may only see data
+// about employees of its own department and that department's descendants; a
+// caller with no department sees nothing (FR-BB117 D-2). Scoping never depends
+// on a role NAME other than the single unrestricted one, so a custom role with
+// reports:read or grading:* cannot read org-wide data.
 //
 // The scope is derived from the authenticated principal carried in the request
 // context (role + department id set by auth.Authenticate), so a handler,
@@ -14,8 +18,16 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
 )
 
-// RoleDepartmentAdmin is the only role subject to department scoping.
+// RoleSuperAdmin is the only role exempt from department scoping.
+const RoleSuperAdmin = "super_admin"
+
+// RoleDepartmentAdmin is the built-in department administrator role.
 const RoleDepartmentAdmin = "department_admin"
+
+// RoleExaminer is the built-in examiner role. It is department-scoped like any
+// other non-super_admin role, with one narrow exception: the manual-grading
+// flow for exams the examiner created (see Scope.ExamOwnerID).
+const RoleExaminer = "examiner"
 
 // noDepartment is a UUID that matches no department. A restricted caller with
 // no department of its own gets this value so its scope is the empty set.
@@ -29,18 +41,33 @@ type Scope struct {
 	DepartmentID string
 	// UserID is the caller's own user id; a caller may always see itself.
 	UserID string
+	// ExamOwnerID is non-empty only for the built-in examiner role: the
+	// examiner's own user id. Manual-grading endpoints (queue, detail, grade)
+	// additionally accept sessions of exams whose created_by equals this id, so
+	// an examiner can grade the exams it owns even when the candidates are
+	// outside its department. It never widens reports, analytics, AI insights
+	// or user records.
+	ExamOwnerID string
 }
 
 // FromContext derives the scope from the authenticated principal in ctx.
+// Only super_admin is unrestricted; any other role, including an empty or
+// unknown one (no principal in ctx), fails closed to the caller's department
+// subtree.
 func FromContext(ctx context.Context) Scope {
-	if ctxkeys.RoleFromCtx(ctx) != RoleDepartmentAdmin {
+	role := ctxkeys.RoleFromCtx(ctx)
+	if role == RoleSuperAdmin {
 		return Scope{}
 	}
-	return Scope{
+	s := Scope{
 		Restricted:   true,
 		DepartmentID: ctxkeys.DepartmentIDFromCtx(ctx),
 		UserID:       ctxkeys.UserIDFromCtx(ctx),
 	}
+	if role == RoleExaminer {
+		s.ExamOwnerID = s.UserID
+	}
+	return s
 }
 
 // Arg returns the SQL parameter for Predicate: nil (SQL NULL, unrestricted) or
@@ -53,6 +80,15 @@ func (s Scope) Arg() any {
 		return noDepartment
 	}
 	return s.DepartmentID
+}
+
+// OwnerArg returns the SQL parameter for GradingPredicate's owner: nil (SQL
+// NULL, matches no exam) unless the caller is an examiner with a known user id.
+func (s Scope) OwnerArg() any {
+	if !s.Restricted || s.ExamOwnerID == "" {
+		return nil
+	}
+	return s.ExamOwnerID
 }
 
 // Predicate returns a SQL boolean expression that is true when the user id in
@@ -68,4 +104,13 @@ func Predicate(userCol, param string) string {
 		`UNION ALL `+
 		`SELECT sc_c.id FROM departments sc_c JOIN sc_t ON sc_c.parent_id = sc_t.id`+
 		`) SELECT id FROM sc_t)))`, userCol, param)
+}
+
+// GradingPredicate is Predicate widened for the manual-grading flow only: true
+// when the session's employee (userCol) is inside the subtree bound to param,
+// OR the exam (examCol is the exams alias/column holding created_by) was
+// created by the examiner bound to ownerParam. A NULL ownerParam never matches
+// an exam, so only examiners with a known user id get the carve-out.
+func GradingPredicate(userCol, param, examCol, ownerParam string) string {
+	return fmt.Sprintf(`(%s.created_by = %s::uuid OR %s)`, examCol, ownerParam, Predicate(userCol, param))
 }

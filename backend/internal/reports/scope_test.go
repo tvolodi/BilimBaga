@@ -66,8 +66,11 @@ func TestScope_GetUserRecord(t *testing.T) {
 		{"department_admin without department not found", principal("department_admin", ""), otherUser, false, ErrNotFound, true},
 		{"own record always OK", principal("department_admin", ""), adminUser, false, nil, false},
 		{"super_admin unchanged", principal("super_admin", ""), otherUser, false, nil, false},
-		{"examiner unchanged", principal("examiner", deptA), otherUser, false, nil, false},
-		{"no principal unchanged", context.Background(), otherUser, false, nil, false},
+		{"examiner scoped (ISS-218)", principal("examiner", deptA), otherUser, false, ErrNotFound, true},
+		{"custom role scoped (ISS-218)", principal("custom_reports_reader", deptA), otherUser, false, ErrNotFound, true},
+		{"custom role in scope OK", principal("custom_reports_reader", deptA), otherUser, true, nil, true},
+		{"custom role without department not found", principal("custom_reports_reader", ""), otherUser, false, ErrNotFound, true},
+		{"no principal fails closed", context.Background(), otherUser, false, ErrNotFound, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -270,8 +273,17 @@ func TestScope_Repository_AggregateQueriesAreScoped(t *testing.T) {
 			call(NewRepository(db), principal("department_admin", ""))
 			assert.Equal(t, zeroUUID, lastArg(f, 0))
 
-			// super_admin / examiner: parameter is NULL (unrestricted).
-			for _, role := range []string{"super_admin", "examiner"} {
+			// super_admin: parameter is NULL (unrestricted). Examiner and custom roles are
+			// scoped like department_admin (ISS-218); no department matches nothing.
+			for _, role := range []string{"examiner", "custom_reports_reader", ""} {
+				db, f = newFakeDB(t)
+				call(NewRepository(db), principal(role, deptA))
+				assert.Equal(t, deptA, lastArg(f, 0), role)
+				db, f = newFakeDB(t)
+				call(NewRepository(db), principal(role, ""))
+				assert.Equal(t, zeroUUID, lastArg(f, 0), role)
+			}
+			for _, role := range []string{"super_admin"} {
 				db, f = newFakeDB(t)
 				call(NewRepository(db), principal(role, deptA))
 				assert.Nil(t, lastArg(f, 0), role)
@@ -319,4 +331,25 @@ func TestScope_StreamUserRecordCSV_UnknownUserIsNotFound(t *testing.T) {
 		require.ErrorIs(t, err, ErrNotFound)
 		assert.Empty(t, w.Body.String())
 	}
+}
+
+// ISS-218: a custom role holding reports:read is scoped on the handlers too.
+func TestScope_Handlers_CustomRoleScopedAndSuperAdminNot(t *testing.T) {
+	outOfScope := &mockRepo{userInScopeFn: func(context.Context, string) (bool, error) { return false, nil }}
+	h := NewHandler(NewService(outOfScope), nil)
+	for _, role := range []string{"custom_reports_reader", "examiner"} {
+		w := httptest.NewRecorder()
+		h.GetUserRecord(w, scopedRequest(role, deptA, otherUser))
+		assert.Equal(t, http.StatusNotFound, w.Code, role)
+		assert.Contains(t, w.Body.String(), `"code":"USER_NOT_FOUND"`, role)
+		w = httptest.NewRecorder()
+		h.GetUserProgress(w, scopedRequest(role, deptA, otherUser))
+		assert.Equal(t, http.StatusNotFound, w.Code, role)
+		w = httptest.NewRecorder()
+		h.UserRecordCSV(w, scopedRequest(role, deptA, otherUser))
+		assert.Equal(t, http.StatusNotFound, w.Code, role)
+	}
+	w := httptest.NewRecorder()
+	h.GetUserRecord(w, scopedRequest("super_admin", "", otherUser))
+	assert.Equal(t, http.StatusOK, w.Code)
 }

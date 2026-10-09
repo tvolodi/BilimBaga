@@ -1229,26 +1229,28 @@ type gradeAnswerResult struct {
 func (r *postgresRepository) ListGradingQueue(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) ([]GradingQueueItem, int, error) {
 	// Build the base WHERE conditions shared by both count and rows queries.
 	// $1=examID, $2=dateFrom, $3=dateTo; scopeParam is the department-scope
-	// parameter (ISS-165): a department_admin only sees its own subtree.
-	baseWhere := func(scopeParam string) string {
+	// parameter (ISS-165/ISS-218): every non-super_admin role only sees its own
+	// subtree, plus (examiner only) sessions of exams it created.
+	baseWhere := func(scopeParam, ownerParam string) string {
 		return `
 WHERE es.status = 'grading_pending'
   AND ($1::UUID IS NULL OR e.id = $1)
   AND ($2::DATE IS NULL OR es.submitted_at::DATE >= $2)
   AND ($3::DATE IS NULL OR es.submitted_at::DATE <= $3)
-  AND ` + deptscope.Predicate("es.user_id", scopeParam)
+  AND ` + deptscope.GradingPredicate("es.user_id", scopeParam, "e", ownerParam)
 	}
-	scopeArg := deptscope.FromContext(ctx).Arg()
+	sc := deptscope.FromContext(ctx)
+	scopeArg, ownerArg := sc.Arg(), sc.OwnerArg()
 
 	countQ := `
 SELECT COUNT(DISTINCT es.id)
 FROM exam_sessions es
 JOIN users u  ON u.id  = es.user_id
 JOIN exams e  ON e.id  = es.exam_id
-JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere("$4")
+JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere("$4", "$5")
 
 	var total int
-	if err := r.db.GetContext(ctx, &total, countQ, examID, dateFrom, dateTo, scopeArg); err != nil {
+	if err := r.db.GetContext(ctx, &total, countQ, examID, dateFrom, dateTo, scopeArg, ownerArg); err != nil {
 		return nil, 0, fmt.Errorf("sessions: ListGradingQueue: count: %w", err)
 	}
 
@@ -1263,13 +1265,13 @@ SELECT
 FROM exam_sessions es
 JOIN users u  ON u.id  = es.user_id
 JOIN exams e  ON e.id  = es.exam_id
-JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere("$6") + `
+JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere("$6", "$7") + `
 GROUP BY es.id, u.full_name, e.id, e.title, es.submitted_at
 ORDER BY es.submitted_at ASC
 LIMIT $4 OFFSET $5`
 
 	offset := (page - 1) * perPage
-	rows, err := r.db.QueryxContext(ctx, rowsQ, examID, dateFrom, dateTo, perPage, offset, scopeArg)
+	rows, err := r.db.QueryxContext(ctx, rowsQ, examID, dateFrom, dateTo, perPage, offset, scopeArg, ownerArg)
 	if err != nil {
 		return nil, 0, fmt.Errorf("sessions: ListGradingQueue: query: %w", err)
 	}

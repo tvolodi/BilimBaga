@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,6 +33,8 @@ type recoveryRepo struct {
 	createErr     error
 	completeErr   error
 	purgedCutoff  time.Time
+	mu            sync.Mutex
+	calls         []string // sequence of repository calls made by ForgotPassword
 }
 
 func newRecoveryRepo(now func() time.Time) *recoveryRepo {
@@ -44,6 +47,9 @@ func (r *recoveryRepo) addUser(u *User) {
 }
 
 func (r *recoveryRepo) GetUserByEmail(_ context.Context, email string) (*User, error) {
+	r.mu.Lock()
+	r.calls = append(r.calls, "GetUserByEmail")
+	r.mu.Unlock()
 	if u, ok := r.users[email]; ok {
 		return u, nil
 	}
@@ -66,31 +72,41 @@ func (r *recoveryRepo) GetRefreshTokenByHash(context.Context, string) (*RefreshT
 	return nil, ErrNotFound
 }
 
-func (r *recoveryRepo) CountRecentResetTokens(_ context.Context, userID string, since time.Time) (int, error) {
+// IssueResetToken models the atomic repository contract: the whole check-and-insert runs
+// under the mutex, exactly as the user-row lock serialises it in Postgres.
+func (r *recoveryRepo) IssueResetToken(_ context.Context, userID, hash string, exp, now, since time.Time, max int) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, "IssueResetToken")
+	if r.createErr != nil {
+		return false, r.createErr
+	}
+	u := r.byID[userID]
+	if u == nil || u.Status != "active" {
+		return false, nil
+	}
 	n := 0
 	for _, t := range r.resets {
 		if t.userID == userID && t.createdAt.After(since) {
 			n++
 		}
 	}
-	return n, nil
-}
-
-func (r *recoveryRepo) CreateResetToken(_ context.Context, userID, hash string, exp time.Time) error {
-	if r.createErr != nil {
-		return r.createErr
+	if n >= max {
+		return false, nil
 	}
-	now := r.now()
 	for _, t := range r.resets {
 		if t.userID == userID && t.usedAt == nil {
 			t.usedAt = &now
 		}
 	}
 	r.resets = append(r.resets, &resetRow{userID: userID, hash: hash, expiresAt: exp, createdAt: now})
-	return nil
+	return true, nil
 }
 
 func (r *recoveryRepo) PurgeExpiredResetTokens(_ context.Context, cutoff time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, "PurgeExpiredResetTokens")
 	r.purgedCutoff = cutoff
 	kept := r.resets[:0]
 	for _, t := range r.resets {

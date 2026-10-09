@@ -25,6 +25,9 @@ const (
 	resetPurgeAge = 24 * time.Hour
 )
 
+// noUserID is the nil UUID used as the decoy subject for unknown/inactive accounts.
+const noUserID = "00000000-0000-0000-0000-000000000000"
+
 // ResetMailer delivers the password reset link. It is implemented by *email.EmailService.
 type ResetMailer interface {
 	TriggerPasswordResetLink(userID, token string)
@@ -41,51 +44,52 @@ type RecoveryService interface {
 
 // ForgotPassword never reveals whether the email exists: unknown, inactive and throttled
 // requests all return ("", nil). Only a malformed email is an error (VALIDATION_ERROR).
+//
+// Timing (ISS-105): every path performs the same sequence of operations -- user lookup,
+// token generation + hashing, purge, IssueResetToken -- so known and unknown emails do
+// structurally equal work. Unknown/inactive accounts use the nil UUID, for which
+// IssueResetToken locks no row and stops early. The mail is sent asynchronously by the
+// mailer, and the HTTP handler additionally pads every response to a minimum duration.
 func (s *service) ForgotPassword(ctx context.Context, req *ForgotPasswordRequest, ipAddr string) (string, error) {
 	email := strings.TrimSpace(req.Email)
 	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email {
 		return "", &ServiceError{Code: "VALIDATION_ERROR", Message: "a valid email is required", HTTPStatus: http.StatusBadRequest}
 	}
 
+	userID := noUserID
 	user, err := s.repo.GetUserByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			// Same cheap work as the found path to even out latency.
-			if raw, genErr := generateResetToken(); genErr == nil {
-				_ = hashToken(raw)
-			}
-			return "", nil
-		}
+	switch {
+	case err == nil && user.Status == "active":
+		userID = user.ID
+	case err == nil || errors.Is(err, ErrNotFound):
+		// inactive or unknown: decoy path
+	default:
 		return "", fmt.Errorf("auth.service.ForgotPassword: look up user: %w", err)
-	}
-	if user.Status != "active" {
-		return "", nil
-	}
-
-	// Bound table growth (only for real accounts, so unauthenticated unknown-email calls stay write-free): drop long-expired rows (kept past the throttle window).
-	if err := s.repo.PurgeExpiredResetTokens(ctx, s.now().Add(-resetPurgeAge)); err != nil {
-		s.logger.Error("auth.ForgotPassword: purge expired reset tokens", "error", err)
-	}
-
-	recent, err := s.repo.CountRecentResetTokens(ctx, user.ID, s.now().Add(-time.Hour))
-	if err != nil {
-		return "", fmt.Errorf("auth.service.ForgotPassword: count recent tokens: %w", err)
-	}
-	if recent >= resetMaxPerHour {
-		return "", nil // silently throttled (AC-9)
 	}
 
 	raw, err := generateResetToken()
 	if err != nil {
 		return "", fmt.Errorf("auth.service.ForgotPassword: %w", err)
 	}
-	if err := s.repo.CreateResetToken(ctx, user.ID, hashToken(raw), s.now().Add(resetTokenTTL)); err != nil {
-		return "", fmt.Errorf("auth.service.ForgotPassword: store token: %w", err)
+	tokenHash := hashToken(raw)
+
+	now := s.now()
+	// Bound table growth: drop long-expired rows (kept past the throttle window).
+	if err := s.repo.PurgeExpiredResetTokens(ctx, now.Add(-resetPurgeAge)); err != nil {
+		s.logger.Error("auth.ForgotPassword: purge expired reset tokens", "error", err)
+	}
+
+	issued, err := s.repo.IssueResetToken(ctx, userID, tokenHash, now.Add(resetTokenTTL), now, now.Add(-time.Hour), resetMaxPerHour)
+	if err != nil {
+		return "", fmt.Errorf("auth.service.ForgotPassword: issue token: %w", err)
+	}
+	if !issued || userID == noUserID {
+		return "", nil // unknown, inactive or silently throttled (AC-9)
 	}
 	if s.mailer != nil {
-		s.mailer.TriggerPasswordResetLink(user.ID, raw)
+		s.mailer.TriggerPasswordResetLink(userID, raw)
 	}
-	return user.ID, nil
+	return userID, nil
 }
 
 // ResetPassword consumes the token. A policy-violating password is rejected before the

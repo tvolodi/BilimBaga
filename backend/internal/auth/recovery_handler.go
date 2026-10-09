@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
 )
@@ -24,17 +25,42 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	started := time.Now()
 	userID, err := h.svc.ForgotPassword(r.Context(), &req, clientIP(r))
 	if err != nil {
 		handleServiceError(w, err)
 		return
 	}
+	// Pad to a constant minimum so residual DB-work differences between known and unknown
+	// emails are not observable (ISS-105), then answer before the audit write below.
+	h.padForgot(started)
+	writeJSON(w, http.StatusOK, map[string]string{"message": forgotPasswordMessage}, nil)
 	if userID != "" {
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 		// Actor is the user the link was requested for; the token is never audited.
 		ctx := context.WithValue(r.Context(), ctxkeys.CtxUserID, userID)
 		h.writer.Write(ctx, r.WithContext(ctx), "auth.password_reset_requested", "user", &userID, nil)
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": forgotPasswordMessage}, nil)
+}
+
+// forgotMinDuration is the minimum time a forgot-password request takes to answer.
+const forgotMinDuration = 400 * time.Millisecond
+
+// padForgot sleeps until forgotMinDuration has elapsed since started. A zero Handler
+// (tests) pads nothing; NewHandler enables it.
+func (h *Handler) padForgot(started time.Time) {
+	if h.forgotMin <= 0 {
+		return
+	}
+	sleep := h.sleep
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	if rest := h.forgotMin - time.Since(started); rest > 0 {
+		sleep(rest)
+	}
 }
 
 // ResetPassword handles POST /api/v1/auth/reset-password (public).

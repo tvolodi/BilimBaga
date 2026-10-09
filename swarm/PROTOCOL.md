@@ -41,7 +41,7 @@ Rules: messages carry pointers (issue numbers, file paths), not content. Everyth
 
 ## 4. GitHub label state machine
 
-Labels: `role:dev|ba|uat|infra`, `status:ready|in-progress|review|uat|blocked|done`, `type:bug|feature|infra|tech-debt|test`, `prio:p0|p1|p2`, plus `swarm`.
+Labels: `role:dev|ba|uat|infra`, `status:ready|in-progress|review|uat|blocked|done`, `type:bug|feature|infra|tech-debt|test`, `prio:p0|p1|p2`, plus `swarm`, and the optional marker `needs-live-db` (SQL-changing PR without a real-Postgres test; UAT verifies it first).
 
 ```
 (new) -> status:ready + role:X     Supervisor/BA/UAT files; Supervisor assigns role
@@ -82,11 +82,13 @@ Infra handles remote/test environments (hetzner-prod `bilimbaga-test`, QA Keyclo
 
 - GitHub issues + labels = source of truth for work.
 - `docs/handoffs/<run-id>/` = pipeline payloads.
+- **Report numbering (retro-002)**: issue/review report files use `ISS-<github issue number>` (e.g. issue #88 -> `docs/issue-reports/ISS-088-<slug>.md`, `docs/code-reviews/ISS-088-review.md`). Never take "highest existing + 1": parallel sessions collide. This overrides the numbering step of `.claude/commands/issue-resolution.md` in the swarm.
 - `swarm/state/*.json` (git-ignored runtime; examples committed): `workers.json`, `retro.json`, `escalations.json`.
 - `docs/retrospectives/retro-NNN.md` = audits.
 
 ## 10. Resources
 
+- **SQL-changing PRs**: a dev PR that adds or changes SQL must either include a test run against a real migrated Postgres, or be labelled `needs-live-db` (see `roles/uat.md`). The no-DB `internal/schemaguard` test (SQL column refs vs migrations, all backend packages) must stay green.
 - Devs run tests with capped parallelism: `npx vitest run --maxWorkers=2` (frontend), `go test -p 2 ./...` (backend).
 - UAT live runs (full stack + browsers) need >= 8 GB free memory; UAT checks before starting and defers the run if below.
 - The Supervisor checks free memory each tick while UAT is running and reports low memory in the tick report.

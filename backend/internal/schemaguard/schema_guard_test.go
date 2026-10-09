@@ -4,6 +4,18 @@
 // fails at runtime with a 500. This test replays backend/migrations/*.up.sql
 // into an in-memory table->columns map and statically checks every SQL string
 // literal found in backend/internal against it.
+//
+// Scope (ISS-88, retro-002 decision 1): the walk covers every package under
+// backend/internal (and backend/cmd), not a single module. A coverage guard
+// (TestEveryDBCallingFileIsScanned) fails when a file issues DB calls but none
+// of its SQL could be collected, so a new package cannot silently escape.
+//
+// Known limits (static analysis, no DB): SQL assembled from non-constant
+// pieces (variables, fmt.Sprintf arguments, dynamic ORDER BY) is only seen for
+// its constant parts; unqualified columns in multi-table queries are checked
+// only against "exists in at least one referenced table"; column types,
+// constraints and function/operator validity are not checked. A real-Postgres
+// test remains the authority for those (see swarm/roles/uat.md).
 package schemaguard
 
 import (
@@ -132,10 +144,19 @@ type literal struct {
 
 // collectSQL returns every string literal (concatenations folded) that looks
 // like a complete SQL statement.
-func collectSQL(t *testing.T, root string) []literal {
+func collectSQL(t *testing.T, roots ...string) []literal {
 	t.Helper()
 	var queries []literal
 	fset := token.NewFileSet()
+	for _, root := range roots {
+		queries = append(queries, collectSQLFrom(t, fset, root)...)
+	}
+	return queries
+}
+
+func collectSQLFrom(t *testing.T, fset *token.FileSet, root string) []literal {
+	t.Helper()
+	var queries []literal
 	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
 			return nil
@@ -257,6 +278,25 @@ func checkQuery(sc schema, q literal, globalCTEs map[string]bool) []finding {
 	for _, r := range real {
 		uniq[r] = true
 	}
+	if len(uniq) > 1 {
+		// Unqualified WHERE/AND/OR column in a multi-table query: it must exist
+		// in at least one referenced table (or be a select alias / CTE column).
+		for _, m := range whereColRe.FindAllStringSubmatch(sql, -1) {
+			c := strings.ToLower(m[1])
+			if notAlias[c] || aliasDefined(sql, c) {
+				continue
+			}
+			found := false
+			for tbl := range uniq {
+				if sc[tbl][c] {
+					found = true
+				}
+			}
+			if !found {
+				out = append(out, finding{q.file, q.line, "(any of " + strings.Join(sortedKeys(uniq), ",") + ")", c, "column does not exist in any referenced table"})
+			}
+		}
+	}
 	if len(uniq) == 1 {
 		tbl := real[0]
 		upper := strings.ToUpper(strings.TrimSpace(sql))
@@ -286,6 +326,101 @@ func checkQuery(sc schema, q literal, globalCTEs map[string]bool) []finding {
 	return out
 }
 
+func sortedKeys(m map[string]bool) []string {
+	var k []string
+	for x := range m {
+		k = append(k, x)
+	}
+	sort.Strings(k)
+	return k
+}
+
+// aliasDefined reports whether name is introduced as "AS name" in sql
+// (select-list alias, CTE or derived-table column), so it is not a table column.
+func aliasDefined(sql, name string) bool {
+	return regexp.MustCompile(`(?i)\bAS\s+` + regexp.QuoteMeta(name) + `\b`).MatchString(sql)
+}
+
+var dbCallRe = regexp.MustCompile(`\.(?:QueryContext|QueryRowContext|ExecContext|GetContext|SelectContext|NamedExecContext|QueryxContext|QueryRowxContext|Query|QueryRow|Exec|Get|Select)\(`)
+
+// TestEveryDBCallingFileIsScanned is the coverage guard: any non-test Go file
+// that calls a DB method with a SQL-looking string must have had at least one
+// statement collected. Files whose DB calls only take non-literal SQL are
+// listed in nonLiteralAllowed with a reason.
+func TestEveryDBCallingFileIsScanned(t *testing.T) {
+	scanned := map[string]bool{}
+	for _, q := range collectSQL(t, "..", "../../cmd") {
+		scanned[q.file] = true
+	}
+	sqlWordRe := regexp.MustCompile(`\b(SELECT [^"]|INSERT INTO |DELETE FROM |UPDATE \w+ SET )`)
+	for _, root := range []string{"..", "../../cmd"} {
+		_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+				return nil
+			}
+			b, _ := os.ReadFile(p)
+			src := string(b)
+			if dbCallRe.MatchString(src) && sqlWordRe.MatchString(src) && !scanned[filepath.ToSlash(p)] {
+				if reason, ok := nonLiteralAllowed[filepath.ToSlash(p)]; ok {
+					t.Logf("allowlisted (%s): %s", reason, p)
+					return nil
+				}
+				t.Errorf("%s issues DB calls with SQL text but no statement was collected; fix the collector or allowlist it with a reason", p)
+			}
+			return nil
+		})
+	}
+}
+
+// nonLiteralAllowed lists files whose SQL cannot be statically collected.
+var nonLiteralAllowed = map[string]string{
+	// SQL is assembled from fragments at runtime; covered by TestDynamicSQLFragments.
+	"../audit/repository.go": "dynamic WHERE built with fmt.Sprintf",
+}
+
+// dynamicFragmentFiles maps files with runtime-assembled SQL to the table
+// aliases their fragments use. Every "alias.column" token found in the file's
+// string literals must exist in the migrated schema.
+var dynamicFragmentFiles = map[string]map[string]string{
+	"../audit/repository.go": {"al": "audit_log", "u": "users"},
+}
+
+func TestDynamicSQLFragments(t *testing.T) {
+	sc := loadSchema(t)
+	fset := token.NewFileSet()
+	for file, aliases := range dynamicFragmentFiles {
+		f, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		seen := 0
+		ast.Inspect(f, func(n ast.Node) bool {
+			lit, ok := n.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			s, err := strconv.Unquote(lit.Value)
+			if err != nil {
+				return true
+			}
+			for _, m := range qualRe.FindAllStringSubmatch(strings.ToLower(s), -1) {
+				tbl, ok := aliases[m[1]]
+				if !ok {
+					continue
+				}
+				seen++
+				if !sc[tbl][m[2]] {
+					t.Errorf("%s:%d %s.%s: column does not exist in %s", file, fset.Position(lit.Pos()).Line, m[1], m[2], tbl)
+				}
+			}
+			return true
+		})
+		if seen == 0 {
+			t.Errorf("%s: no alias.column fragments found; update dynamicFragmentFiles", file)
+		}
+	}
+}
+
 func TestRepositorySQL_MatchesMigratedSchema(t *testing.T) {
 	sc := loadSchema(t)
 
@@ -300,7 +435,7 @@ func TestRepositorySQL_MatchesMigratedSchema(t *testing.T) {
 		t.Fatal("schema replay: ALTER TABLE ADD/DROP COLUMN not applied")
 	}
 
-	queries := collectSQL(t, "..")
+	queries := collectSQL(t, "..", "../../cmd")
 	if len(queries) < 50 {
 		t.Fatalf("only %d SQL statements found; collector is broken", len(queries))
 	}
@@ -354,5 +489,19 @@ func TestOnlyAuditLogHasTenantID(t *testing.T) {
 		if cols["tenant_id"] && tbl != "audit_log" {
 			t.Errorf("table %s now has tenant_id; revisit single-tenant assumptions (ISS-75/ISS-82)", tbl)
 		}
+	}
+}
+
+// TestCheckQuery_FlagsUnqualifiedColumnInJoin proves the multi-table check
+// catches a made-up unqualified column and tolerates select-list aliases.
+func TestCheckQuery_FlagsUnqualifiedColumnInJoin(t *testing.T) {
+	sc := loadSchema(t)
+	bad := literal{file: "x.go", line: 1, sql: `SELECT e.id FROM exams e JOIN exam_sessions s ON s.exam_id = e.id WHERE no_such_col = $1`}
+	if got := checkQuery(sc, bad, nil); len(got) != 1 || got[0].col != "no_such_col" {
+		t.Fatalf("expected one no_such_col finding, got %+v", got)
+	}
+	ok := literal{file: "x.go", line: 2, sql: `SELECT COUNT(*) AS n FROM exams e JOIN exam_sessions s ON s.exam_id = e.id WHERE n > 1 AND status = 'x'`}
+	if got := checkQuery(sc, ok, nil); len(got) != 0 {
+		t.Fatalf("alias/real column wrongly flagged: %+v", got)
 	}
 }

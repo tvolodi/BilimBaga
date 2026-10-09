@@ -1,46 +1,47 @@
 <#
- Swarm launcher (no logic): opens each roster role as a LIVE interactive claude session in a
- Windows Terminal tab (fallback: separate windows). Roles come from swarm/roster.json.
- Session ids are recorded in swarm/state/sessions.json; a role with a recorded id is relaunched
- with --resume <id> (same -n name and per-role settings), otherwise started fresh with a new --session-id.
- Usage: powershell -File swarm\up.ps1 [-Roles dev1,dev2,ba,uat,infra,supervisor] [-ForceInfra] [-Fresh] [-WhatIf]
- -Fresh           ignore recorded session ids (start new conversations)
- -WhatIf          print what would be launched; launches nothing, writes nothing
- -AgentsJsonFile  test stub replacing `claude agents --json`
+ Swarm launcher (no logic): opens each role as a LIVE interactive claude session in a
+ Windows Terminal tab (fallback: separate windows). See swarm/README.md.
+ Usage: powershell -File swarm\up.ps1 [-Roles dev1,dev2,ba,uat,infra,supervisor] [-ForceInfra]
 #>
-[CmdletBinding(SupportsShouldProcess)]
 param(
-  [string[]]$Roles = @(),            # default: every roster role, in roster order (supervisor last)
-  [switch]$ForceInfra,
-  [switch]$Fresh,
-  [string]$AgentsJsonFile
+  [string[]]$Roles = @('dev1','dev2','ba','uat','infra','supervisor'),  # supervisor last
+  [switch]$ForceInfra
 )
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'lib.ps1')
-$roster   = Get-Roster
-$stateDir = Get-StateDir $roster
-$Roles = @($Roles | ForEach-Object { $_ -split ',' } | Where-Object { $_ })   # -File passes 'a,b' as one string
-if (-not $Roles.Count) { $Roles = @($roster.roles | ForEach-Object { $_.key }) }
+$Repo  = Split-Path -Parent $PSScriptRoot
+$Infra = Join-Path (Split-Path -Parent $Repo) 'ai-dala-infra'
+$Mode  = 'bypassPermissions'   # one common permission mode, see PROTOCOL.md section 2
 
 $live = @()
-try { $live = Get-LiveAgents $AgentsJsonFile } catch { Write-Warning "cannot list live sessions: $_" }
-$haveWt = [bool](Get-Command wt.exe -ErrorAction SilentlyContinue)
-if (-not $WhatIfPreference) { Update-SessionsFromLive $roster $live $stateDir }
-$sessions = Read-Sessions $stateDir
+try { $live = (claude agents --json | ConvertFrom-Json) | ForEach-Object { $_.name } } catch {}
 
-foreach ($k in $Roles) {
-  $r = $roster.roles | Where-Object { $_.key -eq $k }
-  if (-not $r) { Write-Warning "unknown role '$k' (not in roster.json)"; continue }
-  if ($r.reuse_live_prefix -and -not $ForceInfra) {
-    $reuse = Find-LiveAgent $live $r.reuse_live_prefix
-    if ($reuse) { Write-Host "${k}: reusing running session ($($reuse.name))"; continue }
-  }
-  if (Find-LiveAgent $live $r.name) { Write-Host "$k already running, skipped"; continue }
-  $spec = New-LaunchSpec $r $roster $stateDir $sessions -Fresh:$Fresh
-  Write-Host "launching $k ($($r.name)) mode=$($spec.Mode) session=$($spec.SessionId)"
-  if ($WhatIfPreference) { Write-Host "  cwd: $(Expand-Path $r.cwd $roster)"; Write-Host "  cmd: $($spec.Command)" }
-  if ($PSCmdlet.ShouldProcess($r.name, "launch $($spec.Mode)")) {
-    if ($spec.Mode -eq 'fresh') { Save-Session $stateDir $r.key $r.name $spec.SessionId }
-    Start-RoleTab $r $spec $roster $haveWt
-  }
+$def = @{
+  dev1       = @{ name='bb-dev1';       cwd="$Repo\.claude\worktrees\dev1"; prompt='Startup: read swarm/roles/dev1.md (main checkout path C:\Users\tvolo\dev\ai-dala\BilimBaga\swarm\roles\dev1.md) plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.' }
+  dev2       = @{ name='bb-dev2';       cwd="$Repo\.claude\worktrees\dev2"; prompt='Startup: read swarm/roles/dev2.md (main checkout path C:\Users\tvolo\dev\ai-dala\BilimBaga\swarm\roles\dev2.md) plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.' }
+  ba         = @{ name='bb-ba';         cwd=$Repo; prompt='Startup: read swarm/roles/ba.md plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.' }
+  uat        = @{ name='bb-uat';        cwd=$Repo; prompt='Startup: read swarm/roles/uat.md plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.' }
+  infra      = @{ name='bb-infra';      cwd=$Infra; prompt="Startup: read $Repo\swarm\roles\infra.md plus _common.md and PROTOCOL.md in that repo, do the startup handshake, then start your /loop tick." }
+  supervisor = @{ name='bb-supervisor'; cwd=$Repo; prompt='/loop Startup: read swarm/roles/supervisor.md plus _common.md, PROTOCOL.md, RETRO.md, then run the Supervisor Tick forever (dynamic cadence).' }
 }
+$settings = @{ dev1='dev1'; dev2='dev2'; ba='ba'; uat='uat'; infra='infra'; supervisor='supervisor' }
+
+$haveWt = [bool](Get-Command wt.exe -ErrorAction SilentlyContinue)
+$wtArgs = @()
+foreach ($r in $Roles) {
+  $d = $def[$r]
+  if ($r -eq 'infra' -and -not $ForceInfra -and ($live | Where-Object { $_ -like 'ai-dala-infra*' })) { Write-Host "infra: reusing running session ($($live | Where-Object { $_ -like 'ai-dala-infra*' }))"; continue }
+  if ($live | Where-Object { $_ -like "$($d.name)*" }) { Write-Host "$r already running, skipped"; continue }
+  $sf  = Join-Path $PSScriptRoot "roles\$($settings[$r]).settings.json"
+  # a launcher started from inside a Claude session leaks its session env; a child would not register for messaging
+  $clean = "Get-ChildItem Env: | Where-Object { `$_.Name -match '^(CLAUDECODE|CLAUDE_PID|CLAUDE_CODE_(CHILD_SESSION|MESSAGING_.*|SESSION_.*|ENTRYPOINT))`$' } | ForEach-Object { Remove-Item (`"Env:`" + `$_.Name) }; "
+  $cmd = $clean + "claude -n $($d.name) --permission-mode $Mode $(if (Test-Path $sf) { "--settings '$sf'" }) '$($d.prompt -replace "'","''")'"
+  $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
+  if ($haveWt) {
+    if ($wtArgs.Count) { $wtArgs += ';' }
+    $wtArgs += @('-w','bilimbaga-swarm','new-tab','--title',$d.name,'-d',$d.cwd,'powershell.exe','-NoExit','-EncodedCommand',$enc)
+  } else {
+    Start-Process powershell.exe -WorkingDirectory $d.cwd -ArgumentList @('-NoExit','-EncodedCommand',$enc)
+  }
+  Write-Host "launching $r ($($d.name))"
+}
+if ($haveWt -and $wtArgs.Count) { Start-Process wt.exe -ArgumentList $wtArgs }

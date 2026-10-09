@@ -47,27 +47,52 @@ describe('OverdueTable', () => {
     expect(screen.getAllByRole('button', { name: /send reminder/i })).toHaveLength(2)
   })
 
-  it('shows success toast after reminder API resolves', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+  it('posts the real exam_id and shows success, then keeps the row disabled', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ data: null, error: null }),
+      json: async () => ({ data: { sent_at: '2026-01-01T00:00:00Z' }, error: null }),
     })
+    global.fetch = fetchMock
     setup([employee])
     fireEvent.click(screen.getByRole('button', { name: /send reminder/i }))
     await waitFor(() => {
       expect(screen.getByText('Reminder sent successfully.')).toBeInTheDocument()
     })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/v1/admin/users/u-1/remind')
+    expect(JSON.parse(init.body)).toEqual({ exam_id: 'e-1' })
+    const sent = screen.getByRole('button', { name: 'Reminder sent' })
+    expect(sent).toBeDisabled()
   })
 
-  it('shows error toast when reminder API fails', async () => {
+  it('disables the button while the request is pending', async () => {
+    let resolve!: (v: unknown) => void
+    global.fetch = vi.fn().mockReturnValue(new Promise((r) => (resolve = r)))
+    setup([employee])
+    const btn = screen.getByRole('button', { name: /send reminder/i })
+    fireEvent.click(btn)
+    await waitFor(() => expect(btn).toBeDisabled())
+    resolve({ ok: true, json: async () => ({ data: { sent_at: 'x' }, error: null }) })
+    await waitFor(() => expect(screen.getByText('Reminder sent successfully.')).toBeInTheDocument())
+  })
+
+  it.each([
+    ['REMINDER_RATE_LIMITED', 'Too many reminders: this employee was already reminded in the last 24 hours.'],
+    ['NOT_OVERDUE', 'This employee has no pending overdue assignment for this exam.'],
+    ['USER_INACTIVE', 'This employee has no pending overdue assignment for this exam.'],
+    ['EMAIL_SEND_FAILED', 'Failed to send reminder.'],
+    ['ERR', 'Failed to send reminder.'],
+  ])('maps error code %s to its message', async (code, message) => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ data: null, error: { code: 'ERR', message: 'fail' } }),
+      json: async () => ({ data: null, error: { code, message: 'fail' } }),
     })
     setup([employee])
     fireEvent.click(screen.getByRole('button', { name: /send reminder/i }))
     await waitFor(() => {
-      expect(screen.getByText('Failed to send reminder.')).toBeInTheDocument()
+      expect(screen.getByText(message)).toBeInTheDocument()
     })
+    // failure leaves the button usable
+    expect(screen.getByRole('button', { name: /send reminder/i })).toBeEnabled()
   })
 })

@@ -33,6 +33,7 @@ type ExamCompletionRate struct {
 type OverdueEmployee struct {
 	UserID    string    `json:"user_id"`
 	Name      string    `json:"name"`
+	ExamID    string    `json:"exam_id"`
 	ExamTitle string    `json:"exam_title"`
 	Deadline  time.Time `json:"deadline"`
 }

@@ -24,6 +24,13 @@ type mockRepo struct {
 	deactivate map[string]bool
 	revoked    []string
 	unlocked   []string
+
+	// FR-BB510
+	exams       map[string]bool
+	overdue     map[string]bool // userID+"|"+examID
+	lastRemind  *time.Time
+	reminders   []string
+	insertErr   error
 }
 
 func newMockRepo() *mockRepo {

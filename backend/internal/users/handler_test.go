@@ -31,6 +31,7 @@ type mockUserService struct {
 	importFn     func(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
 	listRolesFn  func(ctx context.Context, callerRole string) ([]RoleRow, error)
 	unlockFn     func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
+	remindFn     func(ctx context.Context, actorID, userID, examID string) (*RemindResult, error)
 }
 
 func (m *mockUserService) ListUsers(ctx context.Context, callerRole, callerDeptID string, f ListFilters) (*ListResult, error) {

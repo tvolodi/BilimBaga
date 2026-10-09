@@ -47,6 +47,15 @@ type Repository interface {
 	GetDepartmentUsersForEmail(ctx context.Context, deptID string) ([]UserEmailData, error)
 	GetAllActiveUsersForEmail(ctx context.Context) ([]UserEmailData, error)
 	GetSessionEmailData(ctx context.Context, sessionID string) (*SessionEmailData, error)
+	GetOverdueReminderData(ctx context.Context, userID, examID string) (*OverdueReminderData, error)
+}
+
+// OverdueReminderData is the context needed to send a manual overdue reminder.
+type OverdueReminderData struct {
+	Email     string
+	Locale    string
+	ExamTitle string
+	Deadline  *time.Time
 }
 
 // ── Postgres implementation ───────────────────────────────────────────────────
@@ -230,4 +239,52 @@ func (r *postgresRepository) GetSessionEmailData(ctx context.Context, sessionID 
 		Passed:          row.Passed,
 		SessionID:       row.SessionID,
 	}, nil
+}
+
+// GetOverdueReminderData returns the recipient and exam context for a manual overdue
+// reminder. The deadline is the earliest assignment deadline that resolves to the user
+// (user, department-tree or 'all'); it is nil when the assignments carry no deadline.
+// Returns sql.ErrNoRows (wrapped) when the user or exam does not exist.
+func (r *postgresRepository) GetOverdueReminderData(ctx context.Context, userID, examID string) (*OverdueReminderData, error) {
+	const q = `
+		WITH RECURSIVE dept_tree(id, root_id) AS (
+			SELECT d.id, d.id AS root_id FROM departments d
+			UNION ALL
+			SELECT d.id, dt.root_id FROM departments d JOIN dept_tree dt ON d.parent_id = dt.id
+		)
+		SELECT
+			u.email,
+			COALESCE(u.preferred_locale, '') AS preferred_locale,
+			e.title,
+			(
+				SELECT MIN(ea.deadline)
+				FROM exam_assignments ea
+				WHERE ea.exam_id = e.id
+				  AND (
+					(ea.assignee_type = 'user' AND ea.assignee_id = u.id)
+					OR (ea.assignee_type = 'department' AND EXISTS (
+						SELECT 1 FROM dept_tree dt
+						WHERE dt.root_id = ea.assignee_id AND dt.id = u.department_id))
+					OR ea.assignee_type = 'all'
+				  )
+			) AS deadline
+		FROM users u
+		CROSS JOIN exams e
+		WHERE u.id = $1 AND e.id = $2
+	`
+	var row struct {
+		Email     string       `db:"email"`
+		Locale    string       `db:"preferred_locale"`
+		ExamTitle string       `db:"title"`
+		Deadline  sql.NullTime `db:"deadline"`
+	}
+	if err := r.db.GetContext(ctx, &row, q, userID, examID); err != nil {
+		return nil, fmt.Errorf("email: get overdue reminder data: %w", err)
+	}
+	out := &OverdueReminderData{Email: row.Email, Locale: row.Locale, ExamTitle: row.ExamTitle}
+	if row.Deadline.Valid {
+		d := row.Deadline.Time.UTC()
+		out.Deadline = &d
+	}
+	return out, nil
 }

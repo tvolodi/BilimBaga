@@ -22,6 +22,18 @@ interface OverdueTableProps {
   employees: OverdueEmployee[]
 }
 
+function reminderErrorKey(err: Error): string {
+  switch ((err as { code?: string }).code) {
+    case 'REMINDER_RATE_LIMITED':
+      return 'dashboard.reminder_rate_limited'
+    case 'NOT_OVERDUE':
+    case 'USER_INACTIVE':
+      return 'dashboard.reminder_not_overdue'
+    default:
+      return 'dashboard.reminder_error'
+  }
+}
+
 export function OverdueTable({ employees }: OverdueTableProps) {
   const { t } = useTranslation()
   const [toast, setToast] = useState<ToastState | null>(null)
@@ -34,11 +46,11 @@ export function OverdueTable({ employees }: OverdueTableProps) {
 
   const remind = useRemindEmployee(
     () => showToast(t('dashboard.reminder_sent'), 'success'),
-    () => showToast(t('dashboard.reminder_error'), 'error'),
+    (err) => showToast(t(reminderErrorKey(err)), 'error'),
   )
 
   function handleRemind(employee: OverdueEmployee) {
-    const examId = employee.exam_id ?? ''
+    const examId = employee.exam_id
     remind.mutate(
       { userId: employee.user_id, examId },
       {
@@ -81,7 +93,7 @@ export function OverdueTable({ employees }: OverdueTableProps) {
         </TableHeader>
         <TableBody>
           {employees.map((emp) => {
-            const key = emp.user_id + (emp.exam_id ?? '')
+            const key = emp.user_id + emp.exam_id
             const alreadySent = sentIds.has(key)
             return (
               <TableRow key={key}>
@@ -97,7 +109,7 @@ export function OverdueTable({ employees }: OverdueTableProps) {
                     disabled={remind.isPending || alreadySent}
                     onClick={() => handleRemind(emp)}
                   >
-                    {t('dashboard.send_reminder')}
+                    {alreadySent ? t('dashboard.reminder_already_sent') : t('dashboard.send_reminder')}
                   </Button>
                 </TableCell>
               </TableRow>

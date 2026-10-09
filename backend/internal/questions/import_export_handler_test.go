@@ -421,3 +421,40 @@ func TestExportHandler_JSON_200(t *testing.T) {
 
 // ── Compile-time check: errors package must be used ──────────────────────────
 var _ = errors.New
+
+// ── AC-3 (FR-BB64): upload content validation ────────────────────────────────
+
+func TestImportHandler_OversizeFile_Returns413(t *testing.T) {
+	h := NewHandler(&mockQService{}, nil)
+
+	big := validCSV + strings.Repeat("a", 10<<20+1)
+	body, ct := buildQCSVMultipart(t, big, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	_, apiErr := decodeQEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "ERR_FILE_TOO_LARGE", apiErr.Code)
+}
+
+func TestImportHandler_BinaryContent_Returns415(t *testing.T) {
+	h := NewHandler(&mockQService{}, nil)
+
+	// PNG magic bytes disguised as a .csv upload.
+	png := string([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52})
+	body, ct := buildQCSVMultipart(t, png, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+
+	assert.Equal(t, http.StatusUnsupportedMediaType, w.Code)
+	_, apiErr := decodeQEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "ERR_INVALID_FILE_TYPE", apiErr.Code)
+}

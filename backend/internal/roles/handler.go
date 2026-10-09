@@ -43,7 +43,7 @@ func fail(w http.ResponseWriter, op string, err error) {
 	case errors.Is(err, ErrSystemImmutable):
 		api.WriteError(w, http.StatusConflict, "ROLE_SYSTEM_IMMUTABLE", "system roles cannot be modified or deleted")
 	case errors.As(err, &inUse):
-		api.WriteError(w, http.StatusConflict, "ROLE_IN_USE", inUse.Error())
+		api.WriteErrorWithDetails(w, http.StatusConflict, "ROLE_IN_USE", inUse.Error(), map[string]interface{}{"count": inUse.Count})
 	default:
 		slog.Error("roles: "+op+" failed", "err", err)
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal error")

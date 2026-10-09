@@ -10,10 +10,14 @@ describe('roleErrorKey', () => {
   )
 
   it('extracts the user count for ROLE_IN_USE', () => {
-    expect(roleErrorKey({ code: 'ROLE_IN_USE', message: 'role is assigned to 12 user(s)' })).toEqual({
+    expect(roleErrorKey({ code: 'ROLE_IN_USE', message: 'role is assigned to 99 user(s)', details: { count: 12 } })).toEqual({
       key: 'roles.errors.ROLE_IN_USE',
       values: { count: 12 },
     })
+  })
+
+  it('defaults ROLE_IN_USE count to 0 when details are missing', () => {
+    expect(roleErrorKey({ code: 'ROLE_IN_USE', message: 'assigned to 5 users' }).values).toEqual({ count: 0 })
   })
 
   it('falls back to a generic key for unknown codes and non-errors', () => {

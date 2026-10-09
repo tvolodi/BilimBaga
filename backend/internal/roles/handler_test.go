@@ -72,7 +72,8 @@ type errBody struct {
 	Data  json.RawMessage `json:"data"`
 	Error *struct {
 		Code    string `json:"code"`
-		Message string `json:"message"`
+		Message string         `json:"message"`
+		Details map[string]any `json:"details"`
 	} `json:"error"`
 }
 
@@ -233,6 +234,11 @@ func TestHandlerDelete_Errors(t *testing.T) {
 		assert.Equal(t, c.code, e.Error.Code)
 		assert.Contains(t, e.Error.Message, c.msg)
 		assert.Empty(t, a.calls)
+		if c.code == "ROLE_IN_USE" {
+			assert.EqualValues(t, 4, e.Error.Details["count"])
+		} else {
+			assert.Nil(t, e.Error.Details)
+		}
 	}
 }
 

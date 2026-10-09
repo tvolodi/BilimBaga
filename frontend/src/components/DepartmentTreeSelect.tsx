@@ -32,6 +32,8 @@ interface TreeNodeProps {
   onToggle: (id: string) => void
   onSelect: (id: string) => void
   focusedId: string | null
+  // The one treeitem in the tab order (roving tabindex); every other item is tabIndex -1 (#360).
+  tabbableId: string | null
   nodeIds: string[]
 }
 
@@ -44,6 +46,7 @@ function TreeNode({
   onToggle,
   onSelect,
   focusedId,
+  tabbableId,
   nodeIds,
 }: TreeNodeProps) {
   const hasChildren = node.children.length > 0
@@ -64,7 +67,7 @@ function TreeNode({
         role="treeitem"
         aria-selected={isSelected}
         aria-expanded={hasChildren ? showExpanded : undefined}
-        tabIndex={isFocused ? 0 : -1}
+        tabIndex={node.id === tabbableId ? 0 : -1}
         data-nodeid={node.id}
         className={cn(
           'flex items-center gap-1 rounded px-2 py-1.5 text-sm cursor-pointer select-none outline-none',
@@ -130,6 +133,7 @@ function TreeNode({
               onToggle={onToggle}
               onSelect={onSelect}
               focusedId={focusedId}
+              tabbableId={tabbableId}
               nodeIds={nodeIds}
             />
           ))}
@@ -199,6 +203,9 @@ export function DepartmentTreeSelect({
   }, [onChange])
 
   const visibleIds = departments ? collectVisibleIds(departments, expandedIds, query) : []
+  // Roving tabindex: the focused item, else the selected item if visible, else the first visible item (#360).
+  const tabbableId =
+    focusedId ?? (value && visibleIds.includes(value) ? value : (visibleIds[0] ?? null))
 
   return (
     <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setQuery('') }}>
@@ -289,6 +296,7 @@ export function DepartmentTreeSelect({
                   onToggle={handleToggle}
                   onSelect={handleSelect}
                   focusedId={focusedId}
+                  tabbableId={tabbableId}
                   nodeIds={visibleIds}
                 />
               ))}

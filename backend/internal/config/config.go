@@ -72,6 +72,10 @@ type Config struct {
 	// AIInsightsDailyLimit (AI_INSIGHTS_DAILY_LIMIT, ISS-232) caps paid AI insight
 	// calls per user per 24 h; 0 disables the cap. Default 50.
 	AIInsightsDailyLimit int
+
+	// ExportMaxRows (EXPORT_MAX_ROWS, ISS-210) is the hard row cap for the exam
+	// results CSV export; larger exports fail with 422 EXPORT_TOO_LARGE. Default 200000.
+	ExportMaxRows int
 }
 
 // Load reads all required environment variables and returns a validated Config.
@@ -174,6 +178,14 @@ func Load() (*Config, error) {
 	}
 	if cfg.AIInsightsDailyLimit < 0 {
 		return nil, fmt.Errorf("config: AI_INSIGHTS_DAILY_LIMIT must be >= 0")
+	}
+
+	cfg.ExportMaxRows, err = getEnvInt("EXPORT_MAX_ROWS", 200000)
+	if err != nil {
+		return nil, fmt.Errorf("config: EXPORT_MAX_ROWS: %w", err)
+	}
+	if cfg.ExportMaxRows < 1 {
+		return nil, fmt.Errorf("config: EXPORT_MAX_ROWS must be >= 1")
 	}
 
 	if err := cfg.validate(); err != nil {

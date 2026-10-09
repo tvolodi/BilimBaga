@@ -14,7 +14,7 @@ Provides a single consolidated page at `/admin/reports` that surfaces all report
 
 ## Acceptance Criteria
 - [ ] AC-1: Navigating to `/admin/reports` renders a page titled "Reports" (i18n key `reports.title`) and does not redirect or show a blank screen.
-- [ ] AC-2: The route is accessible only to roles `super_admin`, `examiner`, and `hr_admin`; any other authenticated role is redirected to `/login`.
+- [ ] AC-2: The route is accessible only to roles `super_admin`, `examiner`, and `hr_admin`; any other authenticated admin-area role (e.g. `department_admin` on audit-only routes) is redirected to `/login`; an `employee` opening any `/admin/*` URL is redirected to `/portal` (their home, per FR-BB111 AC-5) and never sees `/login` while signed in. *(Decision 2026-10-09, BA, issue #39.)*
 - [ ] AC-3: The Dashboard PDF Export card contains a date-range picker with "From" and "To" date inputs and an "Export PDF" button; clicking the button downloads the PDF from `GET /api/v1/admin/dashboard/export?from=<ISO8601>&to=<ISO8601>`.
 - [ ] AC-4: The "Export PDF" button shows a loading state (spinner + disabled) while the request is in flight and reverts to its default state on completion or error.
 - [ ] AC-5: The Exam Reports table fetches all exams from `GET /api/v1/exams` using a `useQuery` hook with `queryKey: ['exams-list-reports']`; a skeleton loader is shown while the query is pending.

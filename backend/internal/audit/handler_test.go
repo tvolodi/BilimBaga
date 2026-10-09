@@ -224,3 +224,45 @@ func TestHandler_List_ActorIDNonUUID_Returns422(t *testing.T) {
 	}
 	assert.False(t, called)
 }
+
+// ISS-158: user_id (alias of actor_id) must be validated, not silently ignored.
+func TestHandler_UserIDNonUUID_Returns422(t *testing.T) {
+	called := false
+	svc := &mockService{
+		listFn: func(_ context.Context, _ string, _ audit.AuditFilters, _, _ int) ([]audit.AuditEntry, int, error) {
+			called = true
+			return nil, 0, nil
+		},
+		exportFn: func(_ context.Context, _ string, _ audit.AuditFilters) ([]audit.AuditEntry, error) {
+			called = true
+			return nil, nil
+		},
+	}
+	h := audit.NewHandler(svc, nil)
+	for name, fn := range map[string]http.HandlerFunc{"list": h.List, "export": h.Export} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/audit?user_id=bad", nil).WithContext(ctxWithTenant("public"))
+		w := httptest.NewRecorder()
+		fn(w, req)
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code, name)
+		assert.Contains(t, w.Body.String(), "VALIDATION_ERROR", name)
+	}
+	assert.False(t, called)
+}
+
+func TestHandler_UserIDValid_PassedAsActorFilter(t *testing.T) {
+	const id = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	var got audit.AuditFilters
+	svc := &mockService{
+		listFn: func(_ context.Context, _ string, f audit.AuditFilters, _, _ int) ([]audit.AuditEntry, int, error) {
+			got = f
+			return nil, 0, nil
+		},
+	}
+	h := audit.NewHandler(svc, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit?user_id="+id, nil).WithContext(ctxWithTenant("public"))
+	w := httptest.NewRecorder()
+	h.List(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NotNil(t, got.ActorID)
+	assert.Equal(t, id, *got.ActorID)
+}

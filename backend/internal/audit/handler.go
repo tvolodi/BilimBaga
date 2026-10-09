@@ -129,12 +129,21 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 // parseFilters reads the allowed query params from r and populates AuditFilters.
 // Only explicitly allowlisted params are mapped — free-form WHERE injection is not possible.
 // The "actor" param is a free-text partial match on actor full_name (ILIKE).
-// The "actor_id" param is an exact UUID match.
+// The "actor_id" param (alias "user_id") is an exact UUID match.
 func parseFilters(w http.ResponseWriter, r *http.Request) (AuditFilters, bool) {
 	var f AuditFilters
 	v, ok := api.UUIDQuery(w, r, "actor_id")
 	if !ok {
 		return f, false
+	}
+	// "user_id" is accepted as an alias of "actor_id" (ISS-158); it is
+	// validated too so a malformed value never silently drops the filter.
+	uid, ok := api.UUIDQuery(w, r, "user_id")
+	if !ok {
+		return f, false
+	}
+	if v == "" {
+		v = uid
 	}
 	if v != "" {
 		f.ActorID = &v

@@ -166,7 +166,7 @@ type recoveryFixture struct {
 
 func newRecoveryFixture(t *testing.T) *recoveryFixture {
 	t.Helper()
-	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	clock := testNow(0)
 	f := &recoveryFixture{clock: &clock, mailer: &fakeMailer{}}
 	f.repo = newRecoveryRepo(func() time.Time { return *f.clock })
 	locked := clock.Add(20 * time.Minute)

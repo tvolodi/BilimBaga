@@ -45,3 +45,7 @@ Only ListUsers role_id was validated (ISS-133). Other handlers passed id-like qu
 ## Recurrence Log
 | Date | Trigger | Action Taken |
 |------|---------|-------------- |
+
+## Cycle 2 addendum
+
+Added router-level tests (mount proof via real `router.New` with nil handlers + signed JWT) and a `chi.Walk` drift guard. Name list extracted to `api.UUIDPathParamNames`, shared by the router and the test. Non-UUID params found: `{locale}`, `{code}` (documented exceptions). No behavior change.

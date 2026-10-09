@@ -46,6 +46,12 @@ func ValidateUUIDList(w http.ResponseWriter, param string, ids []string) bool {
 	return true
 }
 
+// UUIDPathParamNames lists every chi URL parameter name that always carries a
+// UUID. The router mounts RequireUUIDPathParams(UUIDPathParamNames...) on the
+// authenticated route group, and the router test enumerates all registered
+// routes against this list so a new non-UUID param cannot slip in unnoticed.
+var UUIDPathParamNames = []string{"id", "userId", "sessionId", "examId", "questionId", "tagId", "sectionId", "ruleId", "assignmentId"}
+
 // RequireUUIDPathParams returns chi middleware that responds 404 NOT_FOUND when
 // any of the named URL path parameters present on the matched route is not a
 // valid UUID (such a resource cannot exist). It must be mounted where chi has

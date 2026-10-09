@@ -31,3 +31,11 @@ Result: PASS
 - malformed path UUIDs -> 404 via middleware in authenticated group: covered
 
 Summary: Zero Critical/High findings; fix is correct and safe, with one same-class gap (sessions grading exam_id) recommended as a follow-up.
+
+## Cycle 2 - added tests (supervisor merge condition)
+
+- `TestRouter_MalformedUUIDPathParamIs404`: real router, valid JWT, malformed `{id}`/`{sessionId}` on users, exams, questions, portal/sessions, admin/grading returns 404 NOT_FOUND from the middleware (mutation-checked: removing the `r.Use` fails 7 cases).
+- `TestRouter_NonUUIDParamRoutesUnaffected`: authenticated `{locale}` route and public `/verify/{code}` are not rejected by the middleware.
+- `TestRouter_AllPathParamsAreUUIDOrDocumentedExceptions`: `chi.Walk` over every registered route; each param must be in `api.UUIDPathParamNames` (single shared list, now used by the router) or in the documented exceptions (`locale`, `code`). Failure message tells the dev what to do.
+- Finding: only non-UUID params are `{locale}` (authenticated translations route) and `{code}` (public verify). No other drift.
+- go build/vet/test ./... green.

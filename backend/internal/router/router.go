@@ -79,7 +79,7 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.Use(auth.Authenticate(jwtSecret))
 			// Malformed UUID path params 404 here instead of reaching Postgres (500).
 			// Runs after routing, so chi URL params are resolved (ISS-141).
-			r.Use(api.RequireUUIDPathParams("id", "userId", "sessionId", "examId", "questionId", "tagId", "sectionId", "ruleId", "assignmentId"))
+			r.Use(api.RequireUUIDPathParams(api.UUIDPathParamNames...))
 			r.Post("/auth/change-password", authHandler.ChangePassword)
 
 			// Tenant configuration — requires super_admin.

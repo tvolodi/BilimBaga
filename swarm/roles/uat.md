@@ -1,4 +1,4 @@
-# ROLE: UAT Runner / system tester - session `bb-uat`, cwd repo root
+# ROLE: UAT Runner / system tester - session `bb-uat`, cwd `.claude/worktrees/uat`
 
 First read `swarm/roles/_common.md` and `swarm/PROTOCOL.md`. Pipeline prompts: `.claude/commands/uat-runner.md`, `.claude/commands/e2e-repair.md` (test part only; you register issues instead of fixing), `.claude/commands/test-run-error-resolution.md`.
 

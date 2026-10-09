@@ -151,13 +151,7 @@ func (r *postgresRepository) FetchDeadlineReminderTargets(ctx context.Context, f
 	}
 	result := make([]ReminderRow, len(rows))
 	for i, rr := range rows {
-		result[i] = ReminderRow{
-			UserID:   rr.UserID,
-			Deadline: rr.Deadline,
-			Email:    rr.Email,
-			Locale:   rr.Locale,
-			Title:    rr.Title,
-		}
+		result[i] = ReminderRow(rr)
 	}
 	return result, nil
 }
@@ -168,7 +162,7 @@ func (r *postgresRepository) GetUserForEmail(ctx context.Context, userID string)
 	if err := r.db.GetContext(ctx, &row, q, userID); err != nil {
 		return UserEmailData{}, fmt.Errorf("email: get user %s: %w", userID, err)
 	}
-	return UserEmailData{Email: row.Email, Locale: row.Locale}, nil
+	return UserEmailData(row), nil
 }
 
 func (r *postgresRepository) GetDepartmentUsersForEmail(ctx context.Context, deptID string) ([]UserEmailData, error) {
@@ -183,7 +177,7 @@ func (r *postgresRepository) GetDepartmentUsersForEmail(ctx context.Context, dep
 	}
 	result := make([]UserEmailData, len(rows))
 	for i, rr := range rows {
-		result[i] = UserEmailData{Email: rr.Email, Locale: rr.Locale}
+		result[i] = UserEmailData(rr)
 	}
 	return result, nil
 }
@@ -196,7 +190,7 @@ func (r *postgresRepository) GetAllActiveUsersForEmail(ctx context.Context) ([]U
 	}
 	result := make([]UserEmailData, len(rows))
 	for i, rr := range rows {
-		result[i] = UserEmailData{Email: rr.Email, Locale: rr.Locale}
+		result[i] = UserEmailData(rr)
 	}
 	return result, nil
 }

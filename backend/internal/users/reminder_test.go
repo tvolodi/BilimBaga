@@ -198,7 +198,7 @@ func TestHandlerRemind_ValidationErrors(t *testing.T) {
 	h := &Handler{svc: svc, writer: &spyWriter{}}
 	for _, body := range []string{"", "{}", "{\"exam_id\":\"\"}", "{\"exam_id\":\"not-a-uuid\"}", "not json"} {
 		w := doRemind(h, rUser, body)
-		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code, body)
 		_, apiErr := decodeHandlerEnvelope(t, w)
 		require.NotNil(t, apiErr)
 		assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)

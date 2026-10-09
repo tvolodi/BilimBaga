@@ -49,3 +49,4 @@
 | [ISS-054](ISS-054-auditlogtable-react-key-warning.md) | AuditLogTable logs React "unique key" warning (bare fragment in map) | low | frontend | audit | resolved | 2026-10-09 |
 | [ISS-055](ISS-055-export-buttons-bypass-download-helper.md) | CSV export buttons bypass shared download helper (no 401 refresh / error display) | medium | frontend | reports | resolved | 2026-10-09 |
 | [ISS-059](ISS-059-e2e-portal-redirect-wrong-assertion.md) | e2e full-walkthrough test 21 asserts wrong redirect for admin on /portal | low | frontend | e2e | resolved | 2026-10-09 |
+| [ISS-82](ISS-82-tenant-id-audit.md) | AI insights/loyalty SQL references nonexistent exams.tenant_id, session_questions.order_num, exams.category_id (schema audit) | high | backend | ai | resolved | 2026-10-09 |

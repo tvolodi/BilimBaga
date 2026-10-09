@@ -3,12 +3,14 @@ package reports
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
@@ -335,6 +337,15 @@ func (s *service) GetUserProgress(ctx context.Context, userID string) (*UserProg
 // directly to the http.ResponseWriter without buffering the full dataset (AC-8).
 // Headers and Content-Disposition are set by the handler before calling this.
 func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWriter, examID, tenantID string) error {
+	// ISS-178: an unknown exam id must yield ErrNotFound (handler maps it to 404)
+	// instead of a header-only CSV.
+	if _, err := s.repo.GetExamTitle(ctx, examID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("reports: StreamExamResultsCSV: exam lookup: %w", err)
+	}
+
 	// Fetch ordered question list to build the dynamic header (AC-3).
 	questions, err := s.repo.GetExamQuestions(ctx, examID, tenantID)
 	if err != nil {
@@ -417,9 +428,11 @@ func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWrite
 			timeTakenStr = strconv.Itoa(*r.TimeTakenSeconds)
 		}
 
+		// ISS-191: text cells are guarded against formula injection; numeric
+		// cells (score_pct, time_taken_seconds, question scores) stay raw.
 		record := []string{
-			r.EmployeeName,
-			r.Department,
+			api.CSVSafe(r.EmployeeName),
+			api.CSVSafe(r.Department),
 			r.StartedAt,
 			r.SubmittedAt,
 			scorePctStr,
@@ -495,13 +508,13 @@ func (s *service) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter
 		}
 
 		record := []string{
-			r.ExamTitle,
+			api.CSVSafe(r.ExamTitle),
 			r.StartedAt,
 			r.SubmittedAt,
 			scorePctStr,
 			passedStr,
 			timeTakenStr,
-			r.Status,
+			api.CSVSafe(r.Status),
 		}
 
 		if err := csvWriter.Write(record); err != nil {

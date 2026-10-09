@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -154,7 +155,9 @@ func (s *translationService) Upsert(ctx context.Context, questionID, locale stri
 	}
 
 	// Default-locale option text must be non-blank for choice questions (ISS-173b).
-	// Non-default locales may stay blank; short-text has no options to check.
+	// A non-default locale is all-or-nothing (FR-BB24 AC-11): fully blank options
+	// fall back to the default locale, but a partially filled locale is rejected.
+	// Short-text has no options to check.
 	if locale == q.DefaultLocale {
 		inputs := make([]AnswerOptionInput, 0, len(optionIDs))
 		for _, id := range optionIDs {
@@ -164,6 +167,14 @@ func (s *translationService) Upsert(ctx context.Context, questionID, locale stri
 		}
 		if err := validateOptionTexts(q.Type, q.DefaultLocale, inputs); err != nil {
 			return nil, nil, fmt.Errorf("translations.Upsert: %w", err)
+		}
+	} else if q.Type != "shorttext" {
+		texts := make([]string, 0, len(optionIDs))
+		for _, id := range optionIDs {
+			texts = append(texts, providedOpts[id])
+		}
+		if errs := partialLocaleErrors(locale, strings.TrimSpace(input.Stem) != "", texts); len(errs) > 0 {
+			return nil, nil, fmt.Errorf("translations.Upsert: %w", &OptionValidationError{Fields: errs})
 		}
 	}
 

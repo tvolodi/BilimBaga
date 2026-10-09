@@ -1556,3 +1556,35 @@ func TestGetNextQuestion_500_ServiceError(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+// ISS-141: exam_id filter is a UUID column; malformed -> 422, valid passes through.
+func TestHandleListGradingQueue_ExamIDFilter(t *testing.T) {
+	const examID = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	var got *string
+	called := false
+	svc := &mockSvc{
+		listGradingQueueFn: func(_ context.Context, e *string, _, _ *time.Time, _, _ int) (*GradingQueueResponse, error) {
+			called = true
+			got = e
+			return &GradingQueueResponse{Items: []GradingQueueItem{}, Meta: GradingQueueMeta{Page: 1, PerPage: 20}}, nil
+		},
+	}
+	h := NewHandler(svc)
+	do := func(q string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/admin/grading?"+q, nil)
+		req = req.WithContext(context.WithValue(req.Context(), ctxkeys.CtxTenantID, "tenant-1"))
+		w := httptest.NewRecorder()
+		h.HandleListGradingQueue(w, req)
+		return w
+	}
+
+	w := do("exam_id=not-a-uuid")
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, w.Body.String(), "VALIDATION_ERROR")
+	assert.False(t, called)
+
+	w = do("exam_id=" + examID)
+	assert.Equal(t, http.StatusOK, w.Code)
+	require.NotNil(t, got)
+	assert.Equal(t, examID, *got)
+}

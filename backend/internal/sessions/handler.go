@@ -301,8 +301,12 @@ func (h *Handler) HandleListGradingQueue(w http.ResponseWriter, r *http.Request)
 	q := r.URL.Query()
 
 	var examID *string
-	if v := q.Get("exam_id"); v != "" {
-		examID = &v
+	examIDStr, ok := api.UUIDQuery(w, r, "exam_id")
+	if !ok {
+		return
+	}
+	if examIDStr != "" {
+		examID = &examIDStr
 	}
 
 	var dateFrom, dateTo *time.Time

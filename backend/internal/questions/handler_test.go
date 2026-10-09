@@ -631,3 +631,43 @@ func TestQHandlerRemoveTag_Returns204(t *testing.T) {
 
 	assert.Equal(t, http.StatusNoContent, w.Code)
 }
+
+// ISS-141: category_id / tag_ids / tag_id are UUID columns; malformed -> 422.
+func TestQHandlerList_MalformedUUIDFilters_Return422(t *testing.T) {
+	const ok = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	for _, q := range []string{"category_id=cat", "tag_ids=" + ok + ",bad", "tag_id=bad"} {
+		called := false
+		svc := &mockQService{
+			listFilteredFn: func(_ context.Context, _ QuestionFilter) ([]*QuestionListItem, int, error) {
+				called = true
+				return nil, 0, nil
+			},
+		}
+		h := NewHandler(svc, nil)
+		w := httptest.NewRecorder()
+		h.List(w, httptest.NewRequest(http.MethodGet, "/api/v1/questions?"+q, nil))
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code, q)
+		assert.Contains(t, w.Body.String(), "VALIDATION_ERROR", q)
+		assert.False(t, called, q)
+	}
+}
+
+func TestQHandlerList_ValidUUIDFilters_PassedToService(t *testing.T) {
+	const a = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	const b = "4a2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b33"
+	var got QuestionFilter
+	svc := &mockQService{
+		listFilteredFn: func(_ context.Context, f QuestionFilter) ([]*QuestionListItem, int, error) {
+			got = f
+			return []*QuestionListItem{}, 0, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+	w := httptest.NewRecorder()
+	h.List(w, httptest.NewRequest(http.MethodGet, "/api/v1/questions?category_id="+a+"&tag_ids="+a+","+b, nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+	if assert.NotNil(t, got.CategoryID) {
+		assert.Equal(t, a, *got.CategoryID)
+	}
+	assert.Equal(t, []string{a, b}, got.TagIDs)
+}

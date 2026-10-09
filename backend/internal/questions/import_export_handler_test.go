@@ -458,3 +458,17 @@ func TestImportHandler_BinaryContent_Returns415(t *testing.T) {
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "ERR_INVALID_FILE_TYPE", apiErr.Code)
 }
+
+// ISS-141: export id filters must be UUIDs; malformed -> 422 before streaming.
+func TestExportHandler_MalformedUUIDFilters_Return422(t *testing.T) {
+	const ok = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	for _, q := range []string{"ids=" + ok + ",bad", "category_id=cat", "tag_ids=bad"} {
+		h := NewHandler(&mockQService{}, nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/questions/export?"+q, nil)
+		req.Header.Set("Accept", "application/json")
+		w := httptest.NewRecorder()
+		h.Export(w, req)
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code, q)
+		assert.Contains(t, w.Body.String(), "VALIDATION_ERROR", q)
+	}
+}

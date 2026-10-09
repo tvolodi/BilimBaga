@@ -48,7 +48,8 @@ The first migration seeds a default super-admin account:
 | Email    | `admin@bilimbaga.local` |
 | Password | `Admin1234!`            |
 
-> **Important:** You will be required to change the password on first login.
+> **Security:** this default is public. For any deployment reachable by others, set `BOOTSTRAP_ADMIN_PASSWORD` (8+ chars, upper, lower, digit; must differ from the default) in the API environment before first start: at startup the API bcrypt-hashes it and stores it for the admin, but only while the admin still has the default password (a password someone already chose is never overwritten). Alternatively set `BOOTSTRAP_ADMIN_GENERATE=true` to have a random one-time password generated and logged once at startup (change forced at first login). The value is never logged. If neither is set, the admin keeps the default password but is forced to change it at first login (migration 033 plus a startup check) and the API logs a `SECURITY` warning on every start while the default is still in place.
+> For e2e / `scripts/seed-test-env.ts` runs against a stack started with `BOOTSTRAP_ADMIN_PASSWORD`, export the same value as `E2E_ADMIN_PASS`.
 
 ---
 

@@ -149,6 +149,14 @@ async function ensureAdminToken(): Promise<string> {
     )
   }
 
+  // Operator-provided admin password (BOOTSTRAP_ADMIN_PASSWORD on the API / E2E_ADMIN_PASS here):
+  // the deployment no longer relies on the migration-shipped default (ISS-150/ISS-152).
+  const envPass = process.env.E2E_ADMIN_PASS
+  if (envPass && envPass !== ADMIN_INITIAL_PASS) {
+    const envResult = await tryLoginWithPassword(ADMIN_EMAIL, envPass, 'E2E_ADMIN_PASS')
+    if (envResult) { log('Admin login OK (E2E_ADMIN_PASS)'); return envResult.token }
+  }
+
   // Try known post-seed password first (idempotent re-run)
   let result = await tryLoginWithPassword(ADMIN_EMAIL, ADMIN_KNOWN_PASS, 'Admin2024!')
   if (result) { log('Admin login OK (known password)'); return result.token }

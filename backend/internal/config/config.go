@@ -55,6 +55,14 @@ type Config struct {
 	SMTPFromDefaulted bool
 	TenantTimezone    string
 
+	// BootstrapAdminPassword (BOOTSTRAP_ADMIN_PASSWORD) is an optional initial password for
+	// the seeded super_admin, applied at startup only while the admin still has the
+	// default password (ISS-150). It is a secret: never log it.
+	BootstrapAdminPassword string
+	// BootstrapAdminGenerate (BOOTSTRAP_ADMIN_GENERATE=true) makes the API generate a random
+	// one-time admin password, logged once at startup, when no BootstrapAdminPassword is set.
+	BootstrapAdminGenerate bool
+
 	// Logging
 	LogLevel string // debug | info | warn | error; default "info"
 
@@ -146,6 +154,12 @@ func Load() (*Config, error) {
 	}
 
 	cfg.LogLevel = getEnv("LOG_LEVEL", "info")
+
+	cfg.BootstrapAdminPassword = getEnv("BOOTSTRAP_ADMIN_PASSWORD", "")
+	cfg.BootstrapAdminGenerate, err = strconv.ParseBool(getEnv("BOOTSTRAP_ADMIN_GENERATE", "false"))
+	if err != nil {
+		return nil, fmt.Errorf("config: BOOTSTRAP_ADMIN_GENERATE must be true or false: %w", err)
+	}
 
 	// Anthropic AI (FR-BB71) — optional; handlers return 503 if key is blank.
 	cfg.AnthropicAPIKey = getEnv("ANTHROPIC_API_KEY", "")

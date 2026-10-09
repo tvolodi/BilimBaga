@@ -17,3 +17,8 @@ backend-tests: go vet OK; go test -p 2 ./... OK (with postgres service); staticc
 frontend-tests: tsc, lint, check:i18n OK. vitest: 13 failed / 608 passed, all `TypeError: object.stream is not a function` at `new Response(new Blob([...]))` in the tests' blobResponse helpers:
 - src/api/download.test.ts (8 tests), src/components/results/ResultActions.test.tsx (1), src/components/analytics/__tests__/ExportCSVButton.test.tsx (4).
 Same on Node 20 and 22, so not the Node version. Cause: jsdom's Blob (jsdom ^29) lacks `.stream()`, which Node's undici Response needs; probably resolved differently on dev machines (different node/jsdom/undici combination or a polyfill). Test/environment issue, pre-existing on main (never ran in CI); fix belongs in test code (build the Response from a string/ArrayBuffer, or use Node's Blob) or vitest setup.
+
+## Final state
+
+Run 37921439814: backend-tests PASS, frontend-tests PASS (also security-check, docker-build).
+Fixed in this PR (test code only): SA4006 in privilege_escalation_test.go (dropped the dead `svc` from d1Setup, assertions unchanged); the 13 vitest failures by building test Responses from strings (`new Response('x', {status})`) instead of jsdom Blobs; res.blob() in production code is still exercised. Workflow: Node 22 and `go test` runs even if staticcheck fails. Nothing remains.

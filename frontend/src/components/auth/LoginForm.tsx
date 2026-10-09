@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -100,6 +101,11 @@ export function LoginForm({ onSubmit, isPending, error }: LoginFormProps) {
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? '…' : t('auth.login.submitButton')}
       </Button>
+      <p className="text-center text-sm">
+        <Link to="/forgot-password" className="text-primary underline-offset-4 hover:underline">
+          {t('auth.recovery.forgotLink')}
+        </Link>
+      </p>
     </form>
   )
 }

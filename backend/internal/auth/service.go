@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -32,16 +33,26 @@ type Service interface {
 	Logout(ctx context.Context, rawToken, ipAddr string) (*http.Cookie, error)
 	ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) error
 	ParseAccessToken(tokenString string) (*Claims, error)
+	RecoveryService
 }
 
 type service struct {
-	cfg  ServiceConfig
-	repo Repository
+	cfg    ServiceConfig
+	repo   Repository
+	mailer ResetMailer
+	now    func() time.Time
+	logger *slog.Logger
 }
 
 // NewService creates a new Service backed by the given Repository.
-func NewService(cfg ServiceConfig, repo Repository) Service {
-	return &service{cfg: cfg, repo: repo}
+// An optional ResetMailer enables password recovery emails (FR-BB115); without it,
+// recovery tokens are still issued but nothing is sent.
+func NewService(cfg ServiceConfig, repo Repository, mailer ...ResetMailer) Service {
+	s := &service{cfg: cfg, repo: repo, now: func() time.Time { return time.Now().UTC() }, logger: slog.Default()}
+	if len(mailer) > 0 {
+		s.mailer = mailer[0]
+	}
+	return s
 }
 
 // Login validates credentials and issues a JWT access token plus an httpOnly refresh cookie.

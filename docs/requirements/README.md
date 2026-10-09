@@ -24,7 +24,7 @@
 | FR-BB112 | Frontend-branding-settings | Frontend: Branding Settings | Implemented |
 | FR-BB113 | Frontend-department-management | Frontend: Department Management | Implemented |
 | FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Implemented |
-| FR-BB115 | Account-recovery | Account Recovery: Forgot Password and Lockout Unlock | Validated |
+| FR-BB115 | Account-recovery | Account Recovery: Forgot Password and Lockout Unlock | Implemented |
 | FR-BB116 | User-profile-and-preferred-locale | User Profile Page and Persisted Preferred Locale | Validated |
 | FR-BB21 | Categories-and-tags | Categories and Tags | Implemented |
 | FR-BB22 | Question-model | Question Model | Implemented |

@@ -54,6 +54,7 @@ export default defineConfig({
         '**/exam-wizard.spec.ts',
         '**/exam-lifecycle.spec.ts',
         '**/user-management.spec.ts',
+        '**/account-recovery.spec.ts',
         '**/accessibility.spec.ts',
         '**/loyalty-narrative.spec.ts',
         '**/downloads-bearer.spec.ts',

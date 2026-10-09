@@ -65,11 +65,13 @@
       "deactivate": "Deactivate",
       "reset_password": "Reset Password",
       "import": "Bulk Import",
-      "view_record": "View Record"
+      "view_record": "View Record",
+      "unlock": "Unlock account"
     },
     "status": {
       "active": "Active",
-      "inactive": "Inactive"
+      "inactive": "Inactive",
+      "locked": "Locked"
     },
     "form": {
       "email_label": "Email",
@@ -125,6 +127,8 @@
       "update_success": "User updated successfully.",
       "deactivate_success": "User deactivated.",
       "reset_success": "Password reset.",
+      "unlock_success": "Account unlocked.",
+      "unlock_error": "Could not unlock the account. Please try again.",
       "import_success": "Import completed.",
       "error_generic": "An error occurred. Please try again."
     },
@@ -336,6 +340,35 @@
     "empty": "No tags yet. Click \"New Tag\" to start."
   },
   "auth": {
+    "recovery": {
+      "forgotLink": "Forgot password?",
+      "forgot": {
+        "title": "Forgot your password?",
+        "intro": "Enter the email address of your account and we will send you a link to reset your password.",
+        "emailLabel": "Email",
+        "submitButton": "Send reset link",
+        "confirmation": "If an account exists for that email, a password reset link has been sent. The link is valid for 60 minutes.",
+        "backToLogin": "Back to sign in"
+      },
+      "reset": {
+        "title": "Choose a new password",
+        "newPasswordLabel": "New password",
+        "confirmPasswordLabel": "Confirm new password",
+        "submitButton": "Reset password",
+        "showPassword": "Show password",
+        "hidePassword": "Hide password",
+        "passwordHint": "At least 8 characters, with an uppercase letter, a lowercase letter and a digit.",
+        "requestNewLink": "Request a new reset link"
+      },
+      "errors": {
+        "mismatch": "Passwords do not match.",
+        "INVALID_TOKEN": "This reset link is invalid or has expired.",
+        "VALIDATION_ERROR": "New password does not meet requirements.",
+        "RATE_LIMITED": "Too many requests. Please try again later.",
+        "network": "Service unavailable. Please try again later."
+      },
+      "resetSuccess": "Your password has been reset. You can now sign in."
+    },
     "login": {
       "title": "Sign in to {{appName}}",
       "emailLabel": "Email",

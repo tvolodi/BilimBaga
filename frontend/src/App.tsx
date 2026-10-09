@@ -16,6 +16,8 @@ import { SkipLink } from '@/components/SkipLink'
 // Non-admin routes — eagerly loaded (employee-facing, on the critical path)
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
 import { EmployeePortal } from '@/pages/EmployeePortal'
 import { MyResultsPage } from '@/pages/portal/MyResultsPage'
 import { ExamResultRedirectPage } from '@/pages/portal/ExamResultRedirectPage'
@@ -101,6 +103,15 @@ function AppRoutes() {
           <Route path="/verify/:code" element={<VerifyCertificatePage />} />
         </Routes>
       </Suspense>
+    )
+  }
+  // FR-BB115 AC-7: account-recovery pages are public too — no refresh bootstrap, no auth wrappers.
+  if (pathname === '/forgot-password' || pathname === '/reset-password') {
+    return (
+      <Routes>
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+      </Routes>
     )
   }
   return <AuthedRoutes />

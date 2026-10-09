@@ -89,3 +89,14 @@ type ServiceError struct {
 func (e *ServiceError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
+
+// ForgotPasswordRequest is the JSON body for POST /api/v1/auth/forgot-password.
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ResetPasswordRequest is the JSON body for POST /api/v1/auth/reset-password.
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}

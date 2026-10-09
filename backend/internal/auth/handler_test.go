@@ -23,6 +23,8 @@ type mockService struct {
 	logoutFn         func(ctx context.Context, rawToken, ipAddr string) (*http.Cookie, error)
 	changePasswordFn func(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) error
 	parseTokenFn     func(tokenString string) (*Claims, error)
+	forgotFn         func(ctx context.Context, req *ForgotPasswordRequest, ipAddr string) (string, error)
+	resetFn          func(ctx context.Context, req *ResetPasswordRequest, ipAddr string) (string, error)
 }
 
 func (m *mockService) Login(ctx context.Context, req *LoginRequest, ipAddr string) (*LoginResponse, *http.Cookie, error) {
@@ -43,6 +45,14 @@ func (m *mockService) ChangePassword(ctx context.Context, userID string, req *Ch
 
 func (m *mockService) ParseAccessToken(tokenString string) (*Claims, error) {
 	return m.parseTokenFn(tokenString)
+}
+
+func (m *mockService) ForgotPassword(ctx context.Context, req *ForgotPasswordRequest, ipAddr string) (string, error) {
+	return m.forgotFn(ctx, req, ipAddr)
+}
+
+func (m *mockService) ResetPassword(ctx context.Context, req *ResetPasswordRequest, ipAddr string) (string, error) {
+	return m.resetFn(ctx, req, ipAddr)
 }
 
 // --- Helpers ---
@@ -587,6 +597,7 @@ func TestService_ParseAccessToken_ExpiredToken_ReturnsError(t *testing.T) {
 // --- Mock Repository ---
 
 type mockRepository struct {
+	RecoveryRepository // unused by these tests; recovery has its own fake (recovery_service_test.go)
 	getUserByEmailFn        func(ctx context.Context, email string) (*User, error)
 	getUserByIDFn           func(ctx context.Context, userID string) (*User, error)
 	updateFailedAttemptsFn  func(ctx context.Context, userID string, attempts int) error

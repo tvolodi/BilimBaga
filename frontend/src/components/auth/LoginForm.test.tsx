@@ -1,9 +1,13 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi } from 'vitest'
 import { LoginForm } from './LoginForm'
 import '../../i18n'
 
 const noop = () => {}
+
+// LoginForm renders a router <Link> (forgot-password), so every render needs a router.
+const render = (ui: React.ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>)
 
 describe('LoginForm', () => {
   it('renders email, password fields and submit button', () => {
@@ -95,5 +99,13 @@ describe('LoginForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /hide password/i }))
     expect(passwordInput).toHaveAttribute('type', 'password')
+  })
+})
+
+describe('LoginForm forgot-password link (FR-BB115 AC-7)', () => {
+  it('links to /forgot-password', () => {
+    render(<LoginForm onSubmit={noop} isPending={false} error={null} />)
+    const link = screen.getByRole('link', { name: /forgot password/i })
+    expect(link).toHaveAttribute('href', '/forgot-password')
   })
 })

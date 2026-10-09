@@ -47,6 +47,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     role_name: 'employee',
     status: 'active',
     force_password_change: false,
+    is_locked: false,
     created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }

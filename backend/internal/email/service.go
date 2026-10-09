@@ -12,6 +12,7 @@ import (
 	"mime/quotedprintable"
 	"net/mail"
 	"net/smtp"
+	"net/url"
 	"strings"
 	"time"
 
@@ -27,6 +28,8 @@ type Config struct {
 	TLS        bool
 	From       string // may include display name: "BilimBaga <noreply@example.com>"
 	APIBaseURL string
+	// PublicAppURL is the SPA base URL used to build the password reset link (FR-BB115).
+	PublicAppURL string
 }
 
 // EmailService coordinates template rendering, SMTP delivery, and audit logging.
@@ -179,6 +182,29 @@ func (s *EmailService) TriggerPasswordReset(userID, tempPassword string) {
 		s.logAttempt(u.Email, "password_reset", sendErr)
 		if sendErr != nil {
 			s.logger.Error("email send failed", "template", "password_reset", "to", u.Email, "error", sendErr)
+		}
+	}()
+}
+
+// TriggerPasswordResetLink sends the password_reset_link email carrying the one-time reset
+// link (FR-BB115). The token is only placed in the message; it is never logged or stored.
+func (s *EmailService) TriggerPasswordResetLink(userID, token string) {
+	go func() {
+		ctx := context.Background()
+		if s.repo == nil {
+			return
+		}
+		u, err := s.repo.GetUserForEmail(ctx, userID)
+		if err != nil {
+			s.logger.Error("email: get user for password reset link", "user_id", userID, "error", err)
+			return
+		}
+		link := strings.TrimRight(s.cfg.PublicAppURL, "/") + "/reset-password?token=" + url.QueryEscape(token)
+		sendErr := s.send(u.Email, "password_reset_link", map[string]any{"ResetLink": link}, u.Locale)
+		s.logAttempt(u.Email, "password_reset_link", sendErr)
+		if sendErr != nil {
+			// The error never contains the link/token: only SMTP transport details.
+			s.logger.Error("email send failed", "template", "password_reset_link", "to", u.Email, "error", sendErr)
 		}
 	}()
 }

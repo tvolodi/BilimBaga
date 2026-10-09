@@ -1,0 +1,1 @@
+{"run_id":"FR-BB115","step":"requirement-implementation","status":"COMPLETE","migration":"031_password_reset_tokens (not applied locally)","code_review":"PASS","tests":"go vet + go test -p 2 ./... green; tsc, check:i18n, vitest green","unverified":["migration applied on live DB","live E2E spec","real Mailhog delivery"]}

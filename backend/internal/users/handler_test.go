@@ -30,6 +30,7 @@ type mockUserService struct {
 	resetPwdFn   func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
 	importFn     func(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
 	listRolesFn  func(ctx context.Context) ([]RoleRow, error)
+	unlockFn     func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 }
 
 func (m *mockUserService) ListUsers(ctx context.Context, callerRole, callerDeptID string, f ListFilters) (*ListResult, error) {
@@ -55,6 +56,9 @@ func (m *mockUserService) ResetPassword(ctx context.Context, id, callerRole, cal
 }
 func (m *mockUserService) ImportUsers(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error) {
 	return m.importFn(ctx, rows, commit, callerRole, callerDeptID, callerUserID, ip)
+}
+func (m *mockUserService) UnlockUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error) {
+	return m.unlockFn(ctx, id, callerRole, callerDeptID, callerUserID, ip)
 }
 func (m *mockUserService) ListRoles(ctx context.Context) ([]RoleRow, error) {
 	if m.listRolesFn != nil {
@@ -530,4 +534,88 @@ func TestHandlerImportUsers_TooManyRows_Returns400(t *testing.T) {
 	_, apiErr := decodeHandlerEnvelope(t, w)
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "TOO_MANY_ROWS", apiErr.Code)
+}
+
+// ── UnlockUser (FR-BB115 AC-5, AC-6) ──────────────────────────────────────────
+
+type fakeAudit struct {
+	actions []string
+	ids     []*string
+}
+
+func (f *fakeAudit) Write(_ context.Context, _ *http.Request, action, _ string, entityID *string, _ any) {
+	f.actions = append(f.actions, action)
+	f.ids = append(f.ids, entityID)
+}
+
+func TestHandlerUnlockUser_Returns200AndAudits(t *testing.T) {
+	aw := &fakeAudit{}
+	svc := &mockUserService{unlockFn: func(_ context.Context, id, role, _, caller, _ string) (*User, error) {
+		assert.Equal(t, "u1", id)
+		assert.Equal(t, "super_admin", role)
+		assert.Equal(t, "admin-1", caller)
+		u := sampleUser(id)
+		u.IsLocked = false
+		return u, nil
+	}}
+	h := &Handler{svc: svc, writer: aw}
+
+	req := withChiID(withAuthCtx(httptest.NewRequest(http.MethodPost, "/api/v1/users/u1/unlock", nil), "admin-1", "super_admin", ""), "u1")
+	w := httptest.NewRecorder()
+	h.UnlockUser(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	data, apiErr := decodeHandlerEnvelope(t, w)
+	assert.Nil(t, apiErr)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, "u1", got["id"])
+	assert.Equal(t, false, got["is_locked"])
+	require.Equal(t, []string{"users.unlock"}, aw.actions)
+	require.NotNil(t, aw.ids[0])
+	assert.Equal(t, "u1", *aw.ids[0])
+}
+
+func TestHandlerUnlockUser_NotFound_Returns404NoAudit(t *testing.T) {
+	aw := &fakeAudit{}
+	svc := &mockUserService{unlockFn: func(context.Context, string, string, string, string, string) (*User, error) {
+		return nil, ErrNotFound
+	}}
+	h := &Handler{svc: svc, writer: aw}
+
+	req := withChiID(withAuthCtx(httptest.NewRequest(http.MethodPost, "/x", nil), "admin-1", "super_admin", ""), "nope")
+	w := httptest.NewRecorder()
+	h.UnlockUser(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "NOT_FOUND", apiErr.Code)
+	assert.Empty(t, aw.actions)
+}
+
+func TestHandlerUnlockUser_Forbidden_Returns403(t *testing.T) {
+	svc := &mockUserService{unlockFn: func(context.Context, string, string, string, string, string) (*User, error) {
+		return nil, ErrForbidden
+	}}
+	h := &Handler{svc: svc, writer: &fakeAudit{}}
+
+	req := withChiID(withAuthCtx(httptest.NewRequest(http.MethodPost, "/x", nil), "da-1", "department_admin", "dept-1"), "u1")
+	w := httptest.NewRecorder()
+	h.UnlockUser(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestHandlerUnlockUser_ServiceError_Returns500(t *testing.T) {
+	svc := &mockUserService{unlockFn: func(context.Context, string, string, string, string, string) (*User, error) {
+		return nil, errors.New("db down")
+	}}
+	h := &Handler{svc: svc, writer: &fakeAudit{}}
+
+	req := withChiID(withAuthCtx(httptest.NewRequest(http.MethodPost, "/x", nil), "admin-1", "super_admin", ""), "u1")
+	w := httptest.NewRecorder()
+	h.UnlockUser(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

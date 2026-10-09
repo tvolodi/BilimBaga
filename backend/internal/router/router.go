@@ -57,6 +57,9 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.Post("/auth/login", authHandler.Login)
 			r.Post("/auth/refresh", authHandler.Refresh)
 			r.Post("/auth/logout", authHandler.Logout)
+			// Account recovery (FR-BB115) — public, same tight limiter.
+			r.Post("/auth/forgot-password", authHandler.ForgotPassword)
+			r.Post("/auth/reset-password", authHandler.ResetPassword)
 		})
 
 		// Public non-auth routes — general rate limit (AC-1).
@@ -110,6 +113,8 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Post("/users/{id}/deactivate", usersHandler.DeactivateUser)
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/{id}/reset-password", usersHandler.ResetPassword)
+			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
+				Post("/users/{id}/unlock", usersHandler.UnlockUser)
 
 			// Audit log.
 			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).

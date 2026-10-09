@@ -51,7 +51,7 @@ $o = Run 'ensure-up.ps1' @('-WhatIf', '-AgentsJsonFile', $none)
 Check 'bb-infra resumed when previously launched' ($o -match "claude --resume $sidInfra -n bb-infra")
 
 # 5. supervisor watchdog (all under -WhatIf unless stated; planned actions are asserted from output)
-$all = Stub @(@{ name = 'bb-dev1' }, @{ name = 'bb-dev2' }, @{ name = 'bb-ba' }, @{ name = 'bb-uat' }, @{ name = 'ai-dala-infra-fc' }, @{ name = 'bb-supervisor'; pid = 4003 })
+$all = Stub @(@{ name = 'bb-dev1' }, @{ name = 'bb-dev2' }, @{ name = 'bb-ba' }, @{ name = 'bb-uat' }, @{ name = 'ai-dala-infra-fc' }, @{ name = 'bb-architect' }, @{ name = 'bb-supervisor'; pid = 4003 })
 $sd = $env:SWARM_STATE_DIR
 $hbF = Join-Path $sd 'supervisor.json'; $ndF = Join-Path $sd 'supervisor.nudge.json'
 function Wd([string]$now = '2026-10-09T12:00:00Z', [string[]]$extra = @('-WhatIf')) { Run 'ensure-up.ps1' (@('-AgentsJsonFile', $all, '-NowUtc', $now) + $extra) }

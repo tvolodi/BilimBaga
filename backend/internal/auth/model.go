@@ -70,6 +70,16 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+// ChangePasswordResponse is the data body of POST /api/v1/auth/change-password. Message is the
+// pre-ISS-171 field; AccessToken/TokenType/ExpiresIn carry the caller's replacement session
+// (all earlier access tokens are revoked by the change).
+type ChangePasswordResponse struct {
+	Message     string `json:"message"`
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
 // Claims holds the custom JWT payload used by BilimBaga.
 type Claims struct {
 	Email        string  `json:"email"`

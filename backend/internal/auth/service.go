@@ -32,7 +32,7 @@ type Service interface {
 	Login(ctx context.Context, req *LoginRequest, ipAddr string) (*LoginResponse, *http.Cookie, error)
 	Refresh(ctx context.Context, rawToken, ipAddr string) (*RefreshResponse, *http.Cookie, error)
 	Logout(ctx context.Context, rawToken, ipAddr string) (*http.Cookie, error)
-	ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) error
+	ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) (*ChangePasswordResponse, *http.Cookie, error)
 	ParseAccessToken(tokenString string) (*Claims, error)
 	RecoveryService
 }
@@ -233,10 +233,21 @@ func (s *service) Logout(ctx context.Context, rawToken, ipAddr string) (*http.Co
 
 // ChangePassword validates the current password, enforces complexity constraints,
 // hashes and stores the new password, and clears force_password_change.
-func (s *service) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) error {
+//
+// ISS-171: the change also stamps users.password_changed_at, which revokes every access
+// token issued earlier (other devices, a stolen token) and every refresh token of the user.
+// To keep the caller signed in it then issues a fresh access token and refresh cookie.
+//
+// Boundary semantics (see tokenPredatesPasswordChange): a token is rejected only when
+// iat < floor(password_changed_at) at second resolution. The stamp is taken from the
+// application clock (not the database's now()) and the new token's iat is that same
+// instant, so iat == floor(stamp) always holds for the new token and it is accepted
+// immediately, even when issued in the same second as the stamp. The flip side is that an
+// OLD token issued within that same second also survives (known second-granularity caveat).
+func (s *service) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) (*ChangePasswordResponse, *http.Cookie, error) {
 	// AC-8 (FR-BB64): enforce password complexity.
 	if err := ValidateComplexity(req.NewPassword); err != nil {
-		return &ServiceError{
+		return nil, nil, &ServiceError{
 			Code:       "WEAK_PASSWORD",
 			Message:    "password must be at least 8 characters and contain uppercase, lowercase, and a digit",
 			HTTPStatus: http.StatusBadRequest,
@@ -245,11 +256,11 @@ func (s *service) ChangePassword(ctx context.Context, userID string, req *Change
 
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("auth.service.ChangePassword: get user: %w", err)
+		return nil, nil, fmt.Errorf("auth.service.ChangePassword: get user: %w", err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-		return &ServiceError{
+		return nil, nil, &ServiceError{
 			Code:       "INVALID_CREDENTIALS",
 			Message:    "current password is incorrect",
 			HTTPStatus: http.StatusBadRequest,
@@ -259,14 +270,30 @@ func (s *service) ChangePassword(ctx context.Context, userID string, req *Change
 	// AC-9: bcrypt cost 12.
 	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), s.cfg.BcryptCost)
 	if err != nil {
-		return fmt.Errorf("auth.service.ChangePassword: hash new password: %w", err)
+		return nil, nil, fmt.Errorf("auth.service.ChangePassword: hash new password: %w", err)
 	}
 
-	if err := s.repo.UpdatePassword(ctx, userID, string(newHash)); err != nil {
-		return fmt.Errorf("auth.service.ChangePassword: update password: %w", err)
+	// Stamp and the new token's iat share one instant (truncated to seconds by the JWT lib).
+	changedAt := s.now().Truncate(time.Second)
+	if err := s.repo.UpdatePassword(ctx, userID, string(newHash), changedAt); err != nil {
+		return nil, nil, fmt.Errorf("auth.service.ChangePassword: update password: %w", err)
 	}
 
-	return nil
+	accessToken, err := s.issueAccessTokenAt(user, changedAt)
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth.service.ChangePassword: issue access token: %w", err)
+	}
+	cookie, err := s.issueRefreshCookie(ctx, userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth.service.ChangePassword: issue refresh cookie: %w", err)
+	}
+
+	return &ChangePasswordResponse{
+		Message:     "password changed",
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   s.cfg.JWTAccessTTLMin * 60,
+	}, cookie, nil
 }
 
 // ParseAccessToken validates a JWT access token string and returns its claims.
@@ -289,7 +316,11 @@ func (s *service) ParseAccessToken(tokenString string) (*Claims, error) {
 
 // issueAccessToken generates a signed JWT for the given user.
 func (s *service) issueAccessToken(user *User) (string, error) {
-	now := time.Now().UTC()
+	return s.issueAccessTokenAt(user, time.Now().UTC())
+}
+
+// issueAccessTokenAt is issueAccessToken with an explicit issue time (ISS-171).
+func (s *service) issueAccessTokenAt(user *User, now time.Time) (string, error) {
 	claims := Claims{
 		Email:        user.Email,
 		Role:         user.RoleName,

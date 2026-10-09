@@ -19,10 +19,15 @@ interface LoginBody {
   error?: { code?: string } | null
 }
 
+interface ChangeBody {
+  data?: { access_token?: string } | null
+}
+
 /**
  * Try each candidate password in order. On the first successful login, if the response says
- * force_password_change, change the password to `newPassword` with that same token (change-password
- * does not revoke the token) so the returned token is immediately usable on every route.
+ * force_password_change, change the password to `newPassword`. ISS-171: change-password revokes every
+ * earlier access token, so the returned token is the one from the change-password response (the login
+ * token is dead after the change).
  * Returns null when no candidate logs in or when the forced change itself fails.
  */
 export async function loginClearingForceChange(
@@ -50,7 +55,9 @@ export async function loginClearingForceChange(
       body: JSON.stringify({ current_password: candidate, new_password: newPassword }),
     })
     if (!changed.ok) return null
-    return { token, password: newPassword, changed: true }
+    const next = ((await changed.json().catch(() => null)) as ChangeBody | null)?.data?.access_token
+    if (!next) return null
+    return { token: next, password: newPassword, changed: true }
   }
   return null
 }

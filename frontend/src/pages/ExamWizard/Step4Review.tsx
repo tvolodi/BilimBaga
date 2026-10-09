@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { describeExamError } from '@/api/examErrors'
+import { describeExamError, safeMessage } from '@/api/examErrors'
 import { useExam, usePublishExam, useUnpublishExam, useArchiveExam, useEligibleCounts, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
 
 // ---- Types ------------------------------------------------------------------
@@ -93,7 +93,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
     } catch (err) {
       setArchiveDialogOpen(false)
       const apiErr = err as ExamApiError
-      setGeneralError(describeExamError(apiErr, t) || t('exam.archive.error'))
+      setGeneralError(safeMessage(apiErr.message) || t('exam.archive.error'))
     }
   }
 

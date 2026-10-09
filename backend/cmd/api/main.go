@@ -56,7 +56,8 @@ func initLogger(level string) zerolog.Logger {
 	return log
 }
 
-func main() {
+// serve is the normal startup path: migrate, wire dependencies, serve HTTP until signalled.
+func serve() {
 	// appCtx is cancelled on SIGINT/SIGTERM; used by background jobs for clean shutdown.
 	appCtx, stopApp := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stopApp()
@@ -81,20 +82,9 @@ func main() {
 	// They are not migrated here to avoid a large, unrelated diff.
 	slogger := slog.Default()
 
-	db, err := dbpkg.New(dbpkg.Config{
-		Host:            cfg.DBHost,
-		Port:            cfg.DBPort,
-		Name:            cfg.DBName,
-		User:            cfg.DBUser,
-		Password:        cfg.DBPassword,
-		SSLMode:         cfg.DBSSLMode,
-		MaxOpenConns:    cfg.DBMaxOpenConns,
-		MaxIdleConns:    cfg.DBMaxIdleConns,
-		ConnMaxIdleTime: time.Duration(cfg.DBConnMaxIdleSeconds) * time.Second,
-		ConnMaxLifetime: cfg.DBConnMaxLifetime,
-	})
+	db, err := openDB(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "startup error: open database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "startup error: %v\n", err)
 		os.Exit(1)
 	}
 

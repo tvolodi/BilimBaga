@@ -32,7 +32,9 @@ foreach ($r in $Roles) {
   if ($r -eq 'infra' -and -not $ForceInfra -and ($live | Where-Object { $_ -like 'ai-dala-infra*' })) { Write-Host "infra: reusing running session ($($live | Where-Object { $_ -like 'ai-dala-infra*' }))"; continue }
   if ($live | Where-Object { $_ -like "$($d.name)*" }) { Write-Host "$r already running, skipped"; continue }
   $sf  = Join-Path $PSScriptRoot "roles\$($settings[$r]).settings.json"
-  $cmd = "claude -n $($d.name) --permission-mode $Mode --settings '$sf' '$($d.prompt -replace "'","''")'"
+  # a launcher started from inside a Claude session leaks its session env; a child would not register for messaging
+  $clean = "Get-ChildItem Env: | Where-Object { `$_.Name -match '^(CLAUDECODE|CLAUDE_PID|CLAUDE_CODE_(CHILD_SESSION|MESSAGING_.*|SESSION_.*|ENTRYPOINT))`$' } | ForEach-Object { Remove-Item (`"Env:`" + `$_.Name) }; "
+  $cmd = $clean + "claude -n $($d.name) --permission-mode $Mode --settings '$sf' '$($d.prompt -replace "'","''")'"
   $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
   if ($haveWt) {
     if ($wtArgs.Count) { $wtArgs += ';' }

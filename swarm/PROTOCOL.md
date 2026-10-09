@@ -13,7 +13,7 @@ Normative rules for all swarm roles. Roles: `bb-supervisor`, `bb-dev1`, `bb-dev2
 | UAT | `bb-uat` | repo root (owns the live stack) | `uat.settings.json` |
 | Infra | `ai-dala-infra-fc` (reused) or `bb-infra` | `..\ai-dala-infra` (reused session's cwd is a per-run dir such as `ai-dala-infra\runs\<run-id>`; project root is still `..\ai-dala-infra`) | `infra.settings.json` |
 
-Addressing is by name via `SendMessage`. Claude Code may append a suffix to a session name (observed: `ai-dala-infra-fc`, `bilimbaga-e0`), so always resolve the exact name from `ListAgents` by prefix (`bb-dev1`...) before sending; `claude agents --json` gives the same list to scripts. Verify liveness with `ListAgents`. Reply to an incoming message by copying its `from` attribute into `to`.
+Addressing is by name via `SendMessage`. Names given with `-n` are kept as is, but sessions without one get a derived suffix (observed: `ai-dala-infra-fc`, `bilimbaga-e0`), so always resolve the exact name from `ListAgents` by prefix (`bb-dev1`...) before sending; `claude agents --json` gives the same list to scripts. Verify liveness with `ListAgents`. Reply to an incoming message by copying its `from` attribute into `to`.
 
 ## 2. Permission mode (single common mode)
 

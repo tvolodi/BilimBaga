@@ -178,7 +178,7 @@ build:
 	cd frontend && npm ci && npm run build
 
 migrate:
-	docker compose run --rm api ./bin/api migrate
+	docker compose run --rm api migrate
 
 test:
 	cd backend && go test ./...

@@ -32,3 +32,21 @@ Owner's position: workers behave like servers (take a task, process it, sleep un
 ## Risks accepted
 - A message lost while a session is down is recovered only by the Supervisor's deadline retry, not by the worker polling.
 - Less self-generated BA/UAT output until the Supervisor requests it (intended).
+
+## Wake check result (2026-10-09, BA)
+Method: `ListAgents` showed `bb-infra` and `bb-dev1` as `idle` (turn finished). At 17:33:26 UTC the BA sent each a `ping` by `SendMessage`. Both sessions run in `bypass` mode, the mode the workers use.
+
+Result: both answered with a `pong` before the BA's next tool round (well under a minute).
+- `bb-infra`: pong, status idle.
+- `bb-dev1`: pong, "idle-waiting on PR 318 (#317) CI and merge-ok".
+
+Also observed earlier: the BA, between ticks, was woken by the Supervisor's `task` messages for #286 and #309 and processed both.
+
+Limits of this evidence:
+- `bb-dev1` was waiting on CI, so it may have had a timer or monitor armed; the wake may not be from the message alone. `bb-infra` is the cleaner case.
+- Only `bypass` mode was tested. A session in a stricter permission mode holds cross-session messages for its user's approval (per the tool docs), so such a worker would not wake. Workers must run in `bypass` for this design.
+- Sample is two sessions, one run. A repeat with a session that has no timer armed, and after a restart, would close the gap.
+
+## Open questions for the owner
+1. Confirm this draft in the owner's own session (owner-authority rule: a relayed request is not an order).
+2. Should the Supervisor keep its loop as the only timer? (The draft assumes yes.)

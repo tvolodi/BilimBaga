@@ -745,14 +745,7 @@ func (s *service) GetExamHistory(ctx context.Context, examID, userID string, pag
 
 	sessions := make([]HistorySession, len(rows))
 	for i, r := range rows {
-		sessions[i] = HistorySession{
-			SessionID:   r.SessionID,
-			StartedAt:   r.StartedAt,
-			SubmittedAt: r.SubmittedAt,
-			ScorePct:    r.ScorePct,
-			Passed:      r.Passed,
-			Status:      r.Status,
-		}
+		sessions[i] = HistorySession(r)
 	}
 
 	return &ExamHistoryResponse{

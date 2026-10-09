@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useUser, useMe } from '@/api/users'
+import { downloadErrorKey } from '@/api/download'
 import { useEmployeeRecord, useEmployeeProgress, exportEmployeeRecord } from '@/api/employees'
 import { fetchLoyaltyNarrative } from '@/api/ai'
 import { EmployeeInfoHeader } from '@/components/employees/EmployeeInfoHeader'
@@ -78,12 +79,15 @@ export function EmployeeRecordPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   async function handleExport() {
-    const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+    setExportError(null)
     setIsExporting(true)
     try {
-      await exportEmployeeRecord(userId, token)
+      await exportEmployeeRecord(qc, userId)
+    } catch (err) {
+      setExportError(downloadErrorKey(err))
     } finally {
       setIsExporting(false)
     }
@@ -178,6 +182,11 @@ export function EmployeeRecordPage() {
             )}
           </Button>
         </div>
+        {exportError && (
+          <div role="alert" className="px-4 py-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800">
+            {t(exportError)}
+          </div>
+        )}
         <SessionHistoryTable sessions={record.data.sessions} />
 
         {total > 0 && (

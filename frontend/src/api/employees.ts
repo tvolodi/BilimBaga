@@ -116,28 +116,12 @@ export function useEmployeeProgress(userId: string) {
 
 // ---- Employee record export -------------------------------------------------
 
-export async function exportEmployeeRecord(
-  userId: string,
-  token: string | null | undefined,
-): Promise<void> {
-  const res = await fetch(`/api/v1/admin/users/${userId}/record/export`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    throw new Error(`Export failed: ${res.status}`)
-  }
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = /filename="([^"]+)"/.exec(disposition)
-  a.download = match ? match[1] : `employee-${userId}-record.csv`
-  a.href = url
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+export function exportEmployeeRecord(qc: QueryClient, userId: string): Promise<void> {
+  return downloadFile(
+    qc,
+    `/api/v1/admin/users/${userId}/record/export`,
+    `employee-${userId}-record.csv`,
+  )
 }
 
 // ---- Certificate download ---------------------------------------------------

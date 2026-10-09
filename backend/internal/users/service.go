@@ -25,6 +25,7 @@ type Service interface {
 	ListUsers(ctx context.Context, callerRole, callerDeptID string, f ListFilters) (*ListResult, error)
 	GetUser(ctx context.Context, id, callerRole, callerUserID, callerDeptID string) (*User, error)
 	GetMe(ctx context.Context, userID string) (*User, error)
+	UpdateMyLocale(ctx context.Context, userID string, locale *string) (*LocaleUpdate, error)
 	CreateUser(ctx context.Context, req CreateRequest, callerRole, callerDeptID, callerUserID, ip string) (*CreateResponse, error)
 	UpdateUser(ctx context.Context, id string, req UpdateRequest, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	DeactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
@@ -46,6 +47,22 @@ type service struct {
 	// non-super_admin roles (default-deny).
 	canPerm  PermissionChecker
 	permsFor func(role string) []string
+	// locales supplies the tenant available_locales used to validate preferred_locale (FR-BB116).
+	// nil means "unknown": every non-null locale is then refused (fail-closed).
+	locales LocaleSource
+}
+
+// LocaleSource reports the tenant's configured available_locales (satisfied by tenant.Service).
+type LocaleSource interface {
+	GetAvailableLocales() []string
+}
+
+// WithLocaleSource attaches the tenant locale source used by UpdateMyLocale.
+func WithLocaleSource(svc Service, src LocaleSource) Service {
+	if s, ok := svc.(*service); ok {
+		s.locales = src
+	}
+	return svc
 }
 
 // PermissionChecker reports whether role holds the resource:action permission
@@ -161,6 +178,42 @@ func (s *service) GetMe(ctx context.Context, userID string) (*User, error) {
 		return nil, fmt.Errorf("users.GetMe: %w", err)
 	}
 	return u, nil
+}
+
+// UpdateMyLocale sets (or, with a nil locale, clears) the caller's own preferred_locale
+// (FR-BB116 AC-2). A non-nil locale must be one of the tenant's available_locales; anything
+// else is ErrValidation. The caller can only ever address its own record, so no role check
+// applies. The returned LocaleUpdate carries the previous value for the audit entry.
+func (s *service) UpdateMyLocale(ctx context.Context, userID string, locale *string) (*LocaleUpdate, error) {
+	current, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("users.UpdateMyLocale: %w", err)
+	}
+	previous := current.PreferredLocale
+	if locale != nil && !s.isAvailableLocale(*locale) {
+		return nil, fmt.Errorf("%w: preferred_locale must be one of the tenant available locales", ErrValidation)
+	}
+	if err := s.repo.SetPreferredLocale(ctx, userID, locale); err != nil {
+		return nil, fmt.Errorf("users.UpdateMyLocale: %w", err)
+	}
+	updated, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("users.UpdateMyLocale: reload: %w", err)
+	}
+	return &LocaleUpdate{User: updated, Previous: previous}, nil
+}
+
+// isAvailableLocale reports whether code is one of the tenant's available_locales.
+func (s *service) isAvailableLocale(code string) bool {
+	if s.locales == nil {
+		return false
+	}
+	for _, l := range s.locales.GetAvailableLocales() {
+		if l == code {
+			return true
+		}
+	}
+	return false
 }
 
 // CreateUser creates a new user with a generated temporary password.

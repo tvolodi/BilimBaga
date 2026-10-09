@@ -32,6 +32,7 @@ type Repository interface {
 	IsOverdueTarget(ctx context.Context, userID, examID string) (bool, error)
 	LastReminderAt(ctx context.Context, userID, examID string) (*time.Time, error)
 	InsertReminder(ctx context.Context, userID, examID, sentBy string) error
+	SetPreferredLocale(ctx context.Context, userID string, locale *string) error
 	// UserInDeptScope reports whether the user is in the caller's department subtree (#253).
 	UserInDeptScope(ctx context.Context, sc deptscope.Scope, userID string) (bool, error)
 }
@@ -82,7 +83,8 @@ func (r *pgRepository) List(ctx context.Context, f ListFilters, deptScope *strin
 	listQ := fmt.Sprintf(`
 		SELECT u.id, u.email, u.full_name, u.department_id, d.name AS department_name,
 		       u.role_id, ro.name AS role_name, u.status, u.force_password_change,
-		       (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked, u.created_at
+		       (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked,
+		       u.preferred_locale, u.created_at
 		FROM   users u
 		LEFT JOIN departments d ON d.id = u.department_id
 		JOIN  roles ro ON ro.id = u.role_id
@@ -109,7 +111,8 @@ func (r *pgRepository) GetByID(ctx context.Context, id string) (*User, error) {
 	const q = `
 		SELECT u.id, u.email, u.full_name, u.department_id, d.name AS department_name,
 		       u.role_id, ro.name AS role_name, u.status, u.force_password_change,
-		       (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked, u.created_at
+		       (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked,
+		       u.preferred_locale, u.created_at
 		FROM   users u
 		LEFT JOIN departments d ON d.id = u.department_id
 		JOIN  roles ro ON ro.id = u.role_id
@@ -296,6 +299,23 @@ func (r *pgRepository) GetRoleNameByID(ctx context.Context, roleID string) (stri
 		return "", fmt.Errorf("users.GetRoleNameByID: %w", err)
 	}
 	return name, nil
+}
+
+// SetPreferredLocale stores the caller's preferred locale; nil clears it (FR-BB116).
+func (r *pgRepository) SetPreferredLocale(ctx context.Context, userID string, locale *string) error {
+	const q = `UPDATE users SET preferred_locale = $1, updated_at = now() WHERE id = $2`
+	result, err := r.db.ExecContext(ctx, q, locale, userID)
+	if err != nil {
+		return fmt.Errorf("users.SetPreferredLocale: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("users.SetPreferredLocale: rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // isUniqueViolation returns true when err is a PostgreSQL unique-constraint error.

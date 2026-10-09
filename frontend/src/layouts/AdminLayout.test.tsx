@@ -23,6 +23,8 @@ const employeeUser = { ...adminUser, role_name: 'employee', role_id: 'role-emp' 
 // Mock useMe to avoid network requests in tests
 vi.mock('@/api/users', () => ({
   useMe: vi.fn(),
+  // TopBar -> LocaleSwitcher persists the choice through this mutation (FR-BB116 AC-7).
+  useUpdateMyLocale: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 // Mock Breadcrumb to keep the test isolated from router-specific hooks

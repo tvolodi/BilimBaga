@@ -1,6 +1,7 @@
 package users
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -17,17 +18,33 @@ var (
 
 // User is the public-facing user record returned by the API.
 type User struct {
-	ID                  string    `db:"id"                   json:"id"`
-	Email               string    `db:"email"                json:"email"`
-	FullName            string    `db:"full_name"            json:"full_name"`
-	DepartmentID        *string   `db:"department_id"        json:"department_id"`
-	DepartmentName      *string   `db:"department_name"      json:"department_name"`
-	RoleID              string    `db:"role_id"              json:"role_id"`
-	RoleName            string    `db:"role_name"            json:"role_name"`
-	Status              string    `db:"status"               json:"status"`
-	ForcePasswordChange bool      `db:"force_password_change" json:"force_password_change"`
-	IsLocked            bool      `db:"is_locked"            json:"is_locked"`
-	CreatedAt           time.Time `db:"created_at"           json:"created_at"`
+	ID                  string  `db:"id"                   json:"id"`
+	Email               string  `db:"email"                json:"email"`
+	FullName            string  `db:"full_name"            json:"full_name"`
+	DepartmentID        *string `db:"department_id"        json:"department_id"`
+	DepartmentName      *string `db:"department_name"      json:"department_name"`
+	RoleID              string  `db:"role_id"              json:"role_id"`
+	RoleName            string  `db:"role_name"            json:"role_name"`
+	Status              string  `db:"status"               json:"status"`
+	ForcePasswordChange bool    `db:"force_password_change" json:"force_password_change"`
+	IsLocked            bool    `db:"is_locked"            json:"is_locked"`
+	// PreferredLocale is the user's persisted UI/email language (FR-BB116); nil when unset.
+	PreferredLocale *string   `db:"preferred_locale"     json:"preferred_locale"`
+	CreatedAt       time.Time `db:"created_at"           json:"created_at"`
+}
+
+// LocaleUpdate is the outcome of a successful preferred-locale change: the persisted record
+// and the value it replaced (used for the audit entry).
+type LocaleUpdate struct {
+	User     *User
+	Previous *string
+}
+
+// UpdateMeRequest is the JSON body for PATCH /api/v1/users/me. Only preferred_locale is
+// accepted (FR-BB116 AC-2/AC-3). It is kept raw so an absent key can be told apart from an
+// explicit null, which clears the preference.
+type UpdateMeRequest struct {
+	PreferredLocale json.RawMessage `json:"preferred_locale"`
 }
 
 // RoleRow is a minimal role record returned by the list-roles endpoint.

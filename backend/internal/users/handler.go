@@ -119,6 +119,83 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": meResponse{User: u, Permissions: perms}, "error": nil})
 }
 
+// UpdateMe handles PATCH /api/v1/users/me (FR-BB116). The body may contain only
+// preferred_locale; any other key is rejected with 400 VALIDATION_ERROR before anything is
+// persisted (AC-3). A successful change of the value writes user.preferred_locale_updated.
+func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var req UpdateMeRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid body: only preferred_locale is accepted")
+		return
+	}
+	// Exactly one JSON object: anything after it is rejected, not silently ignored.
+	var trailing json.RawMessage
+	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
+		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid body: only preferred_locale is accepted")
+		return
+	}
+	locale, err := parsePreferredLocale(req.PreferredLocale)
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		return
+	}
+
+	callerUserID := auth.UserIDFromCtx(r.Context())
+	change, err := h.svc.UpdateMyLocale(r.Context(), callerUserID, locale)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			api.WriteError(w, http.StatusNotFound, "NOT_FOUND", "user not found")
+		case errors.Is(err, ErrValidation):
+			api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update profile")
+		}
+		return
+	}
+	if !sameOptionalString(change.Previous, change.User.PreferredLocale) {
+		h.writer.Write(r.Context(), r, "user.preferred_locale_updated", "user", &callerUserID, map[string]any{
+			"old": nullableString(change.Previous),
+			"new": nullableString(change.User.PreferredLocale),
+		})
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": change.User, "error": nil})
+}
+
+// parsePreferredLocale turns the raw preferred_locale JSON value into a *string. An absent key
+// is a validation error; an explicit null yields nil (clears the preference).
+func parsePreferredLocale(raw json.RawMessage) (*string, error) {
+	if len(raw) == 0 {
+		return nil, errors.New("preferred_locale is required (a locale code or null)")
+	}
+	if string(raw) == "null" {
+		return nil, nil
+	}
+	var code string
+	if err := json.Unmarshal(raw, &code); err != nil {
+		return nil, errors.New("preferred_locale must be a string or null")
+	}
+	return &code, nil
+}
+
+// sameOptionalString compares two nullable strings.
+func sameOptionalString(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// nullableString returns the string value for audit metadata, or nil when unset.
+func nullableString(p *string) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
 // GetUser handles GET /api/v1/users/:id.
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

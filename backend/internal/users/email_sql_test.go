@@ -41,7 +41,11 @@ func (c recConn) Close() error                          { return nil }
 func (c recConn) Begin() (driver.Tx, error)             { return nil, errors.New("no tx") }
 func (s recStmt) Close() error                          { return nil }
 func (s recStmt) NumInput() int                         { return -1 }
-func (s recStmt) Exec([]driver.Value) (driver.Result, error) {
+func (s recStmt) Exec(args []driver.Value) (driver.Result, error) {
+	s.f.mu.Lock()
+	defer s.f.mu.Unlock()
+	s.f.queries = append(s.f.queries, s.q)
+	s.f.args = append(s.f.args, append([]driver.Value(nil), args...))
 	return driver.RowsAffected(1), nil
 }
 func (s recStmt) Query(args []driver.Value) (driver.Rows, error) {
@@ -86,4 +90,55 @@ func TestRepositoryCreate_DuplicateProbeIsCaseInsensitive(t *testing.T) {
 	require.Len(t, f.queries, 1, "no INSERT may be issued when a case-insensitive twin exists")
 	assert.Equal(t, "SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = lower($1))", strings.TrimSpace(f.queries[0]))
 	assert.Equal(t, "john.doe@corp.com", f.args[0][0])
+}
+
+// FR-BB116 AC-1 / AC-2: the preferred_locale column is selected by every user read and written
+// by SetPreferredLocale, with a nil locale bound as SQL NULL (clears the preference).
+func TestRepositoryPreferredLocaleSQL(t *testing.T) {
+	const uid = "11111111-1111-4111-8111-111111111111"
+
+	t.Run("GetByID selects preferred_locale", func(t *testing.T) {
+		f := &recDB{}
+		db := sqlx.NewDb(sql.OpenDB(recConnector{f}), "postgres")
+		t.Cleanup(func() { _ = db.Close() })
+
+		_, _ = NewRepository(db).GetByID(context.Background(), uid) // the fake rows never scan; only the SQL matters
+
+		require.Len(t, f.queries, 1)
+		assert.Contains(t, f.queries[0], "u.preferred_locale")
+	})
+
+	t.Run("List selects preferred_locale", func(t *testing.T) {
+		f := &recDB{idRows: []string{"1"}} // one row: the COUNT probe scans it as int, the list as a user id
+		db := sqlx.NewDb(sql.OpenDB(recConnector{f}), "postgres")
+		t.Cleanup(func() { _ = db.Close() })
+
+		_, _, err := NewRepository(db).List(context.Background(), ListFilters{Page: 1, PerPage: 20}, nil)
+		require.NoError(t, err)
+
+		var listQ string
+		for _, q := range f.queries {
+			if strings.Contains(q, "ORDER BY u.created_at DESC") {
+				listQ = q
+			}
+		}
+		require.NotEmpty(t, listQ, "list query must be issued")
+		assert.Contains(t, listQ, "u.preferred_locale")
+	})
+
+	t.Run("SetPreferredLocale writes the column; nil binds NULL", func(t *testing.T) {
+		f := &recDB{}
+		db := sqlx.NewDb(sql.OpenDB(recConnector{f}), "postgres")
+		t.Cleanup(func() { _ = db.Close() })
+		repo := NewRepository(db)
+
+		ru := "ru"
+		require.NoError(t, repo.SetPreferredLocale(context.Background(), uid, &ru))
+		require.NoError(t, repo.SetPreferredLocale(context.Background(), uid, nil))
+
+		require.Len(t, f.queries, 2)
+		assert.Equal(t, "UPDATE users SET preferred_locale = $1, updated_at = now() WHERE id = $2", strings.TrimSpace(f.queries[0]))
+		assert.Equal(t, []driver.Value{"ru", uid}, f.args[0])
+		assert.Equal(t, []driver.Value{nil, uid}, f.args[1])
+	})
 }

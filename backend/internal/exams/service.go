@@ -350,6 +350,12 @@ func (s *service) CreateRule(ctx context.Context, examID string, input QuestionR
 			return nil, fmt.Errorf("%w: tag_id %q is not a valid UUID", ErrInvalidInput, tagID)
 		}
 	}
+	// A malformed question id must be rejected before any row is written (#288).
+	for _, q := range input.Questions {
+		if !isValidUUID(q.QuestionID) {
+			return nil, fmt.Errorf("%w: %q", ErrInvalidQuestionID, q.QuestionID)
+		}
+	}
 	rule, err := s.repo.CreateRule(ctx, examID, input)
 	if err != nil {
 		return nil, fmt.Errorf("exams: CreateRule: %w", err)
@@ -401,6 +407,12 @@ func (s *service) SetManualQuestions(ctx context.Context, ruleID string, questio
 	}
 	if rule.Mode != "manual" {
 		return ErrRulesModeConflict
+	}
+	// A malformed question id must be rejected before it reaches the uuid column (#288).
+	for _, q := range questions {
+		if !isValidUUID(q.QuestionID) {
+			return fmt.Errorf("%w: %q", ErrInvalidQuestionID, q.QuestionID)
+		}
 	}
 	if err := s.repo.SetManualQuestions(ctx, ruleID, questions); err != nil {
 		return fmt.Errorf("exams: SetManualQuestions: %w", err)

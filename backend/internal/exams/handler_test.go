@@ -1038,3 +1038,33 @@ func TestUnpublish_ActiveSessions_Returns409WithERRActiveSessions(t *testing.T) 
 	assert.Equal(t, http.StatusConflict, w.Code)
 	assert.Equal(t, "ERR_ACTIVE_SESSIONS", decode(t, w).Error.Code)
 }
+
+// #288: a malformed question_id answers 422 ERR_VALIDATION on the questions field, never 500.
+func TestCreateRule_MalformedQuestionID_Returns422(t *testing.T) {
+	h := newHandler(&mockSvc{
+		createRuleFn: func(_ context.Context, _ string, _ QuestionRuleInput) (*ExamQuestionRule, error) {
+			return nil, ErrInvalidQuestionID
+		},
+	})
+	body := `{"mode":"manual","count":1,"sort_order":2,"questions":[{"question_id":"not-a-uuid","sort_order":1}]}`
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/rules", strings.NewReader(body)), "id", "exam-1")
+	h.CreateRule(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Equal(t, "ERR_VALIDATION", decode(t, w).Error.Code)
+}
+
+// #288: the manual-question route answers the same 422 for a malformed or unknown question_id.
+func TestSetManualQuestions_MalformedQuestionID_Returns422(t *testing.T) {
+	h := newHandler(&mockSvc{
+		setManualQuestionsFn: func(_ context.Context, _ string, _ []ManualQuestionInput) error {
+			return ErrInvalidQuestionID
+		},
+	})
+	body := `{"questions":[{"question_id":"not-a-uuid","sort_order":1}]}`
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/rules/rule-1/questions", strings.NewReader(body)), "id", "exam-1", "ruleId", "rule-1")
+	h.SetManualQuestions(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Equal(t, "ERR_VALIDATION", decode(t, w).Error.Code)
+}

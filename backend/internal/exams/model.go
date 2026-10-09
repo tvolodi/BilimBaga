@@ -21,6 +21,7 @@ var (
 	ErrInsufficientAdaptiveQuestions = errors.New("insufficient questions per difficulty for adaptive exam")
 	ErrActiveSessionsExist           = errors.New("exam has active in-progress sessions")
 	ErrQuestionNotFound              = errors.New("question not found")
+	ErrInvalidQuestionID             = errors.New("question id is not a valid UUID")
 )
 
 // Exam is the core configuration row.

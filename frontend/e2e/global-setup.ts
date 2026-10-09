@@ -34,6 +34,16 @@ function cachedToken(): string | null {
   return token
 }
 
+/** ISS-171: a password change revokes older tokens, so a cached token must be probed before reuse. */
+async function tokenStillAccepted(token: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${APP_URL}/api/v1/users/me`, { headers: { Authorization: `Bearer ${token}` } })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 /**
  * Global setup: log in once as admin.
  * Saves the access token to .auth/token.txt and reuses it on repeated runs
@@ -45,6 +55,10 @@ export default async function globalSetup() {
 
   // ── Token reuse: skip login if the cached token is still fresh ────────────
   let accessToken = cachedToken()
+  if (accessToken && !(await tokenStillAccepted(accessToken))) {
+    console.log('[global-setup] Cached token was revoked or rejected — logging in again')
+    accessToken = null
+  }
   let storageStateExists = fs.existsSync(STORAGE_STATE_PATH)
 
   if (accessToken && storageStateExists) {
@@ -85,8 +99,13 @@ export default async function globalSetup() {
             credentials: 'include',
           })
           if (!c.ok) return { ok: false, data: null, error: `forced password change failed (${c.status})` }
+          // ISS-171: the change revokes the login token; continue with the one it returns
+          // (its refresh cookie also replaced the login one via credentials: 'include').
+          const cj = await c.json()
+          if (!cj.data?.access_token) return { ok: false, data: null, error: 'change-password returned no access token' }
+          return { ...last, data: { ...json.data, access_token: cj.data.access_token }, password: newPass }
         }
-        return { ...last, password: json.data?.user?.force_password_change ? newPass : pass }
+        return { ...last, password: pass }
       }
       return last
     }, {

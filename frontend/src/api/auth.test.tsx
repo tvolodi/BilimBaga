@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { type ReactNode } from 'react'
-import { useLogin } from './auth'
+import { useLogin, useChangePassword } from './auth'
 
 const server = setupServer()
 
@@ -130,5 +130,53 @@ describe('useLogin', () => {
     })
 
     await waitFor(() => expect(result.current.isError).toBe(true))
+  })
+})
+
+describe('useChangePassword (ISS-171)', () => {
+  it('stores the access token returned by change-password in the auth cache', async () => {
+    server.use(
+      http.post('/api/v1/auth/change-password', ({ request }) => {
+        expect(request.headers.get('Authorization')).toBe('Bearer old-tok')
+        return HttpResponse.json({
+          data: { message: 'password changed', access_token: 'new-tok', token_type: 'Bearer', expires_in: 900 },
+          error: null,
+        })
+      }),
+    )
+    const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+    queryClient.setQueryData(['auth', 'accessToken'], 'old-tok')
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    const { result } = renderHook(() => useChangePassword(), { wrapper })
+    act(() => {
+      result.current.mutate({ current_password: 'Old1aaaa', new_password: 'New1aaaa' })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(queryClient.getQueryData(['auth', 'accessToken'])).toBe('new-tok')
+  })
+
+  it('keeps the old token and surfaces the error when the change fails', async () => {
+    server.use(
+      http.post('/api/v1/auth/change-password', () =>
+        HttpResponse.json(
+          { data: null, error: { code: 'INVALID_CREDENTIALS', message: 'current password is incorrect' } },
+          { status: 400 },
+        ),
+      ),
+    )
+    const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+    queryClient.setQueryData(['auth', 'accessToken'], 'old-tok')
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    const { result } = renderHook(() => useChangePassword(), { wrapper })
+    act(() => {
+      result.current.mutate({ current_password: 'bad', new_password: 'New1aaaa' })
+    })
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error?.code).toBe('INVALID_CREDENTIALS')
+    expect(queryClient.getQueryData(['auth', 'accessToken'])).toBe('old-tok')
   })
 })

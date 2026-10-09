@@ -164,9 +164,9 @@ DROP TABLE IF EXISTS users;
   "new_password": "NewS3cur3P@ss!"
 }
 
-// 200 OK
+// 200 OK (ISS-171: replacement session; earlier access tokens get 401 TOKEN_REVOKED)
 {
-  "data": { "message": "password changed" },
+  "data": { "message": "password changed", "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 900 },
   "error": null
 }
 
@@ -227,4 +227,4 @@ DROP TABLE IF EXISTS users;
 - New password minimum requirements: ≥ 8 characters (see AC-12). Stricter policy (uppercase, digit, special char) is configurable via tenant config in a future phase.
 - Migration `007_auth.up.sql` runs after FR-BB16 (`roles`) and FR-BB17 (`departments`), so both FK targets are guaranteed to exist.
 
-- Implementation note (PR #144, ISS-105): `change-password` does not stamp `users.password_changed_at`; only admin reset (FR-BB61) and token reset (FR-BB115) do, so only those revoke previously issued access tokens. Intended scope still to be decided.
+- Implementation note (PR #144, ISS-105; superseded by PR #204 / ISS-171): `change-password` now also stamps `users.password_changed_at` (application clock, truncated to the second) and, in the same transaction, revokes all of the user's refresh tokens. Every access token issued earlier is then rejected with 401 `TOKEN_REVOKED`, and the caller gets a replacement session in the `200` body (`data.access_token`, `token_type`, `expires_in`) plus a new `refresh_token` cookie. Revocation scope is therefore the same for self change, admin reset (FR-BB61) and token reset (FR-BB115). Known caveat: comparison is at second resolution, so an old token issued in the very same second as the change also survives.

@@ -48,7 +48,7 @@ func (s *service) ValidateAndImport(ctx context.Context, rows []ImportRow, dryRu
 
 	// ── 2. Validate each row ─────────────────────────────────────────────────
 	for i, row := range rows {
-		var errs []string
+		errs := append([]string(nil), row.ParseErrors...)
 
 		if !validQuestionTypes[row.Type] {
 			errs = append(errs, fmt.Sprintf("type: invalid value %q (must be single|multiple|truefalse|likert|shorttext)", row.Type))

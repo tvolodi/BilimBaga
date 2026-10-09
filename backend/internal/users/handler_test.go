@@ -29,7 +29,7 @@ type mockUserService struct {
 	deactivateFn func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
 	resetPwdFn   func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
 	importFn     func(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
-	listRolesFn  func(ctx context.Context) ([]RoleRow, error)
+	listRolesFn  func(ctx context.Context, callerRole string) ([]RoleRow, error)
 	unlockFn     func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 }
 
@@ -60,9 +60,9 @@ func (m *mockUserService) ImportUsers(ctx context.Context, rows []CSVRow, commit
 func (m *mockUserService) UnlockUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error) {
 	return m.unlockFn(ctx, id, callerRole, callerDeptID, callerUserID, ip)
 }
-func (m *mockUserService) ListRoles(ctx context.Context) ([]RoleRow, error) {
+func (m *mockUserService) ListRoles(ctx context.Context, callerRole string) ([]RoleRow, error) {
 	if m.listRolesFn != nil {
-		return m.listRolesFn(ctx)
+		return m.listRolesFn(ctx, callerRole)
 	}
 	return []RoleRow{}, nil
 }

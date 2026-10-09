@@ -16,6 +16,26 @@ import (
 
 const customRole = "qa_lead"
 
+// scopedSvc wires a permission model in which customRole holds users:read/manage plus the
+// employee portal permissions (so an employee target is a permission subset), as D-1 now
+// fails closed without a permission lookup.
+func scopedSvc(repo *mockRepo) Service {
+	perms := map[string][]string{
+		customRole:         {"users:read", "users:manage", "portal:read", "portal:submit"},
+		"department_admin": {"users:read", "users:manage"},
+		"employee":         {"portal:read", "portal:submit"},
+	}
+	has := func(role, res, act string) bool {
+		for _, p := range perms[role] {
+			if p == res+":"+act {
+				return true
+			}
+		}
+		return false
+	}
+	return WithPermissionsLookup(WithPermissionChecker(NewService(repo), has), func(r string) []string { return perms[r] })
+}
+
 func seedTwoDepts(repo *mockRepo) {
 	repo.users["u1"] = makeUser("u1", "dept-1", "role-emp", "employee")
 	repo.users["u2"] = makeUser("u2", "dept-1", "role-emp", "employee")
@@ -112,7 +132,7 @@ func TestScoping_UpdateUser_CustomRoleCannotMoveUserOutOfDepartment(t *testing.T
 func TestScoping_UpdateUser_CustomRoleOwnDeptOK(t *testing.T) {
 	repo := newMockRepo()
 	seedTwoDepts(repo)
-	_, err := NewService(repo).UpdateUser(context.Background(), "u1",
+	_, err := scopedSvc(repo).UpdateUser(context.Background(), "u1",
 		UpdateRequest{FullName: "X", DepartmentID: strPtr("dept-1"), RoleID: "role-emp"}, customRole, "dept-1", "c", "")
 	assert.NoError(t, err)
 }
@@ -127,7 +147,7 @@ func TestScoping_CustomRoleCannotAssignSuperAdmin(t *testing.T) {
 
 func TestScoping_Import_ScopedAndCannotImportSuperAdmin(t *testing.T) {
 	repo := newMockRepo()
-	svc := NewService(repo)
+	svc := scopedSvc(repo)
 	rows := []CSVRow{
 		{RowNum: 1, Email: "a@example.com", FullName: "A", DepartmentName: "Engineering", RoleName: "employee"},
 		{RowNum: 2, Email: "b@example.com", FullName: "B", DepartmentName: "Sales", RoleName: "employee"},

@@ -68,3 +68,21 @@ will make the next edit of such a question fail with 422 until the options are f
 ## Recurrence Log
 | Date | Trigger | Action Taken |
 |------|---------|-------------- |
+
+## Round 2 (ISS-173b, BA finding #202), 2026-10-09
+Two remaining paths still allowed blank default-locale option text:
+
+1. `PUT /api/v1/questions/{id}/translations/{locale}` (translation service `Upsert`): when `locale` equals the question's
+   `default_locale` and the type is a choice type (single, multiple, truefalse, likert), every option's text is now
+   validated with the PR #196 helper (`validateOptionTexts`). Failure: 422 `ERR_VALIDATION`, fields
+   `answer_options[i].translations.<locale>.text` (i = option position by sort_order). Non-default locales may be blank;
+   short-text skipped. Blank stem was already rejected by the handler (`stem is required`, same exact-empty rule as create;
+   whitespace-only stems are accepted by both create and this endpoint, left consistent).
+2. `POST /api/v1/questions/{id}/status` to `active` (service `TransitionStatus`): loads options through the existing
+   `GetWithDetails` (no new SQL) and rejects with 422 `ERR_VALIDATION` (message names the default locale, `fields` lists
+   the option indexes) when any option has blank default-locale text. Status is left unchanged. Other transitions and
+   already-active questions are untouched; no data migration; exam publish is not changed.
+
+Files: translation_service.go, translation_handler.go, service.go, handler.go, service_test.go (mock gains `detailOptions`),
+option_validation_test.go (new tests). Zero-options update remains out of scope.
+Tests: `go test -p 1 ./internal/questions/` passes, `go vet ./internal/questions/` clean. Full suite left to CI.

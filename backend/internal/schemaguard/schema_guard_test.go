@@ -505,3 +505,28 @@ func TestCheckQuery_FlagsUnqualifiedColumnInJoin(t *testing.T) {
 		t.Fatalf("alias/real column wrongly flagged: %+v", got)
 	}
 }
+
+// TestMigration035TargetsExistingColumn (ISS-181): the DO-block migration is not DDL the
+// replay above parses, so assert directly that the table/column it indexes exist in the
+// replayed schema and that it never touches rows (no DELETE/UPDATE/INSERT).
+func TestMigration035TargetsExistingColumn(t *testing.T) {
+	sc := loadSchema(t)
+	if !sc["users"]["email"] {
+		t.Fatal("users.email missing from replayed schema")
+	}
+	b, err := os.ReadFile("../../migrations/035_users_email_lower_unique.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := strings.ToLower(stripComments(string(b)))
+	for _, bad := range []string{"delete ", "update ", "insert ", "drop ", "truncate"} {
+		if strings.Contains(sql, bad) {
+			t.Errorf("migration 035 must not contain %q", bad)
+		}
+	}
+	for _, want := range []string{"from users", "on users (lower(email))", "create unique index if not exists", "raise notice"} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("migration 035 missing %q", want)
+		}
+	}
+}

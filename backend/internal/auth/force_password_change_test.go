@@ -141,11 +141,11 @@ func TestChangePasswordHandler_ClearsFlagThenImmediateAccess(t *testing.T) {
 
 	svc := &mockService{
 		parseTokenFn: func(string) (*Claims, error) { return makeValidClaims(), nil },
-		changePasswordFn: func(_ context.Context, _ string, _ *ChangePasswordRequest, _ string) error {
+		changePasswordFn: func(_ context.Context, _ string, _ *ChangePasswordRequest, _ string) (*ChangePasswordResponse, *http.Cookie, error) {
 			mu.Lock()
 			force = false
 			mu.Unlock()
-			return nil
+			return &ChangePasswordResponse{Message: "password changed"}, nil, nil
 		},
 	}
 	h := NewHandler(svc, nil)
@@ -192,7 +192,9 @@ func TestChangePasswordHandler_FailureDoesNotInvalidate(t *testing.T) {
 	called := false
 	svc := &mockService{
 		parseTokenFn:     func(string) (*Claims, error) { return makeValidClaims(), nil },
-		changePasswordFn: func(context.Context, string, *ChangePasswordRequest, string) error { return errors.New("boom") },
+		changePasswordFn: func(context.Context, string, *ChangePasswordRequest, string) (*ChangePasswordResponse, *http.Cookie, error) {
+			return nil, nil, errors.New("boom")
+		},
 	}
 	h := NewHandler(svc, nil)
 	h.SetPasswordChangedHook(func(string) { called = true })

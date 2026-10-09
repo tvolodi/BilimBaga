@@ -57,7 +57,8 @@ func initLogger(level string) zerolog.Logger {
 	return log
 }
 
-func main() {
+// serve is the normal startup path: migrate, wire dependencies, serve HTTP until signalled.
+func serve() {
 	// appCtx is cancelled on SIGINT/SIGTERM; used by background jobs for clean shutdown.
 	appCtx, stopApp := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stopApp()
@@ -82,20 +83,9 @@ func main() {
 	// They are not migrated here to avoid a large, unrelated diff.
 	slogger := slog.Default()
 
-	db, err := dbpkg.New(dbpkg.Config{
-		Host:            cfg.DBHost,
-		Port:            cfg.DBPort,
-		Name:            cfg.DBName,
-		User:            cfg.DBUser,
-		Password:        cfg.DBPassword,
-		SSLMode:         cfg.DBSSLMode,
-		MaxOpenConns:    cfg.DBMaxOpenConns,
-		MaxIdleConns:    cfg.DBMaxIdleConns,
-		ConnMaxIdleTime: time.Duration(cfg.DBConnMaxIdleSeconds) * time.Second,
-		ConnMaxLifetime: cfg.DBConnMaxLifetime,
-	})
+	db, err := openDB(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "startup error: open database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "startup error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -181,6 +171,11 @@ func main() {
 		zlog.Warn().Str("admin_email", auth.BootstrapAdminEmail).
 			Msg("SECURITY: seeded admin still has the default password; a password change is forced at first login. Set BOOTSTRAP_ADMIN_PASSWORD or change it now")
 	}
+
+	// ISS-181: if migration 035 skipped the lower(email) unique index because of legacy
+	// case-insensitive duplicate emails, report the twins (WARN log + audit entry).
+	// Never aborts startup.
+	users.RunStartupDuplicateEmailCheck(appCtx, db, slogger)
 
 	// Load the RBAC permission cache.
 	rbacCache := rbac.NewCache()

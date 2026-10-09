@@ -21,7 +21,9 @@ func TestRowToCSV_FormulaInjectionGuard(t *testing.T) {
 		},
 		Tags: []string{"+tag"},
 	}
-	rec := rowToCSV(row)
+	sc := newCSVExportScan()
+	sc.add(row)
+	rec := sc.columns().record(row)
 	assert.Equal(t, "'=Cat", rec[2])
 	assert.Equal(t, `'=HYPERLINK("http://evil","x")`, rec[4])
 	assert.Equal(t, "'@SUM(A1)", rec[5])

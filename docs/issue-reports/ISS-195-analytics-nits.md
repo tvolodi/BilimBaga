@@ -1,0 +1,69 @@
+---
+id: ISS-195
+title: Analytics/CSV consistency nits (grouped, from PR #194 review)
+status: resolved
+severity: low
+layer: backend
+module: reports
+tags: [auto_submitted, completion-rate, dashboard, user-progress]
+created: 2026-10-09
+resolved: 2026-10-09
+recurrence_count: 1
+related_issues: [ISS-165, ISS-191]
+regression_test: backend/internal/reports/repository_autosubmitted_test.go
+---
+
+## Symptom
+Dashboard, user-progress and completion-rate queries counted only `submitted`/`grading_pending` sessions,
+while results CSV/analytics (PR #194) also include `auto_submitted`.
+
+## Root Cause
+Hard-coded status lists in `backend/internal/reports/repository.go` were never updated when `auto_submitted` was added to the CSV/analytics queries.
+Real `session_status` enum values (migrations 014, 015): `in_progress`, `submitted`, `auto_submitted`, `grading_pending`.
+
+## Fix Applied
+Status predicates changed. Split rule: completion counts include grading_pending, score aggregates exclude it (partial scores).
+- Completion (`IN ('submitted','auto_submitted','grading_pending')`): GetCompletionRateByExam, GetRecentActivity, GetUserTrackActivity, GetUserRequiredExams, GetDashboardCompletionRatesForRange.
+- Score aggregates (`IN ('submitted','auto_submitted')`): GetAvgScoreByTrack (was `= 'submitted'`), GetTopBottomQuestions (correct rate). deptscope placeholders untouched. No migration.
+
+## Per-item outcome
+| # | Item | Outcome |
+|---|------|---------|
+| 1 | Completed-definition consistency | Done, tests added; SQL unverified against live Postgres (needs-live-db) |
+| 2 | FR-BB54 AC-8 doc lists non-existent `graded` status | Code audit: no session-status `graded` in code or tests. `GradingStatusGraded` in sessions/grading.go is a per-answer grading state, not a session status. Doc fix left to BA |
+| 3 | Exam-existence check lacks tenant filter | Not applicable: single tenant per deployment, `exams` has no tenant_id column; none added; reports code does not reference it; schemaguard green |
+| 4 | Unknown user gives empty record CSV | Already done in PR #182; covered by handler_test.go (USER_NOT_FOUND, ~line 497/593) and scope_test.go:174 |
+
+## Files Changed
+| File | Change |
+|------|--------|
+| backend/internal/reports/repository.go | status predicates include auto_submitted |
+| backend/internal/reports/repository_autosubmitted_test.go | new: SQL assertions for 7 queries, service pass-through |
+
+## Regression Test
+repository_autosubmitted_test.go (fake-driver SQL text assertions; no legacy list, no tenant_id, no 'graded', scope expanded).
+
+## Resolution Results
+- Tests: go test -p 1 ./... all pass; go vet and staticcheck clean
+- Migration applied: no
+- Build clean: yes
+
+## Classification of every touched query (supervisor decision)
+Rule: score statistics (AVG/median/histogram/pass rate/correct rate/passed counts) use `('submitted','auto_submitted')`; counts keep `('submitted','auto_submitted','grading_pending')`. `@SCOPE@` unchanged everywhere.
+
+| Query | Classification | Predicate |
+|-------|----------------|-----------|
+| GetCompletionRateByExam | completed_count = count; passed_count = score stat | 3 statuses / `AND es.status IN (2)` in passed_count |
+| GetDashboardCompletionRatesForRange | same | same |
+| GetRecentActivity | count/list of completed sessions | 3 |
+| GetUserTrackActivity | count (questions answered, last activity) | 3 |
+| GetUserRequiredExams | attempts = count; passed = score stat | 3 join; `BOOL_OR(passed) FILTER (2)` |
+| GetAvgScoreByTrack | score stat | 2 |
+| GetTopBottomQuestions | score stat (correct rate) | 2 |
+| GetExamScoreDistribution | score stat (histogram) | 2 |
+| GetExamSummaryStats | total_attempts, unique_participants = count (3); avg, median, pass rate = score stat (`FILTER (2)`, pass-rate numerator and denominator) | mixed |
+| GetPerQuestionStats | question set = presence (3); correct_rate and avg_time (sqs join) = 2 | mixed |
+| GetAnswerDistribution | selection counts | 3 |
+
+Unchanged on purpose: GetOverdueEmployees (existence of a passing session, not an aggregate), per-session list/stream queries (raw rows).
+Note: avg_time_seconds in GetPerQuestionStats shares the sqs join, so it also excludes grading_pending sessions.

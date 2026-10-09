@@ -2,6 +2,7 @@
 
 | ID | Title | Severity | Layer | Module | Status | Resolved |
 |----|-------|----------|-------|--------|--------|---------|
+| [ISS-171](ISS-171-self-change-revokes-tokens.md) | Self change-password does not revoke older access tokens | medium | backend | auth | resolved | 2026-10-09 |
 | [ISS-131](ISS-131-e2e-fixme-and-silent-skips.md) | e2e specs still test.fixme / silently skip (password-reset, tab-switch, certificates) | low | frontend | e2e | resolved | 2026-10-09 |
 | [ISS-141](ISS-141-uuid-params-422.md) | Malformed UUID id params (query and path) reach Postgres and return 500 | medium | backend | users | resolved | 2026-10-09 |
 | [ISS-102](ISS-102-e2e-specs-uncovered-flows.md) | Add e2e specs for uncovered flows (issue #16) | low | frontend | e2e | resolved | 2026-10-09 |
@@ -58,3 +59,4 @@
 | [ISS-165](ISS-165-dept-admin-report-scoping.md) | department_admin not scoped to its department on reports/analytics/dashboard endpoints | high | backend | reports | resolved | 2026-10-09 |
 | [ISS-160](ISS-160-backend-enforce-password-change.md) | Backend does not enforce force_password_change (SPA-only) | high | backend | auth | resolved | 2026-10-09 |
 | [ISS-176](ISS-176-api-inconsistencies.md) | API inconsistencies: VALIDATION_ERROR 422, import body cap, DISABLE_RATE_LIMIT answer-save | medium | backend | auth | resolved | 2026-10-09 |
+| [ISS-181](ISS-181-unique-email-index-guarded.md) | UNIQUE INDEX on lower(email) that can never break startup (migration 035) + duplicate-twin admin report (#181) | medium | database | users | resolved | 2026-10-09 |

@@ -51,6 +51,7 @@ afterAll(() => server.close())
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClient.setQueryData(['auth', 'accessToken'], `h.${btoa(JSON.stringify({ role: 'super_admin', sub: 'me-1' }))}.s`)
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>{children}</MemoryRouter>

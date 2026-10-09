@@ -189,12 +189,16 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.ChangePassword(r.Context(), userID, &req, clientIP(r)); err != nil {
+	resp, cookie, err := h.svc.ChangePassword(r.Context(), userID, &req, clientIP(r))
+	if err != nil {
 		handleServiceError(w, err)
 		return
 	}
 
 	h.passwordChanged(userID)
 	h.writer.Write(r.Context(), r, "auth.password_change", "user", &userID, nil)
-	writeJSON(w, http.StatusOK, map[string]string{"message": "password changed"}, nil)
+	if cookie != nil {
+		http.SetCookie(w, cookie)
+	}
+	writeJSON(w, http.StatusOK, resp, nil)
 }

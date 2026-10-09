@@ -250,7 +250,7 @@ test.describe('Question Management — Export Questions', () => {
       test.info().annotations.push({ type: 'note', description: 'No questions in bank' })
       return
     }
-    const checkbox = page.locator('input[type="checkbox"]').nth(1)
+    const checkbox = page.getByRole('checkbox', { name: /^select question /i }).first()
     if (!(await checkbox.isVisible({ timeout: 3_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No checkboxes in question table' })
       return
@@ -267,7 +267,7 @@ test.describe('Question Management — Export Questions', () => {
       test.info().annotations.push({ type: 'note', description: 'No questions in bank' })
       return
     }
-    const checkbox = page.locator('input[type="checkbox"]').nth(1)
+    const checkbox = page.getByRole('checkbox', { name: /^select question /i }).first()
     if (!(await checkbox.isVisible({ timeout: 3_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No checkboxes' })
       return
@@ -285,7 +285,7 @@ test.describe('Question Management — Export Questions', () => {
       test.info().annotations.push({ type: 'note', description: 'No questions in bank' })
       return
     }
-    const checkbox = page.locator('input[type="checkbox"]').nth(1)
+    const checkbox = page.getByRole('checkbox', { name: /^select question /i }).first()
     if (!(await checkbox.isVisible({ timeout: 3_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No checkboxes' })
       return
@@ -302,7 +302,7 @@ test.describe('Question Management — Export Questions', () => {
       test.info().annotations.push({ type: 'note', description: 'No questions in bank' })
       return
     }
-    const selectAllCheckbox = page.locator('input[type="checkbox"]').first()
+    const selectAllCheckbox = page.locator('thead').getByRole('checkbox', { name: /select all|выбрать все|барлығын таңдау/i })
     if (!(await selectAllCheckbox.isVisible({ timeout: 3_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No select-all checkbox' })
       return

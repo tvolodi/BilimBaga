@@ -153,6 +153,20 @@ func (s *translationService) Upsert(ctx context.Context, questionID, locale stri
 		return nil, nil, &MissingOptionsError{MissingIDs: missing}
 	}
 
+	// Default-locale option text must be non-blank for choice questions (ISS-173b).
+	// Non-default locales may stay blank; short-text has no options to check.
+	if locale == q.DefaultLocale {
+		inputs := make([]AnswerOptionInput, 0, len(optionIDs))
+		for _, id := range optionIDs {
+			inputs = append(inputs, AnswerOptionInput{
+				Translations: map[string]AnswerTranslationInput{locale: {Text: providedOpts[id]}},
+			})
+		}
+		if err := validateOptionTexts(q.Type, q.DefaultLocale, inputs); err != nil {
+			return nil, nil, fmt.Errorf("translations.Upsert: %w", err)
+		}
+	}
+
 	// Capture before-state for the audit log (may be nil).
 	before, err := s.repo.LoadLocaleTranslation(ctx, questionID, locale)
 	if err != nil {
@@ -164,7 +178,6 @@ func (s *translationService) Upsert(ctx context.Context, questionID, locale stri
 		return nil, nil, fmt.Errorf("translations.Upsert: %w", err)
 	}
 
-	_ = q // q already used for fetch-existence check
 	return before, after, nil
 }
 

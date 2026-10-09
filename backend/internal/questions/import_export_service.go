@@ -86,6 +86,13 @@ func (s *service) ValidateAndImport(ctx context.Context, rows []ImportRow, dryRu
 			}
 		}
 
+		// Every option of a choice question needs non-blank default-locale text.
+		if validQuestionTypes[row.Type] {
+			for _, fe := range optionTextFieldErrors(row.Type, row.DefaultLocale, row.AnswerOptions) {
+				errs = append(errs, fe.Field+": "+fe.Message)
+			}
+		}
+
 		// Resolve category_path to category_id (store resolved ID back in CategoryPath field).
 		if row.CategoryPath != "" && len(errs) == 0 {
 			catID, err := s.repo.ResolveCategoryPath(ctx, row.CategoryPath)

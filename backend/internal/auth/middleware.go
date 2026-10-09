@@ -16,12 +16,35 @@ import (
 // AuthOption configures Authenticate.
 type AuthOption func(*authOptions)
 
-type authOptions struct{ epoch PasswordChangedLookup }
+type authOptions struct{ state AccountStateLookup }
 
-// WithPasswordEpoch makes Authenticate reject access tokens issued before the user's
-// password was last reset (users.password_changed_at). Tokens without iat are rejected.
-func WithPasswordEpoch(l PasswordChangedLookup) AuthOption {
-	return func(c *authOptions) { c.epoch = l }
+// WithAccountState makes Authenticate consult the user's AccountState on every request:
+//   - access tokens issued before the user's last password reset are rejected
+//     (users.password_changed_at; tokens without iat are rejected) — ISS-105;
+//   - while users.force_password_change is true, every route except
+//     forcePasswordChangeAllowedPaths answers 403 PASSWORD_CHANGE_REQUIRED — ISS-160.
+//
+// Lookup failures fail closed.
+func WithAccountState(l AccountStateLookup) AuthOption {
+	return func(c *authOptions) { c.state = l }
+}
+
+// forcePasswordChangeAllowedPaths are the only authenticated routes reachable while
+// force_password_change is set: changing the password, and reading the own profile
+// (the SPA needs it to render the change-password page). /auth/login, /auth/refresh and
+// /auth/logout are public (cookie-based) routes and never pass through Authenticate.
+var forcePasswordChangeAllowedPaths = map[string]bool{
+	"/api/v1/auth/change-password": true,
+	"/api/v1/users/me":             true,
+}
+
+// forceChangeAllowed reports whether r may proceed for a user who must change password.
+// GET /users/me only; change-password for any method (the route itself is POST-only).
+func forceChangeAllowed(r *http.Request) bool {
+	if !forcePasswordChangeAllowedPaths[r.URL.Path] {
+		return false
+	}
+	return r.URL.Path != "/api/v1/users/me" || r.Method == http.MethodGet
 }
 
 // Authenticate validates a Bearer JWT and injects user claims into the context.
@@ -66,24 +89,29 @@ func Authenticate(jwtSecret string, opts ...AuthOption) func(http.Handler) http.
 			}
 			deptID, _ := claims["department_id"].(string) // optional; defaults to ""
 
-			if cfg.epoch != nil {
+			if cfg.state != nil {
 				iat, ok := claims["iat"].(float64)
 				if !ok {
 					api.WriteError(w, http.StatusUnauthorized, "INVALID_TOKEN", "invalid token claims")
 					return
 				}
-				changedAt, err := cfg.epoch(r.Context(), userID)
+				st, err := cfg.state(r.Context(), userID)
 				if err != nil {
 					if errors.Is(err, ErrNotFound) {
 						api.WriteError(w, http.StatusUnauthorized, "INVALID_TOKEN", "invalid token")
 					} else {
-						// Fail closed: without the epoch we cannot prove the token is current.
+						// Fail closed: without the state we cannot prove the token is current
+						// or that the user is not required to change their password.
 						api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "could not verify session")
 					}
 					return
 				}
-				if tokenPredatesPasswordChange(int64(iat), changedAt) {
+				if tokenPredatesPasswordChange(int64(iat), st.PasswordChangedAt) {
 					api.WriteError(w, http.StatusUnauthorized, "TOKEN_REVOKED", "password was changed; please sign in again")
+					return
+				}
+				if st.ForcePasswordChange && !forceChangeAllowed(r) {
+					api.WriteError(w, http.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "you must change your password before continuing")
 					return
 				}
 			}

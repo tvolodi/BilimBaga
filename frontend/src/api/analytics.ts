@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { errorWithCode } from '@/api/errors'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -46,7 +47,7 @@ async function apiGet<T>(url: string, token?: string | null): Promise<T> {
     credentials: 'include',
   })
   const body: ApiResponse<T> = await res.json()
-  if (body.error) throw new Error(body.error.message)
+  if (body.error) throw errorWithCode(body.error)
   if (!res.ok) throw new Error(`Request failed: ${res.status}`)
   return body.data
 }

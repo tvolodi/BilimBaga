@@ -39,6 +39,17 @@ import (
 func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, aiHandler *ai.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
 	r := chi.NewRouter()
 
+	// Per-user account state (password epoch + force_password_change), shared by the
+	// authenticate middleware and the password-change handlers so a successful change
+	// takes effect immediately instead of after the cache TTL (ISS-160).
+	var accountState *auth.AccountStateCache
+	if db != nil {
+		accountState = auth.NewDBAccountStateCache(db)
+		if authHandler != nil {
+			authHandler.SetPasswordChangedHook(accountState.Invalidate)
+		}
+	}
+
 	// Structured middleware chain (FR-BB66):
 	//   1. RequestID  — assign UUID correlation ID
 	//   2. Recovery   — recover panics and return 500 (wraps everything below)
@@ -79,7 +90,7 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		// Protected routes — Bearer JWT required; general rate limit (AC-1).
 		r.Group(func(r chi.Router) {
 			r.Use(ratelimit.GlobalLimiter())
-			r.Use(authenticate(jwtSecret, db))
+			r.Use(authenticate(jwtSecret, accountState))
 			// Department scoping for session-keyed admin endpoints (ISS-165).
 			var scopeStore deptscope.Store
 			if db != nil {
@@ -324,12 +335,14 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 	return r
 }
 
-// authenticate builds the JWT middleware. With a database it also rejects access tokens
-// issued before the user's last password reset (ISS-105); with a nil db (route tests that
-// never reach a handler) only the signature/expiry checks apply.
-func authenticate(jwtSecret string, db *sqlx.DB) func(http.Handler) http.Handler {
-	if db == nil {
+// authenticate builds the JWT middleware. With an account-state cache it also rejects
+// access tokens issued before the user's last password reset (ISS-105) and blocks every
+// route except the force-password-change allowlist while users.force_password_change is
+// set (ISS-160); with a nil cache (route tests that never reach a handler) only the
+// signature/expiry checks apply.
+func authenticate(jwtSecret string, state *auth.AccountStateCache) func(http.Handler) http.Handler {
+	if state == nil {
 		return auth.Authenticate(jwtSecret)
 	}
-	return auth.Authenticate(jwtSecret, auth.WithPasswordEpoch(auth.NewDBPasswordEpochLookup(db)))
+	return auth.Authenticate(jwtSecret, auth.WithAccountState(state.Lookup))
 }

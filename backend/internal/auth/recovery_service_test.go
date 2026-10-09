@@ -50,8 +50,11 @@ func (r *recoveryRepo) GetUserByEmail(_ context.Context, email string) (*User, e
 	r.mu.Lock()
 	r.calls = append(r.calls, "GetUserByEmail")
 	r.mu.Unlock()
-	if u, ok := r.users[email]; ok {
-		return u, nil
+	// mirrors the SQL "WHERE lower(u.email) = $1" (input is already normalised)
+	for stored, u := range r.users {
+		if strings.ToLower(stored) == email {
+			return u, nil
+		}
 	}
 	return nil, ErrNotFound
 }
@@ -241,6 +244,9 @@ func TestForgotPassword_MalformedEmail_ReturnsValidationError(t *testing.T) {
 		_, err := f.svc.ForgotPassword(context.Background(), &ForgotPasswordRequest{Email: bad}, "")
 		require.Error(t, err, bad)
 		assert.Equal(t, "VALIDATION_ERROR", serviceErrCode(t, err), bad)
+		var se *ServiceError
+		require.True(t, errors.As(err, &se))
+		assert.Equal(t, http.StatusUnprocessableEntity, se.HTTPStatus, bad)
 	}
 	assert.Empty(t, f.mailer.calls)
 }
@@ -391,6 +397,9 @@ func TestResetPassword_WeakPassword_ReturnsValidationAndDoesNotConsumeToken(t *t
 		_, err := f.svc.ResetPassword(context.Background(), &ResetPasswordRequest{Token: tok, NewPassword: weak}, "")
 		require.Error(t, err, weak)
 		assert.Equal(t, "VALIDATION_ERROR", serviceErrCode(t, err), weak)
+		var se *ServiceError
+		require.True(t, errors.As(err, &se))
+		assert.Equal(t, http.StatusUnprocessableEntity, se.HTTPStatus, weak)
 	}
 	assert.Nil(t, f.repo.resets[0].usedAt, "token must survive policy failures")
 

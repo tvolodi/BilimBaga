@@ -139,6 +139,22 @@ async function tryLoginWithPassword(email: string, pass: string, label: string):
   return null
 }
 
+/**
+ * ISS-160: a flagged admin (force_password_change) is rejected with 403 PASSWORD_CHANGE_REQUIRED on
+ * every route but change-password, so change it with the login token before any other call. The
+ * password stays unchanged when it already is the known one (the backend does not reject reuse).
+ */
+async function changeForcedAdminPassword(result: LoginResult, currentPass: string): Promise<string> {
+  const changed = await apiPost<unknown>(
+    `${BASE}/api/v1/auth/change-password`,
+    { current_password: currentPass, new_password: currentPass },
+    result.token,
+  )
+  if (!changed.ok) throw new Error(`Failed to clear forced admin password change: ${changed.error}`)
+  log('Admin forced password change completed')
+  return result.token
+}
+
 async function ensureAdminToken(): Promise<string> {
   // Probe for lock before burning attempts
   const lockCheck = await login(ADMIN_EMAIL, '___probe___')
@@ -154,12 +170,18 @@ async function ensureAdminToken(): Promise<string> {
   const envPass = process.env.E2E_ADMIN_PASS
   if (envPass && envPass !== ADMIN_INITIAL_PASS) {
     const envResult = await tryLoginWithPassword(ADMIN_EMAIL, envPass, 'E2E_ADMIN_PASS')
-    if (envResult) { log('Admin login OK (E2E_ADMIN_PASS)'); return envResult.token }
+    if (envResult) {
+      log('Admin login OK (E2E_ADMIN_PASS)')
+      return envResult.forceChange ? changeForcedAdminPassword(envResult, envPass) : envResult.token
+    }
   }
 
   // Try known post-seed password first (idempotent re-run)
   let result = await tryLoginWithPassword(ADMIN_EMAIL, ADMIN_KNOWN_PASS, 'Admin2024!')
-  if (result) { log('Admin login OK (known password)'); return result.token }
+  if (result) {
+    log('Admin login OK (known password)')
+    return result.forceChange ? changeForcedAdminPassword(result, ADMIN_KNOWN_PASS) : result.token
+  }
 
   // Try E2E walkthrough password (set when force_password_change flow runs)
   result = await tryLoginWithPassword(ADMIN_EMAIL, ADMIN_E2E_PASS, 'E2eAdmin2024!')

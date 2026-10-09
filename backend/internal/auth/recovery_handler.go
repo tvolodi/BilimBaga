@@ -21,7 +21,7 @@ const forgotPasswordMessage = "If an account exists for that email, a password r
 func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req ForgotPasswordRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRecoveryBody)).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, nil, &apiError{Code: "VALIDATION_ERROR", Message: "a valid email is required"})
+		writeJSON(w, http.StatusUnprocessableEntity, nil, &apiError{Code: "VALIDATION_ERROR", Message: "a valid email is required"})
 		return
 	}
 
@@ -67,7 +67,7 @@ func (h *Handler) padForgot(started time.Time) {
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req ResetPasswordRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRecoveryBody)).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, nil, &apiError{Code: "VALIDATION_ERROR", Message: "invalid request body"})
+		writeJSON(w, http.StatusUnprocessableEntity, nil, &apiError{Code: "VALIDATION_ERROR", Message: "invalid request body"})
 		return
 	}
 
@@ -81,6 +81,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.passwordChanged(userID)
 	ctx := context.WithValue(r.Context(), ctxkeys.CtxUserID, userID)
 	h.writer.Write(ctx, r.WithContext(ctx), "auth.password_reset_completed", "user", &userID, nil)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password has been reset"}, nil)

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 )
 
@@ -19,6 +20,19 @@ type Handler struct {
 	// forgotMin / sleep: constant-time padding for forgot-password (sleep is injectable in tests).
 	forgotMin time.Duration
 	sleep     func(time.Duration)
+	// onPasswordChanged, when set, runs right after a successful password change/reset so
+	// per-user caches (AccountStateCache) drop their entry (ISS-160).
+	onPasswordChanged func(userID string)
+}
+
+// SetPasswordChangedHook registers fn to be called with the user ID after every successful
+// change-password or reset-password. The router wires it to AccountStateCache.Invalidate.
+func (h *Handler) SetPasswordChangedHook(fn func(userID string)) { h.onPasswordChanged = fn }
+
+func (h *Handler) passwordChanged(userID string) {
+	if h.onPasswordChanged != nil {
+		h.onPasswordChanged(userID)
+	}
 }
 
 // auditWriter is the subset of *audit.Writer the handler uses (allows a fake in tests).
@@ -86,12 +100,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	resp, cookie, err := h.svc.Login(r.Context(), &req, clientIP(r))
 	if err != nil {
-		h.writer.Write(r.Context(), r, "auth.login.failure", "user", nil, map[string]any{"email": req.Email})
+		h.writer.Write(r.Context(), r, "auth.login.failure", "user", nil, map[string]any{"email": api.NormalizeEmail(req.Email)})
 		handleServiceError(w, err)
 		return
 	}
 
-	h.writer.Write(r.Context(), r, "auth.login.success", "user", &resp.User.ID, map[string]any{"email": req.Email})
+	h.writer.Write(r.Context(), r, "auth.login.success", "user", &resp.User.ID, map[string]any{"email": api.NormalizeEmail(req.Email)})
 	http.SetCookie(w, cookie)
 	writeJSON(w, http.StatusOK, resp, nil)
 }
@@ -180,6 +194,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.passwordChanged(userID)
 	h.writer.Write(r.Context(), r, "auth.password_change", "user", &userID, nil)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password changed"}, nil)
 }

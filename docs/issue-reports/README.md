@@ -55,3 +55,5 @@
 | [ISS-059](ISS-059-e2e-portal-redirect-wrong-assertion.md) | e2e full-walkthrough test 21 asserts wrong redirect for admin on /portal | low | frontend | e2e | resolved | 2026-10-09 |
 | [ISS-82](ISS-82-tenant-id-audit.md) | AI insights/loyalty SQL references nonexistent exams.tenant_id, session_questions.order_num, exams.category_id (schema audit) | high | backend | ai | resolved | 2026-10-09 |
 | [ISS-165](ISS-165-dept-admin-report-scoping.md) | department_admin not scoped to its department on reports/analytics/dashboard endpoints | high | backend | reports | resolved | 2026-10-09 |
+| [ISS-160](ISS-160-backend-enforce-password-change.md) | Backend does not enforce force_password_change (SPA-only) | high | backend | auth | resolved | 2026-10-09 |
+| [ISS-176](ISS-176-api-inconsistencies.md) | API inconsistencies: VALIDATION_ERROR 422, import body cap, DISABLE_RATE_LIMIT answer-save | medium | backend | auth | resolved | 2026-10-09 |

@@ -14,6 +14,13 @@ export function AdminHome() {
   const { isCustom, permissions, isLoading } = useMyPermissions()
   if (!isCustom) return <Navigate to="dashboard" replace />
   if (isLoading) return <FullPageSpinner />
+  if (permissions === undefined) {
+    return (
+      <p role="alert" className="py-8 text-sm text-red-600">
+        {t('common.loadError')}
+      </p>
+    )
+  }
   const target = ADMIN_LANDING_ORDER.find((a) => can(permissions, a.permission))
   if (target) return <Navigate to={target.path} replace />
   return (

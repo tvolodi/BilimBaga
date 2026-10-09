@@ -267,4 +267,10 @@ describe('AdminHome landing', () => {
     renderHome('qa_reviewer')
     expect(await screen.findByText('No pages available')).toBeInTheDocument()
   })
+
+  it('custom role shows a load error (not a no-access notice) when /users/me fails', async () => {
+    mePayload = 'error'
+    renderHome('qa_reviewer')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load')
+  })
 })

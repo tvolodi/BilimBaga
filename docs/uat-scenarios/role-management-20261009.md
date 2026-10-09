@@ -97,6 +97,10 @@ Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (as
 | 4 | Custom user (`qa_reviewer`, `reports:read`) | `GET /api/v1/admin/dashboard` and `/admin/reports/exams/{id}` | Data limited to the caller's department like `department_admin`, or the product explicitly accepts org-wide reports for a granted `reports:read` (decision required; today org-wide: GAP G1) | |
 | 5 | Custom2 user | `PUT /api/v1/users/{self}` changing own role | 403 (self role change blocked) | |
 | 6 | Custom2 user | Assign role `department_admin` to a department A employee | 403 if `department_admin` holds permissions the caller lacks | |
+| 7 | Dept admin A1 | Using `uat.deptadmin` (department A) against a peer `department_admin` A2 in the same department: `POST /api/v1/users/{A2}/reset-password`, `PUT /api/v1/users/{A2}`, `POST /api/v1/users/{A2}/deactivate`, `POST /api/v1/users/{A2}/unlock` | 403 `FORBIDDEN` on each (strict rank hierarchy, FR-BB117 D-1); the response body contains no temporary password; A2 can still log in with the old password | |
+| 8 | Dept admin A1 | Same four calls against a `super_admin` user and against an `examiner` and an `employee` in department A | `super_admin` target: 403 on all four. `examiner` and `employee` targets: allowed (200), because they are of strictly lower rank | |
+| 9 | Dept admin A1 | Same calls against an `employee` in department B | 403 or 404 (outside own department; no data leaked) | |
+| 10 | Custom2 user | Reset password of a peer user holding a custom role whose permissions are NOT a subset of Custom2's | 403; a role with a subset of Custom2's permissions is allowed | |
 
 ### S7 curl recipe (D-1, issue #217)
 

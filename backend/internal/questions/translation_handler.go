@@ -84,7 +84,10 @@ func (h *TranslationHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		var missing *MissingOptionsError
+		var optErr *OptionValidationError
 		switch {
+		case errors.As(err, &optErr):
+			writeValidationErrors(w, optErr.Fields)
 		case errors.Is(err, ErrQuestionNotFound):
 			api.WriteError(w, http.StatusNotFound, "ERR_QUESTION_NOT_FOUND", "question not found")
 		case errors.Is(err, ErrUnsupportedLocale):

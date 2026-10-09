@@ -29,7 +29,7 @@ export function startWindowBlock(exam: PortalExam, now: Date = new Date()): 'not
 }
 
 export function ExamCard({ exam, onStart }: ExamCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const countdown = useCountdown(exam.deadline)
 
@@ -107,10 +107,10 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
             : t('portal.card.noDeadline')}
         </div>
         {windowBlock && (
-          <p role="status" className="text-xs text-amber-600 mb-2">
+          <p id={`start-reason-${exam.id}`} role="status" className="text-xs text-amber-800 dark:text-amber-400 mb-2">
             {windowBlock === 'notOpen'
               ? t('portal.card.windowNotOpen', {
-                  date: new Date(exam.available_from as string).toLocaleString(),
+                  date: new Date(exam.available_from as string).toLocaleString(i18n.language),
                 })
               : t('portal.card.windowClosed')}
           </p>
@@ -120,6 +120,7 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
             className="w-full"
             variant={displayStatus === 'not_started' ? 'default' : 'outline'}
             disabled={ctaDisabled}
+            aria-describedby={windowBlock ? `start-reason-${exam.id}` : undefined}
             onClick={handleCta}
           >
             {ctaLabel}

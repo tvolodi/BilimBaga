@@ -65,7 +65,11 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
       if (apiErr.httpStatus === 422 && apiErr.unsatisfiedRules) {
         setUnsatisfiedRules(apiErr.unsatisfiedRules)
       } else {
-        setGeneralError(apiErr.message)
+        setGeneralError(
+          apiErr.code === 'INSUFFICIENT_QUESTIONS'
+            ? t('exam.wizard.step4.noQuestionsError')
+            : apiErr.message,
+        )
       }
     }
   }

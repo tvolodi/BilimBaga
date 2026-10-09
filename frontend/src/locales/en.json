@@ -511,6 +511,7 @@
         "addAssignee": "Add assignee"
       },
       "step4": {
+        "noQuestionsError": "This exam has no questions. Add at least one question rule in the Questions step before publishing.",
         "title": "Review & Publish",
         "publishConfirm": "Publishing this exam will make it available to assigned users. This cannot be undone. Are you sure?",
         "eligibleCount": "eligible",

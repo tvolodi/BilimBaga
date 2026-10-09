@@ -19,12 +19,12 @@ export interface PortalExam {
   show_answers: ShowAnswers
   shuffle_questions: boolean
   shuffle_options: boolean
+  available_from?: string | null
+  available_until?: string | null
 }
 
 export interface PortalExamDetail extends PortalExam {
   certificate_enabled: boolean
-  available_from?: string | null
-  available_until?: string | null
 }
 
 export interface SessionQuestion {

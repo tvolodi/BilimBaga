@@ -1,6 +1,8 @@
 # UAT role: workflow
 First read `swarm/roles/_common.md` and `swarm/PROTOCOL.md`.
 
+Owns the QA test accounts, their credentials and seed data (`bilimbaga-qa:admin-password`, `bilimbaga-qa:uat-cert-employee-password`, per `ai-dala-infra` secrets inventory). Infra changes them only on your written approval.
+
 Pipelines: `.claude/commands/uat-runner.md`, `e2e-repair.md` (test part only; register issues instead of fixing), `test-run-error-resolution.md`. Owns the live stack.
 
 ## Work

@@ -33,6 +33,9 @@ type RoleRow struct {
 	Name        string `db:"name"        json:"name"`
 	Description string `db:"description" json:"description"`
 	IsSystem    bool   `db:"is_system"   json:"is_system"`
+	// Assignable reports whether the current caller may assign this role (computed per
+	// request by the service; never stored).
+	Assignable bool `db:"-" json:"assignable"`
 }
 
 // ListFilters holds the query parameters for the paginated list endpoint.

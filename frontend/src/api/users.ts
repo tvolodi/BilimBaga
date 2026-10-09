@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { errorWithCode } from '@/api/errors'
+import { jwtSub } from '@/lib/routeRoles'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -68,6 +69,8 @@ export interface ImportPreview {
 export interface RoleRow {
   id: string
   name: string
+  /** Server-computed (FR-BB117 D-1, ISS-229): may the current caller assign this role? Absent on older backends. */
+  assignable?: boolean
 }
 
 export interface UsersFilters {
@@ -216,12 +219,18 @@ export function useUnlockUser() {
   })
 }
 
+export const rolesQueryKey = (userId: string | undefined) => ['users', 'roles', userId] as const
+
 export function useRoles() {
   const qc = useQueryClient()
   const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+  // The response carries per-caller `assignable` flags, so the key is scoped to the current
+  // user (JWT sub); without an id the query stays disabled rather than use a shared key.
+  const userId = jwtSub(token)
   return useQuery<RoleRow[], Error>({
-    queryKey: ['users', 'roles'],
+    queryKey: rolesQueryKey(userId),
     queryFn: () => apiFetch<RoleRow[]>('/api/v1/users/roles', token),
+    enabled: !!userId,
   })
 }
 

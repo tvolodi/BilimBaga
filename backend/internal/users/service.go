@@ -30,7 +30,7 @@ type Service interface {
 	ResetPassword(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
 	UnlockUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	ImportUsers(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
-	ListRoles(ctx context.Context) ([]RoleRow, error)
+	ListRoles(ctx context.Context, callerRole string) ([]RoleRow, error)
 }
 
 type service struct {
@@ -478,6 +478,14 @@ func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole st
 		}
 		return fmt.Errorf("checkRoleAssignment: %w", err)
 	}
+	return s.roleAssignableBy(roleName, callerRole)
+}
+
+// roleAssignableBy is the name-based assignment decision shared by checkRoleAssignment
+// (create/update validation) and ListRoles (the per-role `assignable` flag), so the two can
+// never drift. It applies to a non-super_admin caller: canReachRole plus, for custom roles,
+// a ban on roles:read / roles:manage / tenant:manage.
+func (s *service) roleAssignableBy(roleName, callerRole string) error {
 	if err := s.canReachRole(roleName, callerRole); err != nil {
 		return err
 	}
@@ -563,9 +571,23 @@ func (s *service) permissionSubset(roleName, callerRole string) error {
 	return nil
 }
 
-// ListRoles returns all roles from the database.
-func (s *service) ListRoles(ctx context.Context) ([]RoleRow, error) {
-	return s.repo.ListRoles(ctx)
+// ListRoles returns all roles from the database, each annotated with whether the CURRENT
+// caller may assign it (FR-BB117 D-1). super_admin gets true for every role; everyone else
+// is evaluated by roleAssignableBy, the same rule checkRoleAssignment enforces on create and
+// update. Only the boolean is exposed, never another role's permission list.
+func (s *service) ListRoles(ctx context.Context, callerRole string) ([]RoleRow, error) {
+	roles, err := s.repo.ListRoles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range roles {
+		if isOrgWide(callerRole) {
+			roles[i].Assignable = true
+			continue
+		}
+		roles[i].Assignable = s.roleAssignableBy(roles[i].Name, callerRole) == nil
+	}
+	return roles, nil
 }
 
 // generateTempPassword generates a cryptographically secure 10-character password

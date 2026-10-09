@@ -62,6 +62,17 @@ export function jwtRole(token: string | null | undefined): string | undefined {
   }
 }
 
+/** Decode the `sub` (user id) claim from a JWT without signature verification. */
+export function jwtSub(token: string | null | undefined): string | undefined {
+  if (!token) return undefined
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload?.sub === 'string' && payload.sub ? payload.sub : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** Admin pages in landing-preference order, used to route a custom role to its first allowed page. */
 export const ADMIN_LANDING_ORDER: ReadonlyArray<{ path: string; permission: string }> = [
   { path: '/admin/dashboard', permission: ROUTE_PERMISSIONS.dashboard },

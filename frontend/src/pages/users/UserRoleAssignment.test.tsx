@@ -28,7 +28,7 @@ afterAll(() => server.close())
 
 function wrap(role: string, ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  qc.setQueryData(['auth', 'accessToken'], `h.${btoa(JSON.stringify({ role }))}.s`)
+  qc.setQueryData(['auth', 'accessToken'], `h.${btoa(JSON.stringify({ role, sub: 'me-1' }))}.s`)
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
 }
 

@@ -20,7 +20,7 @@ Provides three data export endpoints for HR admins and examiners. Two endpoints 
 - [ ] AC-5: The user record CSV includes columns: `exam_title`, `started_at`, `submitted_at`, `score_pct`, `passed`, `time_taken_seconds`, `status`.
 - [ ] AC-6: The dashboard PDF export accepts `from` and `to` query params (ISO 8601 dates); if omitted, defaults to the last 30 days.
 - [ ] AC-7: The dashboard PDF includes: company logo header, date range label, a completion rates table, a pass rates table, and two question lists — top 5 by `correct_rate` and bottom 5 by `correct_rate` (across all exams in the range).
-- [ ] AC-8: CSV rows are streamed using Go's `encoding/csv` writer directly to the `http.ResponseWriter`; the entire dataset is not buffered in memory before writing.
+- [ ] AC-8: CSV is produced with Go's `encoding/csv`. Amended 2026-10-09 (BA, #163): a handler may build the body in memory before writing (so a query/encoding error can still return a proper error status and never an empty 200), provided the exam results export is bounded (page/row cap documented in the handler) and a failure after headers are sent is logged. Rules for every CSV export: finished sessions with statuses `submitted`, `auto_submitted` and `graded` are included; an unknown exam id returns 404 `NOT_FOUND`; cells beginning with `=`, `+`, `-` or `@` are prefixed with `'` (formula-injection guard); no BOM is required.
 - [ ] AC-9: The dashboard PDF is generated using `GeneratePDF`-compatible infrastructure from FR-BB44 (same PDF library, same tenant config injection); PDF bytes are buffered and streamed.
 - [ ] AC-10: Filenames in `Content-Disposition` are deterministic: `results-{exam_id}-{YYYYMMDD}.csv`, `record-{user_id}-{YYYYMMDD}.csv`, `dashboard-report-{from}-{to}.pdf`.
 

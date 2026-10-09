@@ -16,6 +16,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/upload"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // Handler handles HTTP requests for the users domain.
@@ -47,6 +48,12 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		f.DepartmentID = &v
 	}
 	if v := r.URL.Query().Get("role_id"); v != "" {
+		// role_id is a UUID column; reject anything else with a 422 instead of
+		// letting Postgres fail with "invalid input syntax for type uuid" (500).
+		if _, err := uuid.Parse(v); err != nil {
+			api.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "role_id must be a valid UUID")
+			return
+		}
 		f.RoleID = &v
 	}
 	if v := r.URL.Query().Get("status"); v != "" {

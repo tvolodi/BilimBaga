@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/select'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { StatusBadge } from '@/components/admin/StatusBadge'
-import { useUsers, useResetPassword, useUnlockUser, type User, type UsersFilters } from '@/api/users'
+import { useUsers, useRoles, useResetPassword, useUnlockUser, type User, type UsersFilters } from '@/api/users'
 import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
 import { UserCreateDrawer } from './UserCreateDrawer'
 import { UserEditDrawer } from './UserEditDrawer'
@@ -45,6 +45,7 @@ export function UsersListPage() {
   const [createdPasswordOpen, setCreatedPasswordOpen] = useState(false)
 
   const { data, isLoading, isError } = useUsers(filters)
+  const { data: roles = [] } = useRoles()
 
   // FR-BB115 AC-8: unlock action with an inline, auto-dismissing notice.
   const unlockMutation = useUnlockUser()
@@ -149,14 +150,16 @@ export function UsersListPage() {
 
         <Select
           className="w-48"
+          aria-label={t('users.filters.role')}
           value={filters.role_id ?? ''}
           onChange={(e) => setFilter('role_id', e.target.value)}
         >
           <option value="">{t('users.filters.role')}</option>
-          <option value="super_admin">{t('users.roles.super_admin')}</option>
-          <option value="department_admin">{t('users.roles.department_admin')}</option>
-          <option value="examiner">{t('users.roles.examiner')}</option>
-          <option value="employee">{t('users.roles.employee')}</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {t(`users.roles.${r.name}`, { defaultValue: r.name })}
+            </option>
+          ))}
         </Select>
 
         <Select

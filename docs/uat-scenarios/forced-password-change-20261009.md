@@ -55,6 +55,8 @@ Representative blocked endpoints (the "probe set" P): `GET /users`, `GET /admin/
 
 Use SA (mode B/C) with the token `T0` obtained in S1 step 4, before changing the password.
 
+**Session rule (decision of issue #342, FR-BB14 / ISS-171):** a password change revokes every access token issued before it, including the token that made the change, and returns a replacement session (`data.access_token`, new refresh cookie). Steps after a change use the replacement token `TN`, never the old one. Revocation compares `iat` with the change time at second resolution, so a token issued in the SAME second as the change survives (documented caveat, not a defect): wait at least 2 seconds between obtaining `T0` and the change, otherwise step 8b is not meaningful.
+
 | Step | Actor | Action | Expected Outcome | Pass/Fail |
 |------|-------|--------|-----------------|-----------|
 | 1 | SA | Call every endpoint of the probe set P with `Authorization: Bearer T0` | Every call: HTTP 403, `{data:null, error:{code:"PASSWORD_CHANGE_REQUIRED", message}}` (not 401, not 200, no data leakage) | |
@@ -63,8 +65,9 @@ Use SA (mode B/C) with the token `T0` obtained in S1 step 4, before changing the
 | 4 | SA | Re-login for a fresh token; `POST /auth/refresh` (no cookie) | 200 for login; refresh without cookie 401 `INVALID_REFRESH_TOKEN` (unaffected) | |
 | 5 | SA | `POST /auth/change-password` with `T0`, wrong `current_password` | 400 `INVALID_CREDENTIALS`; flag stays true; P still 403 | |
 | 6 | SA | `POST /auth/change-password` with weak `new_password` `alllower1` | 400 `WEAK_PASSWORD`; flag stays true | |
-| 7 | SA | `POST /auth/change-password` valid (`UatForce123!`) with `T0` | 200; flag cleared | |
-| 8 | SA | Immediately (no wait, no re-login) call the probe set with the SAME `T0` | All 200 (the 10 s cache is invalidated on change); at most one retry within 1 s tolerated, record any delay | |
+| 7 | SA | `POST /auth/change-password` valid (`UatForce123!`) with `T0` (obtained at least 2 s earlier) | 200; flag cleared; body carries `data.access_token` (`TN`) and a new `refresh_token` cookie | |
+| 8a | SA | Immediately (no wait, no re-login) call the probe set with the replacement token `TN` | All 200 (the 10 s cache is invalidated on change); at most one retry within 1 s tolerated, record any delay | |
+| 8b | SA | Call `GET /users/me` and one probe endpoint with the OLD `T0` | 401 `TOKEN_REVOKED` ("password was changed; please sign in again"); the old session is gone by design | |
 | 9 | SA | Login with the old initial credential | 401 `INVALID_CREDENTIALS`; login with `UatForce123!` returns `force_password_change=false` | |
 | 10 | Anonymous | Public/unauthenticated routes while another user is pending: `GET /health`, `GET /verify/...` (public certificate verification), `POST /auth/forgot-password`, `POST /auth/login` | Unaffected (200 or their normal status) | |
 | 11 | SA | Request with a missing token to a probe endpoint | 401 `MISSING_TOKEN` (not 403 `PASSWORD_CHANGE_REQUIRED`) | |
@@ -76,8 +79,9 @@ Use SA (mode B/C) with the token `T0` obtained in S1 step 4, before changing the
 | 1 | SA | `POST /users` for EMP-F (employee) and EXM-F (examiner) | 201; `temporary_password` returned | |
 | 2 | EMP-F | Login with the temporary password | 200; `force_password_change=true` | |
 | 3 | EMP-F | `GET /portal/exams`, `GET /portal/results`, `GET /users` | `PASSWORD_CHANGE_REQUIRED` 403 on all (portal included) | |
-| 4 | EMP-F | `GET /users/me`, then `POST /auth/change-password` to `UatForce456!` | 200 and 200 | |
-| 5 | EMP-F | `GET /portal/exams` with the same token | 200 immediately | |
+| 4 | EMP-F | `GET /users/me`, then (at least 2 s after the login of step 2) `POST /auth/change-password` to `UatForce456!` | 200 and 200; the change response carries the replacement `access_token` (`TN`) | |
+| 5 | EMP-F | `GET /portal/exams` with `TN` | 200 immediately | |
+| 5b | EMP-F | `GET /portal/exams` with the OLD token from step 2 | 401 `TOKEN_REVOKED` (200 only if the login and the change fell in the same second: repeat with a longer wait, record the gap) | |
 | 6 | EXM-F | Same as steps 2-5 against `GET /admin/dashboard` and `GET /admin/exams/{id}/analytics` | 403 `PASSWORD_CHANGE_REQUIRED` until changed, then 200/403-by-role as normal (examiner role rules unchanged) | |
 | 7 | SA | `POST /users/{EMP-R}/reset-password` for a user who has already changed password and holds a valid token `TR` | 200 with new `temporary_password` | |
 | 8 | EMP-R | Using the OLD token `TR`, call `GET /portal/exams` | Within 10 s (cache expiry) calls start returning 403 `PASSWORD_CHANGE_REQUIRED` (or 401 `TOKEN_REVOKED` per PR #144); record time to take effect; must not stay 200 beyond ~15 s | |
@@ -117,7 +121,7 @@ Fresh browser context.
 ## Pass / fail / env-issue criteria
 
 - **PASS:** S1-S5 as expected on a fresh DB; every probe call is `403 PASSWORD_CHANGE_REQUIRED` while pending and 200 right after the change; no documented default credential logs in on any deployment configured per mode A/B.
-- **FAIL (defect):** any probe endpoint returns 200/data with a pending-change token (issue #160 symptom); `change-password`, `GET /users/me` or `logout` blocked; token needs re-login after change; a user whose admin reset is pending keeps full access beyond ~15 s; default credential works on a mode A/B deployment; secret appears in logs; migration 033 modifies a rotated admin.
+- **FAIL (defect):** any probe endpoint returns 200/data with a pending-change token (issue #160 symptom); `change-password`, `GET /users/me` or `logout` blocked; the replacement `access_token` from the change response needs a re-login or does not work immediately, or the old token still works 2 s or more after the change; a user whose admin reset is pending keeps full access beyond ~15 s; default credential works on a mode A/B deployment; secret appears in logs; migration 033 modifies a rotated admin.
 - **ENV ISSUE:** cannot recreate a fresh DB or read startup logs; QA deploy mode unknown (REQ GAP 1); `E2E_ADMIN_PASS` unavailable.
 
 ## Pre-fix baseline (what a Runner sees on `main` `a45b92b`: PR #162 merged, PR #180 not)
@@ -129,7 +133,7 @@ S1 PASS (033 present: admin `force_password_change=true`; SECURITY warning). S2 
 | Source | Criterion | Covered by |
 |--------|-----------|-----------|
 | #160 | Backend rejects authenticated routes except change-password / logout / me with `PASSWORD_CHANGE_REQUIRED` | S2 steps 1-3, 11; S3 steps 3, 6 |
-| #160 | Fresh access right after change-password without re-login | S2 step 8; S3 step 5; S4 step 6 |
+| #160, #342 | Fresh access right after change-password without re-login (replacement token); old token revoked | S2 steps 8a, 8b; S3 steps 5, 5b; S4 step 6 |
 | #160 | Admin-reset of a user re-imposes the block | S3 steps 7-9 |
 | #160 | Frontend guard and global 403 handling | S4 steps 1-4 |
 | #160 | E2E/seed use env password or change first | S5 step 10 |
@@ -145,7 +149,7 @@ S1 PASS (033 present: admin `force_password_change=true`; SECURITY warning). S2 
 2. **Deployment mode contract missing:** no requirement says a public (QA/test/prod) deployment MUST set `BOOTSTRAP_ADMIN_PASSWORD` or `BOOTSTRAP_ADMIN_GENERATE`. Today mode C silently runs with a known credential plus a log warning. Decide whether startup should refuse in a production flag. The QA deployment mode is unknown to the BA.
 3. **Cache window:** enforcement uses a 10 s per-user cache per replica (stale up to 10 s on another replica; admin reset takes up to 10 s). Acceptable tolerance (15 s used above) needs to be a stated requirement.
 4. **Direct-navigation redirect latency** (~7.8 s, none on `/portal/results`) is a UI gap noted by the developer's UAT; S4 step 3 encodes a 2 s target that is not yet in any requirement.
-5. **Interaction with PR #144 token revocation** (`TOKEN_REVOKED` 401 after password change) is unspecified for the token used to call change-password; S2 step 8 expects the SAME token to keep working, which depends on the implementation not stamping revocation against the caller's own token. Confirm.
+5. **Interaction with PR #144 token revocation: RESOLVED (issue #342, BA decision 2026-10-09).** The design stands: change-password revokes the session that made the change and issues a replacement (FR-BB14 "Implementation note", ISS-171 / PR #204). The scenario was wrong to expect the same token to keep working; S2 step 8 is now 8a (replacement token works) and 8b (old token 401 `TOKEN_REVOKED`). The UAT observation in S3 step 5 (old token still 200) is the documented second-granularity caveat (login and change in the same second), not a defect; steps now wait 2 s.
 6. **bilimbaga-test (production-class)** admin state is escalated to the user (issue #152 comment); this scenario never runs there.
 7. CSV-imported users and `hr_admin` were not tested by the developer; hr_admin does not exist (renamed to `examiner`, migration 005).
 8. kk/ru change-password UI not verified by the developer (S4 step 5 is the first check).

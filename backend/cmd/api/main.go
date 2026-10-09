@@ -172,6 +172,11 @@ func serve() {
 			Msg("SECURITY: seeded admin still has the default password; a password change is forced at first login. Set BOOTSTRAP_ADMIN_PASSWORD or change it now")
 	}
 
+	// ISS-181: if migration 035 skipped the lower(email) unique index because of legacy
+	// case-insensitive duplicate emails, report the twins (WARN log + audit entry).
+	// Never aborts startup.
+	users.RunStartupDuplicateEmailCheck(appCtx, db, slogger)
+
 	// Load the RBAC permission cache.
 	rbacCache := rbac.NewCache()
 	if err := rbacCache.Load(db); err != nil {

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { useAssignableRoles } from '@/hooks/useAssignableRoles'
+import { userErrorKey } from '@/lib/assignableRoles'
 import { useImportUsers, type ImportPreview } from '@/api/users'
 
 interface ImportModalProps {
@@ -15,6 +17,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
   const importUsers = useImportUsers()
+  const { roles: assignable } = useAssignableRoles()
 
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [committed, setCommitted] = useState(false)
@@ -32,7 +35,8 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
       setPreview(result)
       setCommitted(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('users.messages.error_generic'))
+      const key = userErrorKey(err)
+      setError(key ? t(key) : err instanceof Error ? err.message : t('users.messages.error_generic'))
     }
   }
 
@@ -45,7 +49,8 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
       setPreview(result)
       setCommitted(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('users.messages.error_generic'))
+      const key = userErrorKey(err)
+      setError(key ? t(key) : err instanceof Error ? err.message : t('users.messages.error_generic'))
     }
   }
 
@@ -74,6 +79,11 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
               className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:cursor-pointer"
             />
             <p className="text-xs text-muted-foreground">{t('users.import_modal.upload_hint')}</p>
+            <p className="text-xs text-muted-foreground">
+              {assignable.length > 0
+                ? t('users.import_modal.assignable_roles_hint', { roles: assignable.map((r) => r.name).join(', ') })
+                : t('users.import_modal.no_assignable_roles')}
+            </p>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

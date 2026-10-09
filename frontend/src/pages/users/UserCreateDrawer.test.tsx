@@ -51,6 +51,8 @@ function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  // super_admin may assign every role (FR-BB117 D-1), keeping the role-list assertions meaningful.
+  queryClient.setQueryData(['auth', 'accessToken'], `h.${btoa(JSON.stringify({ role: 'super_admin' }))}.s`)
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )

@@ -11,6 +11,7 @@ var (
 	ErrInvalidTransition             = errors.New("invalid status transition")
 	ErrNotDraft                      = errors.New("exam is not in draft status")
 	ErrRulesModeConflict             = errors.New("operation not allowed on random-mode rule")
+	ErrNoQuestionRules               = errors.New("exam has no question rules")
 	ErrRulesUnsatisfied              = errors.New("one or more question rules cannot be satisfied")
 	ErrNotActive                     = errors.New("exam is not in active status")
 	ErrAssignmentExists              = errors.New("assignment already exists")

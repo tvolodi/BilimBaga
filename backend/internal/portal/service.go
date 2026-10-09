@@ -57,6 +57,8 @@ func (s *service) ListMyExams(ctx context.Context, userID, deptID string) ([]*Po
 			ShuffleQuestions:   row.ShuffleQuestions,
 			ShuffleOptions:     row.ShuffleOptions,
 			CertificateEnabled: row.CertificateEnabled,
+			AvailableFrom:      row.AvailableFrom,
+			AvailableUntil:     row.AvailableUntil,
 		})
 	}
 	return result, nil
@@ -100,6 +102,8 @@ func (s *service) GetMyExam(ctx context.Context, examID, userID, deptID string) 
 		ShuffleOptions:     row.ShuffleOptions,
 		ShowAnswers:        row.ShowAnswers,
 		CertificateEnabled: row.CertificateEnabled,
+		AvailableFrom:      row.AvailableFrom,
+		AvailableUntil:     row.AvailableUntil,
 		Deadline:           row.Deadline,
 		UserStatus:         status,
 		AttemptsUsed:       attemptsUsed,

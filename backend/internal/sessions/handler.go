@@ -59,6 +59,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusUnprocessableEntity, "INSUFFICIENT_QUESTIONS",
 				"This exam cannot be started because the question pool is too small.")
 		default:
+			slog.Error("sessions: create session failed", "exam_id", examID, "user_id", userID, "error", err)
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL",
 				"failed to create session")
 		}

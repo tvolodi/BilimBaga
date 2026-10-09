@@ -168,6 +168,11 @@ func (s *service) Publish(ctx context.Context, id string) (*Exam, error) {
 		return nil, fmt.Errorf("exams: Publish: list rules: %w", err)
 	}
 
+	// ISS-132: a fixed-form exam without any question rule would start as an empty exam.
+	if !e.Adaptive && len(rules) == 0 {
+		return nil, fmt.Errorf("exams: Publish: exam %s: %w", id, ErrNoQuestionRules)
+	}
+
 	// AC-2 (FR-BB72): if adaptive, validate ≥5 questions per difficulty per rule.
 	if e.Adaptive {
 		for _, rule := range rules {

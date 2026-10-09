@@ -189,6 +189,28 @@ func TestListMyExams_ReturnsItems(t *testing.T) {
 	assert.Equal(t, 0, items[0].AttemptsUsed)
 }
 
+// ISS-132: the availability window is exposed so the UI can disable Start while the exam is closed.
+func TestListMyExams_ExposesAvailabilityWindow(t *testing.T) {
+	fixNow(t, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC))
+	from := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	until := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	repo := &mockRepo{
+		listAssignedExamsFn: func(ctx context.Context, userID, deptID string) ([]*portalExamRow, error) {
+			row := baseExamRow("exam1")
+			row.AvailableFrom = &from
+			row.AvailableUntil = &until
+			return []*portalExamRow{row}, nil
+		},
+	}
+	items, err := NewService(repo).ListMyExams(context.Background(), "user1", "dept1")
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.NotNil(t, items[0].AvailableFrom)
+	assert.True(t, items[0].AvailableFrom.Equal(from))
+	require.NotNil(t, items[0].AvailableUntil)
+	assert.True(t, items[0].AvailableUntil.Equal(until))
+}
+
 func TestListMyExams_RepoError(t *testing.T) {
 	repo := &mockRepo{
 		listAssignedExamsFn: func(ctx context.Context, userID, deptID string) ([]*portalExamRow, error) {

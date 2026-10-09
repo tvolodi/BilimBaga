@@ -675,6 +675,8 @@
       "noAttemptsRemaining": "Қайта тапсыру мүмкіндігі жоқ",
       "attempts": "{{max}} ішінен {{used}}-ші әрекет",
       "deadline": "Мерзімі: {{countdown}}",
+      "windowNotOpen": "Ашылу уақыты: {{date}}",
+      "windowClosed": "Бұл емтиханға қол жеткізу уақыты аяқталды.",
       "noDeadline": "Мерзімсіз"
     },
     "startError": {

@@ -306,6 +306,73 @@ describe('EmployeePortal', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent(/could not start the exam/i)
     })
 
+    // ISS-132: Start is disabled, with a reason, outside the availability window.
+    it('disables Start and explains why when the exam window is closed', async () => {
+      server.use(
+        http.get('/api/v1/portal/exams', () =>
+          HttpResponse.json({
+            data: [makeExam({ available_until: '2020-01-01T00:00:00Z' })],
+            error: null,
+          }),
+        ),
+      )
+      renderPortal()
+      const btn = await screen.findByRole('button', { name: /start exam/i })
+      expect(btn).toBeDisabled()
+      expect(screen.getByRole('status')).toHaveTextContent(/availability window/i)
+    })
+
+    it('disables Start and shows the opening date before available_from', async () => {
+      server.use(
+        http.get('/api/v1/portal/exams', () =>
+          HttpResponse.json({
+            data: [makeExam({ available_from: '2999-01-01T00:00:00Z' })],
+            error: null,
+          }),
+        ),
+      )
+      renderPortal()
+      expect(await screen.findByRole('button', { name: /start exam/i })).toBeDisabled()
+      expect(screen.getByRole('status')).toHaveTextContent(/opens/i)
+    })
+
+    it('keeps Start enabled inside the window', async () => {
+      server.use(
+        http.get('/api/v1/portal/exams', () =>
+          HttpResponse.json({
+            data: [makeExam({ available_from: '2020-01-01T00:00:00Z', available_until: '2999-01-01T00:00:00Z' })],
+            error: null,
+          }),
+        ),
+      )
+      renderPortal()
+      expect(await screen.findByRole('button', { name: /start exam/i })).toBeEnabled()
+      expect(screen.queryByRole('status')).toBeNull()
+    })
+
+    // Every code POST /sessions can return must map to its own message.
+    it.each([
+      ['EXAM_NOT_ASSIGNED', /not assigned to you/i],
+      ['EXAM_ARCHIVED', /archived/i],
+      ['EXAM_NOT_ACTIVE', /not currently active/i],
+      ['EXAM_OUTSIDE_WINDOW', /not available at this time/i],
+      ['ATTEMPTS_EXHAUSTED', /used all allowed attempts/i],
+      ['SESSION_ALREADY_OPEN', /already have an exam in progress/i],
+      ['INSUFFICIENT_QUESTIONS', /too few questions/i],
+    ])('shows the message for %s', async (code, re) => {
+      server.use(
+        http.get('/api/v1/portal/exams', () => HttpResponse.json({ data: [makeExam()], error: null })),
+        http.post('/api/v1/portal/exams/exam-1/sessions', () =>
+          HttpResponse.json({ data: null, error: { code, message: 'x' } }, { status: 422 }),
+        ),
+      )
+      renderPortalWithRoutes()
+      const user = userEvent.setup()
+      await user.click(await screen.findByRole('button', { name: /start exam/i }))
+      await user.click(screen.getByRole('button', { name: /begin exam/i }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(re)
+    })
+
     it('clears the error when the modal is closed and reopened', async () => {
       server.use(
         http.post('/api/v1/portal/exams/exam-1/sessions', () =>

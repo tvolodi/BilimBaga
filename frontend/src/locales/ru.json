@@ -675,6 +675,8 @@
       "noAttemptsRemaining": "Попытки исчерпаны",
       "attempts": "Попытка {{used}} из {{max}}",
       "deadline": "До {{countdown}}",
+      "windowNotOpen": "Откроется {{date}}",
+      "windowClosed": "Время доступа к этому экзамену истекло.",
       "noDeadline": "Без срока"
     },
     "startError": {

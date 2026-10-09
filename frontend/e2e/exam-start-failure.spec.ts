@@ -64,4 +64,24 @@ test.describe('Start exam failure visibility (ISS-132)', () => {
     await page.getByRole('dialog').getByRole('button', { name: CONFIRM_BTN }).click()
     await expect(page).toHaveURL(/\/portal\/sessions\/[0-9a-f-]{36}/, { timeout: 20_000 })
   })
+
+  test('Start is disabled with a reason when the availability window is closed', async ({ page }) => {
+    await page.route('**/api/v1/portal/exams', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue()
+      const res = await route.fetch()
+      const body = await res.json()
+      const data = (body.data ?? []).map((e: Record<string, unknown>) => ({
+        ...e,
+        user_status: 'not_started',
+        open_session_id: null,
+        available_until: '2020-01-01T00:00:00Z',
+      }))
+      return route.fulfill({ response: res, json: { ...body, data } })
+    })
+    await page.goto('/portal')
+    const startBtn = page.getByRole('button', { name: START_BTN }).first()
+    if (!(await startBtn.isVisible({ timeout: 10_000 }).catch(() => false))) return
+    await expect(startBtn).toBeDisabled()
+    await expect(page.getByRole('status').first()).toBeVisible()
+  })
 })

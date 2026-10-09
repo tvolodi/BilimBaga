@@ -23,6 +23,8 @@ export interface PortalExam {
 
 export interface PortalExamDetail extends PortalExam {
   certificate_enabled: boolean
+  available_from?: string | null
+  available_until?: string | null
 }
 
 export interface SessionQuestion {

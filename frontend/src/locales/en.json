@@ -675,6 +675,8 @@
       "noAttemptsRemaining": "No attempts remaining",
       "attempts": "Attempt {{used}} of {{max}}",
       "deadline": "Due {{countdown}}",
+      "windowNotOpen": "Opens {{date}}",
+      "windowClosed": "The availability window for this exam has closed.",
       "noDeadline": "No deadline"
     },
     "startError": {

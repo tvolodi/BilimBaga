@@ -49,6 +49,10 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		if authHandler != nil {
 			authHandler.SetPasswordChangedHook(accountState.Invalidate)
 		}
+		// Role/department/status/lock changes by an admin must not wait out the cache TTL (ISS-248).
+		if usersHandler != nil {
+			usersHandler.SetUserChangedHook(accountState.Invalidate)
+		}
 	}
 
 	// Structured middleware chain (FR-BB66):

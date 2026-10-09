@@ -24,6 +24,19 @@ type Handler struct {
 	writer auditWriter
 	// permsFor resolves a role name to its "resource:action" permissions (GET /users/me, AC-16).
 	permsFor func(role string) []string
+	// onUserChanged is called with the user id after a successful update, deactivate,
+	// reset-password or unlock so the auth account-state cache drops its entry (ISS-248).
+	onUserChanged func(userID string)
+}
+
+// SetUserChangedHook registers fn to be called with the affected user id after every
+// successful account mutation. The router wires it to auth.AccountStateCache.Invalidate.
+func (h *Handler) SetUserChangedHook(fn func(userID string)) { h.onUserChanged = fn }
+
+func (h *Handler) userChanged(userID string) {
+	if h.onUserChanged != nil {
+		h.onUserChanged(userID)
+	}
 }
 
 // WithPermissionsProvider sets the function used to populate permissions on GET /users/me.
@@ -196,6 +209,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.userChanged(id)
 	h.writer.Write(r.Context(), r, "user.update", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": u, "error": nil})
 }
@@ -218,6 +232,7 @@ func (h *Handler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.userChanged(id)
 	h.writer.Write(r.Context(), r, "user.deactivate", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "error": nil})
 }
@@ -241,6 +256,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.userChanged(id)
 	h.writer.Write(r.Context(), r, "user.password_reset", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
 }
@@ -264,6 +280,7 @@ func (h *Handler) UnlockUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.userChanged(id)
 	h.writer.Write(r.Context(), r, "users.unlock", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": user, "error": nil})
 }

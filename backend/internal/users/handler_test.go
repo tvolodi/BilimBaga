@@ -724,3 +724,65 @@ func TestHandlerImportUsers_BodyOverCap_Returns413(t *testing.T) {
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "FILE_TOO_LARGE", apiErr.Code)
 }
+
+// ── ISS-248: account-state cache invalidation hook ───────────────────────────
+
+func TestHandlerMutations_InvokeUserChangedHook(t *testing.T) {
+	svc := &mockUserService{
+		updateFn: func(_ context.Context, id string, _ UpdateRequest, _, _, _, _ string) (*User, error) {
+			return sampleUser(id), nil
+		},
+		deactivateFn: func(_ context.Context, _, _, _, _, _ string) error { return nil },
+		resetPwdFn: func(_ context.Context, _, _, _, _, _ string) (*ResetPasswordResponse, error) {
+			return &ResetPasswordResponse{TemporaryPassword: "x"}, nil
+		},
+		unlockFn: func(_ context.Context, id, _, _, _, _ string) (*User, error) { return sampleUser(id), nil },
+	}
+	cases := []struct {
+		name string
+		call func(h *Handler, w http.ResponseWriter, r *http.Request)
+		body string
+	}{
+		{"update", (*Handler).UpdateUser, `{"full_name":"N","role_id":"role-emp"}`},
+		{"deactivate", (*Handler).DeactivateUser, ""},
+		{"reset-password", (*Handler).ResetPassword, ""},
+		{"unlock", (*Handler).UnlockUser, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var got []string
+			h := NewHandler(svc, nil)
+			h.SetUserChangedHook(func(id string) { got = append(got, id) })
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/users/u1", strings.NewReader(c.body))
+			req = withChiID(withAuthCtx(req, "caller", "super_admin", ""), "u1")
+			w := httptest.NewRecorder()
+			c.call(h, w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, []string{"u1"}, got)
+		})
+	}
+}
+
+func TestHandlerMutations_FailureDoesNotInvokeHook(t *testing.T) {
+	svc := &mockUserService{
+		deactivateFn: func(_ context.Context, _, _, _, _, _ string) error { return ErrForbidden },
+		unlockFn: func(_ context.Context, _, _, _, _, _ string) (*User, error) { return nil, ErrNotFound },
+	}
+	called := false
+	h := NewHandler(svc, nil)
+	h.SetUserChangedHook(func(string) { called = true })
+	for _, call := range []func(http.ResponseWriter, *http.Request){h.DeactivateUser, h.UnlockUser} {
+		req := withChiID(withAuthCtx(httptest.NewRequest(http.MethodPost, "/x", nil), "caller", "super_admin", ""), "u1")
+		call(httptest.NewRecorder(), req)
+	}
+	assert.False(t, called)
+}
+
+func TestHandlerMutations_NoHookIsSafe(t *testing.T) {
+	svc := &mockUserService{deactivateFn: func(_ context.Context, _, _, _, _, _ string) error { return nil }}
+	h := NewHandler(svc, nil)
+	req := withChiID(withAuthCtx(httptest.NewRequest(http.MethodPost, "/x", nil), "caller", "super_admin", ""), "u1")
+	w := httptest.NewRecorder()
+	h.DeactivateUser(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}

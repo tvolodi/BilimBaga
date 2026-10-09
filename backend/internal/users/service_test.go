@@ -30,6 +30,7 @@ type mockRepo struct {
 	overdue    map[string]bool // userID+"|"+examID
 	lastRemind *time.Time
 	reminders  []string
+	outOfScope map[string]bool // #253: users outside the caller's department subtree
 	insertErr  error
 	ambiguous  map[string]bool // department names that resolve to more than one row
 }

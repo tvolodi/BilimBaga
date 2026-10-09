@@ -39,7 +39,9 @@ func NewRepository(db *sqlx.DB) Repository {
 	return &pgRepository{db: db}
 }
 
-// GetUserByEmail fetches a user record joined with the role name.
+// GetUserByEmail fetches a user record joined with the role name. The caller passes the
+// normalised (trim+lowercase) address; the comparison lowercases the stored column so legacy
+// mixed-case rows stay reachable (ISS-164). A functional index on lower(email) is a follow-up.
 func (r *pgRepository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	const q = `
 		SELECT u.id, u.email, u.password_hash, u.full_name,
@@ -48,7 +50,7 @@ func (r *pgRepository) GetUserByEmail(ctx context.Context, email string) (*User,
 		       u.locked_until, u.created_at, u.updated_at
 		FROM   users u
 		JOIN   roles ro ON ro.id = u.role_id
-		WHERE  u.email = $1`
+		WHERE  lower(u.email) = $1`
 	var user User
 	if err := r.db.GetContext(ctx, &user, q, email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

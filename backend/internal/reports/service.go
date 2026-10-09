@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
 // Service defines the business logic for the reports domain.
@@ -248,11 +249,33 @@ func buildTrackProgress(activity []TrackActivity, exams []ExamProgress) []TrackS
 	return result
 }
 
+// authorizeUser enforces department scoping (ISS-165): a department_admin may
+// only read data about users of its own department subtree (or itself); every
+// other role is unrestricted. Returns ErrNotFound otherwise, so an out-of-scope user is
+// indistinguishable from an unknown one (no existence leak).
+func (s *service) authorizeUser(ctx context.Context, userID string) error {
+	sc := deptscope.FromContext(ctx)
+	if !sc.Restricted || sc.UserID == userID {
+		return nil
+	}
+	ok, err := s.repo.UserInScope(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // GetUserRecord validates the target user exists, then returns their paginated
 // session history together with the total session count (AC-2 through AC-5).
 func (s *service) GetUserRecord(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error) {
 	info, err := s.repo.GetUserInfo(ctx, userID)
 	if err != nil {
+		return nil, 0, fmt.Errorf("reports: GetUserRecord: %w", err)
+	}
+	if err := s.authorizeUser(ctx, userID); err != nil {
 		return nil, 0, fmt.Errorf("reports: GetUserRecord: %w", err)
 	}
 
@@ -285,6 +308,9 @@ func (s *service) GetUserRecord(ctx context.Context, userID string, page, perPag
 func (s *service) GetUserProgress(ctx context.Context, userID string) (*UserProgressResponse, error) {
 	info, err := s.repo.GetUserInfo(ctx, userID)
 	if err != nil {
+		return nil, fmt.Errorf("reports: GetUserProgress: %w", err)
+	}
+	if err := s.authorizeUser(ctx, userID); err != nil {
 		return nil, fmt.Errorf("reports: GetUserProgress: %w", err)
 	}
 
@@ -435,6 +461,12 @@ func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWrite
 // StreamUserRecordCSV streams a CSV of all session history for one user
 // directly to the http.ResponseWriter without buffering (AC-5, AC-8).
 func (s *service) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error {
+	if _, err := s.repo.GetUserInfo(ctx, userID); err != nil {
+		return fmt.Errorf("reports: StreamUserRecordCSV: %w", err)
+	}
+	if err := s.authorizeUser(ctx, userID); err != nil {
+		return fmt.Errorf("reports: StreamUserRecordCSV: %w", err)
+	}
 	header := []string{
 		"exam_title", "started_at", "submitted_at",
 		"score_pct", "passed", "time_taken_seconds", "status",

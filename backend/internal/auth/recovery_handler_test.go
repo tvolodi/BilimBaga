@@ -71,25 +71,25 @@ func TestForgotPassword_ExistingAndUnknownEmail_IdenticalResponse(t *testing.T) 
 	assert.Nil(t, aw.entries[0].metadata)
 }
 
-func TestForgotPassword_ValidationError_Returns400(t *testing.T) {
+func TestForgotPassword_ValidationError_Returns422(t *testing.T) {
 	svc := &mockService{forgotFn: func(context.Context, *ForgotPasswordRequest, string) (string, error) {
-		return "", &ServiceError{Code: "VALIDATION_ERROR", Message: "a valid email is required", HTTPStatus: http.StatusBadRequest}
+		return "", &ServiceError{Code: "VALIDATION_ERROR", Message: "a valid email is required", HTTPStatus: http.StatusUnprocessableEntity}
 	}}
 	h, aw := newRecoveryHandler(svc)
 
 	w := postJSON(h.ForgotPassword, `{"email":"not-an-email"}`)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 	_, apiErr := decodeEnvelope(t, w)
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
 	assert.Empty(t, aw.entries)
 }
 
-func TestForgotPassword_MalformedJSON_Returns400(t *testing.T) {
+func TestForgotPassword_MalformedJSON_Returns422(t *testing.T) {
 	h, _ := newRecoveryHandler(&mockService{})
 	w := postJSON(h.ForgotPassword, `{not json`)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 	_, apiErr := decodeEnvelope(t, w)
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
@@ -142,25 +142,25 @@ func TestResetPassword_InvalidToken_Returns400AndAuditsFailureWithoutToken(t *te
 	assert.Nil(t, aw.entries[0].metadata)
 }
 
-func TestResetPassword_WeakPassword_Returns400ValidationNoFailureAudit(t *testing.T) {
+func TestResetPassword_WeakPassword_Returns422ValidationNoFailureAudit(t *testing.T) {
 	svc := &mockService{resetFn: func(context.Context, *ResetPasswordRequest, string) (string, error) {
-		return "", &ServiceError{Code: "VALIDATION_ERROR", Message: "weak", HTTPStatus: http.StatusBadRequest}
+		return "", &ServiceError{Code: "VALIDATION_ERROR", Message: "weak", HTTPStatus: http.StatusUnprocessableEntity}
 	}}
 	h, aw := newRecoveryHandler(svc)
 
 	w := postJSON(h.ResetPassword, `{"token":"tok","new_password":"weak"}`)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 	_, apiErr := decodeEnvelope(t, w)
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
 	assert.Empty(t, aw.entries)
 }
 
-func TestResetPassword_MalformedJSON_Returns400(t *testing.T) {
+func TestResetPassword_MalformedJSON_Returns422(t *testing.T) {
 	h, _ := newRecoveryHandler(&mockService{})
 	w := postJSON(h.ResetPassword, `nope`)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 }
 
 func TestResetPassword_InternalError_Returns500(t *testing.T) {

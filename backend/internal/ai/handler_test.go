@@ -102,7 +102,7 @@ func TestHandler_GenerateQuestions_Success(t *testing.T) {
 	}
 }
 
-// 400 validation failure.
+// 422 validation failure.
 func TestHandler_GenerateQuestions_ValidationError(t *testing.T) {
 	svc := &mockService{err: &wrappedValidationError{}}
 	h := NewHandler(svc)
@@ -112,8 +112,8 @@ func TestHandler_GenerateQuestions_ValidationError(t *testing.T) {
 
 	h.HandleGenerateQuestions(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", w.Code)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d", w.Code)
 	}
 	env := decodeEnvelope(t, w.Body.Bytes())
 	if env.Error == nil || env.Error.Code != "VALIDATION_ERROR" {

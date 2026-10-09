@@ -13,7 +13,8 @@ import (
 )
 
 // disabled returns true when the DISABLE_RATE_LIMIT env variable is set to "true" or "1".
-// This is intended for E2E test environments only.
+// This is intended for E2E/load-test environments only; it must never be set on shared or
+// production-class instances. Rate limiting is ON by default.
 func disabled() bool {
 	v := os.Getenv("DISABLE_RATE_LIMIT")
 	return v == "true" || v == "1"
@@ -78,7 +79,12 @@ func GlobalLimiter() func(http.Handler) http.Handler {
 // AnswerSaveLimiter returns a middleware that allows 60 requests per minute,
 // keyed by the session ID extracted from the URL parameter "id".
 // It is intended for the answer-save endpoint: PUT /portal/sessions/{id}/answers/{questionId}.
+//
+// Like the other limiters it is bypassed when DISABLE_RATE_LIMIT is set (test-only).
 func AnswerSaveLimiter() func(http.Handler) http.Handler {
+	if disabled() {
+		return func(next http.Handler) http.Handler { return noopMiddleware(next) }
+	}
 	return httprate.Limit(
 		60,
 		time.Minute,

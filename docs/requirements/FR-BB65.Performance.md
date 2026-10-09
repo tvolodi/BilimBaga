@@ -45,7 +45,7 @@ The implementation is largely shipped. This revision turns the requirement into 
 - **D4 (UAT)**: executes the Evidence Plan below.
 
 ## Evidence Plan (owner: UAT, who owns the live stack)
-Prerequisites: stack up via `make dev` or `docker compose up -d --build` (Nginx on `${HOST_HTTP_PORT:-80}`, API on 8080), migrations applied (`make migrate`), seed from `frontend/e2e/seed-test-env.ts` plus a perf seed (SQL embedded in the EXPLAIN report), admin `admin@bilimbaga.local`. k6 runs through `docker run --rm -i --network host grafana/k6` (no global install). `DISABLE_RATE_LIMIT=true` is set on the API only for the k6 run and restored afterward.
+Prerequisites: stack up via `make dev` or `docker compose up -d --build` (Nginx on `${HOST_HTTP_PORT:-80}`, API on 8080), migrations applied (`make migrate`), seed from `frontend/e2e/seed-test-env.ts` plus a perf seed (SQL embedded in the EXPLAIN report), admin `admin@bilimbaga.local`. k6 runs through `docker run --rm -i --network host grafana/k6` (no global install). `DISABLE_RATE_LIMIT=true` is set on the API only for the k6 run and restored afterward. Since PR #197 (#176 I-11) it disables all three limiters, including the per-session answer-save limiter (60 req/min), so a k6 answer-save group is no longer throttled; without it that group would hit 429. Never set it on bilimbaga-test or any shared instance; verify the variable is unset after the run (default is rate limiting ON).
 
 | # | Evidence | Command | Report path |
 |---|----------|---------|-------------|

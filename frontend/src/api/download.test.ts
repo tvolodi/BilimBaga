@@ -50,6 +50,13 @@ describe('downloadFile', () => {
     expect(revoke).toHaveBeenCalledWith('blob:mock')
   })
 
+  it('raises the password-change flag on 403 PASSWORD_CHANGE_REQUIRED (ISS-160)', async () => {
+    const qc = makeQc()
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: null, error: { code: 'PASSWORD_CHANGE_REQUIRED' } }, 403))
+    await expect(downloadFile(qc, '/api/v1/x', 'f.pdf')).rejects.toMatchObject({ code: 'PASSWORD_CHANGE_REQUIRED', status: 403 })
+    expect(qc.getQueryData(['auth', 'passwordChangeRequired'])).toBe(true)
+  })
+
   it('omits Authorization when there is no token', async () => {
     fetchMock.mockResolvedValueOnce(blobResponse())
     await downloadFile(makeQc(null), '/api/v1/x', 'f.pdf')

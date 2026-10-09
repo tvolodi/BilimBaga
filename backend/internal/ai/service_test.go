@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
 // ---- Manual mocks -----------------------------------------------------------
@@ -27,6 +29,8 @@ type mockRepository struct {
 	upsertErr       error
 	examInsightData *ExamInsightData
 	examInsightErr  error
+	scopeIDs        map[string][]string // department id -> subtree ids
+	scopeIDsErr     error
 
 	// Loyalty narrative fields.
 	sessionTrack       string
@@ -59,6 +63,16 @@ func (m *mockRepository) GetInsightCache(_ context.Context, _ string) (*InsightR
 func (m *mockRepository) UpsertInsightCache(_ context.Context, _, _ string, _ []string) error {
 	m.upsertCalled = true
 	return m.upsertErr
+}
+
+func (m *mockRepository) GetScopeDepartmentIDs(_ context.Context, sc deptscope.Scope) ([]string, error) {
+	if m.scopeIDsErr != nil {
+		return nil, m.scopeIDsErr
+	}
+	if m.scopeIDs == nil {
+		return nil, nil
+	}
+	return m.scopeIDs[sc.DepartmentID], nil
 }
 
 func (m *mockRepository) GetExamInsightData(_ context.Context, _, _ string) (*ExamInsightData, error) {
@@ -305,7 +319,7 @@ func TestGetInsights_CacheHit_NoChatCall(t *testing.T) {
 	client := &mockClient{} // must not be called
 	svc := NewService(repo, client, "model", newLogger())
 
-	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	result, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", false)
 	if err != nil {
 		t.Fatalf("expected no error on cache hit, got: %v", err)
 	}
@@ -331,7 +345,7 @@ func TestGetInsights_ForceRefresh_BypassesFreshCache(t *testing.T) {
 	client := &mockClient{text: validInsightJSON, tokens: 100}
 	svc := NewService(repo, client, "model", newLogger())
 
-	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", true)
+	result, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -358,7 +372,7 @@ func TestGetInsights_CacheMiss_CallsAnthropic(t *testing.T) {
 	client := &mockClient{text: validInsightJSON, tokens: 200}
 	svc := NewService(repo, client, "model", newLogger())
 
-	result, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	result, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -382,7 +396,7 @@ func TestGetInsights_AnthropicError_ReturnsUnavailable(t *testing.T) {
 	client := &mockClient{err: ErrAIUnavailable}
 	svc := NewService(repo, client, "model", newLogger())
 
-	_, err := svc.GetInsights(context.Background(), "exam-1", "tenant-1", "user-1", false)
+	_, err := svc.GetInsights(scopedCtx("super_admin"), "exam-1", "tenant-1", "user-1", false)
 	if !errors.Is(err, ErrAIUnavailable) {
 		t.Errorf("expected ErrAIUnavailable, got %v", err)
 	}
@@ -397,7 +411,7 @@ func TestGetInsights_ExamNotFound(t *testing.T) {
 	client := &mockClient{}
 	svc := NewService(repo, client, "model", newLogger())
 
-	_, err := svc.GetInsights(context.Background(), "bad-exam", "tenant-1", "user-1", false)
+	_, err := svc.GetInsights(scopedCtx("super_admin"), "bad-exam", "tenant-1", "user-1", false)
 	if !errors.Is(err, ErrExamNotFound) {
 		t.Errorf("expected ErrExamNotFound, got %v", err)
 	}

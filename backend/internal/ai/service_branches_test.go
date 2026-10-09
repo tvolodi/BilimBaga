@@ -48,7 +48,7 @@ func TestGetInsights_StaleCache_Regenerates(t *testing.T) {
 		examInsightData: &ExamInsightData{ExamTitle: "T"},
 	}
 	svc := NewService(repo, &mockClient{text: `["a","b","c"]`, tokens: 9}, "m", newLogger())
-	res, err := svc.GetInsights(context.Background(), "e", "t", "u", false)
+	res, err := svc.GetInsights(scopedCtx("super_admin"), "e", "t", "u", false)
 	if err != nil || res.Cached || len(res.Insights) != 3 || !repo.upsertCalled {
 		t.Fatalf("got (%+v,%v) upsert=%v", res, err, repo.upsertCalled)
 	}
@@ -63,7 +63,7 @@ func TestGetInsights_CacheReadErrorIsNonFatal(t *testing.T) {
 		examInsightData: &ExamInsightData{},
 	}
 	svc := NewService(repo, &mockClient{text: `["a"]`}, "m", newLogger())
-	res, err := svc.GetInsights(context.Background(), "e", "t", "u", false)
+	res, err := svc.GetInsights(scopedCtx("super_admin"), "e", "t", "u", false)
 	if err != nil || len(res.Insights) != 1 { // partial (<3) results accepted
 		t.Fatalf("got (%+v,%v)", res, err)
 	}
@@ -73,7 +73,7 @@ func TestGetInsights_DataGatherErrorWrapped(t *testing.T) {
 	boom := errors.New("sql broke")
 	repo := &mockRepository{examInsightErr: boom}
 	svc := NewService(repo, &mockClient{}, "m", newLogger())
-	_, err := svc.GetInsights(context.Background(), "e", "t", "u", true)
+	_, err := svc.GetInsights(scopedCtx("super_admin"), "e", "t", "u", true)
 	if !errors.Is(err, boom) || errors.Is(err, ErrExamNotFound) {
 		t.Fatalf("got %v", err)
 	}
@@ -82,7 +82,7 @@ func TestGetInsights_DataGatherErrorWrapped(t *testing.T) {
 func TestGetInsights_MalformedJSON_ReturnsUnavailable(t *testing.T) {
 	repo := &mockRepository{examInsightData: &ExamInsightData{}}
 	svc := NewService(repo, &mockClient{text: "not json"}, "m", newLogger())
-	_, err := svc.GetInsights(context.Background(), "e", "t", "u", true)
+	_, err := svc.GetInsights(scopedCtx("super_admin"), "e", "t", "u", true)
 	if err != ErrAIUnavailable || repo.upsertCalled || repo.logCalled {
 		t.Fatalf("got %v upsert=%v log=%v", err, repo.upsertCalled, repo.logCalled)
 	}
@@ -95,7 +95,7 @@ func TestGetInsights_LogAndUpsertFailuresNonFatal(t *testing.T) {
 		upsertErr:       errors.New("upsert"),
 	}
 	svc := NewService(repo, &mockClient{text: `["a","b","c","d"]`}, "m", newLogger())
-	res, err := svc.GetInsights(context.Background(), "e", "t", "u", true)
+	res, err := svc.GetInsights(scopedCtx("super_admin"), "e", "t", "u", true)
 	if err != nil || len(res.Insights) != 4 {
 		t.Fatalf("got (%+v,%v)", res, err)
 	}

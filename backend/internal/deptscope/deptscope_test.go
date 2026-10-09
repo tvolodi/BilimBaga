@@ -38,12 +38,12 @@ func TestFromContext(t *testing.T) {
 	assert.Equal(t, "00000000-0000-0000-0000-000000000000", FromContext(principal("department_admin", "")).Arg(),
 		"a department_admin without a department matches nothing")
 
-	for _, role := range []string{"super_admin", "examiner", "employee", ""} {
+	for _, role := range []string{"super_admin"} {
 		s := FromContext(principal(role, deptA))
 		assert.False(t, s.Restricted, role)
 		assert.Nil(t, s.Arg(), role)
 	}
-	assert.False(t, FromContext(context.Background()).Restricted)
+	assert.True(t, FromContext(context.Background()).Restricted, "no principal fails closed")
 }
 
 func TestPredicate_IncludesDescendantsAndNullBypass(t *testing.T) {
@@ -96,9 +96,15 @@ type fakeStore struct {
 	inScope, found bool
 	err            error
 	calls          int
+	grading        int
 }
 
 func (s *fakeStore) UserInScope(context.Context, Scope, string) (bool, bool, error) {
+	s.calls++
+	return s.inScope, s.found, s.err
+}
+func (s *fakeStore) GradingSessionInScope(context.Context, Scope, string) (bool, bool, error) {
+	s.grading++
 	s.calls++
 	return s.inScope, s.found, s.err
 }
@@ -141,7 +147,9 @@ func TestMiddleware_Session(t *testing.T) {
 		{"malformed id passes to handler", "department_admin", deptA, &fakeStore{}, "not-a-uuid", 200, true, false},
 		{"lookup error 500", "department_admin", deptA, &fakeStore{err: errors.New("db")}, target, 500, false, true},
 		{"super_admin never checked", "super_admin", "", &fakeStore{inScope: false, found: true}, target, 200, true, false},
-		{"examiner never checked", "examiner", deptA, &fakeStore{inScope: false, found: true}, target, 200, true, false},
+		{"examiner is checked", "examiner", deptA, &fakeStore{inScope: false, found: true}, target, 404, false, true},
+		{"custom role is checked", "auditor_x", deptA, &fakeStore{inScope: false, found: true}, target, 404, false, true},
+		{"empty role fails closed", "", "", &fakeStore{inScope: false, found: true}, target, 404, false, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -177,4 +185,96 @@ func TestMiddleware_NilStoreFailsClosedForDepartmentAdmin(t *testing.T) {
 	w, reached = serve(RequireSessionInScope(nil, "id"), "super_admin", "", target)
 	assert.Equal(t, 200, w.Code)
 	assert.True(t, reached)
+}
+
+// ── ISS-218: scoping applies to every role except super_admin ────────────────
+
+func TestFromContext_AllRolesButSuperAdminRestricted(t *testing.T) {
+	for _, role := range []string{"department_admin", "examiner", "employee", "custom_reports_reader", "", "SUPER_ADMIN"} {
+		s := FromContext(principal(role, deptA))
+		assert.True(t, s.Restricted, "role %q must be restricted", role)
+		assert.Equal(t, deptA, s.Arg(), role)
+	}
+	assert.False(t, FromContext(principal("super_admin", deptA)).Restricted)
+	assert.Nil(t, FromContext(principal("super_admin", deptA)).Arg())
+}
+
+func TestFromContext_NoDepartmentIsEmptySet(t *testing.T) {
+	for _, role := range []string{"department_admin", "examiner", "custom_reports_reader", ""} {
+		assert.Equal(t, "00000000-0000-0000-0000-000000000000", FromContext(principal(role, "")).Arg(), role)
+	}
+	assert.Nil(t, FromContext(principal("super_admin", "")).Arg())
+}
+
+func TestFromContext_ExamOwnerOnlyForExaminer(t *testing.T) {
+	ex := FromContext(principal("examiner", deptA))
+	assert.Equal(t, callerU, ex.ExamOwnerID)
+	assert.Equal(t, callerU, ex.OwnerArg())
+	for _, role := range []string{"department_admin", "custom_reports_reader", "", "super_admin"} {
+		s := FromContext(principal(role, deptA))
+		assert.Empty(t, s.ExamOwnerID, role)
+		assert.Nil(t, s.OwnerArg(), role)
+	}
+}
+
+func TestGradingPredicate_OwnerOrSubtree(t *testing.T) {
+	p := GradingPredicate("es.user_id", "$2", "e", "$3")
+	assert.Contains(t, p, "e.created_by = $3::uuid OR ")
+	assert.Contains(t, p, "es.user_id IN (")
+	assert.Contains(t, p, "$2::uuid IS NULL")
+}
+
+func TestStore_GradingSessionInScope(t *testing.T) {
+	db, f := newFakeDB(t)
+	f.queue([]string{"x"}, [][]driver.Value{{int64(1)}})
+	in, found, err := NewStore(db).GradingSessionInScope(context.Background(), FromContext(principal("examiner", deptA)), target)
+	require.NoError(t, err)
+	assert.True(t, in)
+	assert.True(t, found)
+	assert.Contains(t, f.queries[0], "JOIN exams e ON e.id = es.exam_id")
+	assert.Contains(t, f.queries[0], "e.created_by = $3::uuid")
+	assert.Equal(t, []driver.Value{target, deptA, callerU}, f.args[0])
+
+	// A custom role never gets the owner carve-out (NULL owner).
+	db, f = newFakeDB(t)
+	f.queue([]string{"x"}, [][]driver.Value{{int64(0)}})
+	in, _, err = NewStore(db).GradingSessionInScope(context.Background(), FromContext(principal("custom_grader", deptA)), target)
+	require.NoError(t, err)
+	assert.False(t, in)
+	assert.Equal(t, []driver.Value{target, deptA, nil}, f.args[0])
+
+	db, _ = newFakeDB(t) // unknown session
+	_, found, err = NewStore(db).GradingSessionInScope(context.Background(), Scope{}, target)
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	db, f = newFakeDB(t)
+	f.qErr = errors.New("boom")
+	_, _, err = NewStore(db).GradingSessionInScope(context.Background(), Scope{}, target)
+	require.Error(t, err)
+}
+
+func TestGradingMiddleware_ExaminerOwnExamReachableOtherNot(t *testing.T) {
+	// owned exam: store says in scope -> handler reached via the grading lookup.
+	st := &fakeStore{inScope: true, found: true}
+	w, reached := serve(RequireGradingSessionInScope(st, "id"), "examiner", deptA, target)
+	assert.Equal(t, 200, w.Code)
+	assert.True(t, reached)
+	assert.Equal(t, 1, st.grading, "grading lookup used")
+
+	// other department's exam not owned: 404, identical to unknown.
+	st = &fakeStore{inScope: false, found: true}
+	w, reached = serve(RequireGradingSessionInScope(st, "id"), "examiner", deptA, target)
+	assert.Equal(t, 404, w.Code)
+	assert.False(t, reached)
+	assert.Contains(t, w.Body.String(), `"code":"SESSION_NOT_FOUND"`)
+
+	// super_admin is never checked; plain scope middleware never uses the grading lookup.
+	st = &fakeStore{inScope: false, found: true}
+	_, reached = serve(RequireGradingSessionInScope(st, "id"), "super_admin", "", target)
+	assert.True(t, reached)
+	assert.Equal(t, 0, st.calls)
+	st = &fakeStore{inScope: false, found: true}
+	serve(RequireSessionInScope(st, "id"), "examiner", deptA, target)
+	assert.Equal(t, 0, st.grading)
 }

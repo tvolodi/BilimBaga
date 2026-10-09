@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -62,6 +63,9 @@ func TestGetExamInsightData_DepartmentScoped(t *testing.T) {
 		want driver.Value
 	}{
 		{"department_admin", scopeDept},
+		{"examiner", scopeDept},
+		{"custom_insights_reader", scopeDept},
+		{"", scopeDept},
 		{"super_admin", nil},
 	} {
 		db, f := newFakeDB(t)
@@ -83,6 +87,42 @@ func TestGetExamInsightData_DepartmentScoped(t *testing.T) {
 			if a[len(a)-1] != tc.want {
 				t.Errorf("%s: query %d scope arg = %v, want %v", tc.role, i, a[len(a)-1], tc.want)
 			}
+		}
+	}
+}
+
+// ISS-218: any non-super_admin role (examiner, custom role, empty role) gets
+// scoped insights, so none may read or populate the exam-wide shared cache.
+func TestGetInsights_AllNonSuperAdminRoles_BypassSharedCache(t *testing.T) {
+	for _, role := range []string{"examiner", "custom_insights_reader", ""} {
+		freshCache := &InsightResult{
+			Insights:    []string{"All-department insight."},
+			GeneratedAt: time.Now().UTC().Add(-time.Hour),
+			Cached:      true,
+		}
+		repo := &mockRepository{insightCache: freshCache, examInsightData: sampleExamData}
+		svc := NewService(repo, &mockClient{text: validInsightJSON, tokens: 10}, "model", newLogger())
+		res, err := svc.GetInsights(scopedCtx(role), "exam-1", "tenant-1", "user-1", false)
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", role, err)
+		}
+		if res.Cached || (len(res.Insights) > 0 && res.Insights[0] == "All-department insight.") {
+			t.Errorf("%q must get freshly generated scoped insights, got %+v", role, res)
+		}
+		if repo.upsertCalled {
+			t.Errorf("%q: scoped insights must not be written to the shared cache", role)
+		}
+	}
+}
+
+// ISS-218: loyalty narratives are gated by the department check for every role
+// but super_admin (examiner and custom roles included); empty role fails closed.
+func TestGetLoyaltyNarrative_NonSuperAdminRolesDepartmentChecked(t *testing.T) {
+	for _, role := range []string{"examiner", "custom_insights_reader", ""} {
+		repo := &mockRepository{sessionTrack: "loyalty", sessionEmployeeID: "emp-1", inDepartment: false}
+		svc := NewService(repo, &mockClient{}, "model", newLogger())
+		if _, err := svc.GetLoyaltyNarrative(context.Background(), "sess-1", "admin-1", role); !errors.Is(err, ErrForbidden) {
+			t.Errorf("%q: expected ErrForbidden, got %v", role, err)
 		}
 	}
 }

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Download } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { downloadErrorKey } from '@/api/download'
 import { useAuditLog, exportAuditLog, type AuditFilters } from '@/api/audit'
 import { AuditFilterBar } from '@/components/audit/AuditFilterBar'
 import { AuditLogTable } from '@/components/audit/AuditLogTable'
@@ -41,6 +42,7 @@ export function AuditLogPage() {
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const fallbackFrom = useMemo(() => defaultFrom(), [])
 
   // Initialise filters from URL; default to "last 7 days" when no date range set.
@@ -71,10 +73,12 @@ export function AuditLogPage() {
   }
 
   async function handleExport() {
-    const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+    setExportError(null)
     setIsExporting(true)
     try {
-      await exportAuditLog(filters, token)
+      await exportAuditLog(qc, filters)
+    } catch (err) {
+      setExportError(downloadErrorKey(err))
     } finally {
       setIsExporting(false)
     }
@@ -110,6 +114,12 @@ export function AuditLogPage() {
           )}
         </Button>
       </div>
+
+      {exportError && (
+        <div role="alert" className="px-4 py-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800">
+          {t(exportError)}
+        </div>
+      )}
 
       {/* Filter bar */}
       <AuditFilterBar filters={filters} onChange={handleFiltersChange} />

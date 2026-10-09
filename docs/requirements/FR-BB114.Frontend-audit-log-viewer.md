@@ -173,4 +173,4 @@ Diff viewer for before/after state, saved searches, multi-tenant aggregation (su
 ## Test Strategy
 - **Unit**: `AuditTable` renders with mixed `actor_id = null` and populated rows; metadata expand toggles correctly.
 - **Integration**: Filter state ↔ URL query params via `useSearchParams`; CSV export triggers a `fetch` to `/api/v1/audit/export` with the current filters.
-- **E2E**: Filter by entity_type=`user` → table reduces; click "Export CSV" → file downloads; non–super-admin user navigating to `/admin/audit` is redirected.
+- **E2E**: Filter by entity_type=`user` → table reduces; click "Export CSV" → file downloads; non–super-admin admin-area user navigating to `/admin/audit` is redirected to `/login`; an `employee` is redirected to `/portal` (FR-BB111 AC-5).

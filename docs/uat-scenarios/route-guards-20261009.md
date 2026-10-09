@@ -96,8 +96,8 @@ Other: platform at `http://localhost`; fresh browser context per role; capture `
 
 | Step | Actor | Action | Expected Outcome | Pass/Fail |
 |------|-------|--------|-----------------|-----------|
-| 1 | employee | Log in as `uat.employee@test.com`; navigate to `/admin/reports` | Redirected to `/login` (FR-BB59 AC-2); Reports never rendered | |
-| 2 | employee | Log in again if needed; navigate to `/admin/audit` | Redirected to `/login` | |
+| 1 | employee | Log in as `uat.employee@test.com`; navigate to `/admin/reports` | Redirected to `/portal` (BA decision on #39: employee home, FR-BB111 AC-5); Reports never rendered | |
+| 2 | employee | Log in again if needed; navigate to `/admin/audit` | Redirected to `/portal` | |
 | 3 | Tester | API with employee token: `GET /api/v1/admin/dashboard/export` and the audit log endpoint | HTTP 403 each | |
 
 ## Scenario S6: Deep link and history behaviour
@@ -112,7 +112,7 @@ Other: platform at `http://localhost`; fresh browser context per role; capture `
 
 | Step | Actor | Action | Expected Outcome | Pass/Fail |
 |------|-------|--------|-----------------|-----------|
-| 1 | Tester | For each denied case (S3 step 3, S4 step 2, S5 steps 1-2) record the final URL path | `/login` (not `/admin`, not `/portal`, not blank) | |
+| 1 | Tester | For each denied case (S3 step 3, S4 step 2, S5 steps 1-2) record the final URL path | `/login` for admin-area roles; `/portal` for employee (S5); never `/admin` or blank | |
 | 2 | Tester | Check DOM during redirect | No audit table or reports cards ever rendered | |
 | 3 | Tester | Check console | No errors or 403 toasts caused by the redirect | |
 | 4 | Tester | After redirect, check the login screen | Login form shown and usable; no redirect loop back to `/admin`; logging in as super_admin reaches `/admin/dashboard` | |

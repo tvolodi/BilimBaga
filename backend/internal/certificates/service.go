@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/google/uuid"
 )
 
 // TenantConfigProvider exposes the raw tenant configuration cache.
@@ -100,7 +102,13 @@ func (s *service) GetOrCreate(ctx context.Context, sessionID, callerID string, i
 }
 
 func (s *service) GetByVerificationCode(ctx context.Context, code string) (*VerifyResponse, error) {
-	cert, err := s.repo.GetByVerificationCode(ctx, code)
+	// verification_code is a UUID column: a malformed code can never match, and
+	// passing it to Postgres would raise an invalid-input-syntax error (-> 500).
+	parsed, perr := uuid.Parse(code)
+	if perr != nil {
+		return &VerifyResponse{Valid: false}, nil
+	}
+	cert, err := s.repo.GetByVerificationCode(ctx, parsed.String())
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			// AC-7: unknown code → valid=false, still HTTP 200.

@@ -70,7 +70,7 @@ const (
 	testSessionID = "session-uuid-1"
 	testUserID    = "user-uuid-1"
 	testCertID    = "cert-uuid-1"
-	testCode      = "verify-code-1"
+	testCode      = "6f1c1f0e-8c3a-4b8e-9d57-2a1f4c0b7e11"
 )
 
 func defaultSessionRow() *certSessionRow {
@@ -275,6 +275,32 @@ func TestGetByVerificationCode_ReturnsValidFalse_ForUnknownCode(t *testing.T) {
 	assert.Empty(t, resp.EmployeeName)
 	assert.Nil(t, resp.ScorePct)
 	assert.Nil(t, resp.IssuedAt)
+}
+
+// Malformed (non-UUID) code -> valid=false, no error, repository never queried (ISS-092).
+func TestGetByVerificationCode_ReturnsValidFalse_ForMalformedCode(t *testing.T) {
+	called := false
+	repo := &mockRepo{getByVerificationFn: func(_ context.Context, _ string) (*Certificate, error) {
+		called = true
+		return nil, errors.New("pq: invalid input syntax for type uuid")
+	}}
+	svc := newService(repo)
+	for _, code := range []string{"", "not-a-uuid", "does-not-exist", "' OR 1=1 --"} {
+		resp, err := svc.GetByVerificationCode(context.Background(), code)
+		require.NoError(t, err, code)
+		assert.False(t, resp.Valid, code)
+	}
+	assert.False(t, called)
+}
+
+// Repository error for a well-formed UUID still propagates (handler -> 500).
+func TestGetByVerificationCode_PropagatesRepoError_ForValidUUID(t *testing.T) {
+	repo := &mockRepo{getByVerificationFn: func(_ context.Context, _ string) (*Certificate, error) {
+		return nil, errors.New("connection refused")
+	}}
+	resp, err := newService(repo).GetByVerificationCode(context.Background(), testCode)
+	require.Error(t, err)
+	assert.Nil(t, resp)
 }
 
 // Session not found propagates as ErrNotFound.

@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
-import { useCreateUser, useRoles, type CreateUserRequest, type CreateUserResponse } from '@/api/users'
+import { useAssignableRoles } from '@/hooks/useAssignableRoles'
+import { userErrorKey } from '@/lib/assignableRoles'
+import { useCreateUser, type CreateUserRequest, type CreateUserResponse } from '@/api/users'
 
 interface UserCreateDrawerProps {
   open: boolean
@@ -16,7 +18,7 @@ interface UserCreateDrawerProps {
 export function UserCreateDrawer({ open, onClose, onCreated }: UserCreateDrawerProps) {
   const { t } = useTranslation()
   const createUser = useCreateUser()
-  const { data: roles = [] } = useRoles()
+  const { roles } = useAssignableRoles()
 
   const [form, setForm] = useState<CreateUserRequest>({
     email: '',
@@ -40,7 +42,8 @@ export function UserCreateDrawer({ open, onClose, onCreated }: UserCreateDrawerP
       if (onCreated) onCreated(resp)
       setForm({ email: '', full_name: '', department_id: null, role_id: '' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('users.messages.error_generic'))
+      const key = userErrorKey(err)
+      setError(key ? t(key) : err instanceof Error ? err.message : t('users.messages.error_generic'))
     }
   }
 

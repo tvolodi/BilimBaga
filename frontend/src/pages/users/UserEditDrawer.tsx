@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
-import { useUpdateUser, useRoles, type User, type UpdateUserRequest } from '@/api/users'
+import { useAssignableRoles } from '@/hooks/useAssignableRoles'
+import { userErrorKey } from '@/lib/assignableRoles'
+import { useUpdateUser, type User, type UpdateUserRequest } from '@/api/users'
 
 interface UserEditDrawerProps {
   user: User | null
@@ -15,7 +17,9 @@ interface UserEditDrawerProps {
 export function UserEditDrawer({ user, onClose }: UserEditDrawerProps) {
   const { t } = useTranslation()
   const updateUser = useUpdateUser(user?.id ?? '')
-  const { data: roles = [] } = useRoles()
+  const { roles } = useAssignableRoles()
+  // A user whose current role the caller may not assign keeps it: shown read-only, never silently changed.
+  const currentAssignable = !user || roles.some((r) => r.id === user.role_id)
 
   const [form, setForm] = useState<UpdateUserRequest>({
     full_name: '',
@@ -42,7 +46,8 @@ export function UserEditDrawer({ user, onClose }: UserEditDrawerProps) {
       await updateUser.mutateAsync(form)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('users.messages.error_generic'))
+      const key = userErrorKey(err)
+      setError(key ? t(key) : err instanceof Error ? err.message : t('users.messages.error_generic'))
     }
   }
 
@@ -77,12 +82,19 @@ export function UserEditDrawer({ user, onClose }: UserEditDrawerProps) {
               value={form.role_id}
               onChange={(e) => setForm((prev) => ({ ...prev, role_id: e.target.value }))}
               required
+              disabled={!currentAssignable}
             >
               <option value="">{t('users.form.role_placeholder')}</option>
+              {!currentAssignable && user && (
+                <option value={user.role_id}>{user.role_name}</option>
+              )}
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
             </Select>
+            {!currentAssignable && (
+              <p className="text-xs text-muted-foreground">{t('users.messages.role_locked')}</p>
+            )}
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <SheetFooter>

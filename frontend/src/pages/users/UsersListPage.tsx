@@ -8,6 +8,7 @@ import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
 import { useUsers, useResetPassword, type User, type UsersFilters } from '@/api/users'
 import { UserCreateDrawer } from './UserCreateDrawer'
 import { UserEditDrawer } from './UserEditDrawer'
+import { userErrorKey } from '@/lib/assignableRoles'
 import { DeactivateConfirmDialog } from './DeactivateConfirmDialog'
 import { PasswordResetModal } from './PasswordResetModal'
 import { ImportModal } from './ImportModal'
@@ -29,6 +30,7 @@ export function UsersListPage() {
   const [resetUserId, setResetUserId] = useState<string | null>(null)
   const [resetPassword, setResetPassword] = useState<string | null>(null)
   const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
   const resetMutation = useResetPassword(resetUserId ?? '')
 
   // Created user temp password
@@ -43,12 +45,13 @@ export function UsersListPage() {
 
   async function handleResetPassword(user: User) {
     setResetUserId(user.id)
+    setResetError(null)
     try {
       const resp = await resetMutation.mutateAsync()
       setResetPassword(resp.temporary_password)
       setResetModalOpen(true)
-    } catch {
-      // error is surfaced via mutation state
+    } catch (err) {
+      setResetError(t(userErrorKey(err) ?? 'users.messages.error_generic'))
     }
   }
 
@@ -101,6 +104,7 @@ export function UsersListPage() {
 
       {/* Table */}
       {isLoading && <p className="text-muted-foreground">Loading...</p>}
+      {resetError && <p role="alert" className="text-red-600">{resetError}</p>}
       {isError && <p className="text-red-600">{t('users.messages.error_generic')}</p>}
       {data && (
         <Table>

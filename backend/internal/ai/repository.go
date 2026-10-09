@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -150,8 +151,10 @@ DO UPDATE SET insights      = EXCLUDED.insights,
 
 // examInsightRow is the scan target for the exam header query.
 type examInsightRow struct {
-	Title           string `db:"title"`
-	PassingScorePct int    `db:"passing_score_pct"`
+	Title string `db:"title"`
+	// exams.passing_score_pct is numeric(5,2); pgx returns it as "70.00", which
+	// cannot scan into an int (ISS-093), so scan as float64 and round.
+	PassingScorePct float64 `db:"passing_score_pct"`
 }
 
 // insightSummaryRow is the scan target for the session aggregate query.
@@ -270,7 +273,7 @@ ORDER BY order_num`, examID,
 
 	data := &ExamInsightData{
 		ExamTitle:       header.Title,
-		PassingScorePct: header.PassingScorePct,
+		PassingScorePct: int(math.Round(header.PassingScorePct)),
 		TotalAttempts:   summary.TotalAttempts,
 		QuestionStats:   qStats,
 	}

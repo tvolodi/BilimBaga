@@ -28,12 +28,12 @@ type Repository interface {
 
 	// ── FR-BB74: Insight cache ────────────────────────────────────────────────
 
-	// GetInsightCache returns the cached InsightResult for the given exam, or nil
-	// when no cache entry exists.
-	GetInsightCache(ctx context.Context, examID string) (*InsightResult, error)
+	// GetInsightCache returns the cached InsightResult for the given exam and scope
+	// key (deptscope.ScopeKey; "all" for super_admin), or nil when no entry exists.
+	GetInsightCache(ctx context.Context, examID, scopeKey string) (*InsightResult, error)
 
-	// UpsertInsightCache writes (or overwrites) the cache entry for the exam.
-	UpsertInsightCache(ctx context.Context, examID, userID string, insights []string) error
+	// UpsertInsightCache writes (or overwrites) the cache entry for the exam and scope key.
+	UpsertInsightCache(ctx context.Context, examID, scopeKey, userID string, insights []string) error
 
 	// CountAIUsageLastDay returns the number of AI calls made by userID for
 	// feature in the last 24 hours (ISS-232 daily cap).
@@ -131,13 +131,14 @@ func (r *postgresRepository) GetCategoryName(ctx context.Context, categoryID str
 
 // ── FR-BB74: Insight cache ────────────────────────────────────────────────────
 
-func (r *postgresRepository) GetInsightCache(ctx context.Context, examID string) (*InsightResult, error) {
+func (r *postgresRepository) GetInsightCache(ctx context.Context, examID, scopeKey string) (*InsightResult, error) {
 	var raw struct {
 		Insights    []byte    `db:"insights"`
 		GeneratedAt time.Time `db:"generated_at"`
 	}
 	err := r.db.QueryRowxContext(ctx,
-		`SELECT insights, generated_at FROM ai_insight_cache WHERE exam_id = $1`, examID,
+		`SELECT insights, generated_at FROM ai_insight_cache WHERE exam_id = $1 AND scope_key = $2`,
+		examID, scopeKey,
 	).StructScan(&raw)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -158,20 +159,20 @@ func (r *postgresRepository) GetInsightCache(ctx context.Context, examID string)
 	}, nil
 }
 
-func (r *postgresRepository) UpsertInsightCache(ctx context.Context, examID, userID string, insights []string) error {
+func (r *postgresRepository) UpsertInsightCache(ctx context.Context, examID, scopeKey, userID string, insights []string) error {
 	insightsJSON, err := json.Marshal(insights)
 	if err != nil {
 		return fmt.Errorf("ai: UpsertInsightCache: marshal insights: %w", err)
 	}
 
 	_, err = r.db.ExecContext(ctx, `
-INSERT INTO ai_insight_cache (exam_id, insights, generated_at, generated_by)
-VALUES ($1, $2, NOW(), $3)
-ON CONFLICT (exam_id)
+INSERT INTO ai_insight_cache (exam_id, scope_key, insights, generated_at, generated_by)
+VALUES ($1, $2, $3, NOW(), $4)
+ON CONFLICT (exam_id, scope_key)
 DO UPDATE SET insights      = EXCLUDED.insights,
               generated_at  = EXCLUDED.generated_at,
               generated_by  = EXCLUDED.generated_by`,
-		examID, insightsJSON, userID,
+		examID, scopeKey, insightsJSON, userID,
 	)
 	if err != nil {
 		return fmt.Errorf("ai: UpsertInsightCache: %w", err)

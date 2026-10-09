@@ -52,9 +52,6 @@ type aiService struct {
 	client AnthropicClient
 	model  string
 	logger *slog.Logger
-	// scoped holds insights for department-scoped callers, keyed by exam id +
-	// scope hash (in-process; durable scope_key cache deferred, ISS-232 item 3).
-	scoped *scopedInsightCache
 	// flight coalesces concurrent cold insight requests (ISS-232).
 	flight singleflight.Group
 	// insightsDailyLimit caps paid insight calls per user per 24 h; <= 0 disables.
@@ -78,7 +75,6 @@ func NewService(repo Repository, client AnthropicClient, model string, logger *s
 		model:              model,
 		logger:             logger,
 		insightsDailyLimit: DefaultInsightsDailyLimit,
-		scoped:             newScopedInsightCache(maxScopedInsightEntries, insightCacheTTL),
 	}
 	for _, o := range opts {
 		o(s)
@@ -176,8 +172,8 @@ func (s *aiService) validateRequest(req GenerateQuestionsRequest) error {
 // AC-4: forceRefresh=true → call Anthropic regardless, upsert cache.
 // AC-6: Anthropic error → ErrAIUnavailable (no stale-cache fallback).
 // AC-8: Every Anthropic call is logged in ai_usage_log with feature="exam_insights".
-// ISS-232: results are cached per (exam, scope key) (unrestricted in the DB,
-// scoped in-process; durable scope_key migration deferred); concurrent cold
+// ISS-232/#263: results are cached per (exam, scope key) in ai_insight_cache
+// (super_admin is the "all" key); concurrent cold
 // requests for the same exam + scope share one paid call (singleflight); each
 // paid call counts against the caller's daily cap (ErrAIRateLimited).
 func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID string, forceRefresh bool) (*InsightResult, error) {
@@ -235,10 +231,7 @@ func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID st
 
 // readInsightCache returns a fresh cached entry or nil (read errors are non-fatal).
 func (s *aiService) readInsightCache(ctx context.Context, examID, scopeKey string) *InsightResult {
-	if scopeKey != deptscope.ScopeKeyAll {
-		return s.scoped.get(scopedInsightKey{examID: examID, scope: scopeKey})
-	}
-	cached, err := s.repo.GetInsightCache(ctx, examID)
+	cached, err := s.repo.GetInsightCache(ctx, examID, scopeKey)
 	if err != nil {
 		s.logger.Warn("insight cache read failed", "exam_id", examID, "error", err)
 		return nil
@@ -324,9 +317,7 @@ func (s *aiService) generateInsights(ctx context.Context, examID, tenantID, user
 	}
 
 	if cacheable {
-		if scopeKey != deptscope.ScopeKeyAll {
-			s.scoped.put(scopedInsightKey{examID: examID, scope: scopeKey}, insights, time.Now().UTC())
-		} else if cacheErr := s.repo.UpsertInsightCache(ctx, examID, userID, insights); cacheErr != nil {
+		if cacheErr := s.repo.UpsertInsightCache(ctx, examID, scopeKey, userID, insights); cacheErr != nil {
 			s.logger.Error("failed to upsert insight cache", "exam_id", examID, "error", cacheErr)
 		}
 	}

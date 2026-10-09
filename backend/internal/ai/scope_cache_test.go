@@ -11,10 +11,9 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
-// ISS-218 supervisor decision: scoped insights are cached per exam + scope
-// hash. The persistent ai_insight_cache table has exam_id as PRIMARY KEY (no
-// scope column; no migration allowed), so scoped entries live in an in-process
-// cache. Custom roles with grading:* get NO examiner carve-out anywhere in AI
+// ISS-218 / #263: scoped insights are cached per exam + scope hash in
+// ai_insight_cache, primary key (exam_id, scope_key); super_admin uses the "all"
+// key. Custom roles with grading:* get NO examiner carve-out anywhere in AI
 // insights (subtree-only scope), see TestGetInsights_AllNonSuperAdminRoles_*.
 
 const (
@@ -65,8 +64,9 @@ func TestScopedInsights_EqualScopesShareEntry(t *testing.T) {
 	if cl.calls != 1 {
 		t.Errorf("want exactly 1 paid call, got %d", cl.calls)
 	}
-	if repo.upsertCalled {
-		t.Error("scoped insights must never be written to the shared DB cache")
+	// The scoped entry is durable: one row under the scope key, never under "all".
+	if len(repo.upsertScopes) != 1 || repo.upsertScopes[0] == deptscope.ScopeKeyAll {
+		t.Errorf("scoped insight must be written once under its scope key, got %v", repo.upsertScopes)
 	}
 }
 
@@ -197,29 +197,20 @@ func TestGenerateQuestions_RateLimitUnchanged(t *testing.T) {
 	}
 }
 
-func TestScopedInsightCache_TTLAndBound(t *testing.T) {
-	now := time.Now()
-	c := newScopedInsightCache(2, time.Hour)
-	c.now = func() time.Time { return now }
-	k := func(s string) scopedInsightKey { return scopedInsightKey{"e", s} }
-	c.put(k("a"), []string{"1"}, now)
-	if c.get(k("a")) == nil {
-		t.Fatal("fresh entry should hit")
+// A stored scoped row older than the TTL is not served: the caller pays again.
+func TestScopedInsights_StaleRowIsRegenerated(t *testing.T) {
+	repo, cl := scopeRepo(), &countingClient{}
+	key := deptscope.ScopeKey(deptscope.Scope{Restricted: true, DepartmentID: deptX}, []string{deptX, deptZ})
+	repo.scopedRows = map[string]*InsightResult{
+		"exam-1|" + key: {Insights: []string{"stale"}, GeneratedAt: time.Now().UTC().Add(-insightCacheTTL - time.Hour)},
 	}
-	now = now.Add(time.Hour)
-	if c.get(k("a")) != nil {
-		t.Error("entry at TTL must expire")
+	svc := NewService(repo, cl, "m", newLogger())
+	r, err := svc.GetInsights(ctxFor("department_admin", deptX), "exam-1", "t", "u", false)
+	if err != nil || r.Cached || r.Insights[0] == "stale" {
+		t.Fatalf("stale scoped row must be regenerated: %+v %v", r, err)
 	}
-	c.put(k("a"), []string{"1"}, now)
-	c.put(k("b"), []string{"2"}, now.Add(time.Second))
-	c.put(k("c"), []string{"3"}, now.Add(2*time.Second)) // evicts oldest (a)
-	if len(c.entries) != 2 || c.get(k("a")) != nil || c.get(k("c")) == nil {
-		t.Errorf("bound/eviction wrong: %d entries", len(c.entries))
-	}
-	got := c.get(k("c"))
-	got.Insights[0] = "mutated"
-	if c.get(k("c")).Insights[0] != "3" {
-		t.Error("cache must return copies")
+	if cl.calls != 1 {
+		t.Errorf("want 1 paid call, got %d", cl.calls)
 	}
 }
 

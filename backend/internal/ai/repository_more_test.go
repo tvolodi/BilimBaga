@@ -86,7 +86,7 @@ func TestRepo_GetInsightCache_Hit(t *testing.T) {
 	db, f := newFakeDB(t)
 	ts := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	f.queue([]string{"insights", "generated_at"}, [][]driver.Value{{[]byte(`["x","y","z"]`), ts}})
-	res, err := NewRepository(db).GetInsightCache(context.Background(), "exam-1")
+	res, err := NewRepository(db).GetInsightCache(context.Background(), "exam-1", "all")
 	if err != nil || res == nil {
 		t.Fatalf("got (%v,%v)", res, err)
 	}
@@ -97,7 +97,7 @@ func TestRepo_GetInsightCache_Hit(t *testing.T) {
 
 func TestRepo_GetInsightCache_MissIsNilNil(t *testing.T) {
 	db, _ := newFakeDB(t)
-	res, err := NewRepository(db).GetInsightCache(context.Background(), "exam-1")
+	res, err := NewRepository(db).GetInsightCache(context.Background(), "exam-1", "all")
 	if res != nil || err != nil {
 		t.Fatalf("cache miss must be (nil,nil), got (%v,%v)", res, err)
 	}
@@ -106,14 +106,14 @@ func TestRepo_GetInsightCache_MissIsNilNil(t *testing.T) {
 func TestRepo_GetInsightCache_BadJSONAndQueryError(t *testing.T) {
 	db, f := newFakeDB(t)
 	f.queue([]string{"insights", "generated_at"}, [][]driver.Value{{[]byte(`{not json`), time.Now()}})
-	_, err := NewRepository(db).GetInsightCache(context.Background(), "e")
+	_, err := NewRepository(db).GetInsightCache(context.Background(), "e", "all")
 	if err == nil || !strings.Contains(err.Error(), "unmarshal insights") {
 		t.Fatalf("got %v", err)
 	}
 
 	db2, f2 := newFakeDB(t)
 	f2.qErr = errors.New("db down")
-	_, err = NewRepository(db2).GetInsightCache(context.Background(), "e")
+	_, err = NewRepository(db2).GetInsightCache(context.Background(), "e", "all")
 	if !errors.Is(err, f2.qErr) || !strings.Contains(err.Error(), "GetInsightCache") {
 		t.Fatalf("got %v", err)
 	}
@@ -121,26 +121,26 @@ func TestRepo_GetInsightCache_BadJSONAndQueryError(t *testing.T) {
 
 func TestRepo_UpsertInsightCache(t *testing.T) {
 	db, f := newFakeDB(t)
-	err := NewRepository(db).UpsertInsightCache(context.Background(), "exam-1", "user-1", []string{"a", "b"})
+	err := NewRepository(db).UpsertInsightCache(context.Background(), "exam-1", "all", "user-1", []string{"a", "b"})
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
-	if !strings.Contains(f.queries[0], "ON CONFLICT (exam_id)") {
+	if !strings.Contains(f.queries[0], "ON CONFLICT (exam_id, scope_key)") {
 		t.Fatalf("query = %s", f.queries[0])
 	}
 	a := f.args[0]
-	if a[0] != "exam-1" || a[2] != "user-1" {
+	if a[0] != "exam-1" || a[1] != "all" || a[3] != "user-1" {
 		t.Fatalf("args = %v", a)
 	}
-	if b, ok := a[1].([]byte); !ok || string(b) != `["a","b"]` {
-		t.Fatalf("insights arg = %#v", a[1])
+	if b, ok := a[2].([]byte); !ok || string(b) != `["a","b"]` {
+		t.Fatalf("insights arg = %#v", a[2])
 	}
 }
 
 func TestRepo_UpsertInsightCache_ErrorWrapped(t *testing.T) {
 	db, f := newFakeDB(t)
 	f.xErr = errors.New("upsert failed")
-	err := NewRepository(db).UpsertInsightCache(context.Background(), "e", "u", nil)
+	err := NewRepository(db).UpsertInsightCache(context.Background(), "e", "all", "u", nil)
 	if !errors.Is(err, f.xErr) || !strings.Contains(err.Error(), "UpsertInsightCache") {
 		t.Fatalf("got %v", err)
 	}

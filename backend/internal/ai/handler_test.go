@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
+	"github.com/go-chi/chi/v5"
 )
 
 // ctxWithUserID injects a user ID into the context the same way auth middleware does.
@@ -193,5 +196,40 @@ func TestHandler_GenerateQuestions_InvalidBody(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for invalid body, got %d", w.Code)
+	}
+}
+
+// insightsErrService returns a configurable error from GetInsights.
+type insightsErrService struct {
+	mockService
+	err error
+}
+
+func (s *insightsErrService) GetInsights(_ context.Context, _, _, _ string, _ bool) (*InsightResult, error) {
+	return nil, s.err
+}
+
+// ISS-093: unexpected errors yield 500 and are logged, not swallowed.
+func TestHandler_GetInsights_UnexpectedErrorLoggedAnd500(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(prev)
+
+	h := NewHandler(&insightsErrService{err: errors.New("ai: boom: sql: Scan error")})
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ai/insights/e1", nil)
+	r = r.WithContext(ctxWithUserID(r.Context(), "u1"))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("examId", "e1")
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	h.HandleGetInsights(w, r)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", w.Code)
+	}
+	if !strings.Contains(buf.String(), "Scan error") {
+		t.Fatalf("error not logged, log=%q", buf.String())
 	}
 }

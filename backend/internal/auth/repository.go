@@ -24,7 +24,7 @@ type Repository interface {
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (*RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, tokenID string) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
-	UpdatePassword(ctx context.Context, userID, passwordHash string) error
+	UpdatePassword(ctx context.Context, userID, passwordHash string, changedAt time.Time) error
 
 	// Password recovery (FR-BB115) — see recovery_repository.go.
 	RecoveryRepository
@@ -153,14 +153,32 @@ func (r *pgRepository) RevokeAllUserRefreshTokens(ctx context.Context, userID st
 	return nil
 }
 
-// UpdatePassword replaces a user's password hash and clears force_password_change.
-func (r *pgRepository) UpdatePassword(ctx context.Context, userID, passwordHash string) error {
-	const q = `
+// updatePasswordSQL is the self-change counterpart of completeResetSetPasswordSQL: it stamps
+// password_changed_at (ISS-171) so access tokens issued before changedAt are rejected.
+const updatePasswordSQL = `
 		UPDATE users
-		SET    password_hash = $1, force_password_change = false, updated_at = now()
+		SET    password_hash = $1, force_password_change = false, updated_at = now(),
+		       password_changed_at = $3
 		WHERE  id = $2`
-	if _, err := r.db.ExecContext(ctx, q, passwordHash, userID); err != nil {
+
+// UpdatePassword replaces a user's password hash, clears force_password_change, stamps
+// password_changed_at = changedAt and revokes all of the user's refresh tokens in one
+// transaction. The caller issues a fresh session afterwards (ISS-171).
+func (r *pgRepository) UpdatePassword(ctx context.Context, userID, passwordHash string, changedAt time.Time) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("auth.UpdatePassword: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, updatePasswordSQL, passwordHash, userID, changedAt); err != nil {
 		return fmt.Errorf("auth.UpdatePassword: %w", err)
+	}
+	const revokeRefresh = `UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`
+	if _, err := tx.ExecContext(ctx, revokeRefresh, userID); err != nil {
+		return fmt.Errorf("auth.UpdatePassword: revoke refresh tokens: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("auth.UpdatePassword: commit: %w", err)
 	}
 	return nil
 }

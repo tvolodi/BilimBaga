@@ -145,14 +145,17 @@ async function tryLoginWithPassword(email: string, pass: string, label: string):
  * password stays unchanged when it already is the known one (the backend does not reject reuse).
  */
 async function changeForcedAdminPassword(result: LoginResult, currentPass: string): Promise<string> {
-  const changed = await apiPost<unknown>(
+  const changed = await apiPost<{ access_token?: string }>(
     `${BASE}/api/v1/auth/change-password`,
     { current_password: currentPass, new_password: currentPass },
     result.token,
   )
   if (!changed.ok) throw new Error(`Failed to clear forced admin password change: ${changed.error}`)
   log('Admin forced password change completed')
-  return result.token
+  // ISS-171: the change revokes the login token; use the replacement from the response.
+  const next = changed.data?.access_token
+  if (!next) throw new Error('change-password returned no access token')
+  return next
 }
 
 async function ensureAdminToken(): Promise<string> {

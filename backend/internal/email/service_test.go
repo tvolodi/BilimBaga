@@ -1,4 +1,4 @@
-﻿package email
+package email
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 // ── Repository mock ───────────────────────────────────────────────────────────
 
 type mockRepo struct {
+	mu               sync.Mutex // guards the logged* fields (written from async send goroutines)
 	logAttemptCalled bool
 	loggedTo         string
 	loggedTmpl       string
@@ -22,11 +24,20 @@ type mockRepo struct {
 }
 
 func (m *mockRepo) LogAttempt(_ context.Context, to, tmpl string, sendErr error) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.logAttemptCalled = true
 	m.loggedTo = to
 	m.loggedTmpl = tmpl
 	m.loggedErr = sendErr
 	return nil
+}
+
+// logged returns a race-free snapshot of the last LogAttempt call.
+func (m *mockRepo) logged() (called bool, tmpl string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.logAttemptCalled, m.loggedTmpl, m.loggedErr
 }
 
 func (m *mockRepo) GetTenantDefaultLocale(_ context.Context) (string, error) {

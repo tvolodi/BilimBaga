@@ -150,11 +150,12 @@ func TestTriggerPasswordResetLink_SendsLinkAndNeverLogsToken(t *testing.T) {
 	}
 
 	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && !repo.logAttemptCalled {
+	for called, _, _ := repo.logged(); time.Now().Before(deadline) && !called; called, _, _ = repo.logged() {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if repo.loggedTmpl != "password_reset_link" || repo.loggedErr != nil {
-		t.Errorf("email_log attempt = (%q, %v); want (password_reset_link, nil)", repo.loggedTmpl, repo.loggedErr)
+	_, loggedTmpl, loggedErr := repo.logged()
+	if loggedTmpl != "password_reset_link" || loggedErr != nil {
+		t.Errorf("email_log attempt = (%q, %v); want (password_reset_link, nil)", loggedTmpl, loggedErr)
 	}
 	if strings.Contains(logs.String(), token) {
 		t.Errorf("token leaked into logs: %s", logs.String())

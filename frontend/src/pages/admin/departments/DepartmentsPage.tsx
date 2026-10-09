@@ -75,7 +75,7 @@ export function DepartmentsPage() {
     try {
       await deleteMutation.mutateAsync(deleteTarget.id)
       setDeleteTarget(null)
-      showNotification('success', t('departments.actions.delete'))
+      showNotification('success', t('departments.success.deleted'))
     } catch (err: unknown) {
       const e = err as ApiError
       setDeleteTarget(null)

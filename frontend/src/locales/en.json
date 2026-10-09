@@ -1059,6 +1059,9 @@
       "hasChildren": "Cannot delete: department has child departments",
       "parentNotFound": "Selected parent department no longer exists"
     },
+    "success": {
+      "deleted": "Department deleted"
+    },
     "empty": "No departments yet. Click \"New Department\" to get started.",
     "children": "children"
   },

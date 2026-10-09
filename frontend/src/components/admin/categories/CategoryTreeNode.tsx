@@ -63,7 +63,8 @@ export function CategoryTreeNode({
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex-shrink-0 text-muted-foreground w-4 h-4 flex items-center justify-center"
-          aria-label={expanded ? 'Collapse' : 'Expand'}
+          aria-label={t('common.toggleExpand')}
+          aria-expanded={hasChildren ? expanded : undefined}
         >
           {hasChildren ? (
             expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />

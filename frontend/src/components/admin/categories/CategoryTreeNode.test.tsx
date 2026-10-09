@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { type ReactNode } from 'react'
-import '@/i18n'
+import i18n from '@/i18n'
 import { CategoryTreeNode } from './CategoryTreeNode'
 import { type CategoryNode } from '@/api/categories'
 
@@ -172,7 +172,30 @@ describe('CategoryTreeNode — expand and collapse', () => {
     expect(screen.queryByText('ChildB')).not.toBeInTheDocument()
     // The node itself stays visible when collapsed
     expect(screen.getByText('RootCat')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Expand' })).toBeInTheDocument()
+    expect(toggleFor('RootCat')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('names the toggle from the translated label in the current language (#390)', async () => {
+    await i18n.changeLanguage('kk')
+    try {
+      const Wrapper = createWrapper()
+      render(
+        <Wrapper>
+          <CategoryTreeNode
+            node={root}
+            depth={0}
+            canManage={false}
+            onAddChild={noop}
+            onEdit={noop}
+            onDelete={noop}
+          />
+        </Wrapper>,
+      )
+      expect(toggleFor('RootCat')).toHaveAccessibleName(i18n.t('common.toggleExpand', { lng: 'kk' }))
+      expect(toggleFor('RootCat')).not.toHaveAccessibleName('Expand')
+    } finally {
+      await i18n.changeLanguage('en')
+    }
   })
 
   it('re-expands children on a second toggle', () => {
@@ -191,12 +214,12 @@ describe('CategoryTreeNode — expand and collapse', () => {
     )
 
     fireEvent.click(toggleFor('RootCat'))
-    expect(toggleFor('RootCat')).toHaveAccessibleName('Expand')
+    expect(toggleFor('RootCat')).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(toggleFor('RootCat'))
 
     expect(screen.getByText('ChildA')).toBeInTheDocument()
     expect(screen.getByText('ChildB')).toBeInTheDocument()
-    expect(toggleFor('RootCat')).toHaveAccessibleName('Collapse')
+    expect(toggleFor('RootCat')).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('renders nested children one level deeper than their parent', () => {

@@ -2,7 +2,7 @@
 slug: role-management
 title: "Role Management (custom roles and permission matrix) — UAT Scenario"
 feature: role-management (FR-BB117; GitHub issue #135)
-version: 1
+version: 2
 created: 2026-10-09
 author: Business Analyst
 ---
@@ -11,7 +11,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 
 ## Code that must be merged before running
 
-- **Issue #135** (FR-BB117): migration 032, `/api/v1/roles*` endpoints, `GET /users/me` `permissions`, `/admin/roles` page, sidebar item, permission-aware guards, `roles.*` i18n keys.
+- **Issue #135** (FR-BB117), merged as backend PR #185 (`ed22fd5`, migration **034**, not 032) and frontend PR #206 (`147b069`): migration 034, `/api/v1/roles*` endpoints, `GET /users/me` `permissions`, `/admin/roles` page, sidebar item, permission-aware guards, `roles.*` i18n keys.
 - Rebuild frontend and API; run `make migrate`.
 - Expected pre-fix baseline: no Roles sidebar item; `/admin/roles` falls to not-found/redirect; `GET /api/v1/roles` returns 404. All scenarios FAIL.
 
@@ -57,7 +57,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 | 2 | Super admin | Enter name `QA Reviewer` | Inline validation error (pattern `^[a-z][a-z0-9_]{2,31}$`), translated | |
 | 3 | Super admin | Enter `qa_reviewer`, description, tick `questions:read`, `exams:read`, `reports:read`; save | Toast; role appears in list as Custom, 0 users, 3 permissions | |
 | 4 | Super admin | Create `qa_reviewer` again | Inline `ROLE_NAME_TAKEN` message; no duplicate row | |
-| 5 | Tester | `POST /api/v1/roles` with `tenant:manage` permission id | 400 `VALIDATION_ERROR` naming the permission | |
+| 5 | Tester | `POST /api/v1/roles` with `tenant:manage` permission id (repeat with `roles:manage`) | 422 `VALIDATION_ERROR` (shipped status; FR draft said 400) naming the permission | |
 | 6 | Super admin | Open `/admin/audit` | `role.create` entry for `qa_reviewer` with actor and metadata | |
 | 7 | Super admin | Open Users, "Create user" drawer | Role select includes `qa_reviewer` without a page reload | |
 
@@ -77,13 +77,26 @@ Target: local | qa (default: local; never the production-class demo instance, se
 |------|-------|--------|-----------------|-----------|
 | 1 | Super admin | Create user `uat.custom@test.com` with role `qa_reviewer`; capture temp password | Created | |
 | 2 | Custom user | Log in (complete forced password change if prompted) | Lands in admin shell (`/admin`), not the portal | |
-| 3 | Custom user | View sidebar | Only items for held permissions: Questions, Exams, Reports (plus Dashboard); no Users, Audit, Settings, Roles | |
-| 4 | Custom user | `GET /users/me` | `permissions` array equals the three (or four) assigned | |
-| 5 | Custom user | Open `/admin/users` and `/admin/audit` by URL | Redirected; API calls return 403 | |
+| 3 | Custom user | View sidebar | Only items for held permissions: Dashboard and Reports (both need `reports:read`), Questions, Exams; no Users, Audit, Settings, Roles. Settings can never appear (`tenant:manage` is not grantable) | |
+| 4 | Custom user | `GET /users/me` | `permissions` array (sorted `resource:action`) equals the three (or four) assigned | |
+| 5 | Custom user | Open `/admin/users` and `/admin/audit` by URL | Redirected to `/admin`, which forwards to the first permitted page (Dashboard here, as `reports:read` is held); direct API calls return 403 | |
 | 6 | Super admin | While custom user stays logged in (same token), remove `reports:read` and save | Success | |
 | 7 | Custom user | Without re-login, `GET` a reports endpoint (e.g. dashboard metrics) | 403 on the very next request (cache reloaded) | |
 | 8 | Super admin | Re-add `reports:read` | Custom user regains access without re-login | |
 | 9 | Custom user | Try `GET /api/v1/users` (needs `users:read`) | 403, and no cross-department user data is exposed | |
+
+## Scenario S7: Scoping and escalation limits (added from static conformance review; expected to FAIL until GAP G1/G2 are fixed)
+
+Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (assign `uat.custom2@test.com`, department A). Department A also contains one `department_admin` user and one `super_admin` test user; department B contains an employee.
+
+| Step | Actor | Action | Expected Outcome | Pass/Fail |
+|------|-------|--------|-----------------|-----------|
+| 1 | Custom2 user | `GET /api/v1/users` | Only department A users; department B employee absent | |
+| 2 | Custom2 user | `POST /api/v1/users/{super_admin_in_A}/reset-password` | 403 (a caller must not be able to take over an account whose role outranks its own). Currently returns the temporary password: GAP G2 | |
+| 3 | Custom2 user | `PUT /api/v1/users/{department_admin_in_A}` / `POST .../deactivate` | 403 for the same reason (G2) | |
+| 4 | Custom user (`qa_reviewer`, `reports:read`) | `GET /api/v1/admin/dashboard` and `/admin/reports/exams/{id}` | Data limited to the caller's department like `department_admin`, or the product explicitly accepts org-wide reports for a granted `reports:read` (decision required; today org-wide: GAP G1) | |
+| 5 | Custom2 user | `PUT /api/v1/users/{self}` changing own role | 403 (self role change blocked) | |
+| 6 | Custom2 user | Assign role `department_admin` to a department A employee | 403 if `department_admin` holds permissions the caller lacks | |
 
 ## Scenario S6: Localization and accessibility
 
@@ -94,7 +107,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 
 ## Pass / Fail criteria
 
-PASS: S1 to S6 all pass and test data is cleaned (`qa_reviewer` and `uat.custom@test.com` removed or deactivated). DEFECT: any behavioural deviation. REQ GAP: expected behaviour not covered by FR-BB117. ENV ISSUE: stack or seed problems (e.g. migration 032 not applied).
+PASS: S1 to S7 all pass and test data is cleaned (`qa_reviewer` and `uat.custom@test.com` removed or deactivated). DEFECT: any behavioural deviation. REQ GAP: expected behaviour not covered by FR-BB117. ENV ISSUE: stack or seed problems (e.g. migration 034 not applied).
 
 ## Acceptance Criteria Coverage
 
@@ -113,6 +126,7 @@ PASS: S1 to S6 all pass and test data is cleaned (`qa_reviewer` and `uat.custom@
 | AC-15 | S3.7 |
 | AC-16 | S5.2-5, S5.9 |
 | AC-17 | S6 |
+| Scoping hazards (design notes, no AC) | S7 |
 | AC-18 | covered by unit/component test runs, not UAT |
 
 ## Out of Scope

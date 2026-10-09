@@ -23,7 +23,7 @@ Status is what the code returns today. "Where" gives representative source locat
 | MISSING_TOKEN | 401 | `internal/auth/middleware.go:61`, `internal/rbac/middleware.go:19`, `internal/ai/handler.go:35` |
 | INVALID_TOKEN | 401 | `auth/middleware.go:65,74,82,87,95,101` (malformed header, bad signature, bad claims, missing `iat`, user gone) |
 | TOKEN_EXPIRED | 401 | `auth/middleware.go:72` |
-| TOKEN_REVOKED | 401 | `auth/middleware.go:110` (access token issued before the user's last password change) |
+| TOKEN_REVOKED | 401 | `auth/middleware.go:110` (access token issued before the user's last password change: self change-password since ISS-171, admin reset, token reset) |
 | UNAUTHORIZED | 401 | `audit/handler.go:30,67`, `auth/handler.go:160,170,185`, `email/handler.go:27` (missing user/tenant in context) |
 | FORBIDDEN | 403 | `rbac/middleware.go:23`; in-handler scope checks `users/handler.go:102`, `sessions/handler.go:178`, `ai/handler.go:142` |
 | NOT_FOUND | 404 | `api/uuid.go:89` (malformed path id), `users/handler.go:100`, `departments/handler.go:56` |
@@ -50,7 +50,7 @@ There is no `ROLE_*` family of codes in the code; role-related endpoints use the
 
 | Code | HTTP | Where |
 |------|------|-------|
-| DUPLICATE_EMAIL | 409 | `users/handler.go:141` |
+| DUPLICATE_EMAIL | 409 | `users/handler.go:161` (email is trimmed and lowercased by `api.NormalizeEmail` at create, CSV import, login and forgot-password; uniqueness is case-insensitive: pre-check `lower(email)` in `users/repository.go:115`, plus the unique index `idx_users_email_lower_unique` from migration 035 (ISS-181), which is created only when no legacy case-variant duplicates exist, otherwise skipped with a NOTICE and reported at startup as a WARN plus audit action `users.duplicate_emails_detected`) |
 | MISSING_FILE | 400 | `users/handler.go:266` |
 | FILE_TOO_LARGE | 413 | `users/handler.go:257` (whole body over the cap, rejected before parsing, PR #197), `users/handler.go:280` (file content over 10 MiB) |
 | INVALID_FILE_TYPE | 415 | `users/handler.go:282` |

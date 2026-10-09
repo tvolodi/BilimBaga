@@ -162,15 +162,7 @@ ORDER BY started_at`
 		if err := rows.StructScan(&dbr); err != nil {
 			return nil, fmt.Errorf("portal: ListUserSessions: scan: %w", err)
 		}
-		result = append(result, sessionRow{
-			SessionID:   dbr.SessionID,
-			Status:      dbr.Status,
-			ExpiresAt:   dbr.ExpiresAt,
-			Passed:      dbr.Passed,
-			SubmittedAt: dbr.SubmittedAt,
-			ScorePct:    dbr.ScorePct,
-			StartedAt:   dbr.StartedAt,
-		})
+		result = append(result, sessionRow(dbr))
 	}
 	return result, rows.Err()
 }

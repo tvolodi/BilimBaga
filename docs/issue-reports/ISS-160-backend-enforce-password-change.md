@@ -141,3 +141,24 @@ envelope, other errors ignored), download 403. `scripts/lib/e2e-auth.test.ts`.
 ## Recurrence Log
 | Date | Trigger | Action Taken |
 |------|---------|-------------- |
+
+## Changes after UAT (PR #180 @e936541: backend PASS 24/24)
+UAT found two gaps; fixed on the same branch (frontend and e2e only, backend untouched).
+1. UI redirect on a full page load of a non-allowlisted route (/portal redirected after ~7.8 s because React Query
+   retried the 403; /portal/results never redirected):
+   - Root causes: (a) default query retry (3, with backoff) re-sent the 403; (b) many `src/api/*.ts` helpers threw
+     `new Error(body.error.message)` and dropped `code`, so the global onError never recognised the error
+     (/portal/results was one of them, via sessions.ts).
+   - Fix: `createAppQueryClient` sets default `retry` for queries (3) and mutations (0) to never retry
+     PASSWORD_CHANGE_REQUIRED; new `api/errors.ts` `errorWithCode` used by analytics, audit, dashboard, employees,
+     grading, questions, reports (also parses the body before the `!res.ok` check), sessions, useTenantConfig, users;
+     `useRefreshToken` now calls `GET /users/me` (allowlisted; returns `force_password_change`) right after obtaining
+     a token, so a hard reload redirects before any data query fails (best effort; the 403 handler remains the net).
+   - Tests (`src/lib/passwordChangeRedirect.test.tsx`): retry policy, /portal/results redirect on the first 403 with exactly
+     one request (within waitFor's 1 s, which retries would miss), hard-reload bootstrap redirect with zero data calls.
+2. `auth.spec.ts` form login hard-coded `Admin1234!` and broke without `E2E_ADMIN_PASS` after global-setup changed the
+   password. global-setup now records the effective admin password in `frontend/.auth/admin-pass.txt`;
+   `fixtures/admin-pass.ts#currentAdminPassword()` (E2E_ADMIN_PASS, then the file, then the default) is used by
+   `auth.spec.ts` and `full-walkthrough.spec.ts` (the only specs that hard-coded the default; grep verified).
+   Caveat: when global-setup reuses a cached token the file from the earlier run is used; delete `.auth/` after resetting the DB.
+- Checks: tsc, check:i18n, full vitest (75 files, 510 tests, `--maxWorkers=1`) green. Not re-run live.

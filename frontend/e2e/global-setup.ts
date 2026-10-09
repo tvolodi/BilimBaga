@@ -1,5 +1,6 @@
 import { chromium } from '@playwright/test'
 import { requireTarget } from '../../scripts/lib/target-guard'
+import { ADMIN_PASS_FILE } from './fixtures/admin-pass'
 import { adminPasswordCandidates } from '../../scripts/lib/e2e-auth'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -65,7 +66,7 @@ export default async function globalSetup() {
     // Runs in the page so the refresh cookie lands in the saved storage state. Self-contained on
     // purpose: page.evaluate serialises the function. Candidate order mirrors adminPasswordCandidates.
     const res = await page.evaluate(async ({ email, passes, newPass }: { email: string; passes: string[]; newPass: string }) => {
-      let last: { ok: boolean; data: any; error: any } = { ok: false, data: null, error: 'no candidate password worked' }
+      let last: { ok: boolean; data: any; error: any; password?: string } = { ok: false, data: null, error: 'no candidate password worked' }
       for (const pass of passes) {
         const r = await fetch('/api/v1/auth/login', {
           method: 'POST',
@@ -85,7 +86,7 @@ export default async function globalSetup() {
           })
           if (!c.ok) return { ok: false, data: null, error: `forced password change failed (${c.status})` }
         }
-        return last
+        return { ...last, password: json.data?.user?.force_password_change ? newPass : pass }
       }
       return last
     }, {
@@ -100,6 +101,9 @@ export default async function globalSetup() {
     }
 
     accessToken = res.data.access_token as string
+    // Record the effective admin password so form-login specs (auth.spec.ts, full-walkthrough)
+    // work after a forced change without E2E_ADMIN_PASS.
+    if (res.password) fs.writeFileSync(ADMIN_PASS_FILE, res.password, 'utf8')
 
     // Seed locale + auth token into localStorage.
     await page.evaluate((token: string) => {

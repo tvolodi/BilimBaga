@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { clearPasswordChangeRequired } from '@/lib/passwordChangeRequired'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { clearPasswordChangeRequired, markPasswordChangeRequired } from '@/lib/passwordChangeRequired'
 
 export interface ApiError {
   code: string
@@ -30,6 +30,26 @@ interface LoginResponse {
 interface ChangePasswordPayload {
   current_password: string
   new_password: string
+}
+
+/**
+ * ISS-160: the token claims carry no force_password_change, so ask GET /users/me (allowlisted
+ * while the flag is set) once per bootstrap. A flagged user is redirected before any data query
+ * fails. Best effort: any failure leaves the 403 handler as the safety net.
+ */
+async function checkForcePasswordChange(qc: QueryClient, token: string): Promise<void> {
+  try {
+    const res = await fetch('/api/v1/users/me', { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) return
+    const json = (await res.json()) as { data?: { force_password_change?: boolean } | null }
+    if (json.data?.force_password_change === true) {
+      const user = qc.getQueryData<CurrentUser>(['auth', 'currentUser'])
+      if (user) qc.setQueryData(['auth', 'currentUser'], { ...user, force_password_change: true })
+      markPasswordChangeRequired(qc)
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -127,6 +147,7 @@ export function useRefreshToken() {
               force_password_change: false,
             })
           }
+          await checkForcePasswordChange(qc, seeded)
           return seeded
         }
         // Token expired — remove and fall through to refresh.
@@ -163,6 +184,7 @@ export function useRefreshToken() {
             force_password_change: false,
           })
         }
+        await checkForcePasswordChange(qc, accessToken)
         return accessToken
       } catch {
         return null

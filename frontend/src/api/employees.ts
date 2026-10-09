@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { downloadFile } from '@/api/download'
+import { errorWithCode } from '@/api/errors'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -72,7 +73,7 @@ async function fetchPaginated<T>(url: string, token?: string | null): Promise<Pa
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   const body: ApiPaginatedResponse<T> = await res.json()
-  if (body.error) throw new Error(body.error.message)
+  if (body.error) throw errorWithCode(body.error)
   if (!res.ok) throw new Error(`Request failed: ${res.status}`)
   return { data: body.data, meta: body.meta }
 }
@@ -83,7 +84,7 @@ async function apiFetch<T>(url: string, token?: string | null): Promise<T> {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   const body: ApiResponse<T> = await res.json()
-  if (body.error) throw new Error(body.error.message)
+  if (body.error) throw errorWithCode(body.error)
   if (!res.ok) throw new Error(`Request failed: ${res.status}`)
   return body.data
 }

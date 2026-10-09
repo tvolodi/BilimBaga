@@ -24,12 +24,20 @@ export function clearPasswordChangeRequired(qc: QueryClient): void {
   qc.setQueryData(PASSWORD_CHANGE_FLAG_KEY, false)
 }
 
+/** React Query's default: queries retry 3 times, mutations never. A forced password change is permanent, never retried. */
+const retryExceptPasswordChange = (max: number) => (failureCount: number, err: unknown) =>
+  !isPasswordChangeRequired(err) && failureCount < max
+
 /**
  * Application QueryClient: any query or mutation failing with PASSWORD_CHANGE_REQUIRED raises
  * the flag, so every API module is covered without per-module handling.
  */
 export function createAppQueryClient(): QueryClient {
   const qc: QueryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: retryExceptPasswordChange(3) },
+      mutations: { retry: retryExceptPasswordChange(0) },
+    },
     queryCache: new QueryCache({
       onError: (err) => {
         if (isPasswordChangeRequired(err)) markPasswordChangeRequired(qc)

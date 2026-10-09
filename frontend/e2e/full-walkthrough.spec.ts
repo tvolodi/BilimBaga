@@ -16,19 +16,20 @@
  *
  * Credentials: set via env vars or fall back to seeded defaults.
  *   E2E_ADMIN_EMAIL    (default: admin@bilimbaga.local)
- *   E2E_ADMIN_PASS     (default: Admin1234!)
+ *   E2E_ADMIN_PASS     (default: password recorded by global-setup in .auth/admin-pass.txt, else Admin1234!)
  *   E2E_ADMIN_NEW_PASS (default: E2eAdmin2024! — used when force_password_change is true)
  */
 
 import { test, expect, type Page } from '@playwright/test'
 import { getSeedData } from './fixtures/seed'
+import { currentAdminPassword } from './fixtures/admin-pass'
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@bilimbaga.local'
-const ADMIN_PASS = process.env.E2E_ADMIN_PASS ?? 'Admin1234!'
+const ADMIN_PASS = currentAdminPassword()
 const ADMIN_NEW_PASS = process.env.E2E_ADMIN_NEW_PASS ?? 'E2eAdmin2024!'
 
 // ---------------------------------------------------------------------------

@@ -19,8 +19,9 @@ import {
   deleteTestQuestion,
   createPassedEmployeeSession,
 } from './fixtures/seed'
+import { requireTarget } from '../../scripts/lib/target-guard'
 
-const API = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
+const API = requireTarget('E2E_API_URL', process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`, process.env)
 const VERIFY_API = /\/api\/v1\/verify\/[^/]+$/
 
 const VALID_PAYLOAD = {

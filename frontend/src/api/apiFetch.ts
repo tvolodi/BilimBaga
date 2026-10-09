@@ -29,6 +29,10 @@ export async function apiFetch<T>(
     ...options,
     headers: { ...authHeader, ...options?.headers },
   })
+  // 204 No Content (e.g. DELETE endpoints) has no body to parse.
+  if (res.status === 204) {
+    return undefined as T
+  }
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     const err = new Error(body.error.message) as ApiError

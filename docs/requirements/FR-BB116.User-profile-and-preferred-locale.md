@@ -6,7 +6,7 @@
 | ID | FR-BB116 |
 | Phase | 1/6 — Foundation + Polish (gap closure; completes roadmap 6.2 "locale switcher ... in user profile settings" and the locale resolution of 6.1) |
 | Priority | 2 |
-| Status | Validated |
+| Status | implemented |
 | Depends On | FR-BB14, FR-BB18, FR-BB61, FR-BB62, FR-BB110, FR-BB111, FR-BB313, FR-BB316 |
 
 ## Description

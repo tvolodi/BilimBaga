@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -32,6 +33,11 @@ type mockUserService struct {
 	listRolesFn  func(ctx context.Context, callerRole string) ([]RoleRow, error)
 	unlockFn     func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	remindFn     func(ctx context.Context, actorID, userID, examID string) (*RemindResult, error)
+	updateMeFn   func(ctx context.Context, userID string, locale *string) (*LocaleUpdate, error)
+}
+
+func (m *mockUserService) UpdateMyLocale(ctx context.Context, userID string, locale *string) (*LocaleUpdate, error) {
+	return m.updateMeFn(ctx, userID, locale)
 }
 
 func (m *mockUserService) ListUsers(ctx context.Context, callerRole, callerDeptID string, f ListFilters) (*ListResult, error) {
@@ -542,11 +548,13 @@ func TestHandlerImportUsers_TooManyRows_Returns400(t *testing.T) {
 type fakeAudit struct {
 	actions []string
 	ids     []*string
+	metas   []any
 }
 
-func (f *fakeAudit) Write(_ context.Context, _ *http.Request, action, _ string, entityID *string, _ any) {
+func (f *fakeAudit) Write(_ context.Context, _ *http.Request, action, _ string, entityID *string, metadata any) {
 	f.actions = append(f.actions, action)
 	f.ids = append(f.ids, entityID)
+	f.metas = append(f.metas, metadata)
 }
 
 func TestHandlerUnlockUser_Returns200AndAudits(t *testing.T) {
@@ -767,7 +775,7 @@ func TestHandlerMutations_InvokeUserChangedHook(t *testing.T) {
 func TestHandlerMutations_FailureDoesNotInvokeHook(t *testing.T) {
 	svc := &mockUserService{
 		deactivateFn: func(_ context.Context, _, _, _, _, _ string) error { return ErrForbidden },
-		unlockFn: func(_ context.Context, _, _, _, _, _ string) (*User, error) { return nil, ErrNotFound },
+		unlockFn:     func(_ context.Context, _, _, _, _, _ string) (*User, error) { return nil, ErrNotFound },
 	}
 	called := false
 	h := NewHandler(svc, nil)
@@ -786,4 +794,290 @@ func TestHandlerMutations_NoHookIsSafe(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.DeactivateUser(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// ---- FR-BB116: PATCH /users/me and preferred_locale in read payloads ---------
+
+// patchMe sends a raw PATCH /api/v1/users/me body as the given caller.
+func patchMe(h *Handler, callerID, body string) *httptest.ResponseRecorder {
+	req := withAuthCtx(httptest.NewRequest(http.MethodPatch, "/api/v1/users/me", strings.NewReader(body)), callerID, "employee", "dept-1")
+	w := httptest.NewRecorder()
+	h.UpdateMe(w, req)
+	return w
+}
+
+// localeUpdateSvc returns a mock whose UpdateMyLocale reports the given previous and new value
+// and records the arguments it was called with.
+func localeUpdateSvc(called *bool, gotID *string, gotLocale **string, previous, next *string) *mockUserService {
+	return &mockUserService{updateMeFn: func(_ context.Context, userID string, locale *string) (*LocaleUpdate, error) {
+		*called = true
+		*gotID = userID
+		*gotLocale = locale
+		u := sampleUser(userID)
+		u.PreferredLocale = next
+		return &LocaleUpdate{User: u, Previous: previous}, nil
+	}}
+}
+
+// AC-2 + AC-4: a valid code is persisted via the service, returned as 200 data, and audited with
+// the old and new value.
+func TestHandlerUpdateMe_ValidLocale_Returns200AndAudits(t *testing.T) {
+	var called bool
+	var gotID string
+	var gotLocale *string
+	aw := &fakeAudit{}
+	h := &Handler{svc: localeUpdateSvc(&called, &gotID, &gotLocale, nil, strPtr("ru")), writer: aw}
+
+	w := patchMe(h, "u-caller", `{"preferred_locale":"ru"}`)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	data, apiErr := decodeHandlerEnvelope(t, w)
+	assert.Nil(t, apiErr)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, "ru", got["preferred_locale"])
+
+	require.True(t, called)
+	assert.Equal(t, "u-caller", gotID, "service must receive the caller's own id")
+	require.NotNil(t, gotLocale)
+	assert.Equal(t, "ru", *gotLocale)
+
+	require.Equal(t, []string{"user.preferred_locale_updated"}, aw.actions)
+	require.NotNil(t, aw.ids[0])
+	assert.Equal(t, "u-caller", *aw.ids[0], "audit entity is the caller")
+	assert.Equal(t, map[string]any{"old": nil, "new": "ru"}, aw.metas[0])
+}
+
+// AC-2: an explicit null clears the preference; the response carries null and the audit records
+// the cleared value as old.
+func TestHandlerUpdateMe_NullClears_Returns200AndAuditsOldValue(t *testing.T) {
+	var called bool
+	var gotID string
+	var gotLocale *string
+	aw := &fakeAudit{}
+	h := &Handler{svc: localeUpdateSvc(&called, &gotID, &gotLocale, strPtr("kk"), nil), writer: aw}
+
+	w := patchMe(h, "u-caller", `{"preferred_locale":null}`)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Nil(t, gotLocale, "null must reach the service as nil")
+	data, _ := decodeHandlerEnvelope(t, w)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Contains(t, got, "preferred_locale")
+	assert.Nil(t, got["preferred_locale"])
+	assert.Equal(t, map[string]any{"old": "kk", "new": nil}, aw.metas[0])
+}
+
+// AC-4: the audit entry is written only when the stored value actually changes.
+func TestHandlerUpdateMe_UnchangedValue_NoAudit(t *testing.T) {
+	var called bool
+	var gotID string
+	var gotLocale *string
+	aw := &fakeAudit{}
+	h := &Handler{svc: localeUpdateSvc(&called, &gotID, &gotLocale, strPtr("ru"), strPtr("ru")), writer: aw}
+
+	w := patchMe(h, "u-caller", `{"preferred_locale":"ru"}`)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Empty(t, aw.actions)
+}
+
+// AC-2: a code not in the tenant's available_locales is 400 VALIDATION_ERROR and not audited.
+func TestHandlerUpdateMe_UnavailableLocale_Returns400(t *testing.T) {
+	aw := &fakeAudit{}
+	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+		return nil, fmt.Errorf("%w: preferred_locale must be one of the tenant available locales", ErrValidation)
+	}}
+	h := &Handler{svc: svc, writer: aw}
+
+	w := patchMe(h, "u-caller", `{"preferred_locale":"de"}`)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
+	assert.Empty(t, aw.actions)
+}
+
+// AC-3: any key other than preferred_locale is rejected with 400 and the service is never reached,
+// so nothing is persisted.
+func TestHandlerUpdateMe_ExtraField_Returns400AndNothingPersisted(t *testing.T) {
+	for _, body := range []string{
+		`{"preferred_locale":"ru","role_id":"role-sa"}`,
+		`{"preferred_locale":"ru","department_id":"dept-2"}`,
+		`{"preferred_locale":"ru","email":"x@example.com"}`,
+		`{"preferred_locale":"ru","status":"active"}`,
+		`{"role_id":"role-sa"}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			var called bool
+			svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+				called = true
+				return nil, nil
+			}}
+			aw := &fakeAudit{}
+			h := &Handler{svc: svc, writer: aw}
+
+			w := patchMe(h, "u-caller", body)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+			_, apiErr := decodeHandlerEnvelope(t, w)
+			require.NotNil(t, apiErr)
+			assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
+			assert.False(t, called, "service must not be reached")
+			assert.Empty(t, aw.actions)
+		})
+	}
+}
+
+// AC-2: preferred_locale is required; an absent key is not treated as a null that clears it.
+func TestHandlerUpdateMe_MissingKey_Returns400(t *testing.T) {
+	var called bool
+	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+		called = true
+		return nil, nil
+	}}
+	h := &Handler{svc: svc, writer: &fakeAudit{}}
+
+	w := patchMe(h, "u-caller", `{}`)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
+	assert.False(t, called)
+}
+
+func TestHandlerUpdateMe_TrailingData_Returns400(t *testing.T) {
+	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+		t.Fatal("service must not be reached")
+		return nil, nil
+	}}
+	h := &Handler{svc: svc, writer: &fakeAudit{}}
+
+	for _, body := range []string{`{"preferred_locale":"ru"} {}`, `{"preferred_locale":"ru"}garbage`} {
+		w := patchMe(h, "u-caller", body)
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+		_, apiErr := decodeHandlerEnvelope(t, w)
+		require.NotNil(t, apiErr, body)
+		assert.Equal(t, "VALIDATION_ERROR", apiErr.Code, body)
+	}
+}
+
+func TestHandlerUpdateMe_NonStringLocale_Returns400(t *testing.T) {
+	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+		t.Fatal("service must not be reached")
+		return nil, nil
+	}}
+	h := &Handler{svc: svc, writer: &fakeAudit{}}
+
+	for _, body := range []string{`{"preferred_locale":5}`, `{"preferred_locale":["ru"]}`} {
+		w := patchMe(h, "u-caller", body)
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+		_, apiErr := decodeHandlerEnvelope(t, w)
+		require.NotNil(t, apiErr, body)
+		assert.Equal(t, "VALIDATION_ERROR", apiErr.Code, body)
+	}
+}
+
+func TestHandlerUpdateMe_MalformedJSON_Returns400(t *testing.T) {
+	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+		t.Fatal("service must not be reached")
+		return nil, nil
+	}}
+	h := &Handler{svc: svc, writer: &fakeAudit{}}
+
+	w := patchMe(h, "u-caller", `{"preferred_locale":`)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+}
+
+func TestHandlerUpdateMe_UserNotFound_Returns404NoAudit(t *testing.T) {
+	aw := &fakeAudit{}
+	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+		return nil, ErrNotFound
+	}}
+	h := &Handler{svc: svc, writer: aw}
+
+	w := patchMe(h, "ghost", `{"preferred_locale":"ru"}`)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "NOT_FOUND", apiErr.Code)
+	assert.Empty(t, aw.actions)
+}
+
+func TestHandlerUpdateMe_ServiceError_Returns500NoAudit(t *testing.T) {
+	aw := &fakeAudit{}
+	svc := &mockUserService{updateMeFn: func(context.Context, string, *string) (*LocaleUpdate, error) {
+		return nil, errors.New("db down")
+	}}
+	h := &Handler{svc: svc, writer: aw}
+
+	w := patchMe(h, "u-caller", `{"preferred_locale":"ru"}`)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "INTERNAL_ERROR", apiErr.Code)
+	assert.Empty(t, aw.actions)
+}
+
+// AC-1: preferred_locale is part of the GET /users/me, GET /users/{id} and list payloads, and is
+// null when unset. Existing fields are still present.
+func TestHandlerReads_IncludePreferredLocale(t *testing.T) {
+	withLocale := sampleUser("u1")
+	withLocale.PreferredLocale = strPtr("ru")
+	noLocale := sampleUser("u2")
+
+	svc := &mockUserService{
+		getMeFn: func(context.Context, string) (*User, error) { return withLocale, nil },
+		getUserFn: func(context.Context, string, string, string, string) (*User, error) {
+			return noLocale, nil
+		},
+		listFn: func(context.Context, string, string, ListFilters) (*ListResult, error) {
+			return &ListResult{Items: []User{*withLocale, *noLocale}, Meta: Meta{Page: 1, PerPage: 20, Total: 2}}, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	// GET /users/me
+	req := withAuthCtx(httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil), "u1", "employee", "dept-1")
+	w := httptest.NewRecorder()
+	h.GetMe(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	meData, _ := decodeHandlerEnvelope(t, w)
+	var me map[string]any
+	require.NoError(t, json.Unmarshal(meData, &me))
+	assert.Equal(t, "ru", me["preferred_locale"])
+	assert.Contains(t, me, "email")
+	assert.Contains(t, me, "permissions")
+
+	// GET /users/{id}
+	req = withChiID(withAuthCtx(httptest.NewRequest(http.MethodGet, "/api/v1/users/u2", nil), "admin", "super_admin", ""), "u2")
+	w = httptest.NewRecorder()
+	h.GetUser(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	detailData, _ := decodeHandlerEnvelope(t, w)
+	var detail map[string]any
+	require.NoError(t, json.Unmarshal(detailData, &detail))
+	assert.Contains(t, detail, "preferred_locale")
+	assert.Nil(t, detail["preferred_locale"])
+
+	// GET /users (list)
+	req = withAuthCtx(httptest.NewRequest(http.MethodGet, "/api/v1/users", nil), "admin", "super_admin", "")
+	w = httptest.NewRecorder()
+	h.ListUsers(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	listData, _ := decodeHandlerEnvelope(t, w)
+	var list struct {
+		Items []map[string]any `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal(listData, &list))
+	require.Len(t, list.Items, 2)
+	assert.Equal(t, "ru", list.Items[0]["preferred_locale"])
+	assert.Contains(t, list.Items[1], "preferred_locale")
+	assert.Nil(t, list.Items[1]["preferred_locale"])
 }

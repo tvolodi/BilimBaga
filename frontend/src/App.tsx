@@ -35,6 +35,16 @@ const ChangePasswordPage = lazy(() =>
 const ForgotPasswordPage = lazy(() =>
   import('@/pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
 )
+const ProfilePage = lazy(() =>
+  import('@/pages/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })),
+)
+const ProfileRedirect = lazy(() =>
+  import('@/pages/profile/ProfilePage').then((m) => ({ default: m.ProfileRedirect })),
+)
+// FR-BB116 AC-7 side-effect component (renders null); lazy so it stays out of the initial JS budget (FR-BB65)
+const PreferredLocaleSync = lazy(() =>
+  import('@/components/PreferredLocaleSync').then((m) => ({ default: m.PreferredLocaleSync })),
+)
 const ResetPasswordPage = lazy(() =>
   import('@/pages/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
 )
@@ -163,6 +173,9 @@ function AuthedRoutes() {
   return (
     <>
       <PasswordChangeGuard />
+      <Suspense fallback={null}>
+        <PreferredLocaleSync />
+      </Suspense>
       <Suspense fallback={<FullPageSpinner />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -185,6 +198,7 @@ function AuthedRoutes() {
             }
           >
             <Route index element={<AdminHome />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route
               path="dashboard"
               element={
@@ -362,6 +376,15 @@ function AuthedRoutes() {
               </RequireRole>
             }
           />
+          {/* FR-BB116: /profile sends each role to its own layout's profile page. */}
+          <Route
+            path="/profile"
+            element={
+              <RequireAuth>
+                <ProfileRedirect />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/portal"
             element={
@@ -372,6 +395,7 @@ function AuthedRoutes() {
           >
             <Route index element={<EmployeePortal />} />
             <Route path="results" element={<MyResultsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
           <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>

@@ -33,6 +33,8 @@ type mockRepo struct {
 	outOfScope map[string]bool // #253: users outside the caller's department subtree
 	insertErr  error
 	ambiguous  map[string]bool // department names that resolve to more than one row
+	// setLocaleErr, when set, is returned by SetPreferredLocale (FR-BB116 write-failure path).
+	setLocaleErr error
 }
 
 func newMockRepo() *mockRepo {
@@ -578,4 +580,154 @@ func TestCreateUser_LegacyMixedCaseRow_BlocksLowercaseTwin(t *testing.T) {
 	}, "super_admin", "", "caller-id", "127.0.0.1")
 
 	assert.True(t, errors.Is(err, ErrDuplicateEmail))
+}
+
+func (m *mockRepo) SetPreferredLocale(_ context.Context, id string, locale *string) error {
+	if m.setLocaleErr != nil {
+		return m.setLocaleErr
+	}
+	u, ok := m.users[id]
+	if !ok {
+		return ErrNotFound
+	}
+	var v *string
+	if locale != nil {
+		c := *locale
+		v = &c
+	}
+	u.PreferredLocale = v
+	return nil
+}
+
+// ---- FR-BB116: self-service preferred locale ---------------------------------
+
+// fixedLocales is a LocaleSource returning a fixed tenant available_locales list.
+type fixedLocales []string
+
+func (f fixedLocales) GetAvailableLocales() []string { return f }
+
+// localeRepo holds two employees: u1 with no preference, u2 preferring kk.
+func localeRepo() *mockRepo {
+	repo := newMockRepo()
+	repo.users["u1"] = &User{ID: "u1", Email: "u1@example.com", FullName: "U One", RoleID: "role-emp", RoleName: "employee", Status: "active"}
+	repo.users["u2"] = &User{ID: "u2", Email: "u2@example.com", FullName: "U Two", RoleID: "role-emp", RoleName: "employee", Status: "active", PreferredLocale: strPtr("kk")}
+	return repo
+}
+
+var tenantLocales = fixedLocales{"kk", "ru", "en"}
+
+// AC-2: a code in available_locales is persisted and returned on the updated user.
+func TestUpdateMyLocale_SetsAvailableLocale(t *testing.T) {
+	repo := localeRepo()
+	svc := WithLocaleSource(NewService(repo), tenantLocales)
+
+	res, err := svc.UpdateMyLocale(context.Background(), "u1", strPtr("ru"))
+	require.NoError(t, err)
+	require.NotNil(t, res.User.PreferredLocale)
+	assert.Equal(t, "ru", *res.User.PreferredLocale)
+	assert.Nil(t, res.Previous, "u1 had no preference before")
+	require.NotNil(t, repo.users["u1"].PreferredLocale)
+	assert.Equal(t, "ru", *repo.users["u1"].PreferredLocale)
+}
+
+// AC-2: a code outside available_locales is a validation error and nothing is written.
+func TestUpdateMyLocale_RejectsLocaleOutsideAvailable(t *testing.T) {
+	repo := localeRepo()
+	svc := WithLocaleSource(NewService(repo), tenantLocales)
+
+	for _, bad := range []string{"de", "", "RU", "ru-RU"} {
+		_, err := svc.UpdateMyLocale(context.Background(), "u1", strPtr(bad))
+		require.Error(t, err, bad)
+		assert.ErrorIs(t, err, ErrValidation, bad)
+	}
+	assert.Nil(t, repo.users["u1"].PreferredLocale, "rejected value must not be persisted")
+}
+
+// AC-2: null clears the preference; Previous reports the value that was cleared.
+func TestUpdateMyLocale_NullClearsPreference(t *testing.T) {
+	repo := localeRepo()
+	svc := WithLocaleSource(NewService(repo), tenantLocales)
+
+	res, err := svc.UpdateMyLocale(context.Background(), "u2", nil)
+	require.NoError(t, err)
+	assert.Nil(t, res.User.PreferredLocale)
+	require.NotNil(t, res.Previous)
+	assert.Equal(t, "kk", *res.Previous)
+	assert.Nil(t, repo.users["u2"].PreferredLocale)
+}
+
+// Fail-closed: without a tenant locale source every non-null code is refused, while null
+// (which needs no lookup) still clears.
+func TestUpdateMyLocale_NoLocaleSourceFailsClosed(t *testing.T) {
+	repo := localeRepo()
+	svc := NewService(repo)
+
+	_, err := svc.UpdateMyLocale(context.Background(), "u1", strPtr("en"))
+	assert.ErrorIs(t, err, ErrValidation)
+
+	_, err = svc.UpdateMyLocale(context.Background(), "u2", nil)
+	require.NoError(t, err)
+	assert.Nil(t, repo.users["u2"].PreferredLocale)
+}
+
+// AC-3 (service side): the write only ever addresses the given caller id; another user's
+// preference is untouched.
+func TestUpdateMyLocale_OnlyTouchesCallerRecord(t *testing.T) {
+	repo := localeRepo()
+	svc := WithLocaleSource(NewService(repo), tenantLocales)
+
+	_, err := svc.UpdateMyLocale(context.Background(), "u1", strPtr("ru"))
+	require.NoError(t, err)
+	require.NotNil(t, repo.users["u2"].PreferredLocale)
+	assert.Equal(t, "kk", *repo.users["u2"].PreferredLocale)
+}
+
+func TestUpdateMyLocale_UnknownUserIsNotFound(t *testing.T) {
+	svc := WithLocaleSource(NewService(localeRepo()), tenantLocales)
+
+	_, err := svc.UpdateMyLocale(context.Background(), "ghost", strPtr("ru"))
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+// Write failures are wrapped with context and are not reported as validation errors.
+func TestUpdateMyLocale_RepoWriteErrorIsWrapped(t *testing.T) {
+	repo := localeRepo()
+	boom := errors.New("connection reset")
+	repo.setLocaleErr = boom
+	svc := WithLocaleSource(NewService(repo), tenantLocales)
+
+	_, err := svc.UpdateMyLocale(context.Background(), "u1", strPtr("ru"))
+	require.Error(t, err)
+	assert.ErrorIs(t, err, boom)
+	assert.NotErrorIs(t, err, ErrValidation)
+	assert.Contains(t, err.Error(), "UpdateMyLocale")
+}
+
+// AC-1 (service side): the stored preference is exposed on the profile and the list/detail
+// reads, for every caller that can see the record.
+func TestPreferredLocale_ExposedOnReads(t *testing.T) {
+	svc := NewService(localeRepo())
+	ctx := context.Background()
+
+	me, err := svc.GetMe(ctx, "u2")
+	require.NoError(t, err)
+	require.NotNil(t, me.PreferredLocale)
+	assert.Equal(t, "kk", *me.PreferredLocale)
+
+	detail, err := svc.GetUser(ctx, "u2", "super_admin", "admin", "")
+	require.NoError(t, err)
+	require.NotNil(t, detail.PreferredLocale)
+	assert.Equal(t, "kk", *detail.PreferredLocale)
+
+	list, err := svc.ListUsers(ctx, "super_admin", "", ListFilters{Page: 1, PerPage: 20})
+	require.NoError(t, err)
+	var found bool
+	for _, u := range list.Items {
+		if u.ID == "u2" {
+			found = true
+			require.NotNil(t, u.PreferredLocale)
+			assert.Equal(t, "kk", *u.PreferredLocale)
+		}
+	}
+	assert.True(t, found, "u2 must appear in the admin list")
 }

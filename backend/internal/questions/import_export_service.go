@@ -93,6 +93,13 @@ func (s *service) ValidateAndImport(ctx context.Context, rows []ImportRow, dryRu
 			}
 		}
 
+		// FR-BB24 AC-11: a present non-default locale must translate every option.
+		if validQuestionTypes[row.Type] && row.DefaultLocale != "" {
+			for _, fe := range partialLocaleFieldErrors(row.Type, row.DefaultLocale, row.Translations, row.AnswerOptions) {
+				errs = append(errs, fe.Field+": "+fe.Message)
+			}
+		}
+
 		// Resolve category_path to category_id (store resolved ID back in CategoryPath field).
 		if row.CategoryPath != "" && len(errs) == 0 {
 			catID, err := s.repo.ResolveCategoryPath(ctx, row.CategoryPath)

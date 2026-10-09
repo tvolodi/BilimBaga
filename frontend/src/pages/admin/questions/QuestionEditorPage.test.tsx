@@ -232,3 +232,36 @@ describe('QuestionEditorPage — default_locale follows active locale (ISS-006)'
     expect(translations['ru']?.stem).toBe('Первая планета от Солнца')
   })
 })
+
+// ISS-268 / FR-BB24 AC-11: never send a stem-only non-default locale with blank options.
+describe('QuestionEditorPage — partial locale guard (ISS-268)', () => {
+  it('blocks the save and shows an error when a second locale has a stem but blank options', async () => {
+    let posted = false
+    server.use(
+      http.post('/api/v1/questions', () => {
+        posted = true
+        return HttpResponse.json({ data: { ...sampleQuestion, id: 'new-q' }, error: null })
+      }),
+    )
+    const Wrapper = createWrapper('/admin/questions/new')
+    render(
+      <Wrapper>
+        <QuestionEditorPage />
+      </Wrapper>,
+    )
+    await waitFor(() => screen.getByRole('button', { name: /save draft/i }))
+
+    // Default locale (en): stem + both options filled.
+    fireEvent.change(document.querySelector('textarea') as HTMLTextAreaElement, { target: { value: 'English stem' } })
+    // Second locale (ru): stem only.
+    fireEvent.click(screen.getByRole('button', { name: /ru/i }))
+    fireEvent.change(document.querySelector('textarea') as HTMLTextAreaElement, { target: { value: 'Русский вопрос' } })
+
+    // Back on the default locale tab so it is the one used as default_locale.
+    fireEvent.click(screen.getByRole('button', { name: /en/i }))
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+    await waitFor(() => expect(screen.getByText(/Translation incomplete for RU/i)).toBeTruthy())
+    expect(posted).toBe(false)
+  })
+})

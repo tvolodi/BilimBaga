@@ -214,3 +214,37 @@ func TestImport_NoTrigram_Proceeds(t *testing.T) {
 	assert.Equal(t, 1, report.ValidCount)
 	assert.Empty(t, report.WarningRows)
 }
+
+// TestImport_PartialLocale_RowError pins FR-BB24 AC-11 for bulk import: a
+// present non-default locale with a blank option is a per-row error naming the
+// option index (also on commit); a fully untranslated locale is accepted.
+func TestImport_PartialLocale_RowError(t *testing.T) {
+	partial := buildValidRow(1)
+	partial.Translations["en"] = TranslationInput{Stem: "What is Go?"}
+	partial.AnswerOptions[0].Translations["en"] = AnswerTranslationInput{Text: "A"}
+	// option index 1 has no "en" text -> partial.
+
+	stemOnly := buildValidRow(2)
+	stemOnly.Translations["en"] = TranslationInput{Stem: "What is Go?"}
+
+	untranslated := buildValidRow(3)
+	untranslated.Translations["en"] = TranslationInput{}
+
+	full := buildValidRow(4)
+	full.Translations["en"] = TranslationInput{Stem: "What is Go?"}
+	full.AnswerOptions[0].Translations["en"] = AnswerTranslationInput{Text: "A"}
+	full.AnswerOptions[1].Translations["en"] = AnswerTranslationInput{Text: "B"}
+
+	svc := NewService(newMockRepo())
+	report, _, err := svc.ValidateAndImport(context.Background(), []ImportRow{partial, stemOnly, untranslated, full}, true, "actor-1")
+	require.NoError(t, err)
+	assert.Equal(t, 2, report.ValidCount)
+	require.Len(t, report.ErrorRows, 2)
+	assert.Equal(t, 1, report.ErrorRows[0].Row)
+	assert.Contains(t, report.ErrorRows[0].Errors[0], "answer_options[1].translations.en.text")
+	assert.Equal(t, 2, report.ErrorRows[1].Row)
+	assert.Len(t, report.ErrorRows[1].Errors, 2)
+
+	_, _, err = NewService(newMockRepo()).ValidateAndImport(context.Background(), []ImportRow{partial}, false, "actor-1")
+	require.Error(t, err)
+}

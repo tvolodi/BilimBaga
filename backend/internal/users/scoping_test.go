@@ -177,3 +177,31 @@ func TestHandlerGetMe_NoProviderReturnsEmptyPermissionsArray(t *testing.T) {
 	h.GetMe(w, withAuthCtx(httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil), "u1", "employee", "dept-1"))
 	assert.Contains(t, w.Body.String(), `"permissions":[]`)
 }
+
+func TestScoping_CustomRoleCannotAssignMorePowerfulRole(t *testing.T) {
+	repo := newMockRepo()
+	seedTwoDepts(repo)
+	perms := map[string][]string{
+		customRole: {"users:read", "users:manage", "portal:read"},
+		"department_admin": {"users:read", "reports:read"},
+		"examiner": {"exams:read", "questions:write"},
+		"employee": {"portal:read"},
+	}
+	has := func(role, res, act string) bool {
+		for _, p := range perms[role] {
+			if p == res+":"+act {
+				return true
+			}
+		}
+		return false
+	}
+	svc := WithPermissionsLookup(WithPermissionChecker(NewService(repo), has), func(r string) []string { return perms[r] })
+	ctx := context.Background()
+	upd := func(roleID string) error {
+		_, err := svc.UpdateUser(ctx, "u1", UpdateRequest{FullName: "X", DepartmentID: strPtr("dept-1"), RoleID: roleID}, customRole, "dept-1", "c", "")
+		return err
+	}
+	assert.ErrorIs(t, upd("role-ex"), ErrForbidden, "examiner exceeds caller permissions")
+	assert.ErrorIs(t, upd("role-da"), ErrForbidden, "department_admin has reports:read the caller lacks")
+	assert.NoError(t, upd("role-emp"), "employee perms are a subset of the caller's")
+}

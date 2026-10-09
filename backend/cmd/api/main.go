@@ -197,7 +197,7 @@ func main() {
 
 	// Wire up user management.
 	usersRepo := users.NewRepository(db)
-	usersSvc := users.WithPermissionChecker(users.NewService(usersRepo, emailSvc), rbacCache.Has)
+	usersSvc := users.WithPermissionsLookup(users.WithPermissionChecker(users.NewService(usersRepo, emailSvc), rbacCache.Has), rbacCache.PermissionsFor)
 	usersHandler := users.NewHandler(usersSvc, auditWriter).WithPermissionsProvider(rbacCache.PermissionsFor)
 
 	// Wire up audit log.

@@ -38,12 +38,22 @@ type service struct {
 	// canPerm reports whether a role holds resource:action. nil means "no
 	// permission information": GetUser then grants only self-access to
 	// non-super_admin roles (default-deny).
-	canPerm PermissionChecker
+	canPerm  PermissionChecker
+	permsFor func(role string) []string
 }
 
 // PermissionChecker reports whether role holds the resource:action permission
 // (satisfied by (*rbac.Cache).Has).
 type PermissionChecker func(role, resource, action string) bool
+
+// WithPermissionsLookup attaches a role -> "resource:action" lookup used to stop
+// custom-role callers from assigning roles more powerful than their own.
+func WithPermissionsLookup(svc Service, fn func(role string) []string) Service {
+	if s, ok := svc.(*service); ok {
+		s.permsFor = fn
+	}
+	return svc
+}
 
 // WithPermissionChecker attaches a PermissionChecker to a Service built by NewService.
 func WithPermissionChecker(svc Service, fn PermissionChecker) Service {
@@ -363,16 +373,18 @@ func (s *service) validateImportRow(ctx context.Context, row CSVRow, callerRole,
 		return fmt.Sprintf("department %s is outside your scope", row.DepartmentName)
 	}
 
-	if !isOrgWide(callerRole) && row.RoleName == "super_admin" {
-		return "role super_admin cannot be assigned by your role"
-	}
-
-	_, err = s.repo.GetRoleIDByName(ctx, row.RoleName)
+	roleID, err := s.repo.GetRoleIDByName(ctx, row.RoleName)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return fmt.Sprintf("unknown role: %s", row.RoleName)
 		}
 		return "role lookup failed"
+	}
+	if err := s.checkRoleAssignment(ctx, roleID, callerRole); err != nil {
+		if errors.Is(err, ErrForbidden) {
+			return fmt.Sprintf("role %s cannot be assigned by your role", row.RoleName)
+		}
+		return "role check failed"
 	}
 
 	return ""
@@ -426,8 +438,21 @@ func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole st
 	if roleName == "super_admin" {
 		return ErrForbidden
 	}
+	// Privilege-escalation guard for admin-created (custom) caller roles: the target
+	// role's permissions must be a subset of the caller's own. Built-in callers keep
+	// their historical behaviour. Without a lookup (tests) the check is skipped.
+	if s.permsFor != nil && !builtinRoles[callerRole] {
+		for _, p := range s.permsFor(roleName) {
+			res, act, _ := strings.Cut(p, ":")
+			if s.canPerm == nil || !s.canPerm(callerRole, res, act) {
+				return ErrForbidden
+			}
+		}
+	}
 	return nil
 }
+
+var builtinRoles = map[string]bool{"super_admin": true, "department_admin": true, "examiner": true, "employee": true}
 
 // ListRoles returns all roles from the database.
 func (s *service) ListRoles(ctx context.Context) ([]RoleRow, error) {

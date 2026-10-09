@@ -18,6 +18,7 @@ type mockRepo struct {
 	rules       map[string]*ExamQuestionRule
 	manual      map[string][]ManualQuestionInput
 	assignments map[string]*ExamAssignment
+	userDepts   map[string]string
 
 	createFn                      func(ctx context.Context, e *Exam) error
 	getByIDFn                     func(ctx context.Context, id string) (*Exam, error)
@@ -278,6 +279,10 @@ func (m *mockRepo) CreateAssignment(ctx context.Context, a *ExamAssignment) erro
 	a.AssignedAt = time.Now()
 	m.assignments[a.ID] = a
 	return nil
+}
+
+func (m *mockRepo) UserDepartmentID(_ context.Context, userID string) (string, error) {
+	return m.userDepts[userID], nil
 }
 
 func (m *mockRepo) GetAssignmentByID(ctx context.Context, id string) (*ExamAssignment, error) {

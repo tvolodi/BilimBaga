@@ -98,7 +98,7 @@ func (s *service) reloadCache(ctx context.Context) error {
 		return nil
 	}
 	if err := s.reload(ctx); err != nil {
-		return fmt.Errorf("%w: %v", ErrCacheReload, err)
+		return fmt.Errorf("%w: %w", ErrCacheReload, err)
 	}
 	return nil
 }

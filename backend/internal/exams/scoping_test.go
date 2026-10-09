@@ -36,3 +36,21 @@ func TestCreateAssignment_Examiner_StaysOrgWide(t *testing.T) {
 	})
 	assert.NoError(t, err)
 }
+
+func TestCreateAssignment_ScopedRole_UserAssigneeMustBeInOwnDept(t *testing.T) {
+	repo := newMockRepo()
+	repo.userDepts = map[string]string{"u-in": "dept-1", "u-out": "dept-2"}
+	seedExam(repo, "exam-1", "active")
+	svc := NewService(repo)
+	for _, role := range []string{"qa_lead", "department_admin"} {
+		out, in := "u-out", "u-in"
+		_, err := svc.CreateAssignment(context.Background(), CreateAssignmentInput{
+			ExamID: "exam-1", AssigneeType: "user", AssigneeID: &out, AssignedBy: "x", CallerRole: role, CallerDeptID: "dept-1",
+		})
+		assert.ErrorIs(t, err, ErrForbidden, role)
+		_, err = svc.CreateAssignment(context.Background(), CreateAssignmentInput{
+			ExamID: "exam-1", AssigneeType: "user", AssigneeID: &in, AssignedBy: "x", CallerRole: role, CallerDeptID: "dept-1",
+		})
+		assert.NoError(t, err, role)
+	}
+}

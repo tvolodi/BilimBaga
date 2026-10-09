@@ -591,6 +591,8 @@ func (h *Handler) CreateRule(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "exam not found")
 		case errors.Is(err, ErrInvalidInput):
 			writeValidationErrors(w, []fieldError{{"tag_ids", "tag_ids must contain valid UUID strings"}})
+		case errors.Is(err, ErrQuestionNotFound):
+			writeValidationErrors(w, []fieldError{{"questions", "question_id must reference an existing question"}})
 		default:
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to create rule")
 		}

@@ -617,6 +617,10 @@ func (r *postgresRepository) SetManualQuestions(ctx context.Context, ruleID stri
 	for _, q := range questions {
 		const ins = `INSERT INTO exam_manual_questions (rule_id, question_id, sort_order) VALUES ($1, $2, $3)`
 		if _, err = tx.ExecContext(ctx, ins, ruleID, q.QuestionID, q.SortOrder); err != nil {
+			var pqErr *pq.Error
+			if errors.As(err, &pqErr) && pqErr.Code == "23503" && pqErr.Constraint == "exam_manual_questions_question_id_fkey" {
+				return fmt.Errorf("exams: SetManualQuestions: question %s: %w", q.QuestionID, ErrQuestionNotFound)
+			}
 			return fmt.Errorf("exams: SetManualQuestions: insert %s: %w", q.QuestionID, err)
 		}
 	}

@@ -768,6 +768,43 @@ func TestCreateRule_ExamNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotFound)
 }
 
+// #288: an unknown question_id must not leave the new rule row behind.
+func TestCreateRule_UnknownQuestion_RollsBackRule(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.setManualQsFn = func(_ context.Context, _ string, _ []ManualQuestionInput) error {
+		return ErrQuestionNotFound
+	}
+	svc := NewService(repo)
+	_, err := svc.CreateRule(context.Background(), "exam-1", QuestionRuleInput{
+		Mode:      "manual",
+		Count:     1,
+		Questions: []ManualQuestionInput{{QuestionID: "00000000-0000-4000-8000-0000000000aa", SortOrder: 1}},
+	})
+	assert.ErrorIs(t, err, ErrQuestionNotFound)
+	assert.Empty(t, repo.rules)
+}
+
+// #288: when the rollback itself fails, the original cause must still be reported.
+func TestCreateRule_UnknownQuestion_RollbackFailureKeepsCause(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.setManualQsFn = func(_ context.Context, _ string, _ []ManualQuestionInput) error {
+		return ErrQuestionNotFound
+	}
+	repo.deleteRuleFn = func(_ context.Context, _ string) error {
+		return errors.New("db unavailable")
+	}
+	svc := NewService(repo)
+	_, err := svc.CreateRule(context.Background(), "exam-1", QuestionRuleInput{
+		Mode:      "manual",
+		Count:     1,
+		Questions: []ManualQuestionInput{{QuestionID: "00000000-0000-4000-8000-0000000000aa", SortOrder: 1}},
+	})
+	assert.ErrorIs(t, err, ErrQuestionNotFound)
+	assert.ErrorContains(t, err, "db unavailable")
+}
+
 func TestDeleteRule_Success(t *testing.T) {
 	repo := newMockRepo()
 	seedExam(repo, "exam-1", "draft")

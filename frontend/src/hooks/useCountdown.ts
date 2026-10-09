@@ -38,6 +38,7 @@ export function useCountdown(deadline: string | null): string {
 
     // ISS-027: declare interval with let before tick() so the closure
     // can safely call clearInterval(interval) without a TDZ ReferenceError.
+    // eslint-disable-next-line prefer-const -- must be declared before tick() for the closure
     let interval: ReturnType<typeof setInterval>
 
     const tick = () => {

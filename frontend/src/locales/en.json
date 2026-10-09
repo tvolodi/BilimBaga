@@ -22,7 +22,12 @@
     "actions": "Actions",
     "language": "Language",
     "aiGenerated": "AI-generated",
-    "toggleExpand": "Toggle expand"
+    "toggleExpand": "Toggle expand",
+    "errorBoundary": {
+      "title": "Something went wrong",
+      "message": "An unexpected error occurred. Please reload the page.",
+      "reload": "Reload page"
+    }
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -45,7 +50,8 @@
       "role": "Role",
       "status": "Status",
       "created_at": "Created",
-      "actions": "Actions"
+      "actions": "Actions",
+      "error": "Error"
     },
     "roles": {
       "super_admin": "Super Admin",
@@ -201,10 +207,14 @@
       "confirm": "Confirm Import",
       "dropzone": "Drop file here or click to select",
       "cancel": "Cancel",
-      "progress": "Processing {{n}} / {{total}}"
+      "progress": "Processing {{n}} / {{total}}",
+      "row": "Row {{row}}:",
+      "similarTo": "Similar to: “{{stem}}” ({{score}}%)"
     },
     "versions": {
-      "title": "Version History"
+      "title": "Version History",
+      "empty": "No version history.",
+      "label": "v{{version}}"
     },
     "actions": {
       "edit": "Edit",
@@ -409,11 +419,11 @@
       "category": "Category",
       "tags": "Tags",
       "stem": "Question Stem",
-      "stemPlaceholder": "Enter the question text\u2026",
+      "stemPlaceholder": "Enter the question text…",
       "explanation": "Explanation",
-      "explanationPlaceholder": "Optional explanation shown after the question is answered\u2026",
+      "explanationPlaceholder": "Optional explanation shown after the question is answered…",
       "modelAnswer": "Model Answer",
-      "modelAnswerPlaceholder": "Enter the expected answer for AI comparison\u2026",
+      "modelAnswerPlaceholder": "Enter the expected answer for AI comparison…",
       "autoGrade": "Enable Auto-Grading",
       "autoGradeHelp": "AI will score this question automatically. Requires a model answer."
     },
@@ -475,7 +485,10 @@
         "eligibleCountError": "Could not load counts",
         "ruleStatusOk": "Sufficient",
         "ruleStatusInsufficient": "Insufficient",
-        "ruleStatusNone": "No matching questions"
+        "ruleStatusNone": "No matching questions",
+        "ruleUnsatisfied": "Rule {{id}}…: needs {{required}}, only {{available}} available",
+        "ruleSummary": "Rule {{n}}: {{mode}}, {{count}} questions",
+        "published": "Published"
       },
       "validationWarning": "Some question rules cannot be satisfied. Fix them before publishing.",
       "validationWarningHint": "Only questions with 'active' status are counted. Open the Question Bank and approve your questions before publishing.",
@@ -785,7 +798,7 @@
     "ai_reasoning_hide": "Hide AI reasoning",
     "filter_by_exam": "Filter by exam",
     "filter_all_exams": "All exams",
-    "showing_range": "Showing {{start}}\u2013{{end}} of {{total}}",
+    "showing_range": "Showing {{start}}–{{end}} of {{total}}",
     "prev_page": "Previous",
     "next_page": "Next",
     "nav": "Manual Grading"

@@ -42,6 +42,7 @@ type QuestionType = 'single' | 'multiple' | 'truefalse' | 'shorttext' | 'likert'
 type Difficulty = 'easy' | 'medium' | 'hard'
 type Status = 'draft' | 'review' | 'active' | 'archived'
 
+const MISSING_MARK = '○'
 const LOCALES = ['en', 'kk', 'ru'] as const
 type Locale = (typeof LOCALES)[number]
 
@@ -214,7 +215,7 @@ function CoverageTabs({ activeLocale, onLocaleChange, translations }: CoverageTa
             {hasContent ? (
               <span title={t('questionEditor.locale.coverage.complete')}><Check size={12} className="text-green-500" /></span>
             ) : (
-              <span className="text-xs text-muted-foreground" title={t('questionEditor.locale.coverage.missing')}>○</span>
+              <span className="text-xs text-muted-foreground" title={t('questionEditor.locale.coverage.missing')}>{MISSING_MARK}</span>
             )}
           </button>
         )
@@ -388,6 +389,8 @@ function TagCombobox({ tagIds, onTagIdsChange }: TagComboboxProps) {
 
   return (
     <div className="relative">
+      {/* Mouse convenience only: the inner <input> is the keyboard-focusable control. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div className="flex flex-wrap gap-1.5 p-2 border rounded-md min-h-10 cursor-text" onClick={() => inputRef.current?.focus()}>
         {selectedTags.map((tag) => (
           <span
@@ -760,7 +763,7 @@ export function QuestionEditorPage() {
           return
         }
         setTimeout(() => setAutoSaveStatus('idle'), 3000)
-      } catch (err) {
+      } catch {
         setAutoSaveStatus('error')
         setNotification({ type: 'error', message: t('questionEditor.error.saveFailed') })
       }
@@ -809,7 +812,7 @@ export function QuestionEditorPage() {
         tag_ids: form.tag_ids.length > 0 ? form.tag_ids : undefined,
       })
       navigate(`/admin/questions/${created.id}/edit`, { replace: true })
-    } catch (err) {
+    } catch {
       setNotification({ type: 'error', message: t('questionEditor.error.saveFailed') })
     }
   }

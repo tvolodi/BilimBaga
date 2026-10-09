@@ -107,6 +107,8 @@ interface AIGenerateDialogProps {
   onSuccess: (count: number) => void
 }
 
+const RESET_ICON = '↺'
+
 export function AIGenerateDialog({ open, onClose, onSuccess }: AIGenerateDialogProps) {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -341,7 +343,7 @@ export function AIGenerateDialog({ open, onClose, onSuccess }: AIGenerateDialogP
                     onClick={reset}
                     className="text-xs text-muted-foreground hover:underline"
                   >
-                    ↺
+                    {RESET_ICON}
                   </button>
                 </div>
               </div>

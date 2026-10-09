@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { downloadFile, downloadErrorKey } from './download'
-import { downloadAdminCertificate } from './employees'
+import { downloadAdminCertificate, exportEmployeeRecord } from './employees'
+import { exportAuditLog } from './audit'
 import { downloadDashboardPdf, downloadExamCsv } from './reports'
 
 function blobResponse(status = 200): Response {
@@ -122,6 +123,8 @@ describe('download wrappers send Bearer to the right endpoints', () => {
   it.each([
     ['admin certificate', (qc: QueryClient) => downloadAdminCertificate(qc, 's1', 'CODE'), '/api/v1/admin/sessions/s1/certificate'],
     ['dashboard pdf', (qc: QueryClient) => downloadDashboardPdf(qc, '2026-01-01', '2026-01-31'), '/api/v1/admin/dashboard/export?from=2026-01-01&to=2026-01-31'],
+    ['employee record csv', (qc: QueryClient) => exportEmployeeRecord(qc, 'u1'), '/api/v1/admin/users/u1/record/export'],
+    ['audit log csv', (qc: QueryClient) => exportAuditLog(qc, { from: '2026-01-01', actions: ['user.login'] }), '/api/v1/audit/export?from=2026-01-01&action=user.login'],
     ['exam csv', (qc: QueryClient) => downloadExamCsv(qc, 'e1', 'My Exam'), '/api/v1/admin/exams/e1/results/export'],
   ])('%s', async (_n, call, expectedUrl) => {
     await call(makeQc())

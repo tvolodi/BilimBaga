@@ -1,5 +1,5 @@
 ---
-id: ISS-055
+id: ISS-059
 title: E2E full-walkthrough test 21 asserts wrong redirect for admin session on /portal
 status: resolved
 severity: low

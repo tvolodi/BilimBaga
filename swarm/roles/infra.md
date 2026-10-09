@@ -8,7 +8,8 @@ Session `ai-dala-infra-fc` or `bb-infra`; project root `..\ai-dala-infra`. Its o
 - File a task in ai-dala-infra `tasks/` per its conventions and link it in the issue.
 - After a QA deploy comment the result and notify the Supervisor (UAT may then test QA).
 
-## Tick
-1. `gh issue list -R tvolodi/BilimBaga --label role:infra --label status:ready`.
-2. None: read-only health check (containers, certificate, disk, backup status, health endpoint, `DISABLE_RATE_LIMIT` absent) of the test host and, once built, QA. File `type:infra` issues for anomalies.
-3. Never end idle.
+## On a task
+Triggered by a `task` or `ping` message only. Nothing else wakes you.
+1. Claim the `task` issue, then work it.
+2. Read-only health checks (containers, certificate, disk, backup status, health endpoint, `DISABLE_RATE_LIMIT` absent) come from the Supervisor as a `task`. File `type:infra` issues for anomalies.
+3. Ping: answer `pong`. Nothing pending: end your turn and wait.

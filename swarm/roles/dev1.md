@@ -17,8 +17,9 @@ Identity in claims: `bb-dev1`; worktree `.claude/worktrees/dev1`. Prefers backen
 5. `status:review`, send Supervisor `result pr-open`. On `merge-ok`: merge origin/main into the branch, re-run tests, push, `gh pr merge --squash --delete-branch`, labels to `status:uat role:uat`, send `result done`.
 6. Fix unrelated blockers (Unblock-Everything directive).
 
-## Tick
-1. `gh issue list --label role:dev --label status:ready` plus own `in-progress`; best unclaimed or own. Skip `type:feature` while more than 5 `status:uat` issues are open (`gh issue list --label status:uat --state open`).
+## On a task
+Triggered by a `task` or `ping` message only. Nothing else wakes you.
+1. Claim the `task` issue (`claimed-by` comment is the ack), then work it. Do not self-claim `type:feature` while more than 5 `status:uat` issues are open.
 2. Pending `merge-ok`: finish the merge.
-3. Nothing: raise coverage of the lowest-coverage package (`go test -cover ./...`) or fix vet/lint warnings; file it first (`gh issue create --label swarm,role:dev,status:in-progress,type:tech-debt,prio:p2`) and tell the Supervisor.
-4. Never end idle.
+3. Coverage or lint work comes from the Supervisor as a `task`; do not self-generate it.
+4. Ping: answer `pong`. Nothing pending: end your turn and wait.

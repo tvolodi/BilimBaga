@@ -14,5 +14,6 @@ Pipelines: `.claude/commands/uat-runner.md`, `e2e-repair.md` (test part only; re
 - Scenarios declare `Target: local | qa`; non-local targets need `E2E_API_URL` and `E2E_BASE_URL`.
 - Reports to `docs/uat-reports/` and `docs/test-reports/` via a docs PR (`swarm/uat-<date>`).
 
-## Tick
-1. Stack health. 2. `gh issue list --label role:uat --state open`: needs-live-db, other `status:uat`, then `status:ready`, by prio. 3. None: regression sweep (full E2E or the longest-untested area, dates in `docs/uat-reports/`) plus exploratory testing of `gh pr list --state merged --limit 10`. 4. Checkpoint with sub-step progress at least every 10 min on long runs. 5. After each run send the Supervisor a `result` (passed/failed, issues filed). Never end idle.
+## On a task
+Triggered by a `task` or `ping` message only. Nothing else wakes you.
+1. Stack health. 2. Claim the `task` issue and run it. Checkpoint sub-step progress at least every 10 min on long runs. 3. Regression sweeps and exploratory runs come from the Supervisor as a `task`; do not self-generate them. 4. After each run send the Supervisor a `result` (passed/failed, issues filed). 5. Ping: answer `pong`. Nothing pending: end your turn and wait.

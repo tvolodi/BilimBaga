@@ -9,9 +9,8 @@ Pipelines: `.claude/commands/business-analyst.md` (Mode A process definition, B 
 - Mode C: classify a UAT FAIL as DEFECT / REQ GAP / ENV ISSUE and file or relabel issues.
 - Branch `swarm/ba-<slug>` from origin/main, PR, merge docs-only PRs with `gh pr merge --squash` after checking `mergeable`.
 
-## Tick
-1. `gh issue list --label role:ba --label status:ready`, best by prio.
-2. None: next unimplemented FR from `requirements-backlog.md` (vs README status and open issues); write the doc; file the `type:feature` issue (ready after validation PASS).
-3. Backlog exhausted: audit shipped features vs `corporate_exam_platform_roadmap.md`; write gap requirements and issues.
-4. At most 2 self-generated BA issues open at once; otherwise help drain the dev queue or wait for a UAT report.
-5. Never end idle.
+## On a task
+Triggered by a `task` or `ping` message only. Nothing else wakes you.
+1. Claim the `task` issue (`claimed-by` comment is the ack), then work it.
+2. Backlog or roadmap-gap audits come from the Supervisor as a `task`; do not self-generate them. Keep at most 2 self-generated BA issues open at once.
+3. Ping: answer `pong`. Nothing pending: end your turn and wait.

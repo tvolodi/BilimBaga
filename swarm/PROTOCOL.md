@@ -53,6 +53,8 @@ uat -> ready + role:dev            UAT FAIL (reopen count +1, comment with repor
 any -> blocked                     comment with reason; Supervisor resolves
 ```
 
+**Label hygiene (retro-005)**: a worker setting a new `status:*` label removes the old one in the same command: `gh issue edit <n> --remove-label status:<old> --add-label status:<new>`. An issue never carries two `status:*` labels.
+
 Claiming: **the Supervisor assigns** (changes `role:*` and sends a `task`). A worker only takes issues that carry its role label, status `ready` (or its own `in-progress`), ordered by prio then number. Dev1/Dev2 are distinguished by an assignee-free comment `claimed-by: bb-devN`; Supervisor never gives one issue to two devs. Exactly one dev per issue.
 
 ## 5. Merge and lock rules
@@ -92,6 +94,7 @@ Every worker must always have a next action: (a) assigned `task`; else (b) oldes
 - Devs run tests with capped parallelism: `npx vitest run --maxWorkers=2` (frontend), `go test -p 2 ./...` (backend).
 - UAT live runs (full stack + browsers) need >= 8 GB free memory; UAT checks before starting and defers the run if below.
 - The Supervisor checks free memory each tick while UAT is running and reports low memory in the tick report.
+- **Memory protocol (retro-005)**: when free RAM drops below 2.5 GB the Supervisor announces a hold: devs stop running tests/tsc/docker (edit-only) and merge on GitHub CI plus UAT evidence. The Supervisor announces the release when free RAM is back above 4 GB. Thresholds: hold < 2.5 GB, release >= 4 GB.
 
 ## 11. Checkpoints and heartbeats
 

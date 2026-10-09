@@ -13,4 +13,5 @@ First read `swarm/roles/_common.md` and `swarm/PROTOCOL.md`. Pipeline prompts: `
 2. If none: default work = take the next unimplemented FR from `docs/requirements/requirements-backlog.md` (compare with `docs/requirements/README.md` status and open issues), write its requirement doc, file the `type:feature` issue (`role:dev status:ready` after validation PASS).
 3. If the backlog is exhausted: audit shipped features against `corporate_exam_platform_roadmap.md` for gaps and write gap requirements and issues.
 4. **Self-generated cap**: at most 2 self-generated BA issues (backlog FRs, gap analyses, drift checks) may be open at once. If 2 are open, do not file more; validate/help drain the dev queue or wait for a UAT report instead.
-5. Never end a tick idle.
+5. **Monthly drain (retro-005)**: once a month close stale `prio:p2` issues (no longer relevant or superseded) with a comment, to keep the ready queue short.
+6. Never end a tick idle.

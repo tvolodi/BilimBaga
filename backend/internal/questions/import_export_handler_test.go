@@ -472,3 +472,20 @@ func TestExportHandler_MalformedUUIDFilters_Return422(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "VALIDATION_ERROR", q)
 	}
 }
+
+func TestImportHandler_BodyOverCap_Returns413BeforeParse(t *testing.T) {
+	h := NewHandler(&mockQService{}, nil)
+
+	big := strings.Repeat("a", 13<<20)
+	body, ct := buildQCSVMultipart(t, big, "questions.csv")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", body)
+	req.Header.Set("Content-Type", ct)
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	_, apiErr := decodeQEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "ERR_FILE_TOO_LARGE", apiErr.Code)
+}

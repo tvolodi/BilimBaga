@@ -59,6 +59,9 @@ type BootstrapResult struct {
 	// StillDefault is true when the admin still has the default password after the call
 	// (callers log a WARNING).
 	StillDefault bool
+	// EnvPasswordInvalid is true when BOOTSTRAP_ADMIN_PASSWORD was set but invalid and was
+	// ignored because the admin is absent or already rotated (callers log a WARNING).
+	EnvPasswordInvalid bool
 }
 
 // BootstrapAdmin makes the seeded super_admin safe at startup (ISS-150/ISS-152).
@@ -74,25 +77,23 @@ type BootstrapResult struct {
 //
 // The env password is never logged or included in errors.
 func BootstrapAdmin(ctx context.Context, store BootstrapStore, opts BootstrapOptions) (BootstrapResult, error) {
-	if opts.Password != "" {
-		if err := ValidateComplexity(opts.Password); err != nil {
-			return BootstrapResult{}, errors.New("auth.BootstrapAdmin: BOOTSTRAP_ADMIN_PASSWORD does not meet the password complexity policy (8+ chars, upper, lower, digit)")
-		}
-		if opts.Password == DefaultAdminPassword {
-			return BootstrapResult{}, errors.New("auth.BootstrapAdmin: BOOTSTRAP_ADMIN_PASSWORD must differ from the default admin password")
-		}
-	}
+	// The env password is validated up front but only enforced where it matters: if the
+	// admin already rotated away from the default, an invalid value is ignored with a warning.
+	envErr := validateBootstrapPassword(opts.Password)
 
 	id, hash, err := store.GetAdminCredentials(ctx, BootstrapAdminEmail)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return BootstrapResult{Outcome: BootstrapNoAdmin}, nil
+			return BootstrapResult{Outcome: BootstrapNoAdmin, EnvPasswordInvalid: envErr != nil}, nil
 		}
 		return BootstrapResult{}, fmt.Errorf("auth.BootstrapAdmin: load admin: %w", err)
 	}
 
 	if !HasDefaultAdminPassword(hash) {
-		return BootstrapResult{Outcome: BootstrapNotDefault}, nil
+		return BootstrapResult{Outcome: BootstrapNotDefault, EnvPasswordInvalid: envErr != nil}, nil
+	}
+	if envErr != nil {
+		return BootstrapResult{}, envErr
 	}
 
 	password, force, outcome := opts.Password, false, BootstrapPasswordApplied
@@ -133,18 +134,41 @@ func BootstrapAdmin(ctx context.Context, store BootstrapStore, opts BootstrapOpt
 	return BootstrapResult{Outcome: BootstrapForcedChange, StillDefault: true}, nil
 }
 
+// validateBootstrapPassword checks the env password; "" (unset) is valid. Errors never
+// include the value.
+func validateBootstrapPassword(pw string) error {
+	if pw == "" {
+		return nil
+	}
+	if len(pw) > maxBcryptBytes { // bytes, not runes: bcrypt truncates/rejects beyond 72 bytes
+		return errors.New("auth.BootstrapAdmin: BOOTSTRAP_ADMIN_PASSWORD is longer than 72 bytes (bcrypt limit)")
+	}
+	if err := ValidateComplexity(pw); err != nil {
+		return errors.New("auth.BootstrapAdmin: BOOTSTRAP_ADMIN_PASSWORD does not meet the password complexity policy (8+ chars, upper, lower, digit)")
+	}
+	if pw == DefaultAdminPassword {
+		return errors.New("auth.BootstrapAdmin: BOOTSTRAP_ADMIN_PASSWORD must differ from the default admin password")
+	}
+	return nil
+}
+
 // HasDefaultAdminPassword reports whether hash is a bcrypt hash of the default admin password.
 func HasDefaultAdminPassword(hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(DefaultAdminPassword)) == nil
 }
+
+// maxBcryptBytes is bcrypt's maximum input length.
+const maxBcryptBytes = 72
 
 const (
 	pwLower  = "abcdefghijkmnopqrstuvwxyz"
 	pwUpper  = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 	pwDigit  = "23456789"
 	pwAll    = pwLower + pwUpper + pwDigit
-	pwLength = 20
+	pwLength = 20 // must stay < maxBcryptBytes
 )
+
+var _ = [maxBcryptBytes - pwLength]struct{}{} // compile-time: pwLength <= maxBcryptBytes
 
 // generatePassword returns a random password satisfying ValidateComplexity.
 func generatePassword() (string, error) {

@@ -117,6 +117,56 @@ func TestBootstrapAdmin_WeakOrDefaultEnvPasswordRejected(t *testing.T) {
 	}
 }
 
+func TestBootstrapAdmin_OverlongEnvPasswordRejected(t *testing.T) {
+	long := "Aa1" + strings.Repeat("x", 70) // 73 bytes
+	if len(long) != 73 {
+		t.Fatal("setup")
+	}
+	s := &fakeBootstrapStore{exists: true, hash: hashOf(t, DefaultAdminPassword)}
+	if _, err := BootstrapAdmin(context.Background(), s, bopts(long, false)); err == nil {
+		t.Fatal("73-byte password must abort on default hash")
+	}
+	if s.setCalls != 0 || !HasDefaultAdminPassword(s.hash) {
+		t.Fatal("store must not be touched")
+	}
+	// 72 bytes is accepted; 25 four-byte runes (100 bytes) is rejected by byte count.
+	ok72 := "Aa1" + strings.Repeat("x", 69)
+	if _, err := BootstrapAdmin(context.Background(), s, bopts(ok72, false)); err != nil {
+		t.Fatalf("72 bytes should pass: %v", err)
+	}
+	s2 := &fakeBootstrapStore{exists: true, hash: hashOf(t, DefaultAdminPassword)}
+	if _, err := BootstrapAdmin(context.Background(), s2, bopts("Aa1"+strings.Repeat("😀", 25), false)); err == nil {
+		t.Fatal("multibyte password over 72 bytes must be rejected")
+	}
+}
+
+func TestBootstrapAdmin_InvalidEnvOnRotatedAdminWarnsOnly(t *testing.T) {
+	for _, pw := range []string{"short", DefaultAdminPassword, "Aa1" + strings.Repeat("x", 70)} {
+		h := hashOf(t, "Rotated2024!")
+		s := &fakeBootstrapStore{exists: true, hash: h}
+		r, err := BootstrapAdmin(context.Background(), s, bopts(pw, false))
+		if err != nil || r.Outcome != BootstrapNotDefault || !r.EnvPasswordInvalid || r.StillDefault {
+			t.Fatalf("%q: got %v %v", pw, r, err)
+		}
+		if s.hash != h || s.force || s.setCalls != 0 {
+			t.Fatal("rotated admin must not be modified")
+		}
+	}
+	// Valid env + rotated admin: ignored, no warning flag.
+	s := &fakeBootstrapStore{exists: true, hash: hashOf(t, "Rotated2024!")}
+	r, err := BootstrapAdmin(context.Background(), s, bopts("Str0ngInitial!", false))
+	if err != nil || r.Outcome != BootstrapNotDefault || r.EnvPasswordInvalid || s.setCalls != 0 {
+		t.Fatalf("got %v %v", r, err)
+	}
+}
+
+func TestGeneratedPasswordWithinBcryptLimit(t *testing.T) {
+	pw, err := generatePassword()
+	if err != nil || len(pw) >= maxBcryptBytes {
+		t.Fatalf("len=%d err=%v", len(pw), err)
+	}
+}
+
 func TestBootstrapAdmin_GeneratedPassword(t *testing.T) {
 	s := &fakeBootstrapStore{exists: true, hash: hashOf(t, DefaultAdminPassword)}
 	r, err := BootstrapAdmin(context.Background(), s, bopts("", true))

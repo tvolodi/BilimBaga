@@ -173,6 +173,9 @@ func main() {
 	case auth.BootstrapPasswordApplied:
 		zlog.Info().Str("admin_email", auth.BootstrapAdminEmail).Msg("admin password set from BOOTSTRAP_ADMIN_PASSWORD")
 	}
+	if bootRes.EnvPasswordInvalid {
+		zlog.Warn().Msg("BOOTSTRAP_ADMIN_PASSWORD is set but invalid (needs 8-72 bytes, upper, lower, digit, not the default) and is ignored: admin password already changed or admin absent")
+	}
 	if bootRes.StillDefault {
 		zlog.Warn().Str("admin_email", auth.BootstrapAdminEmail).
 			Msg("SECURITY: seeded admin still has the default password; a password change is forced at first login. Set BOOTSTRAP_ADMIN_PASSWORD or change it now")

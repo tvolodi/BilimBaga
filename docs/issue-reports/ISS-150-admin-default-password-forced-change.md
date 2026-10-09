@@ -61,6 +61,13 @@ race, migration 033 targets the 029/030 hashes). Config test. schemaguard green.
   succeeds (flag only), so the live suite is unchanged. Existing deployments: admin keeps the
   old password until rotated; startup check forces change if still default.
 
+## Review Nits Resolved
+- Bootstrap password capped at 72 BYTES (bcrypt limit; rejected as invalid, multibyte aware);
+  generated password (20 chars) asserted < 72 at compile time and in a test.
+- Invalid BOOTSTRAP_ADMIN_PASSWORD no longer aborts startup when the admin is absent or already
+  rotated: a WARNING (no value) is logged and the env var ignored. Startup still aborts only when
+  the admin still has the default hash. Tests in bootstrap_test.go.
+
 ## Recurrence Log
 | Date | Trigger | Action Taken |
 |------|---------|-------------- |

@@ -619,3 +619,48 @@ func TestHandlerUnlockUser_ServiceError_Returns500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+// ISS-133: the role filter must pass a role UUID through to the service and
+// reject non-UUID values (the UI used to send role names) with 422, not 500.
+func TestHandlerListUsers_RoleIDFilter_PassedToService(t *testing.T) {
+	const roleID = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	var got ListFilters
+	svc := &mockUserService{
+		listFn: func(_ context.Context, _, _ string, f ListFilters) (*ListResult, error) {
+			got = f
+			return &ListResult{Items: []User{}, Meta: Meta{Page: 1, PerPage: 20}}, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users?role_id="+roleID, nil)
+	req = withAuthCtx(req, "caller-1", "super_admin", "")
+	w := httptest.NewRecorder()
+	h.ListUsers(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	require.NotNil(t, got.RoleID)
+	assert.Equal(t, roleID, *got.RoleID)
+}
+
+func TestHandlerListUsers_RoleIDFilter_NonUUID_Returns422(t *testing.T) {
+	called := false
+	svc := &mockUserService{
+		listFn: func(_ context.Context, _, _ string, _ ListFilters) (*ListResult, error) {
+			called = true
+			return &ListResult{}, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users?role_id=super_admin", nil)
+	req = withAuthCtx(req, "caller-1", "super_admin", "")
+	w := httptest.NewRecorder()
+	h.ListUsers(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
+	assert.False(t, called, "service must not be called for an invalid role_id")
+}

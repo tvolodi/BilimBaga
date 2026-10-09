@@ -496,3 +496,20 @@ func TestUnlockUser_DeptAdminOwnDept_Succeeds(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"u1"}, repo.unlocked)
 }
+
+// ISS-133: the role filter returns only users holding that role id.
+func TestListUsers_RoleIDFilter(t *testing.T) {
+	repo := newMockRepo()
+	repo.users["u1"] = makeUser("u1", "dept-1", "role-emp", "employee")
+	repo.users["u2"] = makeUser("u2", "dept-1", "role-ex", "examiner")
+	repo.users["u3"] = makeUser("u3", "dept-2", "role-ex", "examiner")
+	svc := NewService(repo)
+
+	roleID := "role-ex"
+	result, err := svc.ListUsers(context.Background(), "super_admin", "", ListFilters{Page: 1, PerPage: 20, RoleID: &roleID})
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Meta.Total)
+	for _, u := range result.Items {
+		assert.Equal(t, "role-ex", u.RoleID)
+	}
+}

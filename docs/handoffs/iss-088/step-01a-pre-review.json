@@ -1,0 +1,1 @@
+{"issue":88,"files_changed":["backend/internal/schemaguard/schema_guard_test.go","swarm/PROTOCOL.md","swarm/roles/uat.md","swarm/roles/supervisor.md","swarm/roles/ba.md","docs/retrospectives/retro-002.md","docs/issue-reports/ISS-088-retro-apply-swarm-improvements.md"],"root_cause":"process gaps; schemaguard lacked coverage guard and multi-table unqualified check"}

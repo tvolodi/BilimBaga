@@ -37,7 +37,12 @@
 5. ba.md: write the self-generated cap (max 2 open) into the role file.
 
 ## Applied changes
-Pending: issue "retro-002: apply swarm improvements" (role:dev, retro-apply).
+Applied in issue #88 (PR `swarm/88-retro-apply-2`):
+1. `internal/schemaguard` now scans all of `backend/internal` + `backend/cmd`, adds a coverage guard (`TestEveryDBCallingFileIsScanned`), a dynamic-SQL fragment check (audit repository) and an unqualified-column check for multi-table queries.
+2. PROTOCOL section 9: report numbers = `ISS-<github issue number>`.
+3. PROTOCOL section 10 + `roles/uat.md`: SQL-changing PRs need a real-Postgres test or the `needs-live-db` label; UAT verifies those first.
+4. `roles/supervisor.md`: UAT queue cap (>5 at status:uat -> hold feature dispatch, devs get tech-debt/test work).
+5. `roles/ba.md`: self-generated cap (max 2 open).
 
 ## Open recommendations for the user
 - bilimbaga-test DB has no scheduled backup (carried over).

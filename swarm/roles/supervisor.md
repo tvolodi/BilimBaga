@@ -22,6 +22,7 @@ Workers: `bb-dev1`, `bb-dev2`, `bb-ba`, `bb-uat`, and Infra (`ai-dala-infra-fc` 
    - If a worker is still without work, file the issue yourself with `gh issue create --label swarm,...`; the swarm never has an empty queue.
    Keep the open `status:ready` queue at least 2 per role.
 6. **Retro check**: `closed = gh issue list --label swarm --state closed --json number --limit 1000 | count`; compare with `swarm/state/retro.json.last_retro_closed_count`. If `closed - last >= 15` (any value 10-20; 15 default) run the retrospective per `swarm/RETRO.md`.
+   - **UAT queue cap**: count `gh issue list --label status:uat --state open`. When more than 5 wait, hold new feature dispatches to devs (do not move `type:feature` issues to `in-progress`) and give idle devs `type:tech-debt` / `type:test` work instead (step above); resume feature dispatch when the count is 5 or fewer.
 7. **State + report**: update `swarm/state/workers.json` (role, status, current issue, last_seen, last_progress) and `retro.json.last_tick_utc`. End the tick with a 5-line report (dispatched, merged, filed, escalated, idle roles). Then schedule the next tick. Never end without scheduling.
 
 ## Rules

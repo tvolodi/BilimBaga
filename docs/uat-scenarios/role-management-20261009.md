@@ -92,8 +92,8 @@ Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (as
 | Step | Actor | Action | Expected Outcome | Pass/Fail |
 |------|-------|--------|-----------------|-----------|
 | 1 | Custom2 user | `GET /api/v1/users` | Only department A users; department B employee absent | |
-| 2 | Custom2 user | `POST /api/v1/users/{super_admin_in_A}/reset-password` | 403 (a caller must not be able to take over an account whose role outranks its own). Currently returns the temporary password: GAP G2 | |
-| 3 | Custom2 user | `PUT /api/v1/users/{department_admin_in_A}` / `POST .../deactivate` | 403 for the same reason (G2) | |
+| 2 | Custom2 user | `POST /api/v1/users/{super_admin_in_A}/reset-password` | 403 `FORBIDDEN`, body has no `temporary_password` (D-1, fixed by issue #217; before the fix it returned the temporary password: GAP G2) | |
+| 3 | Custom2 user | `PUT /api/v1/users/{department_admin_in_A}` / `POST .../deactivate` / `POST .../unlock` / `POST .../reset-password` | 403 for the same reason (D-1); an employee target whose permissions the caller holds is allowed (reset-password 200) | |
 | 4 | Custom user (`qa_reviewer`, `reports:read`) | `GET /api/v1/admin/dashboard` and `/admin/reports/exams/{id}` | Data limited to the caller's department like `department_admin`, or the product explicitly accepts org-wide reports for a granted `reports:read` (decision required; today org-wide: GAP G1) | |
 | 5 | Custom2 user | `PUT /api/v1/users/{self}` changing own role | 403 (self role change blocked) | |
 | 6 | Custom2 user | Assign role `department_admin` to a department A employee | 403 if `department_admin` holds permissions the caller lacks | |
@@ -103,6 +103,39 @@ Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (as
 | 10 | Custom2 user | Reset password of a peer user holding a custom role whose permissions are NOT a subset of Custom2's | 403; a role with a subset of Custom2's permissions is allowed | |
 | 11 | Dept admin A1 | `PUT /api/v1/users/{employee_in_A}` with `role_id` = `department_admin`; then with `role_id` = `super_admin`; then `POST /api/v1/users` creating a user with role `department_admin` | 403 `FORBIDDEN` each (department_admin may assign `examiner` or `employee` only; FR-BB18 AC-4/AC-6, PR #222) | |
 | 12 | Dept admin A1 | `PUT /api/v1/users/{employee_in_A}` with `role_id` = `examiner`; then back to `employee` | 200 each | |
+
+### S7 curl recipe (D-1, issue #217)
+
+```bash
+API=http://localhost/api/v1
+login() { curl -s $API/auth/login -H 'Content-Type: application/json' -d "{\"email\":\"$1\",\"password\":\"$2\"}" | jq -r .data.access_token; }
+ADMIN=$(login admin@bilimbaga.local 'Admin1234!')
+H() { echo "Authorization: Bearer $1"; }
+# 1. custom role: users:read/manage plus portal:* (so the employee target is a permission subset)
+curl -s -X POST $API/roles -H "$(H $ADMIN)" -H 'Content-Type: application/json' \
+  -d '{"name":"uat_helper","description":"S7","permissions":["users:read","users:manage","portal:read","portal:submit"]}'
+ROLE=$(curl -s $API/users/roles -H "$(H $ADMIN)" | jq -r '.data[]|select(.name=="uat_helper").id')
+DEPT=<department A id>   # pick from GET $API/departments
+# 2. helper user in dept A (note temporary_password; change it at first login), plus targets in dept A:
+#    a department_admin user (DA_ID), a super_admin user (SA_ID), an employee user (EMP_ID)
+curl -s -X POST $API/users -H "$(H $ADMIN)" -H 'Content-Type: application/json' \
+  -d "{\"email\":\"uat.helper@test.com\",\"full_name\":\"UAT Helper\",\"department_id\":\"$DEPT\",\"role_id\":\"$ROLE\"}"
+HELPER=$(login uat.helper@test.com '<password after first-login change>')
+# 3. expectations
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/users/$SA_ID/reset-password -H "$(H $HELPER)"      # 403
+curl -s -X POST $API/users/$DA_ID/reset-password -H "$(H $HELPER)"                                       # 403 FORBIDDEN, no temporary_password
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/users/$DA_ID/deactivate -H "$(H $HELPER)"          # 403
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/users/$EMP_ID/reset-password -H "$(H $HELPER)"     # 200 (employee perms are a subset)
+# 4. rank rule (steps 7-8): as a department_admin A1 (DA1 token) against peer DA2, examiner EX_ID, employee EMP_ID
+curl -s -X POST $API/users/$DA2_ID/reset-password -H "$(H $DA1)"                                         # 403 FORBIDDEN, no temporary_password
+for a in deactivate unlock; do curl -s -o /dev/null -w "$a %{http_code}
+" -X POST $API/users/$DA2_ID/$a -H "$(H $DA1)"; done  # 403 403
+curl -s -o /dev/null -w '%{http_code}
+' -X POST $API/users/$EMP_ID/reset-password -H "$(H $DA1)"        # 200
+curl -s -o /dev/null -w '%{http_code}
+' -X POST $API/users/$EX_ID/reset-password -H "$(H $DA1)"         # 200
+# 5. cleanup: deactivate uat.helper@test.com, DELETE $API/roles/$ROLE
+```
 
 ## Scenario S6: Localization and accessibility
 

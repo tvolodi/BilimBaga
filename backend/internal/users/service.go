@@ -210,6 +210,10 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return nil, ErrForbidden
 	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
+		return nil, err
+	}
 	// A non-super_admin caller may not change its own role (self-escalation).
 	if !isOrgWide(callerRole) && id == callerUserID && req.RoleID != existing.RoleID {
 		return nil, ErrForbidden
@@ -226,8 +230,11 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 		return nil, fmt.Errorf("%w: role_id is required", ErrValidation)
 	}
 
-	if err := s.checkRoleAssignment(ctx, req.RoleID, callerRole); err != nil {
-		return nil, err
+	// An unchanged role needs no assignment check: the target check above already covers it.
+	if req.RoleID != existing.RoleID {
+		if err := s.checkRoleAssignment(ctx, req.RoleID, callerRole); err != nil {
+			return nil, err
+		}
 	}
 
 	u, err := s.repo.Update(ctx, id, req.FullName, req.DepartmentID, req.RoleID)
@@ -249,6 +256,10 @@ func (s *service) DeactivateUser(ctx context.Context, id, callerRole, callerDept
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return ErrForbidden
 	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
+		return err
+	}
 
 	if err := s.repo.Deactivate(ctx, id); err != nil {
 		return fmt.Errorf("users.DeactivateUser: %w", err)
@@ -269,6 +280,10 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return nil, ErrForbidden
+	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
+		return nil, err
 	}
 
 	tmpPwd, err := generateTempPassword()
@@ -300,6 +315,10 @@ func (s *service) UnlockUser(ctx context.Context, id, callerRole, callerDeptID, 
 	}
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return nil, ErrForbidden
+	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
+		return nil, err
 	}
 	if err := s.repo.Unlock(ctx, id); err != nil {
 		return nil, fmt.Errorf("users.UnlockUser: %w", err)
@@ -429,8 +448,25 @@ func (s *service) commitImportRow(ctx context.Context, row CSVRow, callerUserID,
 	return nil
 }
 
-// checkRoleAssignment returns ErrForbidden if a department_admin tries to assign the
-// super_admin role. super_admin callers may assign any role.
+// builtinRank is the strict rank hierarchy of the built-in roles (FR-BB117 D-1, Supervisor
+// decision): super_admin > department_admin > examiner > employee. A built-in caller may
+// act on, or assign, a built-in role only if that role's rank is STRICTLY LOWER than its own.
+// A role name absent from this table is a custom role: it has no rank, is treated as ranking
+// below department_admin, and is governed by the permission-subset rule instead. Do not add
+// ad-hoc role-name comparisons elsewhere; extend this table.
+var builtinRank = map[string]int{
+	"employee":         1,
+	"examiner":         2,
+	"department_admin": 3,
+	"super_admin":      4,
+}
+
+// sensitiveCustomPerms may never be conferred by a non-super_admin caller through role assignment.
+var sensitiveCustomPerms = map[string]bool{"roles:read": true, "roles:manage": true, "tenant:manage": true}
+
+// checkRoleAssignment returns ErrForbidden unless the caller may assign roleID (FR-BB117 D-1).
+// super_admin may assign any role; everyone else follows canReachRole plus, for custom roles,
+// a ban on roles:read / roles:manage / tenant:manage.
 func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole string) error {
 	if isOrgWide(callerRole) {
 		return nil
@@ -442,17 +478,12 @@ func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole st
 		}
 		return fmt.Errorf("checkRoleAssignment: %w", err)
 	}
-	if roleName == "super_admin" {
-		return ErrForbidden
+	if err := s.canReachRole(roleName, callerRole); err != nil {
+		return err
 	}
-	// Privilege-escalation guard: the permissions of an admin-created (custom) target
-	// role, or any target assigned by a custom caller role, must be a subset of the
-	// caller's own. Built-in targets assigned by built-in callers keep their historical
-	// behaviour. Without a lookup (tests) the check is skipped.
-	if s.permsFor != nil && (!builtinRoles[callerRole] || !builtinRoles[roleName]) {
+	if _, builtin := builtinRank[roleName]; !builtin && s.permsFor != nil {
 		for _, p := range s.permsFor(roleName) {
-			res, act, _ := strings.Cut(p, ":")
-			if s.canPerm == nil || !s.canPerm(callerRole, res, act) {
+			if sensitiveCustomPerms[p] {
 				return ErrForbidden
 			}
 		}
@@ -460,7 +491,77 @@ func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole st
 	return nil
 }
 
-var builtinRoles = map[string]bool{"super_admin": true, "department_admin": true, "examiner": true, "employee": true}
+// checkTargetActionable enforces FR-BB117 D-1: a non-super_admin caller may reset the
+// password of, edit, deactivate or unlock a user only if canReachRole allows the target's
+// role. Self-service is preserved: a caller acting on its own record while the stored role
+// matches its token role is allowed (own role change is blocked separately in UpdateUser).
+// A target with an unknown/legacy (empty) role is refused (fail-closed). It must run
+// before any password generation or repository write.
+func (s *service) checkTargetActionable(target *User, callerRole, callerUserID string) error {
+	if isOrgWide(callerRole) {
+		return nil
+	}
+	if target == nil || target.RoleName == "" || callerRole == "" {
+		return ErrForbidden
+	}
+	if callerUserID != "" && target.ID == callerUserID && target.RoleName == callerRole {
+		return nil
+	}
+	return s.canReachRole(target.RoleName, callerRole)
+}
+
+// canReachRole is the single D-1 decision for a non-super_admin caller and a role (as a
+// target's current role or a role being assigned).
+//   - built-in caller, built-in role: allowed iff rank(role) < rank(caller).
+//   - built-in caller, custom role: allowed iff every permission of the role is held by the caller.
+//   - custom caller (ranks below department_admin): a built-in role of rank >= department_admin
+//     is refused; every other role must be a permission subset of the caller's.
+//
+// Anything unresolvable (empty names, missing permission lookup, caller custom role holding no
+// permissions) is refused.
+func (s *service) canReachRole(roleName, callerRole string) error {
+	if roleName == "" || callerRole == "" || roleName == "super_admin" {
+		return ErrForbidden
+	}
+	callerRank, callerBuiltin := builtinRank[callerRole]
+	roleRank, roleBuiltin := builtinRank[roleName]
+	if callerBuiltin {
+		if roleBuiltin {
+			if roleRank < callerRank {
+				return nil
+			}
+			return ErrForbidden
+		}
+		return s.permissionSubset(roleName, callerRole)
+	}
+	if roleBuiltin && roleRank >= builtinRank["department_admin"] {
+		return ErrForbidden
+	}
+	if s.permsFor == nil || len(s.permsFor(callerRole)) == 0 {
+		return ErrForbidden
+	}
+	return s.permissionSubset(roleName, callerRole)
+}
+
+// permissionSubset reports nil iff every permission of roleName is held by callerRole.
+func (s *service) permissionSubset(roleName, callerRole string) error {
+	if s.permsFor == nil || s.canPerm == nil {
+		return ErrForbidden
+	}
+	rolePerms := s.permsFor(roleName)
+	if len(rolePerms) == 0 {
+		// Unknown/stale role (absent from the permission cache) or a role without
+		// permissions: not provably a subset, so fail closed.
+		return ErrForbidden
+	}
+	for _, p := range rolePerms {
+		res, act, _ := strings.Cut(p, ":")
+		if !s.canPerm(callerRole, res, act) {
+			return ErrForbidden
+		}
+	}
+	return nil
+}
 
 // ListRoles returns all roles from the database.
 func (s *service) ListRoles(ctx context.Context) ([]RoleRow, error) {

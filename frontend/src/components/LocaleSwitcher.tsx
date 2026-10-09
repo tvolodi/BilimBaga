@@ -19,7 +19,7 @@ export function LocaleSwitcher() {
   }
 
   return (
-    <Select value={i18n.language} onChange={handleChange} className="w-[120px]">
+    <Select value={i18n.language} onChange={handleChange} className="w-[104px] sm:w-[120px]">
       {LOCALES.map((locale) => (
         <option key={locale.code} value={locale.code}>
           {locale.label}

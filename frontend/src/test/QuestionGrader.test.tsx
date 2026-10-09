@@ -114,3 +114,34 @@ describe('QuestionGrader — AI grading display (FR-BB73)', () => {
     expect(screen.queryByText('grading.ai_reasoning_show')).not.toBeInTheDocument()
   })
 })
+
+describe('QuestionGrader — score input (FR-BB47 AC-6)', () => {
+  it('keeps slider and numeric field in sync with the score', () => {
+    render(<QuestionGrader question={makeQuestion()} score={64} feedback="" onChange={vi.fn()} />)
+    expect(screen.getByRole('slider')).toHaveValue('64')
+    expect(screen.getByRole('spinbutton')).toHaveValue(64)
+  })
+
+  it('reports slider and numeric edits through onChange, and null for an emptied field', () => {
+    const onChange = vi.fn()
+    render(<QuestionGrader question={makeQuestion()} score={10} feedback="fb" onChange={onChange} />)
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '55' } })
+    expect(onChange).toHaveBeenLastCalledWith(55, 'fb')
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } })
+    expect(onChange).toHaveBeenLastCalledWith(null, 'fb')
+  })
+
+  it.each([101, -3])('shows an inline error for out-of-range score %i', (bad) => {
+    render(<QuestionGrader question={makeQuestion()} score={bad} feedback="" onChange={vi.fn()} />)
+    expect(screen.getByText('grading.score_error')).toBeInTheDocument()
+  })
+
+  it('shows no error for boundary scores 0 and 100', () => {
+    const { rerender } = render(
+      <QuestionGrader question={makeQuestion()} score={0} feedback="" onChange={vi.fn()} />,
+    )
+    expect(screen.queryByText('grading.score_error')).not.toBeInTheDocument()
+    rerender(<QuestionGrader question={makeQuestion()} score={100} feedback="" onChange={vi.fn()} />)
+    expect(screen.queryByText('grading.score_error')).not.toBeInTheDocument()
+  })
+})

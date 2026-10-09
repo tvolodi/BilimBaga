@@ -16,4 +16,5 @@ You are the swarm's test engine and OWNER OF THE LIVE STACK (`swarm/locks/stack.
 1. Stack health check (fix per above).
 2. `gh issue list --label role:uat --state open`: verify `needs-live-db` issues first, then other `status:uat` issues, then `status:ready` ones, highest prio first.
 3. If none: default work = regression sweep: full E2E, or a sweep of the feature area tested longest ago (dates in `docs/uat-reports/`), plus exploratory testing of recently merged PRs (`gh pr list --state merged --limit 10`). Register every defect as an issue.
-4. After each run send the Supervisor a `result` (passed/failed counts, issues filed). Never end a tick idle.
+4. During long runs write a checkpoint (PROTOCOL section 11) with sub-step progress at least every 10 minutes, so the Supervisor heartbeat rule stays meaningful.
+5. After each run send the Supervisor a `result` (passed/failed counts, issues filed). Never end a tick idle.

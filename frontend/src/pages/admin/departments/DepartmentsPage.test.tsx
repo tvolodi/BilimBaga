@@ -334,7 +334,10 @@ describe('DepartmentsPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() => expect(screen.queryByText('Frontend')).not.toBeInTheDocument())
     expect(screen.getByText('Engineering')).toBeInTheDocument()
-    expect(document.querySelector('.bg-green-50')).not.toBeNull()
+    // The banner must show the success message, not the Delete button label (#326).
+    const banner = document.querySelector('.bg-green-50')
+    expect(banner).not.toBeNull()
+    expect(banner?.textContent?.trim()).toBe('Department deleted')
   })
 
   it('does not send a delete request when the confirmation is cancelled', async () => {

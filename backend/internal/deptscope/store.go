@@ -64,3 +64,16 @@ func (p *pgStore) scan(ctx context.Context, op, q, id string, arg any) (bool, bo
 	}
 	return n == 1, true, nil
 }
+
+// SubtreeIDs returns the sorted ids of the departments a restricted scope may
+// see (its department subtree). It returns nil for an unrestricted scope.
+func SubtreeIDs(ctx context.Context, db sqlx.QueryerContext, s Scope) ([]string, error) {
+	if !s.Restricted {
+		return nil, nil
+	}
+	var ids []string
+	if err := sqlx.SelectContext(ctx, db, &ids, SubtreeSQL, s.SubtreeArg()); err != nil {
+		return nil, fmt.Errorf("deptscope: SubtreeIDs: %w", err)
+	}
+	return ids, nil
+}

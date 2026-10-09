@@ -33,3 +33,17 @@ Reviewer: Code Reviewer subagent. Scope: `git diff --cached` (14 files). `go tes
 - Audit log unchanged: covered.
 
 Summary: the deny-list change is correct and complete across all consumers, the examiner carve-out is narrow and bound to the session's own exam, SQL numbering and NULL handling are correct; only a live-DB test gap (Medium) remains.
+
+## Cycle 2 - scope-keyed AI insights cache
+Reviewer: separate Code Reviewer subagent (run ISS-218-cycle2). Verdict: **PASS** (0 Critical, 0 High).
+Focus: cross-scope leakage, key collision, rate limit, TTL.
+- Leakage: none. super_admin (`all`) uses only the ai_insight_cache DB row; every restricted caller uses only the in-process cache keyed by `{examID, scopeKey}`; no-department = `none` (data query also empty); scope-lookup failure skips cache read and write (fails safe); refresh writes only the scoped key.
+- Collisions: none (struct key, 64-hex digest vs `all`/`none`, sorted+deduped UUID ids).
+- Rate limit: unchanged (`GetInsights` never had one; only `GenerateQuestions` does). Usage logged per paid call only.
+- TTL/concurrency: mutex-guarded, copies on read/write, `>=` TTL, bounded eviction.
+- ExamOwnerID cannot alter insight data (ai uses only `Arg()`/`Predicate`).
+Findings (all accepted, none High):
+- [Medium] No singleflight: concurrent cold misses for one key each pay; bounded cost, no leak.
+- [Medium] Scope id-set and insight data read in separate queries; a department move in between could store newer data under an older key for up to 24 h. Staleness only, not cross-scope.
+- [Low] `SubtreeSQL` uses UNION while `Predicate` uses UNION ALL (differs only on cyclic parent_id).
+- [Low] Expired entries swept only when full (max 512). [Low] Per-process cache (documented).

@@ -35,6 +35,11 @@ type Repository interface {
 	// UpsertInsightCache writes (or overwrites) the cache entry for the exam.
 	UpsertInsightCache(ctx context.Context, examID, userID string, insights []string) error
 
+	// GetScopeDepartmentIDs returns the sorted department ids of the caller's
+	// scope (its subtree; nil for an unrestricted scope). The AI service hashes
+	// them into the scoped insight-cache key (ISS-218).
+	GetScopeDepartmentIDs(ctx context.Context, scope deptscope.Scope) ([]string, error)
+
 	// GetExamInsightData gathers all anonymised aggregate statistics needed to
 	// build the AI prompt.  Returns ErrExamNotFound when the exam does not exist
 	// (tenantID is unused: exams has no tenant_id column; single-tenant, ISS-82).
@@ -155,6 +160,14 @@ DO UPDATE SET insights      = EXCLUDED.insights,
 		return fmt.Errorf("ai: UpsertInsightCache: %w", err)
 	}
 	return nil
+}
+
+func (r *postgresRepository) GetScopeDepartmentIDs(ctx context.Context, scope deptscope.Scope) ([]string, error) {
+	ids, err := deptscope.SubtreeIDs(ctx, r.db, scope)
+	if err != nil {
+		return nil, fmt.Errorf("ai: GetScopeDepartmentIDs: %w", err)
+	}
+	return ids, nil
 }
 
 // examInsightRow is the scan target for the exam header query.

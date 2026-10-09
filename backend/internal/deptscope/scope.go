@@ -13,7 +13,11 @@ package deptscope
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
 )
@@ -113,4 +117,57 @@ func Predicate(userCol, param string) string {
 // an exam, so only examiners with a known user id get the carve-out.
 func GradingPredicate(userCol, param, examCol, ownerParam string) string {
 	return fmt.Sprintf(`(%s.created_by = %s::uuid OR %s)`, examCol, ownerParam, Predicate(userCol, param))
+}
+
+// Scope keys for cache partitioning (ISS-218 supervisor decision). A key is a
+// pure function of the set of department ids a caller may see, so callers with
+// equal scopes share cache entries and callers with different scopes never do.
+const (
+	// ScopeKeyAll is the key of the unrestricted (super_admin) scope.
+	ScopeKeyAll = "all"
+	// ScopeKeyNone is the key of an empty department set (a restricted caller
+	// with no department, or one whose department does not exist).
+	ScopeKeyNone = "none"
+)
+
+// SubtreeSQL selects the ids of the department subtree rooted at $1 (a uuid).
+const SubtreeSQL = `WITH RECURSIVE sc_t(id) AS (` +
+	`SELECT sc_d.id FROM departments sc_d WHERE sc_d.id = $1::uuid ` +
+	`UNION ` +
+	`SELECT sc_c.id FROM departments sc_c JOIN sc_t ON sc_c.parent_id = sc_t.id` +
+	`) SELECT id::text FROM sc_t ORDER BY id`
+
+// SubtreeArg returns the $1 argument for SubtreeSQL: the subtree root, or the
+// no-department sentinel (matches nothing) when the caller has none. It must
+// only be used for a Restricted scope.
+func (s Scope) SubtreeArg() string {
+	if s.DepartmentID == "" {
+		return noDepartment
+	}
+	return s.DepartmentID
+}
+
+// ScopeKey returns a stable cache-partition key for the department ids a
+// caller may see. An unrestricted scope is always ScopeKeyAll regardless of
+// ids; a restricted scope with no ids is ScopeKeyNone; otherwise it is the
+// hex SHA-256 of the sorted, de-duplicated ids joined with ",". Hex digests
+// are 64 characters, so they can never equal "all" or "none".
+func ScopeKey(s Scope, ids []string) string {
+	if !s.Restricted {
+		return ScopeKeyAll
+	}
+	if len(ids) == 0 {
+		return ScopeKeyNone
+	}
+	sorted := make([]string, len(ids))
+	copy(sorted, ids)
+	sort.Strings(sorted)
+	uniq := sorted[:0]
+	for i, id := range sorted {
+		if i == 0 || id != sorted[i-1] {
+			uniq = append(uniq, id)
+		}
+	}
+	sum := sha256.Sum256([]byte(strings.Join(uniq, ",")))
+	return hex.EncodeToString(sum[:])
 }

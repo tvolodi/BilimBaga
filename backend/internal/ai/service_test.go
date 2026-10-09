@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
 // ---- Manual mocks -----------------------------------------------------------
@@ -27,6 +29,8 @@ type mockRepository struct {
 	upsertErr       error
 	examInsightData *ExamInsightData
 	examInsightErr  error
+	scopeIDs        map[string][]string // department id -> subtree ids
+	scopeIDsErr     error
 
 	// Loyalty narrative fields.
 	sessionTrack       string
@@ -59,6 +63,16 @@ func (m *mockRepository) GetInsightCache(_ context.Context, _ string) (*InsightR
 func (m *mockRepository) UpsertInsightCache(_ context.Context, _, _ string, _ []string) error {
 	m.upsertCalled = true
 	return m.upsertErr
+}
+
+func (m *mockRepository) GetScopeDepartmentIDs(_ context.Context, sc deptscope.Scope) ([]string, error) {
+	if m.scopeIDsErr != nil {
+		return nil, m.scopeIDsErr
+	}
+	if m.scopeIDs == nil {
+		return nil, nil
+	}
+	return m.scopeIDs[sc.DepartmentID], nil
 }
 
 func (m *mockRepository) GetExamInsightData(_ context.Context, _, _ string) (*ExamInsightData, error) {

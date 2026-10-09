@@ -65,3 +65,19 @@ Existing ai GetInsights cache tests switched to a super_admin context (no-princi
 ## Recurrence Log
 | Date | Trigger | Action Taken |
 |------|---------|-------------- |
+
+## Scope-keyed AI cache (Supervisor decision)
+Supervisor decisions applied in cycle 2:
+1. Examiner ownership = `exams.created_by` is accepted for now (note for the FR-BB117 doc area; the BA requirement file was not edited).
+2. Custom roles with `grading:*` get NO carve-out (subtree-only); confirmed, test comment in `ai/scope_cache_test.go` and existing sessions/deptscope tests.
+3. `exams/service.go` assignment listing (`assignsOrgWide`) left to issue #183, untouched.
+4. AI insights are no longer an uncached paid call for every non-super_admin request.
+
+Cache key design
+- Scope key = `deptscope.ScopeKey(scope, ids)`: unrestricted (super_admin) = constant `all`; restricted with empty set (no department / unknown department) = constant `none`; otherwise hex SHA-256 of the sorted, de-duplicated subtree department ids joined with `,` (64 hex chars, so it can never equal `all`/`none`). `deptscope.SubtreeIDs` (recursive CTE, `SubtreeSQL`) supplies the ids; `ai.Repository.GetScopeDepartmentIDs` exposes it.
+- Cache key = struct `{examID, scopeKey}` (not a joined string, so no delimiter collision on examID). Equal department-id sets share an entry regardless of role or subtree root; different sets and different exams never do.
+- Schema: `ai_insight_cache.exam_id` is a `UUID PRIMARY KEY` with no scope column, so a composite key cannot be folded in without a migration. No migration was added (lock not held). Fallback implemented: super_admin (`all`) keeps using the existing DB table unchanged; every restricted caller uses a bounded in-process cache (`ai/insight_cache.go`, 512 entries, 24 h TTL = `insightCacheTTL`, expired-then-oldest eviction, copies on read/write). It is per API process: not shared across replicas and lost on restart, worst case an extra paid call, never a cross-scope read. A durable version needs a follow-up migration (`scope_key TEXT NOT NULL DEFAULT 'all'`, PK `(exam_id, scope_key)`).
+- Isolation: scoped callers never read or write the DB row; super_admin never reads the in-memory map. `?refresh=true` bypasses the read and overwrites the entry. If the scope lookup fails the call degrades to uncached generation (data query is still scoped in SQL).
+- Rate limit: unchanged. Note `GetInsights` never had a per-user rate limit (only `GenerateQuestions` calls `checkRateLimit`); usage logging per paid call is unchanged and cache hits log nothing. Flagged for the Supervisor rather than silently adding a limit.
+- SQL: new `deptscope.SubtreeSQL` (read-only, live-DB label `needs-live-db` kept). No existing query text changed.
+- Tests: `ai/scope_cache_test.go`, `deptscope/scopekey_test.go` (same scope hit/no second paid call, different scopes and exams separate, super_admin vs scoped never share both ways, no-department empty-set key, refresh, lookup failure, TTL/bound/eviction, usage logging, GenerateQuestions rate limit). Run: go vet and go test on `./internal/ai/...` and `./internal/deptscope/...` pass. Not run: whole-module build/test, docker, e2e, live DB.

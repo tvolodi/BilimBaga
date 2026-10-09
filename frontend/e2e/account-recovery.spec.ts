@@ -6,8 +6,9 @@
  */
 import { test, expect } from '@playwright/test'
 import { getSeedData, createTestUser, deleteTestUser } from './fixtures/seed'
+import { requireTarget } from '../../scripts/lib/target-guard'
 
-const API = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
+const API = requireTarget('E2E_API_URL', process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`, process.env)
 const MAILHOG = process.env.E2E_MAILHOG_URL || `http://localhost:${process.env.HOST_MAILHOG_UI_PORT || 8025}`
 const NEW_PASSWORD = 'Recovered1234!'
 

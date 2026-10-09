@@ -184,7 +184,7 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 	}
 	allQs := make([]qWithType, len(resolvedIDs))
 	for i, rwi := range resolvedWithRules {
-		allQs[i] = qWithType{id: rwi.id, ruleID: rwi.ruleID}
+		allQs[i] = qWithType(rwi)
 	}
 
 	// AC-7: apply shuffle_questions.

@@ -41,6 +41,19 @@ powershell -File swarm\install-ensure-task.ps1 -Uninstall
 - **Restart rule**: a restarted worker re-reads its checkpoint file, its label queue and `docs/handoffs/` before acting (PROTOCOL section 12).
 - **Dry runs**: `up.ps1`, `ensure-up.ps1`, `down.ps1` and the installer all support `-WhatIf`; `-AgentsJsonFile <file>` replaces `claude agents --json` and `SWARM_STATE_DIR` redirects state. Tests: `powershell -File swarm\tests\test-ensure-up.ps1` and `bash swarm/tests/test-checkpoint-roster.sh` (neither launches, stops or registers anything).
 
+## Backup, status page and restart drill (#149)
+- **`backup-state.ps1`** (called hourly from `ensure-up.ps1`, throttled by `-MinIntervalMin 60`, skipped in dry runs): copies `swarm/state/*.json`, `roster.json` and `roles/*.settings.json` to `%USERPROFILE%\.swarm-backups\bilimbaga\yyyyMMdd-HHmmss` (outside the repo) and prunes ONLY its own folders matching `^\d{8}-\d{6}$` beyond the newest 20. It also pushes `swarm-snapshot.txt` (roster, open issue counts per `status:*` label and titles; token-like strings scrubbed; no state files or session ids) to branch `swarm-state` of this repo through a throwaway temp repo, never touching the working checkout; the push is a plain (non-force) push and a failure only warns. Options: `-WhatIf`, `-NoPush`, `-BackupRoot`, `-Keep`, `-PushRemote`, `-QueueJsonFile`.
+- **`status.ps1`**: one page with roster vs live sessions (`claude agents --json`, same recognised-schema fail-safe: an unrecognised list shows "unknown", never "down"), each worker's checkpoint with heartbeat age (STALE past `stale_supervisor_min`) and open issue counts by `status:*` label.
+- Tests (temp dirs, stub files and a temp bare repo only): `powershell -File swarm\tests\test-backup-status.ps1`.
+
+### Restart drill (documented, to be run by the user once the scheduled task is registered)
+Proves that a killed worker comes back with its context. NOT executed by the swarm: it needs the `BilimBaga-Swarm-EnsureUp` task registered by the user.
+1. `powershell -File swarm\status.ps1`: note `bb-dev2` LIVE and its checkpoint (issue, step, next action).
+2. Kill that one worker: close its Windows Terminal tab or `Stop-Process -Id <pid>` (pid from `claude agents --json`). Never kill several at once.
+3. Within about 5 min (task interval; the relaunch cooldown is 8 min) `ensure-up.ps1` relaunches it with `claude --resume <saved id> -n bb-dev2 --settings ...`. Watch with `status.ps1`.
+4. Confirm: the session is LIVE again under the same name, the first thing it does is re-read `swarm/state/dev2.json`, its label queue and `docs/handoffs/` (restart rule), and it continues the same issue/step. If the saved id was gone it starts fresh with the same prompt and still re-reads the checkpoint.
+5. Pass criteria: restored within 10 min, same role name and settings, no duplicate session, other workers and `ai-dala-infra*` untouched. Record the outcome in the next retrospective.
+
 ## Troubleshooting
 - *A worker does not react*: `claude agents --json` shows status; idle sessions may not wake on a message, the worker's `/loop` tick picks work up within 5-10 min. If the loop died, send any message or restart that role with `up.ps1 -Roles <role>`.
 - *Messages not delivered / held*: permission-mode mismatch. All sessions must be `bypassPermissions`. Restart the odd one.

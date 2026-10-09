@@ -157,3 +157,47 @@ function Update-SessionsFromLive($Roster, $Live, [string]$StateDir) {
     if ($id) { Save-Session $StateDir $r.key $r.name $id }
   }
 }
+
+# --- backup / status helpers (backup-state.ps1, status.ps1) ---
+$script:QueueStatuses = 'ready', 'in-progress', 'review', 'uat', 'blocked', 'done'
+
+# Removes anything token-like from text that may leave the machine (GitHub snapshot). Over-redaction is fine.
+function Remove-Secrets([string]$Text) {
+  if (-not $Text) { return $Text }
+  $t = $Text
+  $t = $t -replace '(?i)\b(gh[pousr]_[A-Za-z0-9]{10,}|github_pat_[A-Za-z0-9_]{10,}|sk-[A-Za-z0-9_-]{10,}|xox[abprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{12,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_.-]+)', '[REDACTED]'
+  $t = $t -replace '(?i)\b(bearer|token|secret|password|passwd|api[_-]?key|authorization)\b(\s*[:=]\s*|\s+)\S+', '$1 [REDACTED]'
+  $t = $t -replace '\b[A-Za-z0-9+/_-]{32,}={0,2}', '[REDACTED]'
+  $t
+}
+
+# Open swarm issues. -QueueJsonFile is the test stub (same shape as `gh issue list --json number,title,labels`).
+# Throws if unreadable; callers decide how to degrade.
+function Get-SwarmIssues([string]$QueueJsonFile) {
+  if ($QueueJsonFile) { $raw = Get-Content -Raw -LiteralPath $QueueJsonFile }
+  else {
+    $raw = (& gh issue list --label swarm --state open --limit 300 --json number,title,labels) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw "gh issue list failed (exit $LASTEXITCODE)" }
+  }
+  if (-not $raw -or -not $raw.TrimStart().StartsWith('[')) { throw 'gh issue list output is not a JSON array (unrecognised)' }
+  @(,($raw | ConvertFrom-Json) | ForEach-Object { $_ })
+}
+
+function Get-LabelNames($Issue) { @($Issue.labels | ForEach-Object { if ($_ -is [string]) { $_ } else { $_.name } }) }
+
+# ordered hashtable status -> count
+function Get-QueueCounts($Issues) {
+  $c = [ordered]@{}
+  foreach ($s in $script:QueueStatuses) { $c[$s] = @($Issues | Where-Object { (Get-LabelNames $_) -contains "status:$s" }).Count }
+  $c
+}
+
+# Checkpoint summary from <StateDir>/<key>.json; heartbeat age in minutes (null if unknown).
+function Get-Checkpoint([string]$StateDir, [string]$Key, [datetime]$NowUtc) {
+  $f = Join-Path $StateDir "$Key.json"
+  if (-not (Test-Path -LiteralPath $f)) { return $null }
+  try { $j = Get-Content -Raw -LiteralPath $f | ConvertFrom-Json } catch { return [pscustomobject]@{ unreadable = $true; age_min = $null } }
+  $age = $null
+  try { $age = ($NowUtc.ToUniversalTime() - ([datetime]$j.last_tick_utc).ToUniversalTime()).TotalMinutes } catch {}
+  [pscustomobject]@{ unreadable = $false; status = $j.status; issue = $j.issue; branch = $j.branch; step = $j.step; next_action = $j.next_action; blockers = $j.blockers; age_min = $age }
+}

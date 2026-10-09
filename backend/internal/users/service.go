@@ -210,6 +210,10 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return nil, ErrForbidden
 	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole); err != nil {
+		return nil, err
+	}
 	// A non-super_admin caller may not change its own role (self-escalation).
 	if !isOrgWide(callerRole) && id == callerUserID && req.RoleID != existing.RoleID {
 		return nil, ErrForbidden
@@ -249,6 +253,10 @@ func (s *service) DeactivateUser(ctx context.Context, id, callerRole, callerDept
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return ErrForbidden
 	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole); err != nil {
+		return err
+	}
 
 	if err := s.repo.Deactivate(ctx, id); err != nil {
 		return fmt.Errorf("users.DeactivateUser: %w", err)
@@ -269,6 +277,10 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return nil, ErrForbidden
+	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole); err != nil {
+		return nil, err
 	}
 
 	tmpPwd, err := generateTempPassword()
@@ -300,6 +312,10 @@ func (s *service) UnlockUser(ctx context.Context, id, callerRole, callerDeptID, 
 	}
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return nil, ErrForbidden
+	}
+	// FR-BB117 D-1: authorise against the target's role before any write or secret.
+	if err := s.checkTargetActionable(existing, callerRole); err != nil {
+		return nil, err
 	}
 	if err := s.repo.Unlock(ctx, id); err != nil {
 		return nil, fmt.Errorf("users.UnlockUser: %w", err)
@@ -429,8 +445,8 @@ func (s *service) commitImportRow(ctx context.Context, row CSVRow, callerUserID,
 	return nil
 }
 
-// checkRoleAssignment returns ErrForbidden if a department_admin tries to assign the
-// super_admin role. super_admin callers may assign any role.
+// checkRoleAssignment returns ErrForbidden if a non-super_admin caller tries to assign the
+// super_admin role or a role more powerful than its own. super_admin callers may assign any role.
 func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole string) error {
 	if isOrgWide(callerRole) {
 		return nil
@@ -442,13 +458,36 @@ func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole st
 		}
 		return fmt.Errorf("checkRoleAssignment: %w", err)
 	}
+	return s.checkRoleReach(roleName, callerRole)
+}
+
+// checkTargetActionable enforces FR-BB117 D-1: a non-super_admin caller may reset the
+// password of, edit, deactivate or unlock a user only if the target's role is not
+// super_admin and the target role's permissions are a subset of the caller's own.
+// A target with an unknown/legacy (empty) role is refused (fail-closed). It must run
+// before any password generation or repository write.
+func (s *service) checkTargetActionable(target *User, callerRole string) error {
+	if isOrgWide(callerRole) {
+		return nil
+	}
+	if target == nil || target.RoleName == "" {
+		return ErrForbidden
+	}
+	return s.checkRoleReach(target.RoleName, callerRole)
+}
+
+// checkRoleReach is the shared D-1 rule: roleName must not be super_admin and, unless both
+// the caller and roleName are built-in roles (historical behaviour: a department_admin
+// manages examiners and employees even though their permission sets are not strict
+// subsets), every permission of roleName must be held by the caller. Without a
+// permissions lookup (unit tests) the subset check is skipped.
+func (s *service) checkRoleReach(roleName, callerRole string) error {
 	if roleName == "super_admin" {
 		return ErrForbidden
 	}
-	// Privilege-escalation guard: the permissions of an admin-created (custom) target
-	// role, or any target assigned by a custom caller role, must be a subset of the
-	// caller's own. Built-in targets assigned by built-in callers keep their historical
-	// behaviour. Without a lookup (tests) the check is skipped.
+	if roleName == callerRole {
+		return nil
+	}
 	if s.permsFor != nil && (!builtinRoles[callerRole] || !builtinRoles[roleName]) {
 		for _, p := range s.permsFor(roleName) {
 			res, act, _ := strings.Cut(p, ":")

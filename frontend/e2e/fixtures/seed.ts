@@ -353,22 +353,33 @@ interface ExamCreated {
   id: string
 }
 
-async function createExam(adminToken: string, title: string, onTabSwitch: string): Promise<string> {
+interface CreateExamOptions {
+  maxAttempts?: number
+  certificateEnabled?: boolean
+  passingScorePct?: number
+}
+
+async function createExam(
+  adminToken: string,
+  title: string,
+  onTabSwitch: string,
+  opts: CreateExamOptions = {},
+): Promise<string> {
   const result = await apiPost<ExamCreated>(
     `${BASE}/api/v1/exams`,
     {
       title,
       description: 'E2E test exam — created by seed fixture',
       time_limit_minutes: 60,
-      passing_score_pct: 70,
-      max_attempts: 99,
+      passing_score_pct: opts.passingScorePct ?? 70,
+      max_attempts: opts.maxAttempts ?? 99,
       available_from: null,
       available_until: null,
       shuffle_questions: false,
       shuffle_options: false,
       show_answers: 'after_completion',
       on_tab_switch: onTabSwitch,
-      certificate_enabled: false,
+      certificate_enabled: opts.certificateEnabled ?? false,
     },
     adminToken,
   )
@@ -564,17 +575,96 @@ export interface TestExam {
   title: string
 }
 
+export interface TestExamOptions {
+  /** Defaults to 99 (the seeded exams' value). */
+  maxAttempts?: number
+  /** Defaults to false. A certificate needs a passed, submitted session on such an exam. */
+  certificateEnabled?: boolean
+  passingScorePct?: number
+  onTabSwitch?: 'log' | 'warn' | 'submit'
+  /** Assign the (published) exam to this user. Requires `questionId` (only then is it published). */
+  assignToUserId?: string
+}
+
 export async function createTestExam(
   adminToken: string,
   title: string,
   questionId?: string,
+  opts: TestExamOptions = {},
 ): Promise<TestExam> {
-  const examId = await createExam(adminToken, title, 'log')
+  const examId = await createExam(adminToken, title, opts.onTabSwitch ?? 'log', opts)
   if (questionId) {
     await addRule(adminToken, examId, questionId, 1)
     await publishExam(adminToken, examId)
+    if (opts.assignToUserId) await assignExam(adminToken, examId, opts.assignToUserId)
   }
   return { id: examId, title }
+}
+
+// ---------------------------------------------------------------------------
+// Seed-employee session helpers (strict: throw instead of returning null)
+// ---------------------------------------------------------------------------
+
+const SEED_EMPLOYEE_EMAIL = 'employee@bilimbaga.local'
+const SEED_EMPLOYEE_PASSWORD = 'Employee1234!'
+const EMPLOYEE_TOKEN_TTL_MS = 10 * 60_000 // access JWT lives 15 min; re-login before that
+let employeeTokenCache: { token: string; at: number } | null = null
+
+/** API access token of the seeded employee (cached; avoids hitting the auth rate limit). */
+export async function getEmployeeApiToken(): Promise<string> {
+  if (employeeTokenCache && Date.now() - employeeTokenCache.at < EMPLOYEE_TOKEN_TTL_MS) {
+    return employeeTokenCache.token
+  }
+  const token = await login(SEED_EMPLOYEE_EMAIL, SEED_EMPLOYEE_PASSWORD)
+  if (!token) throw new Error(`getEmployeeApiToken: login as ${SEED_EMPLOYEE_EMAIL} failed - did global setup run?`)
+  employeeTokenCache = { token, at: Date.now() }
+  return token
+}
+
+interface SessionQuestions {
+  session_id: string
+  questions: Array<{ id: string; options: Array<{ id: string; text: string }> }>
+}
+
+/**
+ * Open an exam session for the seeded employee, or return the already-open one. Throws (never
+ * returns null) when no session can be had, so specs fail loudly instead of silently skipping.
+ */
+export async function startEmployeeSession(examId: string): Promise<string> {
+  const token = await getEmployeeApiToken()
+  const started = await apiPost<SessionQuestions>(`${BASE}/api/v1/portal/exams/${examId}/sessions`, {}, token)
+  if (started.ok && started.data?.session_id) return started.data.session_id
+  if (started.error === 'SESSION_ALREADY_OPEN') {
+    const open = await getOpenSessionId(token, examId)
+    if (open) return open
+  }
+  throw new Error(`startEmployeeSession: cannot open a session for exam ${examId}: ${started.error ?? started.status}`)
+}
+
+/**
+ * Give the seeded employee a submitted, passed session on an exam whose only question was made by
+ * createTestQuestion(..., 'single') (correct answer = the option labelled "Option A"). Returns the
+ * session id.
+ */
+export async function createPassedEmployeeSession(examId: string): Promise<string> {
+  const token = await getEmployeeApiToken()
+  const started = await apiPost<SessionQuestions>(`${BASE}/api/v1/portal/exams/${examId}/sessions`, {}, token)
+  if (!started.ok || !started.data?.session_id) {
+    throw new Error(`createPassedEmployeeSession: cannot start session: ${started.error ?? started.status}`)
+  }
+  const { session_id: sessionId, questions } = started.data
+  for (const q of questions) {
+    const correct = q.options.find((o) => o.text === 'Option A')
+    if (!correct) throw new Error(`createPassedEmployeeSession: question ${q.id} has no "Option A" option`)
+    const res = await fetch(`${BASE}/api/v1/portal/sessions/${sessionId}/answers/${q.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ selected_option_ids: [correct.id], text_answer: null, time_spent_seconds: 1 }),
+    })
+    if (!res.ok) throw new Error(`createPassedEmployeeSession: saving answer failed (HTTP ${res.status})`)
+  }
+  await submitSession(token, sessionId)
+  return sessionId
 }
 
 export async function deleteTestExam(adminToken: string, examId: string): Promise<void> {

@@ -10,7 +10,17 @@
  * auth bootstrap), which the first test asserts.
  */
 import { test, expect } from '@playwright/test'
+import {
+  EMPLOYEE_STORAGE_STATE,
+  getSeedData,
+  createTestQuestion,
+  createTestExam,
+  deleteTestExam,
+  deleteTestQuestion,
+  createPassedEmployeeSession,
+} from './fixtures/seed'
 
+const API = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
 const VERIFY_API = /\/api\/v1\/verify\/[^/]+$/
 
 const VALID_PAYLOAD = {
@@ -100,10 +110,46 @@ test.describe('Certificate verification page (FR-BB48)', () => {
     await expect(page.getByRole('status')).toContainText(/сертификат действителен/i)
   })
 
-  // seed.ts creates no exam that is certificate-enabled with a passed employee session (the
-  // seeded exams are not configured for certificates), so the real issue -> PDF -> verify round
-  // trip cannot be driven without extending the seed. Tracked as a follow-up in the PR description.
-  test.fixme('passed certifiable exam: result page offers a PDF whose code verifies (FR-BB43/44)', async () => {
-    // Blocked: needs a seeded exam with certificates enabled + a passed employee session.
+  // Real round trip: a certificate-enabled exam with a passed employee session is created through
+  // the API (seed helpers), the employee opens the result page in a browser context, downloads the
+  // PDF and the verification code from the response filename verifies on the public endpoint.
+  test('passed certifiable exam: result page offers a PDF whose code verifies (FR-BB43/44)', async ({ browser }) => {
+    test.setTimeout(90_000)
+    const { adminToken, employeeId } = await getSeedData()
+    const question = await createTestQuestion(adminToken, `E2E Cert Q ${Date.now()}`, 'single', true)
+    const exam = await createTestExam(adminToken, `E2E Certified Exam ${Date.now()}`, question.id, {
+      certificateEnabled: true,
+      passingScorePct: 50,
+      assignToUserId: employeeId,
+    })
+    const ctx = await browser.newContext({ storageState: EMPLOYEE_STORAGE_STATE })
+    try {
+      const sessionId = await createPassedEmployeeSession(exam.id)
+      const page = await ctx.newPage()
+      await page.goto(`/portal/sessions/${sessionId}/result`)
+
+      const download = page.getByRole('button', { name: /скачать сертификат|download certificate/i })
+      await expect(download).toBeVisible({ timeout: 20_000 })
+      const [response] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/api/v1/portal/sessions/${sessionId}/certificate`)),
+        download.click(),
+      ])
+      expect(response.status()).toBe(200)
+      expect(response.headers()['content-type']).toContain('application/pdf')
+      expect(response.request().headers()['authorization']).toMatch(/^Bearer /)
+      const code = /filename="certificate-([^"]+)\.pdf"/.exec(response.headers()['content-disposition'] ?? '')?.[1]
+      expect(code, 'verification code in Content-Disposition').toBeTruthy()
+
+      const verify = await fetch(`${API}/api/v1/verify/${encodeURIComponent(code!)}`)
+      expect(verify.status).toBe(200)
+      const body = (await verify.json()) as { data: { valid: boolean; exam_title?: string } }
+      expect(body.data.valid).toBe(true)
+      expect(body.data.exam_title).toBe(exam.title)
+    } finally {
+      await ctx.close()
+      // Best effort: an exam with sessions / certificates may be undeletable; titles are unique per run.
+      await deleteTestExam(adminToken, exam.id).catch(() => undefined)
+      await deleteTestQuestion(adminToken, question.id).catch(() => undefined)
+    }
   })
 })

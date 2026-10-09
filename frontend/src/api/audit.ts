@@ -1,4 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
+import { downloadFile } from '@/api/download'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -110,27 +112,6 @@ export function useAuditLog(filters: AuditFilters, page: number) {
   })
 }
 
-export async function exportAuditLog(
-  filters: AuditFilters,
-  token: string | null | undefined,
-): Promise<void> {
-  const res = await fetch(buildExportURL(filters), {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    throw new Error(`Export failed: ${res.status}`)
-  }
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  // Extract filename from Content-Disposition header or use a default.
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = /filename="([^"]+)"/.exec(disposition)
-  a.download = match ? match[1] : 'audit-export.csv'
-  a.href = url
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+export function exportAuditLog(qc: QueryClient, filters: AuditFilters): Promise<void> {
+  return downloadFile(qc, buildExportURL(filters), 'audit-export.csv')
 }

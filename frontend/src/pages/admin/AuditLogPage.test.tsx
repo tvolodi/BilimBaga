@@ -4,7 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { AuditLogPage } from './AuditLogPage'
-import { useAuditLog } from '@/api/audit'
+import { useAuditLog, exportAuditLog } from '@/api/audit'
+import { waitFor } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -68,5 +69,25 @@ describe('AuditLogPage', () => {
     expect(firstFilters.from).toBeTruthy()
     expect(secondFilters.from).toBeTruthy()
     expect(secondFilters.from).toBe(firstFilters.from)
+  })
+
+  it('shows a translated error when the export fails (401 after refresh)', async () => {
+    vi.mocked(exportAuditLog).mockRejectedValueOnce(
+      Object.assign(new Error('ERR_UNAUTHORIZED'), { code: 'ERR_UNAUTHORIZED' }),
+    )
+    renderPage('/admin/audit')
+    fireEvent.click(screen.getByRole('button', { name: /audit\.export_csv/ }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('download.session_expired')
+    await waitFor(() => expect(screen.getByRole('button', { name: /audit\.export_csv/ })).not.toBeDisabled())
+  })
+
+  it('shows a generic error for other export failures and clears it on retry', async () => {
+    vi.mocked(exportAuditLog).mockRejectedValueOnce(new Error('boom'))
+    renderPage('/admin/audit')
+    fireEvent.click(screen.getByRole('button', { name: /audit\.export_csv/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('download.failed')
+    fireEvent.click(screen.getByRole('button', { name: /audit\.export_csv/ }))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
   })
 })

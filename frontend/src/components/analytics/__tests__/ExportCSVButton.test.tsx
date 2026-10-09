@@ -1,95 +1,112 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/i18n'
 import { ExportCSVButton } from '../ExportCSVButton'
 
-function setup(examId = 'exam-123') {
+function blobResponse(status = 200): Response {
+  return new Response(new Blob(['csv,data']), { status })
+}
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+function setup(examId = 'exam-123', token: string | null = 'tok-1') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  qc.setQueryData(['auth', 'accessToken'], token)
   const { container } = render(
     <QueryClientProvider client={qc}>
       <ExportCSVButton examId={examId} />
     </QueryClientProvider>,
   )
-  return container
+  return { container, qc }
 }
 
 describe('ExportCSVButton', () => {
-  it('renders the export button', () => {
-    setup()
-    const buttons = screen.getAllByRole('button')
-    expect(buttons.length).toBeGreaterThanOrEqual(1)
-  })
+  let fetchMock: ReturnType<typeof vi.fn>
+  let clicked: HTMLAnchorElement[]
 
-  it('button is enabled initially', () => {
-    setup()
-    const buttons = screen.getAllByRole('button')
-    expect(buttons[0]).not.toBeDisabled()
-  })
-
-  it('calls fetch on button click with correct URL', async () => {
-    const mockBlob = new Blob(['csv,data'], { type: 'text/csv' })
-    // Use direct assignment like other tests in the codebase
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: async () => mockBlob,
-      headers: { get: vi.fn(() => 'attachment; filename="results.csv"') },
-    })
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
     URL.createObjectURL = vi.fn(() => 'blob:mock-url')
     URL.revokeObjectURL = vi.fn()
-
-    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((el) => el)
-    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((el) => el)
-
-    const container = setup('exam-abc')
-    // Use container to find button - avoids any screen isolation issue
-    const btn = container.querySelector('button')
-    expect(btn).toBeTruthy()
-    fireEvent.click(btn!)
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/admin/exams/exam-abc/results/export',
-        expect.objectContaining({ credentials: 'include' }),
-      )
+    clicked = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      clicked.push(this)
     })
-
-    appendSpy.mockRestore()
-    removeSpy.mockRestore()
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
-  it('disables button during download', async () => {
-    let resolveBlob!: (value: Blob) => void
-    const blobPromise = new Promise<Blob>((resolve) => {
-      resolveBlob = resolve
-    })
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => blobPromise,
-      headers: { get: vi.fn(() => null) },
-    })
-    URL.createObjectURL = vi.fn(() => 'blob:mock-url')
-    URL.revokeObjectURL = vi.fn()
+  it('renders an enabled export button', () => {
+    const { container } = setup()
+    expect(container.querySelector('button')).not.toBeDisabled()
+  })
 
-    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((el) => el)
-    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((el) => el)
+  it('downloads with Bearer token via the shared helper', async () => {
+    fetchMock.mockResolvedValueOnce(blobResponse())
+    const { container } = setup('exam-abc')
+    fireEvent.click(container.querySelector('button')!)
+    await waitFor(() => expect(clicked).toHaveLength(1))
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/v1/admin/exams/exam-abc/results/export')
+    expect(init.headers.Authorization).toBe('Bearer tok-1')
+    expect(clicked[0].download).toBe('exam-exam-abc-results.csv')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 
-    const container = setup()
-    const btn = container.querySelector('button')
-    expect(btn).toBeTruthy()
-    fireEvent.click(btn!)
+  it('disables the button while downloading', async () => {
+    let resolveFetch!: (r: Response) => void
+    fetchMock.mockReturnValueOnce(new Promise<Response>((r) => (resolveFetch = r)))
+    const { container } = setup()
+    const btn = container.querySelector('button')!
+    fireEvent.click(btn)
+    await waitFor(() => expect(btn).toBeDisabled())
+    resolveFetch(blobResponse())
+    await waitFor(() => expect(btn).not.toBeDisabled())
+  })
 
-    await waitFor(() => {
-      expect(btn).toBeDisabled()
-    })
+  it('refreshes the token on 401 and retries', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ error: { code: 'ERR_UNAUTHORIZED' } }, 401))
+      .mockResolvedValueOnce(jsonResponse({ data: { access_token: 'new' }, error: null }, 200))
+      .mockResolvedValueOnce(blobResponse())
+    const { container, qc } = setup('e1', 'old')
+    fireEvent.click(container.querySelector('button')!)
+    await waitFor(() => expect(clicked).toHaveLength(1))
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/auth/refresh')
+    expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer new')
+    expect(qc.getQueryData(['auth', 'accessToken'])).toBe('new')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 
-    resolveBlob(new Blob(['data']))
+  it('shows a session-expired error when refresh fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+    const { container } = setup()
+    fireEvent.click(container.querySelector('button')!)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Your session has expired')
+    expect(clicked).toHaveLength(0)
+    expect(container.querySelector('button')).not.toBeDisabled()
+  })
 
-    await waitFor(() => {
-      expect(btn).not.toBeDisabled()
-    })
-
-    appendSpy.mockRestore()
-    removeSpy.mockRestore()
+  it('shows a generic error on server failure and clears it on retry', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: { code: 'ERR_FORBIDDEN' } }, 403))
+    const { container } = setup()
+    fireEvent.click(container.querySelector('button')!)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Download failed')
+    fetchMock.mockResolvedValueOnce(blobResponse())
+    fireEvent.click(container.querySelector('button')!)
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
   })
 })

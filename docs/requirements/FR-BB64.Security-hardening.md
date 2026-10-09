@@ -6,21 +6,42 @@
 | ID | FR-BB64 |
 | Phase | 6 — Polish & Hardening |
 | Priority | 1 |
-| Status | Draft |
+| Status | Validated |
 | Depends On | FR-BB14, FR-BB15, FR-BB16, FR-BB25, FR-BB37 |
 
 ## Description
 Closes security gaps across the full stack. Rate limiting is applied to all API endpoints with tighter limits on sensitive auth and answer-save routes. HTTP security headers are configured at the Nginx layer. File uploads are validated by magic bytes server-side. JWT secrets meet minimum entropy requirements and refresh tokens are stored only as SHA-256 hashes. Password complexity is enforced on all password-setting code paths.
 
+## Implementation Delta (audited 2026-10-09)
+
+Part of this FR is already in the codebase. Only the items under "Remaining" need implementation.
+
+| AC | State | Evidence |
+|----|-------|----------|
+| AC-1 | Satisfied (tests missing) | `backend/internal/ratelimit/middleware.go` (AuthLimiter 10/min, GlobalLimiter 300/min, AnswerSaveLimiter 60/min keyed `session:{id}`, 429 envelope `RATE_LIMITED` + `Retry-After: 60`); wired in `backend/internal/router/router.go` lines 54-75, 231. No `ratelimit` test file exists. |
+| AC-2 | Partial | `deploy/nginx.conf` sets CSP, X-Frame-Options DENY, nosniff, Referrer-Policy. **HSTS missing.** CSP is deliberately relaxed (`'unsafe-inline'`, Google Fonts) because `frontend/index.html` loads Inter from fonts.googleapis.com; this relaxed policy is the accepted baseline (see AC-2 text). `deploy/nginx/bilimbaga*.conf` (host vhosts, TLS) add no headers. |
+| AC-3 | Partial | `backend/internal/upload/validate.go` (magic bytes, 2 MB / 10 MB); used by `tenant/service.go` (logo, 413 in `tenant/handler.go`) and `users/handler.go` (CSV, 413 `FILE_TOO_LARGE`). **`questions/import_export_handler.go` Import does not call `upload` validation and has no 10 MB limit** (only `ParseMultipartForm(32<<20)`). |
+| AC-4 | Satisfied | `sessions/handler.go` lines ~100-110 map `ErrQuestionNotInSession`, `ErrInvalidAnswerOption`, `ErrInvalidOption` to 400 `INVALID_ANSWER_OPTION`; tests in `sessions/handler_test.go`. |
+| AC-5 | Satisfied | `config/config.go` rejects JWT_SECRET < 32 chars; `auth/service.go` SHA-256 hashes refresh tokens; `refresh_tokens.token_hash` (migration 004, repository.go). |
+| AC-6 | Satisfied (audit) | Dynamic `fmt.Sprintf` queries (`audit`, `exams`, `questions`, `sessions` repositories) only interpolate `$N` placeholders or fixed clauses; values are passed as args. Re-run the grep audit once in implementation and record the result; no code change expected. |
+| AC-7 | Partial | `Makefile` target `security-check` runs `go mod verify` and `npm audit --audit-level=high`. **No CI workflow exists** (`.github/workflows/` absent), so it is not a required CI step. |
+| AC-8 | Satisfied (test gap) | `auth/password.go` `ValidateComplexity` enforced in `auth/service.go` ChangePassword (400 `WEAK_PASSWORD`). Create/reset/import in `users/service.go` use server-generated `generateTempPassword()` (3 lower, 3 upper, 2 digits, 2 specials, 10 chars), which always satisfies the rule; no user-supplied password path exists there. |
+
+### Remaining work
+1. AC-2: add `Strict-Transport-Security` to `deploy/nginx.conf` only when the original request was HTTPS. The container listens on :80 behind a TLS-terminating proxy/Cloudflare, so use `map $http_x_forwarded_proto $hsts { default ""; https "max-age=31536000; includeSubDomains"; }` and `add_header Strict-Transport-Security $hsts always;` (nginx omits headers with empty values). Do not use `if ($scheme = "https")`.
+2. AC-3: apply `upload.ValidateCSVFile` (and size cap 10 MB, 413) to `questions` Import for `.csv` files; JSON imports are capped at 10 MB too. Add handler tests.
+3. AC-7: add `.github/workflows/security.yml` (or equivalent) running `make security-check` on push and pull request.
+4. Tests: add `ratelimit/middleware_test.go` (429 envelope, Retry-After, per-session keying, 11th auth request blocked) and a `users` test asserting `generateTempPassword()` satisfies `auth.ValidateComplexity` over many iterations (avoid an import cycle by duplicating the rule check if required).
+
 ## Acceptance Criteria
-- [ ] AC-1: Rate limiting middleware is applied globally; auth endpoints (`/api/v1/auth/*`) are limited to 10 req/min per IP, answer-save (`PUT /portal/sessions/*/answers/*`) to 60 req/min per session ID, and all other endpoints to 300 req/min per IP; requests exceeding the limit receive `429 Too Many Requests` with `Retry-After` header.
-- [ ] AC-2: Nginx serves all five required security headers (`Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`) on every response; `Strict-Transport-Security` is only set when the request is HTTPS.
+- [x] AC-1: Rate limiting middleware is applied globally; auth endpoints (`/api/v1/auth/*`) are limited to 10 req/min per IP, answer-save (`PUT /portal/sessions/*/answers/*`) to 60 req/min per session ID, and all other endpoints to 300 req/min per IP; requests exceeding the limit receive `429 Too Many Requests` with `Retry-After` header.
+- [ ] AC-2: Nginx serves all five required security headers (`Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`) on every response; `Strict-Transport-Security` is only set when the original request was HTTPS (detected via `X-Forwarded-Proto`). Baseline CSP is the policy currently in `deploy/nginx.conf` (permits `'unsafe-inline'` and Google Fonts, as the SPA loads Inter from Google Fonts); tightening is out of scope.
 - [ ] AC-3: File upload endpoints (logo, CSV import) validate the uploaded file server-side by reading its magic bytes and reject any file whose detected MIME type does not match the expected type, regardless of the `Content-Type` header; logo files exceeding 2 MB and CSV files exceeding 10 MB are rejected with `413 Payload Too Large`.
-- [ ] AC-4: Exam answer submission validates that each supplied option ID belongs to one of the session's active questions; unknown option IDs or questions not present in the session return `400 Bad Request` with error code `INVALID_ANSWER_OPTION`.
-- [ ] AC-5: JWT tokens use HS256 with a secret of at least 256 bits (32 bytes); refresh tokens are stored in the database only as a SHA-256 hash (never plaintext); the plaintext token is returned to the client once and never persisted.
-- [ ] AC-6: All database queries across the codebase use parameterized statements (sqlx named queries or positional `$N` placeholders); no SQL query is built via string concatenation of user input.
+- [x] AC-4: Exam answer submission validates that each supplied option ID belongs to one of the session's active questions; unknown option IDs or questions not present in the session return `400 Bad Request` with error code `INVALID_ANSWER_OPTION`.
+- [x] AC-5: JWT tokens use HS256 with a secret of at least 256 bits (32 bytes); refresh tokens are stored in the database only as a SHA-256 hash (never plaintext); the plaintext token is returned to the client once and never persisted.
+- [x] AC-6: All database queries across the codebase use parameterized statements (sqlx named queries or positional `$N` placeholders); no SQL query is built via string concatenation of user input.
 - [ ] AC-7: `go mod verify` completes with no errors and `npm audit --audit-level=high` reports zero high or critical vulnerabilities; both commands are added as required CI steps.
-- [ ] AC-8: Password-setting code paths (create user, change password, reset to temp password) enforce the complexity rule: minimum 8 characters, at least one uppercase letter, one lowercase letter, and one digit; violations return `400` with error code `WEAK_PASSWORD`.
+- [x] AC-8: Password-setting code paths (create user, change password, reset to temp password) enforce the complexity rule: minimum 8 characters, at least one uppercase letter, one lowercase letter, and one digit; violations return `400` with error code `WEAK_PASSWORD`.
 
 ## Technical Specification
 
@@ -60,10 +81,9 @@ add_header X-Frame-Options "DENY" always;
 add_header X-Content-Type-Options "nosniff" always;
 add_header Referrer-Policy "same-origin" always;
 
-# HTTPS only
-if ($scheme = "https") {
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-}
+# HTTPS only (TLS terminates upstream; detect via X-Forwarded-Proto). Define map in http context / conf.d:
+# map $http_x_forwarded_proto $hsts { default ""; https "max-age=31536000; includeSubDomains"; }
+add_header Strict-Transport-Security $hsts always;
 ```
 
 Note: The strict CSP (`no inline scripts/styles`) requires Vite build to produce no inline `<script>` or `<style>` tags. Enable `build.cssCodeSplit: true` and ensure no inline `style=` attributes in production HTML.
@@ -147,4 +167,4 @@ npm audit --audit-level=high --prefix frontend
 - The CSP header `default-src 'self'` blocks Google Fonts, CDN-hosted assets, and external analytics. Ensure all fonts are self-hosted in the Vite build output (`public/fonts/`).
 - Rate limiting state is in-process (Go map); in a multi-instance deployment, a Redis-backed rate limiter would be needed. This is acceptable for Phase 6 (single-instance Docker Compose deployment).
 - `go mod verify` checks that modules in the module cache have not been tampered with. It does not scan for CVEs; a future CI step can add `govulncheck ./...` for CVE scanning.
-- HSTS header must only be sent over HTTPS to avoid HSTS pinning over HTTP in development. The Nginx `if ($scheme = "https")` block handles this correctly.
+- HSTS header must only be sent over HTTPS to avoid HSTS pinning over HTTP in development. The `map` on `X-Forwarded-Proto` yields an empty (omitted) header over HTTP.

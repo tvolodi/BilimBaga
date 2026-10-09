@@ -136,9 +136,11 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid body: only preferred_locale is accepted")
 		return
 	}
+	// A bad locale value is a validation error: 422 VALIDATION_ERROR (api-conventions). Body shape
+	// errors above stay 400.
 	locale, err := parsePreferredLocale(req.PreferredLocale)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		api.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		return
 	}
 
@@ -149,7 +151,7 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrNotFound):
 			api.WriteError(w, http.StatusNotFound, "NOT_FOUND", "user not found")
 		case errors.Is(err, ErrValidation):
-			api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			api.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		default:
 			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update profile")
 		}

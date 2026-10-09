@@ -529,7 +529,7 @@ func TestRouterUsersAuthz_PatchMeRejectsUnavailableLocale(t *testing.T) {
 	h, repo := newUsersRouter(t)
 
 	rec := call(h, http.MethodPatch, "/api/v1/users/me", tokenFor(t, idEmp, "employee", authzDeptA), map[string]any{"preferred_locale": "de"})
-	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, rec))
 	assert.Nil(t, repo.snapshot(idEmp).PreferredLocale)
 	assert.Zero(t, repo.writes)

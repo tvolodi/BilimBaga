@@ -14,7 +14,7 @@ Roadmap 6.2 requires a locale switcher "on the login screen and in user profile 
 
 ## Acceptance Criteria
 - [ ] AC-1: `GET /api/v1/users/me` additionally returns `preferred_locale` (`"kk"`, `"ru"`, `"en"` or `null`); `GET /users/{id}` and the list endpoint return the same field for admins. No other existing response field changes.
-- [ ] AC-2: `PATCH /api/v1/users/me` (any authenticated role, no extra RBAC permission) accepts `{ "preferred_locale": "<code>|null" }`. A code must be one of the tenant `available_locales`; otherwise 400 `VALIDATION_ERROR`. `null` clears the preference. On success returns 200 with the updated user (`{ data, error: null }`).
+- [ ] AC-2: `PATCH /api/v1/users/me` (any authenticated role, no extra RBAC permission) accepts `{ "preferred_locale": "<code>|null" }`. A code must be one of the tenant `available_locales`; otherwise 422 `VALIDATION_ERROR`. `null` clears the preference. On success returns 200 with the updated user (`{ data, error: null }`).
 - [ ] AC-3: The endpoint can only modify the caller's own `preferred_locale`; any other key in the body (e.g. `role_id`, `department_id`, `email`, `status`) is rejected with 400 `VALIDATION_ERROR` and nothing is persisted (no privilege escalation).
 - [ ] AC-4: A successful change writes an `audit_log` entry `user.preferred_locale_updated` (actor = entity = caller, metadata contains old and new value only).
 - [ ] AC-5: Frontend: a route `/profile`, reachable by admin and employee roles (inside `RequireAuth`, rendered in the respective layout), shows full name, email, department, role (read-only), a language select (kk/ru/en, native labels as in `LocaleSwitcher`) and a "Change password" link to `/change-password`. Admin `TopBar` and `PortalLayout` each expose a link to it from the user name/menu.
@@ -33,7 +33,7 @@ None. Uses existing `users.preferred_locale TEXT NULL` (migration 023). Optional
 | Method | Path | Auth | Request | Success | Errors |
 |--------|------|------|---------|---------|--------|
 | GET | `/api/v1/users/me` | any authenticated | - | 200 `{ data: { ...user, preferred_locale }, error: null }` | 401, 404 |
-| PATCH | `/api/v1/users/me` | any authenticated | `{ "preferred_locale": "ru" }` or `null` | 200 `{ data: user, error: null }` | 400 `VALIDATION_ERROR` (unknown locale / extra field), 401 |
+| PATCH | `/api/v1/users/me` | any authenticated | `{ "preferred_locale": "ru" }` or `null` | 200 `{ data: user, error: null }` | 422 `VALIDATION_ERROR` (unknown or invalid locale), 400 `VALIDATION_ERROR` (extra field), 401 |
 
 Register `PATCH /users/me` beside `GET /users/me`, before `/users/{id}` routes. Subject to the global limiter.
 

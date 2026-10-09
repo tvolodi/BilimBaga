@@ -7,6 +7,8 @@ created: 2026-06-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Preconditions
 
 - The platform is running at `http://localhost:5173`.

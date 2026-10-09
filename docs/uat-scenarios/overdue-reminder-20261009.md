@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **Issue #61** (FR-BB510 implementation): `exam_id` on `overdue_employees[]`, real `POST /api/v1/admin/users/{userId}/remind`, `overdue_reminder` email template (en/ru/kk), `exam_reminders` migration (next number after 030), audit `users.remind`, frontend `OverdueTable` changes. Status at authoring time: not merged.

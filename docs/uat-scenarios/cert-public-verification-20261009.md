@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **PR #36** `feat(certificates): public /verify/:code page and PUBLIC_APP_URL (FR-BB48)` (branch swarm/25-cert-verify) — OPEN at authoring time. Without it `/verify/:code` does not exist and the QR code still encodes `API_BASE_URL`. Do not run until merged and the stack rebuilt.

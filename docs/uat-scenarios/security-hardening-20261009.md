@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **Issue #19** (FR-BB64 remaining): (a) `Strict-Transport-Security` in `deploy/nginx.conf` via `map $http_x_forwarded_proto $hsts`; (b) `backend/internal/questions/import_export_handler.go` Import uses `internal/upload` validation (magic bytes, 10 MB limit, 413); (c) `.github/workflows/security.yml` running `make security-check`; (d) tests for ratelimit and temp-password complexity. Status ready, no PR at authoring time.

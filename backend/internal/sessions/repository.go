@@ -424,7 +424,6 @@ func (r *postgresRepository) GetEligibleQuestions(ctx context.Context, rule ques
 			parts = append(parts, fmt.Sprintf(`(
     SELECT array_agg(qt.tag_id::text) FROM question_tags qt WHERE qt.question_id = q.id
 ) @> (SELECT array_agg(t) FROM jsonb_array_elements_text($%d::jsonb) t)`, idx))
-			idx++
 		}
 	}
 

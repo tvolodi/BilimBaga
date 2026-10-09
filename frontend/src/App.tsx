@@ -22,20 +22,37 @@ import { SkipLink } from '@/components/SkipLink'
 import { PasswordChangeGuard } from '@/components/PasswordChangeGuard'
 import { createAppQueryClient } from '@/lib/passwordChangeRequired'
 
-// Non-admin routes — eagerly loaded (employee-facing, on the critical path)
+// Login stays eager (first paint); other employee/auth routes are lazy (FR-BB65 initial JS budget, #200)
 import { LoginPage } from '@/pages/auth/LoginPage'
-import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
-import { EmployeePortal } from '@/pages/EmployeePortal'
-import { MyResultsPage } from '@/pages/portal/MyResultsPage'
-import { ExamResultRedirectPage } from '@/pages/portal/ExamResultRedirectPage'
-import { ExamTakingPage } from '@/pages/ExamTaking'
-import { ResultPage } from '@/pages/ResultPage'
 
 // Layouts — eagerly loaded (shell chrome shared by all authenticated routes)
 import { AdminLayout } from '@/layouts/AdminLayout'
 import { PortalLayout } from '@/layouts/PortalLayout'
+
+const ChangePasswordPage = lazy(() =>
+  import('@/pages/auth/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })),
+)
+const ForgotPasswordPage = lazy(() =>
+  import('@/pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
+)
+const ResetPasswordPage = lazy(() =>
+  import('@/pages/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
+)
+const EmployeePortal = lazy(() =>
+  import('@/pages/EmployeePortal').then((m) => ({ default: m.EmployeePortal })),
+)
+const MyResultsPage = lazy(() =>
+  import('@/pages/portal/MyResultsPage').then((m) => ({ default: m.MyResultsPage })),
+)
+const ExamResultRedirectPage = lazy(() =>
+  import('@/pages/portal/ExamResultRedirectPage').then((m) => ({ default: m.ExamResultRedirectPage })),
+)
+const ExamTakingPage = lazy(() =>
+  import('@/pages/ExamTaking').then((m) => ({ default: m.ExamTakingPage })),
+)
+const ResultPage = lazy(() =>
+  import('@/pages/ResultPage').then((m) => ({ default: m.ResultPage })),
+)
 
 // AC-7: Admin-only routes lazy-loaded so the employee bundle stays lean
 const UsersListPage = lazy(() =>
@@ -121,10 +138,12 @@ function AppRoutes() {
   // FR-BB115 AC-7: account-recovery pages are public too — no refresh bootstrap, no auth wrappers.
   if (pathname === '/forgot-password' || pathname === '/reset-password') {
     return (
-      <Routes>
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-      </Routes>
+      <Suspense fallback={<FullPageSpinner />}>
+        <Routes>
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+        </Routes>
+      </Suspense>
     )
   }
   return <AuthedRoutes />
@@ -144,217 +163,219 @@ function AuthedRoutes() {
   return (
     <>
       <PasswordChangeGuard />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="/change-password"
-          element={
-            <RequireAuth>
-              <ChangePasswordPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <RequireRole roles={ADMIN_SHELL_ROLES} allowCustomRole>
-              <Suspense fallback={<FullPageSpinner />}>
-                <AdminLayout />
-              </Suspense>
-            </RequireRole>
-          }
-        >
-          <Route index element={<AdminHome />} />
+      <Suspense fallback={<FullPageSpinner />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route
-            path="dashboard"
+            path="/change-password"
             element={
-              <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']} permission={PERM.dashboard}>
-                <AdminDashboardPage />
+              <RequireAuth>
+                <ChangePasswordPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireRole roles={ADMIN_SHELL_ROLES} allowCustomRole>
+                <Suspense fallback={<FullPageSpinner />}>
+                  <AdminLayout />
+                </Suspense>
+              </RequireRole>
+            }
+          >
+            <Route index element={<AdminHome />} />
+            <Route
+              path="dashboard"
+              element={
+                <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']} permission={PERM.dashboard}>
+                  <AdminDashboardPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.users}>
+                  <UsersListPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="users/:userId/record"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.reports}>
+                  <EmployeeRecordPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="departments"
+              element={
+                <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.departments}>
+                  <DepartmentsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="roles"
+              element={
+                <RequireRole roles={ROLES_MANAGE_ROLES} permission={PERM.roles}>
+                  <RolesPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="questions"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questions}>
+                  <QuestionBankPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="questions/new"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questionsWrite}>
+                  <QuestionEditorPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="questions/:id/edit"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questionsWrite}>
+                  <QuestionEditorPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="categories"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.categories}>
+                  <CategoriesPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="tags"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.tags}>
+                  <TagsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="exams"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']} permission={PERM.exams}>
+                  <ExamsListPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="exams/new"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.examsWrite}>
+                  <ExamWizardCreatePage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="exams/:id/edit"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.examsWrite}>
+                  <ExamWizardEditPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="exams/:examId/analytics"
+              element={
+                <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.exams}>
+                  <ExamAnalyticsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="settings/branding"
+              element={
+                <RequireSuperAdmin>
+                  <BrandingSettingsPage />
+                </RequireSuperAdmin>
+              }
+            />
+            <Route
+              path="grading"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.grading}>
+                  <GradingQueuePage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="grading/:sessionId"
+              element={
+                <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.grading}>
+                  <GradingDetailPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="audit"
+              element={
+                <RequireRole roles={AUDIT_READ_ROLES} unauthorizedRedirect="/login" permission={PERM.audit}>
+                  <AuditLogPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="reports"
+              element={
+                <RequireRole roles={REPORTS_READ_ROLES} unauthorizedRedirect="/login" permission={PERM.reports}>
+                  <ReportsPage />
+                </RequireRole>
+              }
+            />
+          </Route>
+          <Route
+            path="/portal/exams/:examId/result"
+            element={
+              <RequireRole roles={['employee']}>
+                <ExamResultRedirectPage />
               </RequireRole>
             }
           />
           <Route
-            path="users"
+            path="/portal/sessions/:sessionId/result"
             element={
-              <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.users}>
-                <UsersListPage />
+              <RequireRole roles={['employee']}>
+                <ResultPage />
               </RequireRole>
             }
           />
           <Route
-            path="users/:userId/record"
+            path="/portal/sessions/:sessionId"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.reports}>
-                <EmployeeRecordPage />
+              <RequireRole roles={['employee']}>
+                <ExamTakingPage />
               </RequireRole>
             }
           />
           <Route
-            path="departments"
+            path="/portal"
             element={
-              <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.departments}>
-                <DepartmentsPage />
+              <RequireRole roles={['employee']}>
+                <PortalLayout />
               </RequireRole>
             }
-          />
-          <Route
-            path="roles"
-            element={
-              <RequireRole roles={ROLES_MANAGE_ROLES} permission={PERM.roles}>
-                <RolesPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="questions"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questions}>
-                <QuestionBankPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="questions/new"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questionsWrite}>
-                <QuestionEditorPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="questions/:id/edit"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questionsWrite}>
-                <QuestionEditorPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="categories"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.categories}>
-                <CategoriesPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="tags"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.tags}>
-                <TagsPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="exams"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']} permission={PERM.exams}>
-                <ExamsListPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="exams/new"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.examsWrite}>
-                <ExamWizardCreatePage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="exams/:id/edit"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.examsWrite}>
-                <ExamWizardEditPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="exams/:examId/analytics"
-            element={
-              <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.exams}>
-                <ExamAnalyticsPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="settings/branding"
-            element={
-              <RequireSuperAdmin>
-                <BrandingSettingsPage />
-              </RequireSuperAdmin>
-            }
-          />
-          <Route
-            path="grading"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.grading}>
-                <GradingQueuePage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="grading/:sessionId"
-            element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.grading}>
-                <GradingDetailPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="audit"
-            element={
-              <RequireRole roles={AUDIT_READ_ROLES} unauthorizedRedirect="/login" permission={PERM.audit}>
-                <AuditLogPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="reports"
-            element={
-              <RequireRole roles={REPORTS_READ_ROLES} unauthorizedRedirect="/login" permission={PERM.reports}>
-                <ReportsPage />
-              </RequireRole>
-            }
-          />
-        </Route>
-        <Route
-          path="/portal/exams/:examId/result"
-          element={
-            <RequireRole roles={['employee']}>
-              <ExamResultRedirectPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/portal/sessions/:sessionId/result"
-          element={
-            <RequireRole roles={['employee']}>
-              <ResultPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/portal/sessions/:sessionId"
-          element={
-            <RequireRole roles={['employee']}>
-              <ExamTakingPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/portal"
-          element={
-            <RequireRole roles={['employee']}>
-              <PortalLayout />
-            </RequireRole>
-          }
-        >
-          <Route index element={<EmployeePortal />} />
-          <Route path="results" element={<MyResultsPage />} />
-        </Route>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-      </Routes>
+          >
+            <Route index element={<EmployeePortal />} />
+            <Route path="results" element={<MyResultsPage />} />
+          </Route>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     </>
   )
 }

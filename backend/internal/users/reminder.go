@@ -150,7 +150,7 @@ func (h *Handler) RemindEmployee(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userId")
 	var req RemindRequest
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil || !uuidRe.MatchString(req.ExamID) {
-		api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "exam_id must be a valid UUID")
+		api.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "exam_id must be a valid UUID")
 		return
 	}
 	if !uuidRe.MatchString(userID) {

@@ -14,6 +14,12 @@ const (
 
 	// MaxCSVBytes is the maximum allowed size for a CSV import file (10 MB).
 	MaxCSVBytes = 10 << 20 // 10 MiB
+
+	// multipartOverhead is slack added to MaxCSVBytes for multipart boundaries and headers.
+	multipartOverhead = 1 << 20 // 1 MiB
+
+	// MaxImportBodyBytes caps the whole request body of a CSV/JSON import upload.
+	MaxImportBodyBytes = MaxCSVBytes + multipartOverhead
 )
 
 // magic byte prefixes for supported image types.
@@ -79,4 +85,20 @@ func ValidateCSVFile(data []byte) error {
 		return nil
 	}
 	return ErrInvalidMIME
+}
+
+// ParseImportMultipart parses a multipart import upload after capping the request body at
+// MaxImportBodyBytes (http.MaxBytesReader) and limiting in-memory parsing to MaxCSVBytes, so an
+// oversize upload is rejected without being parsed. It returns ErrFileTooLarge when the body
+// exceeds the cap; any other error means the body is not valid multipart/form-data.
+func ParseImportMultipart(w http.ResponseWriter, r *http.Request) error {
+	r.Body = http.MaxBytesReader(w, r.Body, MaxImportBodyBytes)
+	if err := r.ParseMultipartForm(MaxCSVBytes); err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			return ErrFileTooLarge
+		}
+		return err
+	}
+	return nil
 }

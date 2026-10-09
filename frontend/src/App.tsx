@@ -6,7 +6,14 @@ import { TenantProvider } from '@/components/TenantProvider'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { RequireAuth } from '@/components/RequireAuth'
 import { RequireRole } from '@/components/RequireRole'
-import { AUDIT_READ_ROLES, REPORTS_READ_ROLES } from '@/lib/routeRoles'
+import {
+  ADMIN_SHELL_ROLES,
+  AUDIT_READ_ROLES,
+  REPORTS_READ_ROLES,
+  ROLES_MANAGE_ROLES,
+  ROUTE_PERMISSIONS as PERM,
+} from '@/lib/routeRoles'
+import { AdminHome } from '@/components/admin/AdminHome'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useRefreshToken } from '@/api/auth'
@@ -71,6 +78,10 @@ const GradingDetailPage = lazy(() =>
 const EmployeeRecordPage = lazy(() =>
   import('@/pages/admin/EmployeeRecordPage').then((m) => ({ default: m.EmployeeRecordPage })),
 )
+const RolesPage = lazy(() =>
+  import('@/pages/admin/roles/RolesPage').then((m) => ({ default: m.RolesPage })),
+)
+
 const AuditLogPage = lazy(() =>
   import('@/pages/admin/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 )
@@ -146,36 +157,58 @@ function AuthedRoutes() {
         <Route
           path="/admin"
           element={
-            <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
+            <RequireRole roles={ADMIN_SHELL_ROLES} allowCustomRole>
               <Suspense fallback={<FullPageSpinner />}>
                 <AdminLayout />
               </Suspense>
             </RequireRole>
           }
         >
-          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route index element={<AdminHome />} />
           <Route
             path="dashboard"
             element={
-              <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']}>
+              <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']} permission={PERM.dashboard}>
                 <AdminDashboardPage />
               </RequireRole>
             }
           />
-          <Route path="users" element={<UsersListPage />} />
+          <Route
+            path="users"
+            element={
+              <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.users}>
+                <UsersListPage />
+              </RequireRole>
+            }
+          />
           <Route
             path="users/:userId/record"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.reports}>
                 <EmployeeRecordPage />
               </RequireRole>
             }
           />
-          <Route path="departments" element={<DepartmentsPage />} />
+          <Route
+            path="departments"
+            element={
+              <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.departments}>
+                <DepartmentsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="roles"
+            element={
+              <RequireRole roles={ROLES_MANAGE_ROLES} permission={PERM.roles}>
+                <RolesPage />
+              </RequireRole>
+            }
+          />
           <Route
             path="questions"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questions}>
                 <QuestionBankPage />
               </RequireRole>
             }
@@ -183,7 +216,7 @@ function AuthedRoutes() {
           <Route
             path="questions/new"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questionsWrite}>
                 <QuestionEditorPage />
               </RequireRole>
             }
@@ -191,7 +224,7 @@ function AuthedRoutes() {
           <Route
             path="questions/:id/edit"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.questionsWrite}>
                 <QuestionEditorPage />
               </RequireRole>
             }
@@ -199,7 +232,7 @@ function AuthedRoutes() {
           <Route
             path="categories"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.categories}>
                 <CategoriesPage />
               </RequireRole>
             }
@@ -207,7 +240,7 @@ function AuthedRoutes() {
           <Route
             path="tags"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.tags}>
                 <TagsPage />
               </RequireRole>
             }
@@ -215,7 +248,7 @@ function AuthedRoutes() {
           <Route
             path="exams"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner', 'hr_admin']} permission={PERM.exams}>
                 <ExamsListPage />
               </RequireRole>
             }
@@ -223,7 +256,7 @@ function AuthedRoutes() {
           <Route
             path="exams/new"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.examsWrite}>
                 <ExamWizardCreatePage />
               </RequireRole>
             }
@@ -231,14 +264,18 @@ function AuthedRoutes() {
           <Route
             path="exams/:id/edit"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.examsWrite}>
                 <ExamWizardEditPage />
               </RequireRole>
             }
           />
           <Route
             path="exams/:examId/analytics"
-            element={<ExamAnalyticsPage />}
+            element={
+              <RequireRole roles={ADMIN_SHELL_ROLES} permission={PERM.exams}>
+                <ExamAnalyticsPage />
+              </RequireRole>
+            }
           />
           <Route
             path="settings/branding"
@@ -251,7 +288,7 @@ function AuthedRoutes() {
           <Route
             path="grading"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.grading}>
                 <GradingQueuePage />
               </RequireRole>
             }
@@ -259,7 +296,7 @@ function AuthedRoutes() {
           <Route
             path="grading/:sessionId"
             element={
-              <RequireRole roles={['super_admin', 'department_admin', 'examiner']}>
+              <RequireRole roles={['super_admin', 'department_admin', 'examiner']} permission={PERM.grading}>
                 <GradingDetailPage />
               </RequireRole>
             }
@@ -267,7 +304,7 @@ function AuthedRoutes() {
           <Route
             path="audit"
             element={
-              <RequireRole roles={AUDIT_READ_ROLES} unauthorizedRedirect="/login">
+              <RequireRole roles={AUDIT_READ_ROLES} unauthorizedRedirect="/login" permission={PERM.audit}>
                 <AuditLogPage />
               </RequireRole>
             }
@@ -275,7 +312,7 @@ function AuthedRoutes() {
           <Route
             path="reports"
             element={
-              <RequireRole roles={REPORTS_READ_ROLES} unauthorizedRedirect="/login">
+              <RequireRole roles={REPORTS_READ_ROLES} unauthorizedRedirect="/login" permission={PERM.reports}>
                 <ReportsPage />
               </RequireRole>
             }

@@ -15,6 +15,8 @@ export interface User {
   force_password_change: boolean
   is_locked: boolean
   created_at: string
+  /** Present on GET /users/me only: the caller's "resource:action" permissions (FR-BB117 AC-16). */
+  permissions?: string[]
 }
 
 export interface UserMeta {
@@ -132,12 +134,13 @@ export function useUser(id: string) {
   })
 }
 
-export function useMe() {
+export function useMe(options?: { enabled?: boolean }) {
   const qc = useQueryClient()
   const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<User, Error>({
     queryKey: ['users', 'me'],
     queryFn: () => apiFetch<User>('/api/v1/users/me', token),
+    enabled: options?.enabled ?? true,
   })
 }
 

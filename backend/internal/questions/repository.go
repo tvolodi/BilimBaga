@@ -577,9 +577,10 @@ func (r *postgresRepository) ListFiltered(ctx context.Context, filter QuestionFi
 			AND (array_length($5::text[], 1) IS NULL OR q.status = ANY($5::text[]))
 			AND ($6::text IS NULL OR EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = $6))
 			AND ($7::text IS NULL OR NOT EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = $7))
-			AND ($8::text IS NULL OR EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = q.default_locale AND stem ILIKE '%' || $8 || '%'))`
+			AND ($8::text IS NULL OR EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = q.default_locale AND stem ILIKE '%' || $8 || '%'))
+			AND ($9::bool OR NOT EXISTS (SELECT 1 FROM questions child WHERE child.parent_id = q.id))`
 
-	listQ := baseSelectQ + "\n\t\tORDER BY " + sortCol + " " + direction + "\n\t\tLIMIT $9 OFFSET $10"
+	listQ := baseSelectQ + "\n\t\tORDER BY " + sortCol + " " + direction + "\n\t\tLIMIT $10 OFFSET $11"
 
 	const countQ = `
 		SELECT COUNT(*)
@@ -592,7 +593,8 @@ func (r *postgresRepository) ListFiltered(ctx context.Context, filter QuestionFi
 			AND (array_length($5::text[], 1) IS NULL OR q.status = ANY($5::text[]))
 			AND ($6::text IS NULL OR EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = $6))
 			AND ($7::text IS NULL OR NOT EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = $7))
-			AND ($8::text IS NULL OR EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = q.default_locale AND stem ILIKE '%' || $8 || '%'))`
+			AND ($8::text IS NULL OR EXISTS (SELECT 1 FROM question_translations WHERE question_id = q.id AND locale = q.default_locale AND stem ILIKE '%' || $8 || '%'))
+			AND ($9::bool OR NOT EXISTS (SELECT 1 FROM questions child WHERE child.parent_id = q.id))`
 
 	if filter.Page < 1 {
 		filter.Page = 1
@@ -616,6 +618,7 @@ func (r *postgresRepository) ListFiltered(ctx context.Context, filter QuestionFi
 		filter.Locale,
 		filter.LocaleMissing,
 		searchParam,
+		filter.IncludeSuperseded,
 	}
 
 	var total int

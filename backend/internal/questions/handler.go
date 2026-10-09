@@ -194,6 +194,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("locale_missing"); v != "" {
 		filter.LocaleMissing = &v
 	}
+	filter.IncludeSuperseded = r.URL.Query().Get("include_versions") == "true"
 	filter.Search = r.URL.Query().Get("search")
 	filter.Sort = r.URL.Query().Get("sort")
 	filter.Order = r.URL.Query().Get("order")

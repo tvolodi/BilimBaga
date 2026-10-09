@@ -32,14 +32,14 @@ type mockQService struct {
 	untagFn            func(ctx context.Context, questionID, tagID string) error
 	getTagsFn          func(ctx context.Context, questionID string) ([]string, error)
 	// legacy methods — not exercised in handler tests but required by interface
-	createQuestionFn      func(ctx context.Context, input CreateQuestionInput) (*Question, error)
-	listQuestionsFn       func(ctx context.Context, categoryID string) ([]*Question, error)
-	publishVersionFn      func(ctx context.Context, previousID string, input CreateQuestionInput) (*Question, error)
-	addTranslationFn      func(ctx context.Context, questionID, locale, stem string, explanation *string) (*QuestionTranslation, error)
-	addAnswerOptionFn     func(ctx context.Context, questionID string, sortOrder int, isCorrect bool, likertWeight *float64, likertPolarity *string) (*AnswerOption, error)
-	addAnswerTranslFn     func(ctx context.Context, optionID, locale, text string) (*AnswerTranslation, error)
-	validateAndImportFn   func(ctx context.Context, rows []ImportRow, dryRun bool, createdBy string) (*DryRunReport, *CommitResult, error)
-	streamExportFn        func(ctx context.Context, filter ExportFilter, fn func(*ExportRow) error) error
+	createQuestionFn    func(ctx context.Context, input CreateQuestionInput) (*Question, error)
+	listQuestionsFn     func(ctx context.Context, categoryID string) ([]*Question, error)
+	publishVersionFn    func(ctx context.Context, previousID string, input CreateQuestionInput) (*Question, error)
+	addTranslationFn    func(ctx context.Context, questionID, locale, stem string, explanation *string) (*QuestionTranslation, error)
+	addAnswerOptionFn   func(ctx context.Context, questionID string, sortOrder int, isCorrect bool, likertWeight *float64, likertPolarity *string) (*AnswerOption, error)
+	addAnswerTranslFn   func(ctx context.Context, optionID, locale, text string) (*AnswerTranslation, error)
+	validateAndImportFn func(ctx context.Context, rows []ImportRow, dryRun bool, createdBy string) (*DryRunReport, *CommitResult, error)
+	streamExportFn      func(ctx context.Context, filter ExportFilter, fn func(*ExportRow) error) error
 }
 
 func (m *mockQService) CreateQuestionFull(ctx context.Context, input CreateQuestionFullInput) (*QuestionDetail, error) {
@@ -156,13 +156,13 @@ func withQChiParam(r *http.Request, key, val string) *http.Request {
 
 func sampleDetail(id string) *QuestionDetail {
 	return &QuestionDetail{
-		ID:           id,
-		Type:         "single",
-		Difficulty:   "easy",
-		Status:       "draft",
-		CategoryID:   "cat-1",
+		ID:            id,
+		Type:          "single",
+		Difficulty:    "easy",
+		Status:        "draft",
+		CategoryID:    "cat-1",
 		DefaultLocale: "kk",
-		Version:      1,
+		Version:       1,
 		Translations: map[string]TranslationDetail{
 			"kk": {Stem: "Question stem"},
 		},
@@ -176,16 +176,16 @@ func sampleDetail(id string) *QuestionDetail {
 
 func sampleQuestion(id string) *Question {
 	return &Question{
-		ID:           id,
-		CategoryID:   "cat-1",
-		Difficulty:   "easy",
-		Type:         "single",
+		ID:            id,
+		CategoryID:    "cat-1",
+		Difficulty:    "easy",
+		Type:          "single",
 		DefaultLocale: "kk",
-		Status:       "draft",
-		Version:      1,
-		CreatedBy:    "actor-1",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		Status:        "draft",
+		Version:       1,
+		CreatedBy:     "actor-1",
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 }
 
@@ -207,6 +207,47 @@ func TestQHandlerList_Returns200(t *testing.T) {
 	data, apiErr := decodeQEnvelope(t, w)
 	assert.Nil(t, apiErr)
 	assert.NotEmpty(t, data)
+}
+
+func TestQHandlerList_ParsesLocaleAndVersionParams(t *testing.T) {
+	var got QuestionFilter
+	svc := &mockQService{
+		listFilteredFn: func(_ context.Context, f QuestionFilter) ([]*QuestionListItem, int, error) {
+			got = f
+			return []*QuestionListItem{}, 0, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/questions?locale=kk&locale_missing=ru&include_versions=true", nil)
+	w := httptest.NewRecorder()
+	h.List(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	if assert.NotNil(t, got.Locale) {
+		assert.Equal(t, "kk", *got.Locale)
+	}
+	if assert.NotNil(t, got.LocaleMissing) {
+		assert.Equal(t, "ru", *got.LocaleMissing)
+	}
+	assert.True(t, got.IncludeSuperseded)
+}
+
+func TestQHandlerList_DefaultHidesSupersededVersions(t *testing.T) {
+	var got QuestionFilter
+	svc := &mockQService{
+		listFilteredFn: func(_ context.Context, f QuestionFilter) ([]*QuestionListItem, int, error) {
+			got = f
+			return []*QuestionListItem{}, 0, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/questions", nil)
+	h.List(httptest.NewRecorder(), req)
+
+	assert.Nil(t, got.Locale)
+	assert.False(t, got.IncludeSuperseded)
 }
 
 func TestQHandlerList_ServiceError_Returns500(t *testing.T) {

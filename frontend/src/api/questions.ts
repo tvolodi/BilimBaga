@@ -30,7 +30,9 @@ export interface QuestionFilters {
   statuses?: Array<'draft' | 'review' | 'active' | 'archived'>
   difficulties?: Array<'easy' | 'medium' | 'hard'>
   type?: 'single' | 'multiple' | 'truefalse' | 'shorttext' | 'likert'
+  locale?: string
   locale_missing?: string
+  include_versions?: boolean
   search?: string
 }
 
@@ -193,6 +195,8 @@ function buildQuestionsQuery(filters: QuestionFilters): string {
   if (filters.statuses?.length) params.set('statuses', filters.statuses.join(','))
   if (filters.difficulties?.length) params.set('difficulties', filters.difficulties.join(','))
   if (filters.type) params.set('type', filters.type)
+  if (filters.locale) params.set('locale', filters.locale)
+  if (filters.include_versions) params.set('include_versions', 'true')
   if (filters.locale_missing) params.set('locale_missing', filters.locale_missing)
   if (filters.search) params.set('search', filters.search)
   const qs = params.toString()

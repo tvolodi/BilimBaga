@@ -178,7 +178,8 @@
       "allCategories": "Все категории",
       "allTypes": "Все типы",
       "allLocales": "Все языки",
-      "locale": "Фильтр по языку"
+      "locale": "Фильтр по языку",
+      "showOldVersions": "Показать прошлые версии"
     },
     "column": {
       "stem": "Вопрос",

@@ -416,7 +416,7 @@ func TestTriggerAssignment(t *testing.T) {
 	t.Run("silent no-op paths", func(t *testing.T) {
 		repo := newStubRepo()
 		repo.userErr, repo.deptErr, repo.allErr = errors.New("x"), errors.New("x"), errors.New("x")
-		svc := svcFor(repo, nil) // all lookups fail; fields are never mutated after goroutines start
+		svc := svcFor(repo, nil)                                // all lookups fail; fields are never mutated after goroutines start
 		svc.TriggerAssignment("e", "t", nil, "user", nil)       // missing assignee id
 		svc.TriggerAssignment("e", "t", nil, "department", nil) // missing assignee id
 		svc.TriggerAssignment("e", "t", nil, "bogus", &uid)     // unknown type
@@ -457,6 +457,55 @@ func TestTriggerPasswordReset(t *testing.T) {
 		svcFor(repo, nil).TriggerPasswordReset("u", "p")
 		assertNoLog(t, repo)
 	})
+}
+
+// FR-BB116 AC-8: the password-reset email is rendered in the locale the user has persisted at the
+// time of sending. The profile PATCH stores users.preferred_locale; GetUserForEmail reads it on every
+// send, so a preference change is picked up without any cache step. The test models the update by
+// changing the stored locale between two sends and asserts the locale passed to the template each time.
+func TestTriggerPasswordReset_UsesPreferenceUpdatedBeforeSend(t *testing.T) {
+	srv := startFakeSMTP(t, nil)
+	repo := newStubRepo()
+	repo.tenantLocale = "en"
+	repo.user = UserEmailData{Email: "u@x.io", Locale: "kk"}
+	svc := svcFor(repo, srv)
+
+	wantSubject := func(tmpPwd, locale string) string {
+		t.Helper()
+		rendered, err := renderTemplate("password_reset", map[string]any{"TempPassword": tmpPwd}, locale)
+		if err != nil {
+			t.Fatalf("render %s: %v", locale, err)
+		}
+		return "Subject: " + rendered.Subject
+	}
+	if wantSubject("x", "kk") == wantSubject("x", "ru") {
+		t.Fatal("kk and ru must render different subjects for the test to be meaningful")
+	}
+
+	svc.TriggerPasswordReset("u-1", "Tmp-1")
+	repo.waitLogs(t, 1)
+	msgs, _, _ := srv.snapshot()
+	if len(msgs) != 1 {
+		t.Fatalf("messages after first send = %d; want 1", len(msgs))
+	}
+	if !strings.Contains(msgs[0], wantSubject("Tmp-1", "kk")) {
+		t.Fatalf("first send must use the kk preference; message:\n%s", msgs[0])
+	}
+
+	// PATCH /users/me {"preferred_locale":"ru"} has been persisted; the next send reads it.
+	repo.mu.Lock()
+	repo.user.Locale = "ru"
+	repo.mu.Unlock()
+
+	svc.TriggerPasswordReset("u-1", "Tmp-2")
+	repo.waitLogs(t, 1)
+	msgs, _, _ = srv.snapshot()
+	if len(msgs) != 2 {
+		t.Fatalf("messages after second send = %d; want 2", len(msgs))
+	}
+	if !strings.Contains(msgs[1], wantSubject("Tmp-2", "ru")) {
+		t.Fatalf("second send must use the updated ru preference; message:\n%s", msgs[1])
+	}
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────

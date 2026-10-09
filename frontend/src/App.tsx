@@ -20,6 +20,7 @@ import { useRefreshToken } from '@/api/auth'
 import { useLocaleDirection } from '@/hooks/useLocaleDirection'
 import { SkipLink } from '@/components/SkipLink'
 import { PasswordChangeGuard } from '@/components/PasswordChangeGuard'
+import { PreferredLocaleSync } from '@/components/PreferredLocaleSync'
 import { createAppQueryClient } from '@/lib/passwordChangeRequired'
 
 // Login stays eager (first paint); other employee/auth routes are lazy (FR-BB65 initial JS budget, #200)
@@ -34,6 +35,12 @@ const ChangePasswordPage = lazy(() =>
 )
 const ForgotPasswordPage = lazy(() =>
   import('@/pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
+)
+const ProfilePage = lazy(() =>
+  import('@/pages/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })),
+)
+const ProfileRedirect = lazy(() =>
+  import('@/pages/profile/ProfilePage').then((m) => ({ default: m.ProfileRedirect })),
 )
 const ResetPasswordPage = lazy(() =>
   import('@/pages/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
@@ -163,6 +170,7 @@ function AuthedRoutes() {
   return (
     <>
       <PasswordChangeGuard />
+      <PreferredLocaleSync />
       <Suspense fallback={<FullPageSpinner />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -185,6 +193,7 @@ function AuthedRoutes() {
             }
           >
             <Route index element={<AdminHome />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route
               path="dashboard"
               element={
@@ -362,6 +371,15 @@ function AuthedRoutes() {
               </RequireRole>
             }
           />
+          {/* FR-BB116: /profile sends each role to its own layout's profile page. */}
+          <Route
+            path="/profile"
+            element={
+              <RequireAuth>
+                <ProfileRedirect />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/portal"
             element={
@@ -372,6 +390,7 @@ function AuthedRoutes() {
           >
             <Route index element={<EmployeePortal />} />
             <Route path="results" element={<MyResultsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
           <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>

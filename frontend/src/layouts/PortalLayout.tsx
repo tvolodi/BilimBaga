@@ -35,6 +35,10 @@ export function PortalLayout() {
             <NavLink to="/portal/results" className={tabClass}>
               {t('portal.tab_results', 'My Results')}
             </NavLink>
+            {/* FR-BB116 AC-5: link to the caller's profile page. */}
+            <NavLink to="/portal/profile" className={tabClass}>
+              {t('profile.nav_link')}
+            </NavLink>
           </div>
           <div className="flex items-center gap-1 sm:gap-3 ml-auto shrink-0">
             <LocaleSwitcher />

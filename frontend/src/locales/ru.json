@@ -665,6 +665,24 @@
       }
     }
   },
+  "profile": {
+    "title": "Мой профиль",
+    "nav_link": "Профиль",
+    "identity_heading": "Аккаунт",
+    "preferences_heading": "Настройки",
+    "security_heading": "Безопасность",
+    "full_name": "Полное имя",
+    "email": "Эл. почта",
+    "department": "Подразделение",
+    "no_department": "Не указано",
+    "role": "Роль",
+    "language": "Язык",
+    "language_hint": "Используется в интерфейсе и в письмах, которые вы получаете.",
+    "language_saved": "Язык обновлён.",
+    "language_save_failed": "Не удалось сохранить язык. Предыдущий язык восстановлен.",
+    "change_password": "Сменить пароль",
+    "load_failed": "Не удалось загрузить профиль. Попробуйте позже."
+  },
   "portal": {
     "title": "Мои экзамены",
     "empty": {

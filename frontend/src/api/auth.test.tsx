@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { type ReactNode } from 'react'
-import { useLogin, useChangePassword } from './auth'
+import { useLogin, useChangePassword, useLogout } from './auth'
 
 const server = setupServer()
 
@@ -178,5 +178,55 @@ describe('useChangePassword (ISS-171)', () => {
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(result.current.error?.code).toBe('INVALID_CREDENTIALS')
     expect(queryClient.getQueryData(['auth', 'accessToken'])).toBe('old-tok')
+  })
+})
+
+// FR-BB116 AC-7: a previous session's cached profile (and its preferred_locale) must not outlive
+// the session, otherwise the next user's sync would apply the previous user's language.
+describe('session change drops the cached profile (FR-BB116)', () => {
+  function clientWithStaleProfile() {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+    queryClient.setQueryData(['users', 'me'], { id: 'user-a', preferred_locale: 'ru' })
+    queryClient.setQueryData(['users', 'roles', 'user-a'], [])
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    return { queryClient, wrapper }
+  }
+
+  it('useLogin removes the previous user profile when the next user signs in', async () => {
+    server.use(
+      http.post('/api/v1/auth/login', () =>
+        HttpResponse.json({
+          data: { access_token: 'tok-b', token_type: 'Bearer', expires_in: 3600, user: MOCK_USER },
+          error: null,
+        }),
+      ),
+    )
+    const { queryClient, wrapper } = clientWithStaleProfile()
+    const { result } = renderHook(() => useLogin(), { wrapper })
+
+    act(() => {
+      result.current.mutate({ email: 'test@example.com', password: 'secret' })
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(queryClient.getQueryData(['users', 'me'])).toBeUndefined()
+    expect(queryClient.getQueryData(['users', 'roles', 'user-a'])).toBeUndefined()
+  })
+
+  it('useLogout removes the profile of the signed-out user', async () => {
+    server.use(http.post('/api/v1/auth/logout', () => new HttpResponse(null, { status: 204 })))
+    const { queryClient, wrapper } = clientWithStaleProfile()
+    const { result } = renderHook(() => useLogout(), { wrapper })
+
+    act(() => {
+      result.current.mutate()
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(queryClient.getQueryData(['users', 'me'])).toBeUndefined()
   })
 })

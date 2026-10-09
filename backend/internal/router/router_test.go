@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
-	"github.com/go-chi/chi/v5"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
+	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
 )
 
@@ -37,6 +37,7 @@ func TestRouter_ProtectedRoutesRequireBearerToken(t *testing.T) {
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodPost, "/api/v1/auth/change-password"},
 		{http.MethodPut, "/api/v1/tenant/config"},
+		{http.MethodPatch, "/api/v1/users/me"},
 	} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))

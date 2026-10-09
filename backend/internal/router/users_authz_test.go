@@ -165,6 +165,24 @@ func (r *authzRepo) GetRoleNameByID(_ context.Context, id string) (string, error
 }
 func (r *authzRepo) ListRoles(context.Context) ([]users.RoleRow, error) { return nil, nil }
 
+// SetPreferredLocale mirrors the pgRepository contract: nil clears, unknown id is ErrNotFound (FR-BB116).
+func (r *authzRepo) SetPreferredLocale(_ context.Context, id string, locale *string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	u, ok := r.users[id]
+	if !ok {
+		return users.ErrNotFound
+	}
+	r.writes++
+	if locale == nil {
+		u.PreferredLocale = nil
+	} else {
+		v := *locale
+		u.PreferredLocale = &v
+	}
+	return nil
+}
+
 // ---- recording driver answering the auth account-state query -----------------
 
 type stateConnector struct{ repo *authzRepo }
@@ -224,12 +242,18 @@ func newUsersRouter(t *testing.T) (http.Handler, *authzRepo) {
 	cache := rbac.NewCache()
 	cache.LoadFromMap(authzPerms)
 	svc := users.WithPermissionsLookup(users.WithPermissionChecker(users.NewService(repo), cache.Has), cache.PermissionsFor)
+	svc = users.WithLocaleSource(svc, localeList{"kk", "ru", "en"})
 	uh := users.NewHandler(svc, nil)
 
 	h := router.New(nil, nil, nil, uh, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		"test-secret", cache, db, "test", zerolog.Nop())
 	return h, repo
 }
+
+// localeList is the tenant available_locales stand-in for the router harness.
+type localeList []string
+
+func (l localeList) GetAvailableLocales() []string { return l }
 
 func tokenFor(t *testing.T, sub, role, dept string) string {
 	t.Helper()
@@ -466,3 +490,74 @@ func (r *authzRepo) LastReminderAt(context.Context, string, string) (*time.Time,
 	return nil, nil
 }
 func (r *authzRepo) InsertReminder(context.Context, string, string, string) error { return nil }
+
+// ---- FR-BB116: PATCH /users/me through the real route tree ---------------------
+
+// AC-2/AC-3 end to end: an employee (no users permissions) may set its own locale; the
+// stored value changes and only the caller's record is touched.
+func TestRouterUsersAuthz_PatchMeSetsOwnLocaleForAnyRole(t *testing.T) {
+	h, repo := newUsersRouter(t)
+	before := repo.snapshot(idFar)
+
+	rec := call(h, http.MethodPatch, "/api/v1/users/me", tokenFor(t, idEmp, "employee", authzDeptA), map[string]any{"preferred_locale": "ru"})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var env struct {
+		Data struct {
+			ID              string  `json:"id"`
+			PreferredLocale *string `json:"preferred_locale"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	assert.Equal(t, idEmp, env.Data.ID)
+	require.NotNil(t, env.Data.PreferredLocale)
+	assert.Equal(t, "ru", *env.Data.PreferredLocale)
+	require.NotNil(t, repo.snapshot(idEmp).PreferredLocale)
+	assert.Equal(t, "ru", *repo.snapshot(idEmp).PreferredLocale)
+
+	// A department admin can use the same endpoint on its own record.
+	rec = call(h, http.MethodPatch, "/api/v1/users/me", daToken(t), map[string]any{"preferred_locale": nil})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Nil(t, repo.snapshot(idDeptAdm).PreferredLocale)
+
+	// The other user is untouched.
+	assert.Equal(t, before.PreferredLocale, repo.snapshot(idFar).PreferredLocale)
+}
+
+// AC-2: a code outside the tenant available_locales is refused and nothing is written.
+func TestRouterUsersAuthz_PatchMeRejectsUnavailableLocale(t *testing.T) {
+	h, repo := newUsersRouter(t)
+
+	rec := call(h, http.MethodPatch, "/api/v1/users/me", tokenFor(t, idEmp, "employee", authzDeptA), map[string]any{"preferred_locale": "de"})
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, "VALIDATION_ERROR", errCode(t, rec))
+	assert.Nil(t, repo.snapshot(idEmp).PreferredLocale)
+	assert.Zero(t, repo.writes)
+}
+
+// AC-3: role_id, department_id, email and status cannot ride along on the self-service endpoint.
+// Each attempt is 400 VALIDATION_ERROR and persists nothing, including the locale in the same body.
+func TestRouterUsersAuthz_PatchMeRejectsPrivilegeFields(t *testing.T) {
+	cases := map[string]map[string]any{
+		"role_id escalation":     {"preferred_locale": "ru", "role_id": roleSuperID},
+		"department move":        {"preferred_locale": "ru", "department_id": authzDeptB},
+		"email change":           {"preferred_locale": "ru", "email": "attacker@example.com"},
+		"status change":          {"preferred_locale": "ru", "status": "inactive"},
+		"role_id without locale": {"role_id": roleSuperID},
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			h, repo := newUsersRouter(t)
+			rec := call(h, http.MethodPatch, "/api/v1/users/me", tokenFor(t, idEmp, "employee", authzDeptA), body)
+			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			assert.Equal(t, "VALIDATION_ERROR", errCode(t, rec))
+
+			after := repo.snapshot(idEmp)
+			assert.Equal(t, "employee", after.RoleName)
+			assert.Equal(t, authzDeptA, *after.DepartmentID)
+			assert.Equal(t, idEmp+"@example.com", after.Email)
+			assert.Equal(t, "active", after.Status)
+			assert.Nil(t, after.PreferredLocale)
+			assert.Zero(t, repo.writes)
+		})
+	}
+}

@@ -86,6 +86,8 @@ export function useLogin() {
       return json.data as LoginResponse
     },
     onSuccess: (data) => {
+      // FR-BB116: drop the previous session's cached profile so its preferred_locale is never applied.
+      qc.removeQueries({ queryKey: ['users'] })
       qc.setQueryData(['auth', 'currentUser'], data.user)
       qc.setQueryData(['auth', 'accessToken'], data.access_token)
       clearPasswordChangeRequired(qc) // the login response carries the authoritative flag
@@ -134,6 +136,7 @@ export function useLogout() {
       })
     },
     onSettled: () => {
+      qc.removeQueries({ queryKey: ['users'] }) // FR-BB116: no profile (or locale) outlives the session
       qc.setQueryData(['auth', 'accessToken'], null)
       qc.setQueryData(['auth', 'currentUser'], null)
       clearPasswordChangeRequired(qc)

@@ -68,3 +68,11 @@ describe('PortalLayout narrow-viewport layout (ISS-130)', () => {
     expect(screen.getByRole('combobox')).toHaveClass('w-[104px]', 'sm:w-[120px]')
   })
 })
+
+// FR-BB116 AC-5: the portal navigation exposes a link to the profile page.
+describe('PortalLayout profile link (FR-BB116 AC-5)', () => {
+  it('links to the employee profile page', () => {
+    renderLayout()
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/portal/profile')
+  })
+})

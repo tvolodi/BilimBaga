@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,10 @@ export function TopBar({ user }: TopBarProps) {
       <div />
       <div className="flex items-center gap-3">
         <LocaleSwitcher />
-        <span className="text-sm font-medium text-gray-700">{user.full_name}</span>
+        {/* FR-BB116 AC-5: the name opens the caller's profile page. */}
+        <Link to="/admin/profile" className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:underline">
+          {user.full_name}
+        </Link>
         <RoleBadge role={user.role_name} />
         <Button
           variant="ghost"

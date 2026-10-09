@@ -665,6 +665,24 @@
       }
     }
   },
+  "profile": {
+    "title": "My profile",
+    "nav_link": "Profile",
+    "identity_heading": "Account",
+    "preferences_heading": "Preferences",
+    "security_heading": "Security",
+    "full_name": "Full name",
+    "email": "Email",
+    "department": "Department",
+    "no_department": "No department",
+    "role": "Role",
+    "language": "Language",
+    "language_hint": "Used for the interface and for the emails you receive.",
+    "language_saved": "Language updated.",
+    "language_save_failed": "Could not save your language. The previous language has been restored.",
+    "change_password": "Change password",
+    "load_failed": "Could not load your profile. Please try again later."
+  },
   "portal": {
     "title": "My Exams",
     "empty": {

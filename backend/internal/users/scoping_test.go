@@ -205,3 +205,45 @@ func TestScoping_CustomRoleCannotAssignMorePowerfulRole(t *testing.T) {
 	assert.ErrorIs(t, upd("role-da"), ErrForbidden, "department_admin has reports:read the caller lacks")
 	assert.NoError(t, upd("role-emp"), "employee perms are a subset of the caller's")
 }
+
+// Cycle-2 review: a built-in department_admin must not assign a custom role more
+// powerful than itself, nor change its own role.
+func TestScoping_DepartmentAdminCannotAssignMorePowerfulCustomRole(t *testing.T) {
+	repo := newMockRepo()
+	seedTwoDepts(repo)
+	repo.roles["big_custom"] = "role-big"
+	repo.roleByID["role-big"] = "big_custom"
+	repo.roles["small_custom"] = "role-small"
+	repo.roleByID["role-small"] = "small_custom"
+	perms := map[string][]string{
+		"department_admin": {"users:read", "users:manage"},
+		"big_custom":       {"users:read", "audit:read"},
+		"small_custom":     {"users:read"},
+	}
+	has := func(role, res, act string) bool {
+		for _, p := range perms[role] {
+			if p == res+":"+act {
+				return true
+			}
+		}
+		return false
+	}
+	svc := WithPermissionsLookup(WithPermissionChecker(NewService(repo), has), func(r string) []string { return perms[r] })
+	upd := func(roleID string) error {
+		_, err := svc.UpdateUser(context.Background(), "u1", UpdateRequest{FullName: "X", DepartmentID: strPtr("dept-1"), RoleID: roleID}, "department_admin", "dept-1", "c", "")
+		return err
+	}
+	assert.ErrorIs(t, upd("role-big"), ErrForbidden)
+	assert.NoError(t, upd("role-small"))
+	assert.NoError(t, upd("role-emp"), "built-in targets keep historical behaviour")
+}
+
+func TestScoping_NonSuperAdminCannotChangeOwnRole(t *testing.T) {
+	repo := newMockRepo()
+	repo.users["da1"] = makeUser("da1", "dept-1", "role-da", "department_admin")
+	svc := NewService(repo)
+	_, err := svc.UpdateUser(context.Background(), "da1", UpdateRequest{FullName: "X", DepartmentID: strPtr("dept-1"), RoleID: "role-ex"}, "department_admin", "dept-1", "da1", "")
+	assert.ErrorIs(t, err, ErrForbidden)
+	_, err = svc.UpdateUser(context.Background(), "da1", UpdateRequest{FullName: "Y", DepartmentID: strPtr("dept-1"), RoleID: "role-da"}, "department_admin", "dept-1", "da1", "")
+	assert.NoError(t, err, "same-role self update is fine")
+}

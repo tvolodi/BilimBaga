@@ -208,6 +208,10 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
 		return nil, ErrForbidden
 	}
+	// A non-super_admin caller may not change its own role (self-escalation).
+	if !isOrgWide(callerRole) && id == callerUserID && req.RoleID != existing.RoleID {
+		return nil, ErrForbidden
+	}
 	// A scoped caller may not move a user out of its own department.
 	if !isOrgWide(callerRole) && !inCallerScope(callerRole, callerDeptID, req.DepartmentID) {
 		return nil, ErrForbidden
@@ -438,10 +442,11 @@ func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole st
 	if roleName == "super_admin" {
 		return ErrForbidden
 	}
-	// Privilege-escalation guard for admin-created (custom) caller roles: the target
-	// role's permissions must be a subset of the caller's own. Built-in callers keep
-	// their historical behaviour. Without a lookup (tests) the check is skipped.
-	if s.permsFor != nil && !builtinRoles[callerRole] {
+	// Privilege-escalation guard: the permissions of an admin-created (custom) target
+	// role, or any target assigned by a custom caller role, must be a subset of the
+	// caller's own. Built-in targets assigned by built-in callers keep their historical
+	// behaviour. Without a lookup (tests) the check is skipped.
+	if s.permsFor != nil && (!builtinRoles[callerRole] || !builtinRoles[roleName]) {
 		for _, p := range s.permsFor(roleName) {
 			res, act, _ := strings.Cut(p, ":")
 			if s.canPerm == nil || !s.canPerm(callerRole, res, act) {

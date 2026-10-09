@@ -35,3 +35,29 @@ Summary: the role CRUD, migration and users scoping are solid. The exam-assignme
 - Finding 3: fixed. CSV import now resolves the role id and reuses `checkRoleAssignment`.
 - Finding 4: underlying reload error now preserved (`%w`); no-audit-on-reload-failure kept per AC-7/AC-8.
 - Findings 5-8: accepted as minor (5 benign under single super_admin use; 6 documented in the FR doc; 7 super_admin-only; 8 built-in fallback kept).
+
+## Cycle 2
+
+Commit reviewed: ce421be (+ reviewer fix). Migration number 034 is still free: origin/main tops out at 033, no other migration landed. `go build`, `go vet` and `go test -p 1 ./...` are green.
+
+Cycle-1 verification:
+- Finding 1 (exam assignee scoping): resolved. Scoped callers (everything except super_admin and examiner) are checked for `user` assignees via `UserDepartmentID`, and empty caller department is rejected, on both create and delete. Test present in exams/scoping_test.go.
+- Finding 2 (role-assignment escalation): only partially resolved. The subset rule applied to custom-role callers only, so a built-in department_admin could still assign any custom role (for example one holding audit:read), including to itself, and could change its own role. FR-BB18 AC-6 also limits department_admin to department_admin/employee targets. **Reopened as a major (High) finding and fixed in this cycle** (see below).
+- Finding 3 (CSV role check): resolved; import reuses `checkRoleAssignment`.
+- Finding 4 (reload error): resolved (`%w` chain preserved). Findings 5-8 accepted as minor.
+
+Fresh review results:
+- (a) Privilege escalation: `roles:read`, `roles:manage` and `tenant:manage` are blocked on create and update. System roles are immutable (service and SQL). Role name is immutable. Fixed this cycle: custom targets now require a subset of the caller's permissions for every non-super_admin caller, and a non-super_admin cannot change its own role.
+- (b) Default-deny: the only remaining role-name branch outside users is `assignsOrgWide` in exams (super_admin and examiner, which keeps the previous examiner behaviour; custom roles are scoped). Users scoping is default-deny. No contradiction with requirement docs found; built-in dept_admin to examiner assignment is kept (historical behaviour) although FR-BB18 AC-6 says dept_admin/employee only (minor, pre-existing).
+- (c) Migration 034 up is idempotent; down guards against custom-role users, then removes roles, permissions and columns. is_system flags and super_admin-only seed are correct.
+- (d) Cache reload follows every committed mutation; on failure the endpoint returns 500 and writes no audit entry (accepted, minor).
+- (e) Path param is `{id}`, covered by `UUIDPathParamNames`; router test passes.
+- (f) Envelope and codes consistent (400 INVALID_BODY, 422 VALIDATION_ERROR, 409 codes, 204 on delete).
+- (g) Tests cover the above; new tests added for department_admin custom-role assignment and self-role change.
+
+Findings:
+- [High, fixed] users/service.go checkRoleAssignment, UpdateUser: built-in department_admin could assign any custom role and change its own role. Fix: subset rule for all non-super_admin callers when the target is custom (or the caller is custom); block self role change for non-super_admin. Tests added in users/scoping_test.go.
+- [Minor] No audit entry when cache reload fails after a committed change.
+- [Minor] department_admin may assign examiner, contrary to FR-BB18 AC-6.
+
+VERDICT: PASS (after the fix above)

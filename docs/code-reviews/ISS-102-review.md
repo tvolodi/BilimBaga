@@ -42,3 +42,14 @@ Specs are well aligned with components and locales and not flaky by construction
 - Medium: tab-switch helper falls back to creating a session via API; ID renumbered ISS-102 -> ISS-102 (016 was taken); README index row added.
 - Low: locale/password specs use an empty storageState for unauthenticated contexts.
 - Remaining accepted: AC6 375px overflow test unverified (may expose a real layout issue; UAT to confirm); real tab_switch test depends on seed `warn` policy only for the `warn` boolean type.
+
+## Cycle 2 (re-review after fixes)
+
+Result: PASS
+
+- High resolved: `generateQuestions` in `frontend/src/api/ai.ts` now sends `Authorization: Bearer <token>` using the same `['auth','accessToken']` query-cache read as `download.ts`, `analytics.ts`, `audit.ts` and `useAIInsights`. ai-assist.spec asserts `^Bearer ` on the wire. Added unit test `frontend/src/api/ai.test.tsx` (2 tests: header present with token, absent without) - passes.
+- Medium resolved: tab-switch helper no longer skips on a "View result" card; it creates a session via `POST /portal/exams/:id/sessions` (token key `__e2e_access_token__` is the one used by the other specs). `test.skip` remains only if the API refuses (attempts exhausted/exam missing), which is acceptable.
+- Low resolved: unauthenticated contexts use an explicit empty storageState.
+- Flakiness: no `waitForTimeout` in the new specs; selectors were verified against components in cycle 1. Remote host: no `bilimbaga-test.ai-dala.com` reference in the specs or live config (relative URLs / baseURL only). `test.fixme` is limited to the certificate round-trip and the whole of password-reset (routes absent on main, issue #33), both documented.
+- Numbering: ISS-016 is already taken on origin/main (ISS-016-save-button-archives-active-question.md), so the report stays ISS-102 (free on main; README row present).
+- Static: `npx tsc --noEmit` and `npm run lint` clean. Nothing run live. Accepted residual: AC6 375 px overflow test unverified.

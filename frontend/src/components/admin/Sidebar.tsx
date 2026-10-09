@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTenantConfig } from '@/api/useTenantConfig'
 import {
   LayoutDashboard,
@@ -17,13 +18,24 @@ import {
   ScrollText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AUDIT_READ_ROLES, REPORTS_READ_ROLES, jwtRole } from '@/lib/routeRoles'
 
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
 }
 
-const NAV_ITEMS = [
+interface NavItem {
+  key: string
+  icon: typeof Users
+  path: string
+  labelKey: string
+  end: boolean
+  /** When set, the link is shown only to these roles (mirrors the route guards). */
+  roles?: string[]
+}
+
+const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', icon: LayoutDashboard, path: '/admin', labelKey: 'nav.dashboard', end: true },
   { key: 'users', icon: Users, path: '/admin/users', labelKey: 'nav.users', end: false },
   { key: 'departments', icon: Building2, path: '/admin/departments', labelKey: 'nav.departments', end: false },
@@ -32,14 +44,17 @@ const NAV_ITEMS = [
   { key: 'tags', icon: Hash, path: '/admin/tags', labelKey: 'nav.tags', end: false },
   { key: 'exams', icon: ClipboardList, path: '/admin/exams', labelKey: 'nav.exams', end: false },
   { key: 'grading', icon: ClipboardCheck, path: '/admin/grading', labelKey: 'grading.nav', end: false },
-  { key: 'reports', icon: BarChart2, path: '/admin/reports', labelKey: 'nav.reports', end: false },
-  { key: 'audit', icon: ScrollText, path: '/admin/audit', labelKey: 'nav.audit', end: false },
+  { key: 'reports', icon: BarChart2, path: '/admin/reports', labelKey: 'nav.reports', end: false, roles: REPORTS_READ_ROLES },
+  { key: 'audit', icon: ScrollText, path: '/admin/audit', labelKey: 'nav.audit', end: false, roles: AUDIT_READ_ROLES },
   { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false },
 ]
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { t } = useTranslation()
   const { data: tenantConfig } = useTenantConfig()
+  const qc = useQueryClient()
+  const role = jwtRole(qc.getQueryData<string | null>(['auth', 'accessToken']))
+  const visibleItems = NAV_ITEMS.filter((item) => !item.roles || (role !== undefined && item.roles.includes(role)))
 
   return (
     <aside
@@ -64,7 +79,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Nav items */}
       <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-2">
-        {NAV_ITEMS.map(({ key, icon: Icon, path, labelKey, end }) => (
+        {visibleItems.map(({ key, icon: Icon, path, labelKey, end }) => (
           <NavLink
             key={key}
             to={path}

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/i18n'
 import { Sidebar } from './Sidebar'
 
@@ -11,12 +12,21 @@ vi.mock('@/api/useTenantConfig', () => ({
 
 import { useTenantConfig } from '@/api/useTenantConfig'
 
-function renderSidebar(collapsed = false) {
+function tokenFor(role: string): string {
+  const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=/g, '')
+  return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: 'u', role, exp: 9999999999 })}.sig`
+}
+
+function renderSidebar(collapsed = false, role = 'super_admin') {
   const onToggle = vi.fn()
+  const qc = new QueryClient()
+  qc.setQueryData(['auth', 'accessToken'], tokenFor(role))
   render(
-    <MemoryRouter>
-      <Sidebar collapsed={collapsed} onToggle={onToggle} />
-    </MemoryRouter>,
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <Sidebar collapsed={collapsed} onToggle={onToggle} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
   return { onToggle }
 }
@@ -78,5 +88,18 @@ describe('Sidebar', () => {
 
     renderSidebar(false)
     expect(screen.getByText('BilimBaga')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['super_admin', true, true],
+    ['department_admin', false, true],
+    ['examiner', false, true],
+    ['employee', false, false],
+  ])('role %s: audit link=%s, reports link=%s', (role, audit, reports) => {
+    renderSidebar(false, role)
+    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'))
+    expect(hrefs.includes('/admin/audit')).toBe(audit)
+    expect(hrefs.includes('/admin/reports')).toBe(reports)
+    expect(hrefs).toContain('/admin/users')
   })
 })

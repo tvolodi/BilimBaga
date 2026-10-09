@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { findPartialLocales } from './partialLocales'
 import {
   useQuestion,
   useCreateQuestion,
@@ -576,9 +577,20 @@ export function QuestionEditorPage() {
     }
   }, [question])
 
+  function partialLocaleLabel(f: FormState, defaultLocale: string): string | null {
+    const bad = findPartialLocales(
+      LOCALES,
+      defaultLocale,
+      f.translations,
+      f.answer_options.map((o) => o.translations),
+    )
+    return f.type !== 'shorttext' && bad.length > 0 ? bad.map((l) => l.toUpperCase()).join(', ') : null
+  }
+
   // Auto-save logic (edit mode only)
   const doAutoSave = useCallback(async () => {
     if (!id || !dirtyRef.current) return
+    if (partialLocaleLabel(form, question?.default_locale ?? 'en')) return
     setAutoSaveStatus('saving')
     try {
       const updated = await updateQuestion.mutateAsync({ id, payload: buildUpdatePayload(form) })
@@ -750,6 +762,11 @@ export function QuestionEditorPage() {
 
   async function handleSaveDraft() {
     if (isEditMode && id) {
+      const partial = partialLocaleLabel(form, question?.default_locale ?? 'en')
+      if (partial) {
+        setNotification({ type: 'error', message: t('questionEditor.error.partialLocale', { locales: partial }) })
+        return
+      }
       if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
       setAutoSaveStatus('saving')
       try {
@@ -776,6 +793,11 @@ export function QuestionEditorPage() {
       form.translations[activeLocale]?.stem?.trim()
         ? activeLocale
         : (LOCALES.find((l) => form.translations[l]?.stem?.trim()) ?? activeLocale)
+    const partialCreate = partialLocaleLabel(form, defaultLocale)
+    if (partialCreate) {
+      setNotification({ type: 'error', message: t('questionEditor.error.partialLocale', { locales: partialCreate }) })
+      return
+    }
     try {
       const createTranslations: Record<string, { stem: string; explanation?: string }> = {}
       for (const loc of LOCALES) {

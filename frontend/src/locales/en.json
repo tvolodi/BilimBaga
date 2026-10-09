@@ -497,6 +497,7 @@
     },
     "error": {
       "saveFailed": "Save failed. Please try again.",
+      "partialLocale": "Translation incomplete for {{locales}}: fill every answer option or clear the stem in that language.",
       "statusTransitionFailed": "Status transition failed."
     }
   },

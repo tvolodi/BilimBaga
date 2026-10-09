@@ -58,7 +58,7 @@ func mixedExportRows() []*ExportRow {
 			Translations: map[string]TranslationDetail{"en": stem("Bilingual"), "kk": stem("Eki tilde")},
 			AnswerOptions: []AnswerOptionDetail{
 				{SortOrder: 1, IsCorrect: true, Translations: at(map[string]string{"en": "A", "kk": "A-kk"})},
-				{SortOrder: 2, Translations: at(map[string]string{"en": "B"})}}, Tags: []string{}},
+				{SortOrder: 2, Translations: at(map[string]string{"en": "B", "kk": "B-kk"})}}, Tags: []string{}},
 	}
 }
 
@@ -138,4 +138,20 @@ func TestImportDryRun_ExtraNonEmptyCellIsRowError(t *testing.T) {
 	assert.Equal(t, 3, report.ErrorRows[0].Row)
 	assert.Contains(t, strings.Join(report.ErrorRows[0].Errors, " "), "unexpected value in column 10")
 	assert.Equal(t, 1, report.ValidCount)
+}
+
+// ISS-268 / FR-BB24 AC-11: an exported legacy row that is only partially
+// translated (kk stem + one kk option, other option blank) is not silently
+// accepted on re-import; it is reported as a row error naming the option index.
+func TestExport_PartialLocaleRow_ReimportReportsRowError(t *testing.T) {
+	rows := mixedExportRows()[:1]
+	rows[0].Translations["kk"] = TranslationDetail{Stem: "Zhai soz"}
+	rows[0].AnswerOptions[0].Translations["kk"] = AnswerTranslationDetail{Text: "Ia"}
+
+	code, report, raw := importDryRun(t, exportCSVBytes(t, rows))
+	require.Equal(t, http.StatusOK, code, raw)
+	require.NotNil(t, report)
+	assert.Equal(t, 0, report.ValidCount, raw)
+	require.Len(t, report.ErrorRows, 1, raw)
+	assert.Contains(t, strings.Join(report.ErrorRows[0].Errors, ";"), "answer_options[1].translations.kk.text")
 }

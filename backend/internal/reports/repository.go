@@ -79,6 +79,9 @@ type Repository interface {
 	GetUserRequiredExams(ctx context.Context, userID string) ([]ExamProgress, error)
 
 	// ── FR-BB54: Export API ───────────────────────────────────────────────────
+	// NOTE (ISS-75): the schema is single-tenant (no tenant column on exams /
+	// exam_sessions). The tenantID parameters below are accepted for API
+	// stability but are NOT used in SQL; do not add tenant predicates.
 
 	// GetExamQuestions returns the ordered list of unique questions for sessions
 	// of an exam, used to build the dynamic CSV header (AC-3).
@@ -177,7 +180,7 @@ SELECT
                                                                                  AS completed_count,
     COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)               AS passed_count
 FROM exams e
-JOIN resolved_assignments ra ON ra.exam_id = e.id
+LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id
 LEFT JOIN exam_sessions es ON es.exam_id = e.id AND es.user_id = ra.user_id
 WHERE e.status = 'active'
 GROUP BY e.id, e.title
@@ -750,13 +753,12 @@ SELECT
 FROM session_questions sq
 JOIN exam_sessions es ON es.id = sq.session_id
 WHERE es.exam_id = $1
-  AND es.tenant_id = $2
   AND es.status IN ('submitted', 'grading_pending')
 GROUP BY sq.question_id
 ORDER BY position`
 
 	var result []ExamQuestion
-	if err := r.db.SelectContext(ctx, &result, q, examID, tenantID); err != nil {
+	if err := r.db.SelectContext(ctx, &result, q, examID); err != nil {
 		return nil, fmt.Errorf("reports: GetExamQuestions: %w", err)
 	}
 	return result, nil
@@ -780,11 +782,10 @@ FROM exam_sessions es
 JOIN users u ON u.id = es.user_id
 LEFT JOIN departments d ON d.id = u.department_id
 WHERE es.exam_id = $1
-  AND es.tenant_id = $2
   AND es.status IN ('submitted', 'grading_pending')
 ORDER BY es.started_at`
 
-	rows, err := r.db.QueryxContext(ctx, q, examID, tenantID)
+	rows, err := r.db.QueryxContext(ctx, q, examID)
 	if err != nil {
 		return nil, fmt.Errorf("reports: StreamExamResultSessions: %w", err)
 	}
@@ -835,11 +836,10 @@ SELECT
 FROM exam_sessions es
 JOIN exams e ON e.id = es.exam_id
 WHERE es.user_id = $1
-  AND es.tenant_id = $2
   AND es.status != 'in_progress'
 ORDER BY es.started_at DESC`
 
-	rows, err := r.db.QueryxContext(ctx, q, userID, tenantID)
+	rows, err := r.db.QueryxContext(ctx, q, userID)
 	if err != nil {
 		return nil, fmt.Errorf("reports: StreamUserRecordSessions: %w", err)
 	}
@@ -880,17 +880,16 @@ SELECT
                                                                                  AS completed_count,
   COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)                 AS passed_count
 FROM exams e
-JOIN resolved_assignments ra ON ra.exam_id = e.id
+LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id
 LEFT JOIN exam_sessions es
   ON es.exam_id = e.id
   AND es.user_id = ra.user_id
-  AND es.submitted_at BETWEEN $2 AND $3
-WHERE e.tenant_id = $1
-  AND e.status = 'active'
+  AND es.submitted_at BETWEEN $1 AND $2
+WHERE e.status = 'active'
 GROUP BY e.id, e.title
 ORDER BY e.title`
 
-	rows, err := r.db.QueryxContext(ctx, q, tenantID, from, to)
+	rows, err := r.db.QueryxContext(ctx, q, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetDashboardCompletionRatesForRange: %w", err)
 	}
@@ -940,9 +939,8 @@ WITH question_rates AS (
   JOIN session_question_scores sqs ON sqs.session_id = es.id
   JOIN questions q                  ON q.id = sqs.question_id
   JOIN question_translations qt     ON qt.question_id = q.id AND qt.locale = q.default_locale
-  WHERE es.tenant_id = $1
-    AND es.status IN ('submitted', 'grading_pending')
-    AND es.submitted_at BETWEEN $2 AND $3
+  WHERE es.status IN ('submitted', 'grading_pending')
+    AND es.submitted_at BETWEEN $1 AND $2
   GROUP BY q.id, qt.stem
 ),
 ranked AS (
@@ -963,7 +961,7 @@ ORDER BY bucket DESC, correct_rate DESC`
 		Bucket      string   `db:"bucket"`
 	}
 
-	rows, err := r.db.QueryxContext(ctx, q, tenantID, from, to)
+	rows, err := r.db.QueryxContext(ctx, q, from, to)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reports: GetTopBottomQuestions: %w", err)
 	}

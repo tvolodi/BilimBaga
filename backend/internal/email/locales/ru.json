@@ -21,5 +21,8 @@
 
   "email.password_reset_link.subject":   "Сброс пароля — BilimBaga",
   "email.password_reset_link.body_text": "Здравствуйте,\n\nМы получили запрос на сброс пароля BilimBaga. Откройте ссылку ниже, чтобы задать новый пароль. Ссылка действует 60 минут и может быть использована один раз.\n\n{{.ResetLink}}\n\nЕсли вы не запрашивали сброс, просто проигнорируйте это письмо.\n\nС уважением,\nBilimBaga",
-  "email.password_reset_link.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Мы получили запрос на сброс пароля BilimBaga. Ссылка действует 60 минут и может быть использована один раз.</p><p><a href=\"{{.ResetLink}}\">Сбросить пароль</a></p><p>Если вы не запрашивали сброс, просто проигнорируйте это письмо.</p><p>С уважением,<br>BilimBaga</p></body></html>"
+  "email.password_reset_link.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Мы получили запрос на сброс пароля BilimBaga. Ссылка действует 60 минут и может быть использована один раз.</p><p><a href=\"{{.ResetLink}}\">Сбросить пароль</a></p><p>Если вы не запрашивали сброс, просто проигнорируйте это письмо.</p><p>С уважением,<br>BilimBaga</p></body></html>",
+  "email.overdue_reminder.subject": "Просрочено: пройдите экзамен «{{.ExamTitle}}»",
+  "email.overdue_reminder.body_text": "Здравствуйте,\n\nСрок сдачи экзамена «{{.ExamTitle}}» истёк: {{.Deadline}}.\n\nПожалуйста, пройдите его как можно скорее: {{.PortalLink}}\n\nС уважением,\nBilimBaga",
+  "email.overdue_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Срок сдачи экзамена <strong>{{.ExamTitle}}</strong> истёк.</p><p><strong>Срок выполнения:</strong> {{.Deadline}}</p><p><a href=\"{{.PortalLink}}\">Открыть экзамен</a></p><p>С уважением,<br>BilimBaga</p></body></html>"
 }

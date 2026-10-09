@@ -497,6 +497,7 @@
     },
     "error": {
       "saveFailed": "Save failed. Please try again.",
+      "partialLocale": "Translation incomplete for {{locales}}: fill every answer option or clear the stem in that language.",
       "statusTransitionFailed": "Status transition failed."
     }
   },
@@ -794,6 +795,9 @@
     "send_reminder": "Send Reminder",
     "reminder_sent": "Reminder sent successfully.",
     "reminder_error": "Failed to send reminder.",
+    "reminder_rate_limited": "Too many reminders: this employee was already reminded in the last 24 hours.",
+    "reminder_not_overdue": "This employee has no pending overdue assignment for this exam.",
+    "reminder_already_sent": "Reminder sent",
     "activity_title": "Recent Activity",
     "activity_empty": "No recent activity.",
     "refresh": "Refresh"

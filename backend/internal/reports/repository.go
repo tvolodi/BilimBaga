@@ -233,6 +233,7 @@ ORDER BY e.title`, "ra.user_id", "$1")
 type overdueRow struct {
 	UserID    string    `db:"user_id"`
 	Name      string    `db:"name"`
+	ExamID    string    `db:"exam_id"`
 	ExamTitle string    `db:"exam_title"`
 	Deadline  time.Time `db:"deadline"`
 }
@@ -275,6 +276,7 @@ resolved_assignments AS (
 SELECT DISTINCT ON (ra.user_id, ra.exam_id)
     u.id                 AS user_id,
     u.full_name          AS name,
+    ra.exam_id           AS exam_id,
     e.title              AS exam_title,
     ra.deadline
 FROM resolved_assignments ra
@@ -307,6 +309,7 @@ LIMIT 20`, "ra.user_id", "$1")
 		result = append(result, &OverdueEmployee{
 			UserID:    row.UserID,
 			Name:      row.Name,
+			ExamID:    row.ExamID,
 			ExamTitle: row.ExamTitle,
 			Deadline:  row.Deadline,
 		})

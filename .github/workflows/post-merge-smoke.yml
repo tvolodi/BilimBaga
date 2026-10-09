@@ -1,0 +1,44 @@
+name: post-merge-smoke
+
+# retro-003: after every merge to main, prove main still builds (backend, frontend, docker images).
+# Offline: no secrets, nothing is pushed or deployed.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Backend build
+        working-directory: backend
+        run: go build ./...
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Docker images
+        run: |
+          docker build -t bilimbaga-frontend:smoke ./frontend
+          docker build -t bilimbaga-api:smoke ./backend
+          docker build -f deploy/Dockerfile -t bilimbaga-deploy:smoke .

@@ -34,7 +34,7 @@ foreach ($r in $Roles) {
   $sf  = Join-Path $PSScriptRoot "roles\$($settings[$r]).settings.json"
   # a launcher started from inside a Claude session leaks its session env; a child would not register for messaging
   $clean = "Get-ChildItem Env: | Where-Object { `$_.Name -match '^(CLAUDECODE|CLAUDE_PID|CLAUDE_CODE_(CHILD_SESSION|MESSAGING_.*|SESSION_.*|ENTRYPOINT))`$' } | ForEach-Object { Remove-Item (`"Env:`" + `$_.Name) }; "
-  $cmd = $clean + "claude -n $($d.name) --permission-mode $Mode --settings '$sf' '$($d.prompt -replace "'","''")'"
+  $cmd = $clean + "claude -n $($d.name) --permission-mode $Mode $(if (Test-Path $sf) { "--settings '$sf'" }) '$($d.prompt -replace "'","''")'"
   $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
   if ($haveWt) {
     if ($wtArgs.Count) { $wtArgs += ';' }

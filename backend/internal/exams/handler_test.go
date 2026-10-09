@@ -514,6 +514,21 @@ func TestCreateRule_InvalidTagIDs_Returns422(t *testing.T) {
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 }
 
+// #288: an unknown question_id answers 422 ERR_VALIDATION on the questions field, never 500.
+func TestCreateRule_UnknownQuestion_Returns422(t *testing.T) {
+	h := newHandler(&mockSvc{
+		createRuleFn: func(_ context.Context, _ string, _ QuestionRuleInput) (*ExamQuestionRule, error) {
+			return nil, ErrQuestionNotFound
+		},
+	})
+	body := `{"mode":"manual","count":1,"sort_order":2,"questions":[{"question_id":"00000000-0000-4000-8000-0000000000aa","sort_order":1}]}`
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/rules", strings.NewReader(body)), "id", "exam-1")
+	h.CreateRule(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Equal(t, "ERR_VALIDATION", decode(t, w).Error.Code)
+}
+
 // ── DeleteRule ────────────────────────────────────────────────────────────────
 
 func TestDeleteRule_Success_Returns204(t *testing.T) {

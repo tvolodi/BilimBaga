@@ -25,6 +25,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $env:GIT_TERMINAL_PROMPT = '0'   # never wait for a credential prompt
+$env:GCM_INTERACTIVE = 'never'
+Remove-Item Env:GIT_ASKPASS, Env:SSH_ASKPASS -WhatIf:$false -ErrorAction SilentlyContinue
+$gitSafe = @('-c', 'core.hooksPath=NUL', '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', '-c', 'core.autocrlf=false', '-c', 'credential.interactive=never')
 . (Join-Path $PSScriptRoot 'lib.ps1')
 $roster   = Get-Roster
 $stateDir = Get-StateDir $roster
@@ -104,12 +107,17 @@ try {
   New-Item -ItemType Directory -Path $tmp | Out-Null
   $ErrorActionPreference = 'Continue'   # git writes progress to stderr; exit codes are checked explicitly
   try {
-    function G { & git -C $tmp -c user.name='swarm-backup' -c user.email='swarm-backup@users.noreply.github.com' -c core.autocrlf=false @args 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) { throw "git $($args[0]) failed" } }
+    function G { & git -C $tmp -c user.name='swarm-backup' -c user.email='swarm-backup@users.noreply.github.com' @gitSafe @args 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) { throw "git $($args[0]) failed" } }
     G init -q
     G remote add origin $remote
-    & git -C $tmp fetch -q --depth 1 origin swarm-state 2>&1 | Out-Null
+    & git -C $tmp @gitSafe fetch -q --depth 1 origin swarm-state 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) { G checkout -q -B swarm-state FETCH_HEAD } else { G checkout -q --orphan swarm-state }
-    Set-Content -LiteralPath (Join-Path $tmp 'swarm-snapshot.txt') -Value $snap -Encoding UTF8
+    $snapFile = Join-Path $tmp 'swarm-snapshot.txt'
+    if (Test-Path -LiteralPath $snapFile) {   # unchanged apart from the timestamp line: no commit, no push
+      $body = { param($t) (($t -replace "`r", '') -split "`n" | Select-Object -Skip 1 | ForEach-Object { $_.TrimEnd() }) -join "`n" }
+      if ((& $body (Get-Content -Raw -LiteralPath $snapFile)).Trim() -eq (& $body $snap).Trim()) { Write-Host 'snapshot unchanged, not pushing'; exit 0 }
+    }
+    Set-Content -LiteralPath $snapFile -Value $snap -Encoding UTF8
     G add swarm-snapshot.txt
     G commit -q -m "swarm snapshot $($NowUtc.ToString('yyyy-MM-ddTHH:mm:ssZ'))"
     G push -q origin swarm-state            # plain push, never forced

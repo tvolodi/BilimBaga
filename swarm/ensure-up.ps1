@@ -52,21 +52,21 @@ function Get-HeartbeatAgeMin {
   ($NowUtc - $t).TotalMinutes
 }
 
-# Hourly state backup (backup-state.ps1 throttles itself); never fails or delays the liveness check, skipped for dry runs/stubs.
+# Hourly state backup: runs AFTER the mutex is released, in a child process with a 120 s hard timeout
+# (tree-killed), so a hung git/gh call can never block later watchdog runs. Marker-throttled to once per hour
+# even when it times out. Never fails or delays the liveness check; skipped for dry runs/stubs.
 function Invoke-Backup {
   if ($WhatIfPreference -or $AgentsJsonFile) { Write-Host 'backup: skipped (dry run)'; return }
-  # bounded: a hung git/network call must never hold the mutex and block later watchdog runs
-  try {
-    $p = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'backup-state.ps1'), '-MinIntervalMin', '60') -NoNewWindow -PassThru
-    if (-not $p.WaitForExit(120000)) { Write-Warning 'backup timed out after 120 s, killing it'; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
-  } catch { Write-Warning "backup failed: $_" }
+  [void](Invoke-BoundedBackup (Join-Path $PSScriptRoot 'backup-state.ps1') @('-MinIntervalMin', '60') (Join-Path $stateDir 'backup.last.json') $NowUtc 120 60)
 }
 
 # one run at a time (the task fires every 5 min; launching tabs can take a while)
 $mutex = New-Object System.Threading.Mutex($false, 'Global\bilimbaga-swarm-ensure-up')
 if (-not $mutex.WaitOne(0)) { Write-Host 'another ensure-up run is active, exiting'; exit 0 }
+$liveFailed = $false
 try {
-  try { $live = Get-RecognisedLiveAgents $AgentsJsonFile } catch { Write-Warning "cannot get a recognised live-session list, doing nothing (no relaunch, no stop): $_"; Invoke-Backup; exit 1 }
+  try { $live = Get-RecognisedLiveAgents $AgentsJsonFile } catch { Write-Warning "cannot get a recognised live-session list, doing nothing (no relaunch, no stop): $_"; $liveFailed = $true }
+  if (-not $liveFailed) {
   if (-not $WhatIfPreference) { Update-SessionsFromLive $roster $live $stateDir }
   $script:sessions = Read-Sessions $stateDir
   $script:haveWt = [bool](Get-Command wt.exe -ErrorAction SilentlyContinue)
@@ -121,5 +121,7 @@ try {
       if ($PSCmdlet.ShouldProcess($nudgeFile, 'remove')) { Remove-Item -LiteralPath $nudgeFile -Force }
     }
   }
-  Invoke-Backup
+  }
 } finally { $mutex.ReleaseMutex(); $mutex.Dispose() }
+Invoke-Backup   # mutex released: a slow backup cannot block the next run
+if ($liveFailed) { exit 1 }

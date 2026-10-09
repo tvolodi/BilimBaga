@@ -59,6 +59,7 @@ Check 'foreign files and near-miss names untouched' ((Test-Path (Join-Path $root
 $o = Run 'backup-state.ps1' @('-NoPush', '-BackupRoot', $root, '-MinIntervalMin', '60', '-NowUtc', ([datetime]::UtcNow.ToString('o')))
 Check 'min-interval skips a recent backup' ($o -match 'skipping')
 
+$queue2 = Json 'queue2.json' @(@{ number = 9; title = 'new issue'; labels = @(@{ name = 'swarm' }, @{ name = 'status:ready' }) })
 # --- snapshot push to a temp bare repo; failure does not fail the backup ---
 $bare = Join-Path $tmp 'remote.git'
 & git init -q --bare $bare 2>&1 | Out-Null
@@ -69,10 +70,41 @@ Check 'snapshot pushed to branch swarm-state' ($txt -match 'status:ready = 2' -a
 Check 'pushed snapshot has no secrets' (($txt -notmatch 'ghp_abcdef') -and ($txt -notmatch 'hunter2') -and ($txt -notmatch 'session_id'))
 $files = (& git -C $bare ls-tree -r --name-only swarm-state 2>&1 | Out-String).Trim()
 Check 'branch holds only the snapshot file' ($files -eq 'swarm-snapshot.txt')
-$o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', $bare, '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T13:00:00Z')
+$o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', $bare, '-QueueJsonFile', $queue2, '-NowUtc', '2026-10-09T13:00:00Z')
 Check 'second push is a fast-forward (2 commits)' ((& git -C $bare rev-list --count swarm-state) -eq '2')
 $o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', (Join-Path $tmp 'no-such.git'), '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T14:00:00Z')
 Check 'failed push only warns, backup still made' (($o -match 'snapshot push skipped') -and (Test-Path (Join-Path $root2 '20261009-140000\roster.json')) -and ($LASTEXITCODE -eq 0))
+
+# --- unchanged snapshot is skipped (only the timestamp differs) ---
+$o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', $bare, '-QueueJsonFile', $queue2, '-NowUtc', '2026-10-09T15:00:00Z')
+Check 'unchanged snapshot is not pushed' (($o -match 'snapshot unchanged') -and ((& git -C $bare rev-list --count swarm-state) -eq '2'))
+$o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', $bare, '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T16:00:00Z')
+Check 'changed snapshot is pushed' ((& git -C $bare rev-list --count swarm-state) -eq '3')
+
+# --- hang simulation: a stubbed slow git on PATH must be killed by the bounded runner ---
+. (Join-Path $swarm 'lib.ps1')
+$stub = Join-Path $tmp 'stubbin'
+New-Item -ItemType Directory -Path $stub | Out-Null
+Set-Content (Join-Path $stub 'git.cmd') "@echo off`r`nping -n 120 127.0.0.1 >nul"
+$oldPath = $env:PATH
+$env:PATH = "$stub;$oldPath"
+$marker = Join-Path $tmp 'state\backup.last.json'
+$now = [datetime]::UtcNow
+$sw = [Diagnostics.Stopwatch]::StartNew()
+$r = Invoke-BoundedBackup (Join-Path $swarm 'backup-state.ps1') @('-BackupRoot', (Join-Path $tmp 'backups3'), '-PushRemote', $bare, '-QueueJsonFile', $queue2) $marker $now 8 60 3>$null
+$sw.Stop()
+$env:PATH = $oldPath
+Check 'hung git: runner reports timeout' ($r -eq 'timeout')
+Check 'hung git: returned promptly (watchdog proceeds)' ($sw.Elapsed.TotalSeconds -lt 60)
+Start-Sleep -Seconds 1
+$left = @(Get-CimInstance Win32_Process -Filter "Name='PING.EXE'" | Where-Object { $_.CommandLine -match '-n 120 127.0.0.1' })
+Check 'hung git: child processes were killed' ($left.Count -eq 0)
+$left | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Check 'timed-out backup wrote the throttle marker' (Test-Path $marker)
+$r2 = Invoke-BoundedBackup (Join-Path $swarm 'backup-state.ps1') @('-NoPush') $marker $now.AddMinutes(5) 8 60
+Check 'no retry within the hour after a timeout' ($r2 -eq 'throttled')
+$r3 = Invoke-BoundedBackup (Join-Path $swarm 'backup-state.ps1') @('-WhatIf', '-NoPush', '-BackupRoot', (Join-Path $tmp 'backups4')) $marker $now.AddMinutes(61) 60 60
+Check 'retry allowed after the hour' ($r3 -eq 'ok')
 
 # --- status.ps1 ---
 $agents = Json 'agents.json' @(@{ name = 'bb-dev1'; pid = 1; status = 'busy' }, @{ name = 'bb-supervisor'; pid = 2 })

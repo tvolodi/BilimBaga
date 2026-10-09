@@ -201,3 +201,30 @@ function Get-Checkpoint([string]$StateDir, [string]$Key, [datetime]$NowUtc) {
   try { $age = ($NowUtc.ToUniversalTime() - ([datetime]$j.last_tick_utc).ToUniversalTime()).TotalMinutes } catch {}
   [pscustomobject]@{ unreadable = $false; status = $j.status; issue = $j.issue; branch = $j.branch; step = $j.step; next_action = $j.next_action; blockers = $j.blockers; age_min = $age }
 }
+
+
+# Run a backup script as a child process with a hard timeout (the whole process tree is killed on timeout).
+# The throttle marker is written BEFORE the child starts, so a hung or timed-out backup is retried at most
+# once per IntervalMin instead of on every 5-minute watchdog run. Never throws. Returns ok|failed|timeout|throttled.
+function Invoke-BoundedBackup([string]$Script, [string[]]$ScriptArgs, [string]$MarkerFile, [datetime]$NowUtc, [int]$TimeoutSec = 120, [int]$IntervalMin = 60) {
+  try {
+    if (Test-Path -LiteralPath $MarkerFile) {
+      try { $t = ([datetime](Get-Content -Raw -LiteralPath $MarkerFile | ConvertFrom-Json).started_utc).ToUniversalTime() } catch { $t = (Get-Item -LiteralPath $MarkerFile).LastWriteTimeUtc }
+      if (($NowUtc - $t).TotalMinutes -lt $IntervalMin) { Write-Host 'backup: attempted less than an hour ago, skipping'; return 'throttled' }
+    }
+    $md = Split-Path -Parent $MarkerFile
+    if (-not (Test-Path -LiteralPath $md)) { New-Item -ItemType Directory -Path $md -Force | Out-Null }
+    Set-Content -LiteralPath $MarkerFile -Value ('{"started_utc":"' + $NowUtc.ToString('yyyy-MM-ddTHH:mm:ssZ') + '"}') -Encoding UTF8
+    $argList = @('-NoProfile', '-File', ('"' + $Script + '"')) + @($ScriptArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } })
+    $p = Start-Process powershell.exe -ArgumentList $argList -NoNewWindow -PassThru; $null = $p.Handle
+    if (-not $p.WaitForExit($TimeoutSec * 1000)) {
+      Write-Warning "backup timed out after $TimeoutSec s, killing it and its children"
+      & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null
+      Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+      return 'timeout'
+    }
+    $p.WaitForExit()   # flush so ExitCode is populated
+    if ($p.ExitCode -ne 0) { Write-Warning "backup exited with $($p.ExitCode)"; return 'failed' }
+    return 'ok'
+  } catch { Write-Warning "backup failed: $_"; return 'failed' }
+}

@@ -1,0 +1,250 @@
+# API Conventions (as implemented)
+
+> Status: Accepted. Source: GitHub issue #172. Derived from the backend code on `main` at the time of writing, not from aspiration. Where code is inconsistent the inconsistency is recorded in section 13; nothing was changed. Paths are relative to `backend/` unless noted.
+
+## 1. Envelope
+
+Every JSON response is `{ "data": <payload|null>, "error": <null|{code,message,...}> }`.
+
+- Shared helpers: `api.WriteJSON(w, status, payload)` (`internal/api/response.go:9`) and `api.WriteError(w, status, code, message)` (`internal/api/response.go:18`). Most domains use these.
+- Two packages keep a private copy of the same envelope: `auth` (`internal/auth/handler.go:35-50`) and `tenant` (`internal/tenant/handler.go:32`). The rate limiter has a third (`internal/ratelimit/middleware.go:54-77`). The wire format is identical.
+- Success: handlers pass `map[string]any{"data": x, "error": nil}` to `api.WriteJSON` (e.g. `internal/users/handler.go:77`). The error body is always `{code, message}`; some errors add keys: `details` (`exams/handler.go:330-346`, `INSUFFICIENT_ADAPTIVE_QUESTIONS`, `EXAM_RULES_UNSATISFIED`) or `fields` (`ERR_VALIDATION`, `exams/handler.go:96-104`, `questions/handler.go:84-92`).
+- Content-Type is `application/json`, except file downloads (section 9).
+- Frontend contract: `apiFetch` (`frontend/src/api/apiFetch.ts:21-44`) throws an `ApiError{code, message, details}` whenever `body.error` is non-null; the code is the machine key.
+
+## 2. Error code catalogue
+
+Status is what the code returns today. "Where" gives representative source locations; many codes are reused in several handlers.
+
+### 2.1 Cross-cutting
+
+| Code | HTTP | Where |
+|------|------|-------|
+| MISSING_TOKEN | 401 | `internal/auth/middleware.go:38`, `internal/rbac/middleware.go:19`, `internal/ai/handler.go:35` |
+| INVALID_TOKEN | 401 | `auth/middleware.go:42,51,59,64,72,78` (malformed header, bad signature, bad claims, user gone) |
+| TOKEN_EXPIRED | 401 | `auth/middleware.go:49` |
+| TOKEN_REVOKED | 401 | `auth/middleware.go:86` (access token issued before the user's last password change) |
+| UNAUTHORIZED | 401 | `audit/handler.go:30,67`, `auth/handler.go:147`, `email/handler.go:27` (missing user/tenant in context) |
+| FORBIDDEN | 403 | `rbac/middleware.go:23`; in-handler scope checks `users/handler.go:102`, `sessions/handler.go:178`, `ai/handler.go:142` |
+| NOT_FOUND | 404 | `api/uuid.go:89` (malformed path id), `users/handler.go:100`, `departments/handler.go:56` |
+| VALIDATION_ERROR | 422 or 400 | 422: `api/uuid.go:53,65`, `users/handler.go:137,173`. 400: `auth/recovery_handler.go:24,70`, `auth/recovery_service.go:56,105`, `ai/handler.go:49` (I-1) |
+| INVALID_BODY | 400 | undecodable JSON/multipart: `ai/handler.go:41`, `auth/handler.go:83`, `departments/handler.go:41`, `users/handler.go:257` |
+| RATE_LIMITED | 429 | `ratelimit/middleware.go:72` (sets `Retry-After: 60`, line 68) |
+| INTERNAL_ERROR | 500 | catch-all: `auth/handler.go:59`, `auth/middleware.go:81` (fails closed), `audit/handler.go:44` |
+
+There is no `ROLE_*` family of codes in the code; role-related endpoints use the cross-cutting codes.
+
+### 2.2 Auth and account
+
+| Code | HTTP | Where |
+|------|------|-------|
+| INVALID_CREDENTIALS | 401 on login, 400 on change-password (wrong current password) | `auth/service.go:71,113` (401); `auth/service.go:252` (400) |
+| ACCOUNT_LOCKED | 423 | `auth/service.go:82,106` |
+| ACCOUNT_INACTIVE | 401 | `auth/service.go:91` |
+| INVALID_REFRESH_TOKEN | 401 | `auth/handler.go:104`, `auth/service.go:155,167,175` |
+| WEAK_PASSWORD | 400 | `auth/service.go:239`; policy `auth/password.go:20-34` (min 8, upper, lower, digit) |
+| INVALID_TOKEN (reset link) | 400 | `auth/recovery_service.go:98` (same code as the 401 JWT case; I-2) |
+
+### 2.3 Users, departments, tenant, audit, email
+
+| Code | HTTP | Where |
+|------|------|-------|
+| DUPLICATE_EMAIL | 409 | `users/handler.go:141` |
+| MISSING_FILE | 400 | `users/handler.go:262` |
+| FILE_TOO_LARGE | 413 | `users/handler.go:276` |
+| INVALID_FILE_TYPE | 415 | `users/handler.go:278` |
+| INVALID_CSV | 400 | `users/handler.go:286,291` |
+| TOO_MANY_ROWS | 400 | `users/handler.go:297` (more than 500 data rows) |
+| DUPLICATE_NAME | 409 | `departments/handler.go:58,93` |
+| DEPARTMENT_HAS_CHILDREN, DEPARTMENT_NOT_EMPTY | 409 | `departments/handler.go:118,120` |
+| LOGO_TOO_LARGE | 413 | `tenant/handler.go:58-64` (status chosen in the handler) |
+| INVALID_LOGO_TYPE, INVALID_LOCALE | 400 | `tenant/service.go:177,251` (default status 400, `tenant/handler.go:59`) |
+| EMAIL_UNAVAILABLE | 503 | `email/handler.go:38` |
+| USER_NOT_FOUND | 404 (reports), 500 (email test) | `reports/handler.go:97`, `email/handler.go:33` (I-3) |
+
+### 2.4 Categories, tags, questions
+
+| Code | HTTP | Where |
+|------|------|-------|
+| ERR_VALIDATION | 422 with `fields[]` | `questions/handler.go:84-92`, `questions/translation_handler.go:67` |
+| ERR_NOT_FOUND | 404 | `categories/handler.go:102`, `exams/handler.go:264` |
+| ERR_INVALID_BODY | 400 | `categories/handler.go:36`, `exams/handler.go:206`, `questions/import_export_handler.go:24` |
+| ERR_INVALID_PARAM | 400 | `questions/import_export_handler.go:125`, `reports/handler.go:52,120,144,165` |
+| ERR_INTERNAL | 500 | `categories/handler.go:26`, `exams/handler.go:183`, `certificates/handler.go:97` |
+| ERR_CATEGORY_CYCLE, ERR_PARENT_NOT_FOUND, ERR_INVALID_NAME | 400 | `categories/handler.go:104-110` |
+| ERR_CATEGORY_IN_USE | 409 | `categories/handler.go:108` |
+| ERR_TAG_DUPLICATE, ERR_TAG_IN_USE | 409 | `tags/handler.go:84,86` |
+| ERR_INVALID_NAME (tags) | 400 | `tags/handler.go:88` |
+| ERR_NOT_DRAFT | 409 | `exams/handler.go:481`, `questions/handler.go:457` |
+| ERR_INVALID_TRANSITION | 409 | `exams/handler.go:386`, `questions/handler.go:425` |
+| ERR_INVALID_STATUS | 422 | `questions/handler.go:367` |
+| ERR_STEM_REQUIRED | 400 | `questions/handler.go:430` |
+| INVALID_FIELD_FOR_TYPE, MISSING_MODEL_ANSWER | 400 | `questions/handler.go:147-152,359-363` (no `ERR_` prefix; I-4) |
+| ERR_QUESTION_NOT_FOUND | 404 | `questions/translation_handler.go:43` |
+| ERR_UNSUPPORTED_LOCALE, ERR_MISSING_OPTION_TRANSLATIONS, ERR_CANNOT_DELETE_DEFAULT_LOCALE | 4xx (see source) | `questions/translation_handler.go:94,102,137` |
+| ERR_FILE_TOO_LARGE | 413 | `questions/import_export_handler.go:48` |
+| ERR_INVALID_FILE_TYPE | 415 | `questions/import_export_handler.go:50` |
+| ERR_IMPORT_VALIDATION, ERR_BATCH_TOO_LARGE | 4xx (see source) | `questions/import_export_handler.go:72,86` |
+
+### 2.5 Exams, assignments
+
+| Code | HTTP | Where |
+|------|------|-------|
+| INSUFFICIENT_QUESTIONS | 422 | publish with no rules `exams/handler.go:349-351`; session start with too-small pool `sessions/handler.go:58-60` |
+| INSUFFICIENT_ADAPTIVE_QUESTIONS | 422 with `details` | `exams/handler.go:332-338` (adaptive needs at least 5 questions per difficulty per rule) |
+| EXAM_RULES_UNSATISFIED | 422 with `details` | `exams/handler.go:340-346` |
+| EXAM_NOT_DRAFT | 409 | `exams/handler.go:303-309,358` |
+| EXAM_NOT_ACTIVE | 409 (assign), 422 (start session) | `exams/handler.go:714-716`, `sessions/handler.go:46-48` (I-5) |
+| ASSIGNMENT_ALREADY_EXISTS | 409 | `exams/handler.go:720-726` |
+| ERR_FORBIDDEN | 403 | `exams/handler.go:729,761` (assign target outside caller scope) |
+| ERR_DEADLINE_IN_PAST | 400 | `exams/handler.go:731` |
+| ERR_ACTIVE_SESSIONS | 409 | `exams/handler.go:422` |
+| RULE_NOT_MANUAL | 400 | `exams/handler.go:806` |
+| EXAM_NOT_FOUND | 404 | `exams/handler.go:823`, `reports/handler.go:59`, `ai/handler.go:95` (exam CRUD itself uses ERR_NOT_FOUND; I-4) |
+
+### 2.6 Sessions, results, certificates, AI
+
+| Code | HTTP | Where |
+|------|------|-------|
+| EXAM_NOT_ASSIGNED | 403 | `sessions/handler.go:40-42`, `portal/handler.go:50` |
+| EXAM_ARCHIVED | 403 | `sessions/handler.go:43-45` |
+| EXAM_OUTSIDE_WINDOW, ATTEMPTS_EXHAUSTED | 422 | `sessions/handler.go:49-54` |
+| SESSION_ALREADY_OPEN | 409 | `sessions/handler.go:55-57` |
+| SESSION_NOT_FOUND | 404 | `sessions/handler.go:146,176,198,220`, `certificates/handler.go:94`, `ai/handler.go:138` |
+| SESSION_FORBIDDEN | 403 | `sessions/handler.go:97,148,200,222,401`, `certificates/handler.go:82` |
+| SESSION_NOT_ACTIVE | 422 | `sessions/handler.go:100,151` |
+| SESSION_EXPIRED | 422 | `sessions/handler.go:103,154` |
+| SESSION_IN_PROGRESS | 422 | `sessions/handler.go:225,246` |
+| INVALID_ANSWER_OPTION, INVALID_ANSWER_FORMAT, INVALID_TIME_SPENT, INVALID_EVENT_TYPE, INVALID_DATE | 400 | `sessions/handler.go:107-117,91,143,316,324` |
+| INVALID_SCORE | 422 | `sessions/handler.go:377` |
+| NOT_ADAPTIVE | 404 | `sessions/handler.go:404` |
+| SESSION_NOT_SUBMITTED, SESSION_NOT_PASSED, EXAM_NOT_CERTIFIABLE | 422 | `certificates/handler.go:84-92` |
+| NOT_A_LOYALTY_SESSION | 400 | `ai/handler.go:140` |
+| AI_RATE_LIMITED | 429 | `ai/handler.go:51` (hourly generation cap) |
+| AI_UNAVAILABLE | 503 | `ai/handler.go:54,144` |
+| INVALID_PARAM | 400 | `ai/handler.go:84,128` (cf. ERR_INVALID_PARAM) |
+
+## 3. Malformed UUID rule (PR #147, ISS-141)
+
+- A malformed UUID in a **path** parameter returns **404 NOT_FOUND** (`"resource not found"`), because such a resource cannot exist. Implemented by `api.RequireUUIDPathParams(names...)` (`internal/api/uuid.go:83-95`), mounted once on the authenticated route group (`internal/router/router.go:84`). Names covered: `id, userId, sessionId, examId, questionId, tagId, sectionId, ruleId, assignmentId` (`api/uuid.go:76`, `UUIDPathParamNames`). A router test enumerates registered routes against this list (comment at `api/uuid.go:72-75`), so a new UUID path parameter name must be added to the list.
+- A malformed UUID in a **query** parameter returns **422 VALIDATION_ERROR** (`"<name> must be a valid UUID"`). Helper `api.UUIDQuery(w, r, name)` (`api/uuid.go:47-57`): an absent parameter is fine; the caller must return when `ok == false`. Comma lists use `api.ValidateUUIDList(w, param, ids)` (`api/uuid.go:62-70`). Current users: `audit/handler.go:135` (actor_id), `questions/handler.go:167,180` (category_id, tag_ids), `questions/import_export_handler.go:128-141` (ids, category_id, tag_ids), `sessions/handler.go:304` (exam_id), `users/handler.go:48,55` (department_id, role_id).
+- Validity means canonical 36-character hyphenated only (`api.IsUUID`, `api/uuid.go:36-42`).
+- **Exceptions**: the middleware is mounted only in the authenticated group, so public routes are not covered. `GET /verify/{code}` (`router.go:75`) takes a non-UUID code; an unknown or malformed code returns **200** with `data.valid == false` and no error, to avoid information leakage (`certificates/handler.go:59-67`). A DB failure there is 500 `INTERNAL_ERROR`.
+- UUIDs inside JSON bodies have no shared helper; each handler validates its own (I-6).
+
+## 4. Authentication and authorization
+
+- Access token: `Authorization: Bearer <JWT>` on every route in the protected group (`router.go:79-85`). Claims used: `sub`, `role`, optional `department_id`, `iat` (`auth/middleware.go:57-74`). Missing header: 401 `MISSING_TOKEN`; wrong scheme, bad signature or bad claims: 401 `INVALID_TOKEN`; expired: 401 `TOKEN_EXPIRED`; issued before the last password change: 401 `TOKEN_REVOKED` (`auth/middleware.go:85-88`). If the epoch lookup fails the middleware fails closed with 500 (`auth/middleware.go:80-82`).
+- Refresh token: opaque value in cookie `refresh_token`, `HttpOnly`, `SameSite=Strict`, `Path=/api/v1/auth`, `Secure` from config (`auth/service.go:329-337`). `POST /auth/refresh` reads the cookie (`auth/handler.go:101`) and returns a new access token in the body; `POST /auth/logout` clears it. Both sit in the public, tightly rate-limited group (`router.go:57-66`). Failures: 401 `INVALID_REFRESH_TOKEN`.
+- Frontend flow: `apiFetch` attaches Bearer from the React Query cache; `downloadFile` refreshes once on a 401 and retries (`frontend/src/api/download.ts:52-62`).
+- **401 vs 403**: 401 means no usable credentials (missing, invalid, expired or revoked token, or no role in context, `rbac/middleware.go:18-20`). 403 means authenticated but not allowed (`rbac/middleware.go:22-25` `FORBIDDEN`; ownership checks `SESSION_FORBIDDEN`, `ERR_FORBIDDEN`; `EXAM_NOT_ASSIGNED`).
+- Permission middleware: `rbac.RequirePermission(cache, resource, action)` (`internal/rbac/middleware.go:14`), applied per route with `r.With(...)`. Permissions are the string `resource:action`, loaded from the DB into an in-memory `Cache` at startup (`rbac/cache.go:28-67`). In use today (from `router.go`): `tenant:manage`, `departments:read|manage`, `users:read|manage`, `audit:read`, `categories:manage`, `tags:read|manage`, `questions:read|write`, `exams:read|write|assign`, `reports:read`, `grading:read|write`. The verb `manage` versus `write` is not unified (I-7).
+- Routes without `RequirePermission` ("any authenticated user") are commented as such in the router: `/users/me`, `/portal/*`, `/auth/change-password`, `GET /categories`, and `GET /users/{id}` with an in-handler self/scope check (`router.go:114`). Static sub-paths (`/users/roles`, `/users/import`, `/questions/import`, `/questions/export`) are registered before the `/{id}` routes.
+- Tenancy: `auth.TenantContext()` runs on every request (`router.go:53`) and puts `tenant_id` in the context; handlers and repositories scope by it.
+
+## 5. Pagination, filtering, sorting
+
+- Query names: `page` (1-based) and `per_page`. Non-numeric or non-positive values silently fall back to defaults and do not produce an error: `parseIntParam` in `users/handler.go`, `exams/handler.go:150-160`, `audit/handler.go`; `parsePagination` in `sessions/handler.go:278-296`; inline in `reports/handler.go:78-92`.
+- Defaults and caps: users 20, cap 100 (`users/service.go:54-62`); questions 20 and exams 20 (`parseIntParam`, no cap in the handler); audit 50 (`audit/handler.go:35`); grading queue, history and My Results 20, cap 100 (`sessions/handler.go:278-296`); user record 20, cap 100 (`reports/handler.go:85-91`).
+- List response shape: `data: { items: [...], meta: { page, per_page, total } }` for users (`users/types.go:46-56`), audit (`audit/handler.go:48-58`), questions (`questions/handler.go:217-227`), exams (`exams/handler.go:189-199`), grading queue (`sessions/model.go:349`). `items` is normalised to `[]`, not null (`questions/handler.go:214`). Some lists (departments, categories) return a tree or array without meta.
+- Filters: snake_case query names, allow-listed per handler: `status`, `search`, `locale`, `category_id`, `tag_ids` (comma list), `department_id`, `role_id`, `exam_id`, `actor_id`, `actor` (ILIKE on name), `action`, `entity_type`. Unknown parameters are ignored.
+- Sorting: `sort` + `order` for exams and questions (`exams/handler.go:174-175`, `questions/handler.go:206-207`); `sort` + `dir` for My Results, allow-listed to `date|score` and `asc|desc`, defaulting to `date`/`desc` (`sessions/handler.go:420-427`). Naming differs (I-8). Invalid values fall back silently.
+- Dates: `from`/`to` are RFC 3339 on audit (`audit/handler.go:151-160`; an unparseable value is silently dropped) and reports (`reports/handler.go:191-196`); `date_from`/`date_to` are `YYYY-MM-DD` on the grading queue and give 400 `INVALID_DATE` (`sessions/handler.go:313-326`) (I-9).
+
+## 6. Identifiers, timestamps, bodies
+
+- IDs are UUID v4 strings, validated as in section 3. Timestamps are UTC ISO 8601 / RFC 3339 (project rule in `CLAUDE.md`). Date-only filters use `YYYY-MM-DD`.
+- JSON field names are snake_case.
+- JSON request bodies are decoded with `json.NewDecoder`; failure maps to 400 `INVALID_BODY` (or `ERR_INVALID_BODY`). Only the public recovery endpoints cap the body with `http.MaxBytesReader` (`auth/recovery_handler.go:23,69`) (I-10).
+
+## 7. Rate limiting
+
+- Limiters (`internal/ratelimit/middleware.go`): `AuthLimiter` 10 req/min per IP on `/health` and `/auth/*` (line 81; `router.go:57-66`); `GlobalLimiter` 300 req/min per IP on the public and protected groups (line 95); `AnswerSaveLimiter` 60 req/min keyed by session id on `PUT /portal/sessions/{id}/answers/{questionId}` (line 110; `router.go:241-243`). AI generation has its own hourly cap in the service (`AI_RATE_LIMITED`, 429).
+- 429 response: the envelope with `RATE_LIMITED` / "Too many requests" and header `Retry-After: 60`, a constant (`middleware.go:68`). The repo sets no `X-RateLimit-*` headers itself; the `httprate` library (v0.15.0, `go.mod:12`) may add its own, which this document does not guarantee.
+- `DISABLE_RATE_LIMIT=true|1` disables the Auth and Global limiters for E2E (`middleware.go:46-49`). `AnswerSaveLimiter` ignores it (I-11).
+- Client IP comes from `chimw.RealIP` (`router.go:49`); `auth` additionally parses `X-Forwarded-For` itself (`auth/handler.go:62-72`).
+
+## 8. Uploads
+
+| Endpoint | Field | Parse limit | Content limit | Validation | Errors |
+|----------|-------|-------------|---------------|------------|--------|
+| `POST /users/import[?commit=true]` | `file` (CSV) | `ParseMultipartForm(10<<20)`, `users/handler.go:255` | 10 MiB `upload.MaxCSVBytes` (`upload/validate.go:16`); 500 rows | magic-byte check `upload.ValidateCSVFile` | `MISSING_FILE`, `FILE_TOO_LARGE` 413, `INVALID_FILE_TYPE` 415, `INVALID_CSV`, `TOO_MANY_ROWS` |
+| `POST /questions/import[?dry_run=true]` | `file` (CSV, or JSON by `.json` extension) | `ParseMultipartForm(32<<20)`, `questions/import_export_handler.go:23` | 10 MiB, bounded read via `io.LimitReader` | same magic-byte check | `ERR_INVALID_BODY`, `ERR_FILE_TOO_LARGE` 413, `ERR_INVALID_FILE_TYPE` 415 |
+| `PUT /tenant/config` (logo) | key inside the JSON update map (`tenant/handler.go:50`), not multipart | n/a | 2 MiB `upload.MaxLogoBytes` (`upload/validate.go:13`) | PNG/JPEG magic bytes, never the client Content-Type | `LOGO_TOO_LARGE` 413, `INVALID_LOGO_TYPE` 400 |
+
+File type is always detected from magic bytes (`upload/validate.go`, `DetectMIME`).
+
+## 9. File downloads
+
+All download endpoints are ordinary GETs inside the protected group, so **Bearer is required**; a plain `<a href>` navigation cannot send it. The frontend must use `downloadFile` (fetch with Authorization, blob, object URL; `frontend/src/api/download.ts:46-75`). Responses set `Content-Disposition: attachment; filename="..."`:
+
+- CSV (`text/csv; charset=utf-8`): `GET /audit/export` (`audit/handler.go:83`), `GET /questions/export` (`questions/import_export_handler.go:166`), `GET /admin/exams/{id}/results/export` and `GET /admin/users/{id}/record/export` (`reports/handler.go:151,172`).
+- PDF (`application/pdf`): `GET /portal/sessions/{id}/certificate` and `GET /admin/sessions/{id}/certificate` (`certificates/handler.go:111`), `GET /admin/dashboard/export` (`reports/handler.go:241`).
+- Errors on a download endpoint are still the JSON envelope with the normal status, so the client must check `res.ok` before treating the body as a blob (`download.ts:56-62`).
+- Public, unauthenticated reads: `GET /tenant/config`, `GET /tenant/logo` (stored image content type, `tenant/handler.go:88`), `GET /verify/{code}`.
+
+## 10. Audit logging
+
+- `audit.Writer.Write(ctx, r, action, entityType, entityID *string, metadata any)` (`internal/audit/writer.go`) inserts into `audit_log`. It never returns an error, no-ops on a nil writer, and drops the event with a warning when the tenant is missing. Actor comes from the context, IP from `r.RemoteAddr`.
+- Convention: every state-changing handler writes one event after success, from the handler (not the service). Action names are dotted lower-case `<entity>.<verb>`; sub-entities add a segment: `category.create`, `exam.publish`, `exam.section.create`, `exam.rule.delete`, `exam.assign`, `question.status_transition`, `question.tag_add`, `question_translation.upsert`, `auth.login.success`, `auth.login.failure`, `auth.password_reset_requested` (e.g. `exams/handler.go:250,513,600,738`; `auth/handler.go:89-94`). `entity_type` is a snake_case noun; `entity_id` is the UUID or nil; `metadata` is a small JSON object (names, diffs; never secrets).
+- Reads are generally not audited; exports are (`question.export`, `questions/import_export_handler.go:207`).
+- Read endpoints: `GET /audit` and `GET /audit/export`, permission `audit:read`, filters as in section 5.
+
+## 11. Messages and i18n
+
+- Server `message` strings are English, human-readable and not localized (all `WriteError` calls above). They are for logs and as a fallback, not primary UI text.
+- The `code` is the stable contract. The frontend branches on `error.code` and shows localized text through `react-i18next` keys (for example `frontend/src/components/auth/LoginForm.tsx:49-52` maps `ACCOUNT_LOCKED` and `INVALID_CREDENTIALS`; category and tag errors live under `categories.errors.*` and `tags.errors.*` in `frontend/src/locales/en.json:298,335`). Locale files: `frontend/src/locales/{en,kk,ru}.json`.
+- Some validation messages embed dynamic text from `err.Error()` (`users/handler.go:137`, `ai/handler.go:49`); those are English and unlocalized.
+- Download failures map to `download.failed` / `download.session_expired` (`download.ts:14-18`).
+
+## 12. Checklist: when adding an endpoint
+
+1. Register the route in `internal/router/router.go` in the right group: public (`GlobalLimiter`), auth (`AuthLimiter`), or protected. Register static sub-paths before `/{id}`.
+2. Protected route: add `r.With(rbac.RequirePermission(rbacCache, "<resource>", "<read|write|manage>"))`, or comment explicitly that any authenticated user may call it. A new permission needs a new migration (never edit old ones) seeding it for the intended roles.
+3. Path params that carry UUIDs: use a name from `api.UUIDPathParamNames`; if you introduce a new name, add it to that list (the router test fails otherwise).
+4. Query UUIDs: `api.UUIDQuery` / `api.ValidateUUIDList` (422). Body UUIDs: validate and return 422 `VALIDATION_ERROR`.
+5. Respond only through `api.WriteJSON` / `api.WriteError` with `{data,error}`. Lists: `{items, meta:{page,per_page,total}}`, default `per_page` 20, cap 100, never `items: null`.
+6. Reuse a code from section 2 where one fits. A new code is SCREAMING_SNAKE, stable, and gets a locale key in all three locale files.
+7. Scope every query by `tenant_id`; apply department scoping for `department_admin` where relevant.
+8. Keep the handler thin: logic in the service, SQL in the repository, errors wrapped with context; a sentinel error maps to a status in the handler.
+9. State change: call `writer.Write` with `<entity>.<verb>`.
+10. Upload: magic-byte validation, bounded read, documented size cap. Download: set `Content-Type` and `Content-Disposition`, state that Bearer is required, use `downloadFile` on the frontend.
+11. Tests: `service_test.go` and `handler_test.go` (plus a router test if you add a route group or path-param name); run `go test ./...`.
+12. Add the endpoint to the owning FR-BB requirement doc.
+
+## 13. Inconsistencies in the code (not fixed here)
+
+- I-1 `VALIDATION_ERROR` status: 422 in `users/handler.go:137,173` and `api/uuid.go`, 400 in `auth/recovery_*` and `ai/handler.go:49`. Questions and exams use `ERR_VALIDATION` (422) instead.
+- I-2 `INVALID_TOKEN` is 401 for a bad JWT (`auth/middleware.go`) and 400 for an invalid reset link (`auth/recovery_service.go:98`).
+- I-3 `USER_NOT_FOUND` is 404 in `reports/handler.go:97` but 500 in `email/handler.go:33`; the users domain itself uses `NOT_FOUND`.
+- I-4 Two code families coexist: `ERR_*` (categories, tags, questions, exam CRUD, certificates 500, reports params) and unprefixed (auth, users, departments, sessions, ai, tenant). Pairs for the same meaning: `ERR_NOT_FOUND` / `EXAM_NOT_FOUND` for the same exam resource (`exams/handler.go:264` vs `:823`), `ERR_INVALID_PARAM` / `INVALID_PARAM`, `ERR_INVALID_BODY` / `INVALID_BODY`, `ERR_INTERNAL` / `INTERNAL_ERROR`, `ERR_FORBIDDEN` / `FORBIDDEN`. `certificates/handler.go` uses both `INTERNAL_ERROR` (line 69) and `ERR_INTERNAL` (line 97).
+- I-5 `EXAM_NOT_ACTIVE` is 409 on assign and 422 on session start.
+- I-6 Bad ids/params outside the UUID helpers get 400 (`reports/handler.go:52` `ERR_INVALID_PARAM`, `ai/handler.go:84` `INVALID_PARAM`), while the query-UUID helper gives 422.
+- I-7 Permission verbs: `write` (questions, exams, grading) versus `manage` (users, departments, tags, categories, tenant) with no documented rule; `exams:read` also gates the admin session result and certificate routes (`router.go:256,296`).
+- I-8 Sort params: `sort`+`order` (exams, questions) versus `sort`+`dir` (My Results). Invalid sort values silently default instead of 422.
+- I-9 Date filters: RFC 3339 `from`/`to` (invalid value silently ignored on audit) versus `date_from`/`date_to` `YYYY-MM-DD` (400 `INVALID_DATE` on grading).
+- I-10 Invalid pagination input silently falls back; request-body size limits exist only on recovery endpoints; the questions import parses up to 32 MiB although its content cap is 10 MiB.
+- I-11 `DISABLE_RATE_LIMIT` does not disable `AnswerSaveLimiter` (`ratelimit/middleware.go:110-123`), and it is read with `os.Getenv` in middleware (`middleware.go:46-49`), contrary to the typed-Config rule in `CLAUDE.md`.
+- I-12 Envelope construction is duplicated (`auth`, `tenant`, `ratelimit`), and `exams`/`questions` hand-build envelopes with `map[string]any` instead of `api.WriteError`. The error object gains extra keys (`details`, `fields`) with no declared schema.
+- I-13 Duplicate-name conflict codes differ: `DUPLICATE_NAME` (departments), `ERR_TAG_DUPLICATE` (tags), `DUPLICATE_EMAIL` (users).
+- I-14 `Retry-After` is a fixed 60; `AI_RATE_LIMITED` returns 429 without `Retry-After`.
+- I-15 Wrong-password status differs: 401 on login, 400 on change-password (`auth/service.go:252`).
+- I-16 Exam/question deletion of a non-draft returns 409 `ERR_NOT_DRAFT`, while publish on a non-draft returns 409 `EXAM_NOT_DRAFT`: the same condition under two names.
+
+## 14. Broken references to fix elsewhere (outside BA scope)
+
+Checked with `ls docs/` and grep over `CLAUDE.md`, `README.md` and `.github/`.
+
+| Reference | Where referenced | State | Proposed replacement |
+|-----------|------------------|-------|----------------------|
+| `docs/architecture-guide.md` | `CLAUDE.md:146`; `.github/agents/06-release-finalizer.agent.md:45`; `.github/agents/business-analyst.agent.md:59`; `.github/agents/functions/GIT_COMMIT.md:32`; `.github/agents/infrastructure-configuration.agent.md:94` | **Missing** (`docs/` holds only business-process-map.md, product-summary-en/ru.md, ui-forms-inventory.md, ui-workflows-inventory.md and subdirectories) | Point API questions to `docs/requirements/api-conventions.md`, topology to `docs/business-process-map.md` and `docs/requirements/DEC-001.Environments-production-class-demo-and-qa.md`; or create the guide. Remove `docs/architecture-guide.md` from the `git add` lines in the release agents (they stage a nonexistent path). |
+| `docs/backend-development-guide.md` | `CLAUDE.md:147` | **Missing** | `.github/instructions/backend-conventions.instructions.md` (exists) plus `docs/requirements/api-conventions.md` |
+| `docs/frontend-development-guide.md` | `CLAUDE.md:148` | **Missing** | `.github/instructions/frontend-conventions.instructions.md` (exists) |
+| `docs/requirements/requirements-backlog.md`, `docs/requirements/README.md`, `corporate_exam_platform_roadmap.md` | `CLAUDE.md` Key Docs | Exist | none |
+| `make migrate` | `CLAUDE.md:10,22,132`; `README.md:60`; `.github/agents/06-release-finalizer.agent.md:29`; `.github/agents/infrastructure-configuration.agent.md:65` | `Makefile:13-14` runs `docker compose run --rm api ./bin/api migrate`, but `backend/cmd/api/main.go` has no `migrate` subcommand. Migrations are applied automatically on API startup by `dbpkg.RunMigrations(db, "migrations")` (`main.go:101-105`). `README.md:71` already admits the target does not work (ISS-105). | Say "migrations apply automatically when the API starts (`make dev`)"; remove or implement the `migrate` target; update the agent prompts that mandate `make migrate`. |
+| CLAUDE.md Repository Layout (`internal/` domain list) | `CLAUDE.md` Repository Layout | Stale: packages also include `ai, api, categories, config, ctxkeys, db, departments, email, health, middleware, portal, ratelimit, rbac, router, schemaguard, tags, tenant, upload`; the certificates package is `certificates`, not `certs` | Update the layout block and note that shared HTTP helpers live in `internal/api` |
+| "Never `os.Getenv()` outside the startup Config" | `CLAUDE.md` Non-Negotiable Conventions | Violated by `internal/ratelimit/middleware.go:46-49` | Code fix (move to `config.Config`), outside BA scope |
+| Frontend port 5173 | `CLAUDE.md` Repository Layout | Only the Vite dev server; the Docker stack serves the SPA on port 80 (`README.md` table) | Clarify in `CLAUDE.md`/`README.md` |
+| Root `README.md` | n/a | No link to API documentation | Add a link to `docs/requirements/api-conventions.md` |
+
+Recommendation: in the `CLAUDE.md` Key Docs table replace the three missing guide rows with `docs/requirements/api-conventions.md` (API), `.github/instructions/backend-conventions.instructions.md` and `.github/instructions/frontend-conventions.instructions.md`.

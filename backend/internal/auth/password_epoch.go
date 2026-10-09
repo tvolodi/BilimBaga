@@ -18,6 +18,14 @@ type AccountState struct {
 	PasswordChangedAt time.Time
 	// ForcePasswordChange mirrors users.force_password_change.
 	ForcePasswordChange bool
+	// Status, RoleName and DepartmentID mirror users.status, roles.name and
+	// users.department_id ("" when NULL). When Status is non-empty (the production lookup
+	// always sets it) Authenticate rejects the token unless the account is active and the
+	// token's role/department claims equal these values, so a demotion, move or
+	// deactivation takes effect within the cache TTL instead of the JWT lifetime (ISS-240).
+	Status       string
+	RoleName     string
+	DepartmentID string
 }
 
 // AccountStateLookup returns the user's AccountState. It returns ErrNotFound when the
@@ -89,15 +97,20 @@ func (c *AccountStateCache) Invalidate(userID string) {
 }
 
 // accountStateSQL reads the epoch column (migration 032) and the force flag in one query.
-const accountStateSQL = `SELECT password_changed_at, force_password_change FROM users WHERE id = $1`
+const accountStateSQL = `SELECT u.password_changed_at, u.force_password_change, u.status,
+       ro.name AS role_name, u.department_id
+FROM users u JOIN roles ro ON ro.id = u.role_id WHERE u.id = $1`
 
 // NewDBAccountStateCache is the production cache over users.password_changed_at and
 // users.force_password_change.
 func NewDBAccountStateCache(db *sqlx.DB) *AccountStateCache {
 	return NewAccountStateCache(func(ctx context.Context, userID string) (AccountState, error) {
 		var row struct {
-			ChangedAt sql.NullTime `db:"password_changed_at"`
-			Force     bool         `db:"force_password_change"`
+			ChangedAt sql.NullTime   `db:"password_changed_at"`
+			Force     bool           `db:"force_password_change"`
+			Status    string         `db:"status"`
+			RoleName  string         `db:"role_name"`
+			DeptID    sql.NullString `db:"department_id"`
 		}
 		if err := db.GetContext(ctx, &row, accountStateSQL, userID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -105,7 +118,8 @@ func NewDBAccountStateCache(db *sqlx.DB) *AccountStateCache {
 			}
 			return AccountState{}, fmt.Errorf("auth.accountState: %w", err)
 		}
-		return AccountState{PasswordChangedAt: row.ChangedAt.Time, ForcePasswordChange: row.Force}, nil
+		return AccountState{PasswordChangedAt: row.ChangedAt.Time, ForcePasswordChange: row.Force,
+			Status: row.Status, RoleName: row.RoleName, DepartmentID: row.DeptID.String}, nil
 	}, time.Now)
 }
 

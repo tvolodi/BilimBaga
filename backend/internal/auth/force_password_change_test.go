@@ -84,7 +84,7 @@ func TestAccountStateCache_InvalidateForcesReread(t *testing.T) {
 	var mu sync.Mutex
 	force := true
 	fetches := 0
-	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	clock := time.Now().UTC().Truncate(time.Second).Add(0)
 	c := NewAccountStateCache(func(context.Context, string) (AccountState, error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -132,7 +132,7 @@ func TestAccountStateCache_ErrorsAreNotCached(t *testing.T) {
 func TestChangePasswordHandler_ClearsFlagThenImmediateAccess(t *testing.T) {
 	var mu sync.Mutex
 	force := true // simulated users.force_password_change
-	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	clock := time.Now().UTC().Truncate(time.Second).Add(0)
 	cache := NewAccountStateCache(func(context.Context, string) (AccountState, error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -205,7 +205,7 @@ func TestChangePasswordHandler_FailureDoesNotInvalidate(t *testing.T) {
 }
 
 func TestAccountStateCache_InvalidateDuringFetchDoesNotStoreStale(t *testing.T) {
-	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	clock := time.Now().UTC().Truncate(time.Second).Add(0)
 	var c *AccountStateCache
 	force := true
 	c = NewAccountStateCache(func(context.Context, string) (AccountState, error) {

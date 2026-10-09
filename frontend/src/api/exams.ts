@@ -121,6 +121,8 @@ export class ExamApiError extends Error {
   httpStatus: number
   fields?: Array<{ field: string; message: string }>
   unsatisfiedRules?: PublishValidationDetail[]
+  /** Raw `error.details` from the backend: array, object, string or absent. Never assume a shape. */
+  details?: unknown
 
   constructor(
     message: string,
@@ -128,6 +130,7 @@ export class ExamApiError extends Error {
     httpStatus: number,
     fields?: Array<{ field: string; message: string }>,
     unsatisfiedRules?: PublishValidationDetail[],
+    details?: unknown,
   ) {
     super(message)
     this.name = 'ExamApiError'
@@ -135,6 +138,7 @@ export class ExamApiError extends Error {
     this.httpStatus = httpStatus
     this.fields = fields
     this.unsatisfiedRules = unsatisfiedRules
+    this.details = details
   }
 }
 
@@ -144,7 +148,7 @@ interface ApiErrorBody {
   code: string
   message: string
   fields?: Array<{ field: string; message: string }>
-  details?: PublishValidationDetail[]
+  details?: unknown
 }
 
 interface ApiResponse<T> {
@@ -171,6 +175,7 @@ async function examsFetch<T>(url: string, token?: string | null, options?: Reque
       body.error.code,
       res.status,
       body.error.fields,
+      Array.isArray(body.error.details) ? (body.error.details as PublishValidationDetail[]) : undefined,
       body.error.details,
     )
   }

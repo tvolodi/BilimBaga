@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { downloadFile, downloadErrorKey } from '@/api/download'
 import {
   Table,
   TableBody,
@@ -28,17 +31,30 @@ function SortIndicator({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }
 export function ResultsTable({ sessions, sortCol, sortDir, onSort }: ResultsTableProps) {
   const { t } = useTranslation()
 
-  function handleCertificate(sessionId: string) {
-    const a = document.createElement('a')
-    a.href = `/api/v1/portal/sessions/${sessionId}/certificate`
-    a.download = ''
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+  const qc = useQueryClient()
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  async function handleCertificate(sessionId: string) {
+    setDownloadError(null)
+    try {
+      await downloadFile(
+        qc,
+        `/api/v1/portal/sessions/${sessionId}/certificate`,
+        `certificate-${sessionId}.pdf`,
+      )
+    } catch (err) {
+      setDownloadError(downloadErrorKey(err))
+    }
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="space-y-2">
+      {downloadError && (
+        <p role="alert" className="text-sm text-red-700">
+          {t(downloadError)}
+        </p>
+      )}
+      <div className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -112,6 +128,7 @@ export function ResultsTable({ sessions, sortCol, sortDir, onSort }: ResultsTabl
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }

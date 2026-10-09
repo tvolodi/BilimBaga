@@ -1018,5 +1018,9 @@
     "issuedOn": "Issued on",
     "loading": "Verifying certificate…",
     "footer": "This page confirms the authenticity of certificates issued by this organization."
+  },
+  "download": {
+    "failed": "Download failed. Please try again.",
+    "session_expired": "Your session has expired. Please sign in again."
   }
 }

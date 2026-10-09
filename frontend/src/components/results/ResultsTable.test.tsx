@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import '@/i18n'
 import { ResultsTable } from './ResultsTable'
@@ -33,14 +34,16 @@ function renderTable(
   onSort = vi.fn(),
 ) {
   return render(
-    <MemoryRouter>
-      <ResultsTable
-        sessions={sessions}
-        sortCol={sortCol}
-        sortDir={sortDir}
-        onSort={onSort}
-      />
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <ResultsTable
+          sessions={sessions}
+          sortCol={sortCol}
+          sortDir={sortDir}
+          onSort={onSort}
+        />
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 
@@ -104,5 +107,17 @@ describe('ResultsTable', () => {
     renderTable([session])
     const link = screen.getByRole('link', { name: 'Go Fundamentals' })
     expect(link).toHaveAttribute('href', '/portal/sessions/sess-1/result')
+  })
+})
+
+describe('ResultsTable certificate download', () => {
+  it('uses a Bearer-capable fetch to the portal endpoint and shows an error on failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 500 }))
+    vi.stubGlobal('fetch', fetchMock)
+    renderTable([session])
+    fireEvent.click(screen.getByRole('button', { name: /download/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Download failed')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/portal/sessions/sess-1/certificate')
+    vi.unstubAllGlobals()
   })
 })

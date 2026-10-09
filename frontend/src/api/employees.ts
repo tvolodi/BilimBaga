@@ -1,4 +1,6 @@
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
+import { downloadFile } from '@/api/download'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -140,25 +142,14 @@ export async function exportEmployeeRecord(
 
 // ---- Certificate download ---------------------------------------------------
 
-export async function downloadAdminCertificate(
+export function downloadAdminCertificate(
+  qc: QueryClient,
   sessionId: string,
   verificationCode: string,
 ): Promise<void> {
-  const res = await fetch(`/api/v1/admin/sessions/${sessionId}/certificate`, {
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => null) as { error?: { code?: string } } | null
-    const code = body?.error?.code ?? 'ERR_INTERNAL'
-    throw new Error(code)
-  }
-  const blob = await res.blob()
-  const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `certificate-${verificationCode}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  window.URL.revokeObjectURL(url)
+  return downloadFile(
+    qc,
+    `/api/v1/admin/sessions/${sessionId}/certificate`,
+    `certificate-${verificationCode}.pdf`,
+  )
 }

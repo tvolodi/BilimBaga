@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { downloadFile, downloadErrorKey } from '@/api/download'
 import { Button } from '@/components/ui/button'
 
 interface ResultActionsProps {
@@ -19,22 +22,29 @@ export function ResultActions({
   const { t } = useTranslation()
   const navigate = useNavigate()
 
+  const qc = useQueryClient()
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
   async function handleDownloadCertificate() {
-    const res = await fetch(`/api/v1/portal/sessions/${sessionId}/certificate`)
-    if (!res.ok) return
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `certificate-${sessionId}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
+    setDownloadError(null)
+    try {
+      await downloadFile(
+        qc,
+        `/api/v1/portal/sessions/${sessionId}/certificate`,
+        `certificate-${sessionId}.pdf`,
+      )
+    } catch (err) {
+      setDownloadError(downloadErrorKey(err))
+    }
   }
 
   return (
     <div className="flex flex-col gap-2 w-full sm:flex-row sm:justify-center">
+      {downloadError && (
+        <p role="alert" className="text-sm text-red-700">
+          {t(downloadError)}
+        </p>
+      )}
       {passed && certificateEnabled && (
         <Button variant="default" onClick={handleDownloadCertificate}>
           {t('result.download_certificate')}

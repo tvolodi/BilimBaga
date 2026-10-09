@@ -64,10 +64,12 @@ test.describe('AI question generation assist (FR-BB71)', () => {
 
   test('generates drafts, lets the user pick some, and confirms the selection', async ({ page }) => {
     let generateBody: Record<string, unknown> | null = null
+    let generateAuth: string | undefined
     const created: Array<Record<string, unknown>> = []
 
     await page.route(GENERATE_API, async (route) => {
       generateBody = route.request().postDataJSON() as Record<string, unknown>
+      generateAuth = route.request().headers()['authorization']
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -97,7 +99,8 @@ test.describe('AI question generation assist (FR-BB71)', () => {
 
     await dialog.getByRole('button', { name: /^генерация ии$|^ai generate$/i }).click()
 
-    // Request payload contract.
+    // Request payload contract; the endpoint is JWT protected so the Bearer header is required.
+    expect(generateAuth).toMatch(/^Bearer /)
     await expect.poll(() => generateBody).not.toBeNull()
     expect(generateBody).toMatchObject({
       category_id: categoryId,

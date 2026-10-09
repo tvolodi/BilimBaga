@@ -1,5 +1,5 @@
 ---
-id: ISS-016
+id: ISS-102
 title: No dedicated e2e specs for employee record, certificates, tab-switch, AI assist, password reset, locale switcher
 status: resolved
 severity: low

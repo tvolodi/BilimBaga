@@ -23,21 +23,30 @@ async function startMixedExamSession(page: Page): Promise<string> {
 
   const continueBtn = card.getByRole('button', { name: /^продолжить$|^continue$/i })
   const startBtn = card.getByRole('button', { name: /начать экзамен|start exam/i })
-  const hasCta = await continueBtn
-    .or(startBtn)
-    .waitFor({ state: 'visible', timeout: 10_000 })
-    .then(() => true)
-    .catch(() => false)
-  // No Start/Continue CTA means the seeded employee has used all attempts on this exam.
-  test.skip(!hasCta, 'E2E Mixed Exam offers no Start/Continue action (attempts exhausted) - cannot open an exam session')
-
-  if (await continueBtn.isVisible()) {
-    await continueBtn.click()
+  if (await continueBtn.or(startBtn).waitFor({ state: 'visible', timeout: 5_000 }).then(() => true).catch(() => false)) {
+    if (await continueBtn.isVisible()) {
+      await continueBtn.click()
+    } else {
+      await startBtn.click()
+      const dialog = page.getByRole('dialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: /начать экзамен|begin exam/i }).click()
+    }
   } else {
-    await startBtn.click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await dialog.getByRole('button', { name: /начать экзамен|begin exam/i }).click()
+    // Card shows "View result" (e.g. exam-taking.spec.ts already submitted it): open a fresh
+    // session through the API, as exam-taking.spec.ts does.
+    const created = await page.evaluate(async () => {
+      const tok = localStorage.getItem('__e2e_access_token__')
+      const headers = { Authorization: `Bearer ${tok}` }
+      const list = await fetch('/api/v1/portal/exams', { headers }).then((r) => r.json())
+      const exam = ((list.data ?? []) as Array<{ id: string; title: string }>).find((e) => e.title === 'E2E Mixed Exam')
+      if (!exam) return null
+      const res = await fetch(`/api/v1/portal/exams/${exam.id}/sessions`, { method: 'POST', headers, credentials: 'include' })
+      const json = await res.json()
+      return (json.data as { session_id?: string } | null)?.session_id ?? null
+    })
+    test.skip(!created, 'Cannot open a session for E2E Mixed Exam (attempts exhausted or exam missing)')
+    await page.goto(`/portal/sessions/${created}`)
   }
   await expect(page).toHaveURL(/\/portal\/sessions\/[^/]+$/, { timeout: 20_000 })
   // Exam layout is mounted once the header timer/progress is rendered.

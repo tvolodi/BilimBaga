@@ -93,7 +93,7 @@ test.describe('Portal locale switcher (FR-BB316)', () => {
 
 test.describe('Login screen language selector (FR-BB316 AC5: own switcher)', () => {
   test('login screen has its own language selector and no portal switcher', async ({ browser }) => {
-    const ctx = await browser.newContext()
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const page = await ctx.newPage()
     try {
       await page.goto('/login')

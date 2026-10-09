@@ -21,7 +21,7 @@ test.describe('Account recovery (FR-BB115) - blocked on #33', () => {
   test.fixme(true, 'FR-BB115 / issue #33 not merged: no /forgot-password, /reset-password routes on main')
 
   test('login page links to /forgot-password', async ({ browser }) => {
-    const ctx = await browser.newContext()
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const page = await ctx.newPage()
     await page.goto('/login')
     await page.getByRole('link', { name: /забыли пароль|forgot password/i }).click()
@@ -30,7 +30,7 @@ test.describe('Account recovery (FR-BB115) - blocked on #33', () => {
   })
 
   test('forgot-password shows the same neutral confirmation for any email', async ({ browser }) => {
-    const ctx = await browser.newContext()
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const page = await ctx.newPage()
     await page.route(FORGOT_API, (route) =>
       route.fulfill({
@@ -52,7 +52,7 @@ test.describe('Account recovery (FR-BB115) - blocked on #33', () => {
   })
 
   test('reset-password with a valid token submits and redirects to /login', async ({ browser }) => {
-    const ctx = await browser.newContext()
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const page = await ctx.newPage()
     await page.route(RESET_API, (route) =>
       route.fulfill({
@@ -75,7 +75,7 @@ test.describe('Account recovery (FR-BB115) - blocked on #33', () => {
   })
 
   test('reset-password with an invalid token shows an error and a link back to /forgot-password', async ({ browser }) => {
-    const ctx = await browser.newContext()
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const page = await ctx.newPage()
     await page.route(RESET_API, (route) =>
       route.fulfill({

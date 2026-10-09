@@ -14,6 +14,7 @@ import (
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/bilimbaga/bilimbaga/internal/email"
 	"github.com/go-chi/chi/v5"
 )
@@ -87,6 +88,17 @@ func (s *service) RemindEmployee(ctx context.Context, actorID, userID, examID st
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("users.RemindEmployee: get user: %w", err)
+	}
+	// Department subtree scope (#253, deptscope): a target outside the caller's subtree
+	// gets the same 404 as an unknown user, so existence does not leak.
+	if sc := deptscope.FromContext(ctx); sc.Restricted {
+		inScope, err := s.repo.UserInDeptScope(ctx, sc, userID)
+		if err != nil {
+			return nil, fmt.Errorf("users.RemindEmployee: scope: %w", err)
+		}
+		if !inScope {
+			return nil, ErrNotFound
+		}
 	}
 	exists, err := s.repo.ExamExists(ctx, examID)
 	if err != nil {
@@ -256,4 +268,19 @@ func (r *pgRepository) InsertReminder(ctx context.Context, userID, examID, sentB
 		return fmt.Errorf("users.InsertReminder: %w", err)
 	}
 	return nil
+}
+
+// UserInDeptScope reports whether the user sits in the department subtree the caller may
+// see (deptscope.Predicate, the same subtree rule as the overdue table). A missing user is
+// reported as out of scope. sc must be Restricted; an unrestricted scope needs no check.
+func (r *pgRepository) UserInDeptScope(ctx context.Context, sc deptscope.Scope, userID string) (bool, error) {
+	q := `SELECT ` + deptscope.Predicate("u.id", "$2") + ` FROM users u WHERE u.id = $1`
+	var ok bool
+	if err := r.db.GetContext(ctx, &ok, q, userID, sc.Arg()); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("users.UserInDeptScope: %w", err)
+	}
+	return ok, nil
 }

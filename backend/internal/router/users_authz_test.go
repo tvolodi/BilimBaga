@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/bilimbaga/bilimbaga/internal/users"
@@ -466,3 +467,8 @@ func (r *authzRepo) LastReminderAt(context.Context, string, string) (*time.Time,
 	return nil, nil
 }
 func (r *authzRepo) InsertReminder(context.Context, string, string, string) error { return nil }
+
+// UserInDeptScope: this file tests role gates, not department scope, so every target is in scope.
+func (r *authzRepo) UserInDeptScope(context.Context, deptscope.Scope, string) (bool, error) {
+	return true, nil
+}

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +37,17 @@ func (m *mockRepo) InsertReminder(_ context.Context, u, e, by string) error {
 	}
 	m.reminders = append(m.reminders, u+"|"+e+"|"+by)
 	return nil
+}
+
+// UserInDeptScope (#253): users listed in outOfScope are outside the caller's subtree.
+func (m *mockRepo) UserInDeptScope(_ context.Context, _ deptscope.Scope, id string) (bool, error) {
+	return !m.outOfScope[id], nil
+}
+
+// scopedCtx is a request context carrying the principal that deptscope.FromContext reads.
+func scopedCtx(role, deptID string) context.Context {
+	ctx := context.WithValue(context.Background(), ctxkeys.CtxRole, role)
+	return context.WithValue(ctx, ctxkeys.CtxDepartmentID, deptID)
 }
 
 func (m *mockUserService) RemindEmployee(ctx context.Context, actorID, userID, examID string) (*RemindResult, error) {
@@ -271,4 +284,64 @@ func TestRemindRoute_EmployeeForbidden(t *testing.T) {
 	guarded.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusForbidden, w.Code)
 	assert.False(t, called)
+}
+
+// ── #253 department subtree scope ─────────────────────────────────────────────
+
+const rDeptAdminDept = "33333333-3333-4333-8333-333333333333"
+
+// An out-of-scope target is "not found" and is neither emailed nor recorded.
+func TestRemindEmployee_DeptAdmin_OutOfScope_NotFound(t *testing.T) {
+	s, repo, fr := remindSvc(t)
+	repo.outOfScope = map[string]bool{rUser: true}
+	_, err := s.RemindEmployee(scopedCtx("department_admin", rDeptAdminDept), "actor", rUser, rExam)
+	assert.ErrorIs(t, err, ErrNotFound)
+	assert.Equal(t, 0, fr.calls, "out-of-scope target must not be emailed")
+	assert.Empty(t, repo.reminders)
+}
+
+// An in-subtree target is reminded as before.
+func TestRemindEmployee_DeptAdmin_InSubtree_Sends(t *testing.T) {
+	s, repo, fr := remindSvc(t)
+	res, err := s.RemindEmployee(scopedCtx("department_admin", rDeptAdminDept), "actor", rUser, rExam)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, 1, fr.calls)
+	assert.Len(t, repo.reminders, 1)
+}
+
+// super_admin is unrestricted: scope never blocks it.
+func TestRemindEmployee_SuperAdmin_UnaffectedByScope(t *testing.T) {
+	s, repo, fr := remindSvc(t)
+	repo.outOfScope = map[string]bool{rUser: true}
+	_, err := s.RemindEmployee(scopedCtx("super_admin", ""), "actor", rUser, rExam)
+	require.NoError(t, err)
+	assert.Equal(t, 1, fr.calls)
+}
+
+// Through the handler, out-of-scope gets the same 404 body as an unknown user.
+func TestHandlerRemind_DeptAdmin_OutOfScope_404(t *testing.T) {
+	s, repo, _ := remindSvc(t)
+	repo.outOfScope = map[string]bool{rUser: true}
+	h := &Handler{svc: s, writer: &spyWriter{}}
+	w := httptest.NewRecorder()
+	h.RemindEmployee(w, withAuthCtx(remindReq(rUser, examBody()), "actor", "department_admin", rDeptAdminDept))
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "user not found")
+}
+
+// UAT S7 (445216d): a department_admin reminding an employee with no department got 200.
+// That target is never in the caller's subtree, so it must be 404 and nothing is sent.
+func TestHandlerRemind_DeptAdmin_NoDepartmentTarget_404(t *testing.T) {
+	const rNoDept = "44444444-4444-4444-8444-444444444444"
+	s, repo, fr := remindSvc(t)
+	repo.users[rNoDept] = sampleUser(rNoDept)
+	repo.overdue[rNoDept+"|"+rExam] = true
+	repo.outOfScope = map[string]bool{rNoDept: true}
+	h := &Handler{svc: s, writer: &spyWriter{}}
+	w := httptest.NewRecorder()
+	h.RemindEmployee(w, withAuthCtx(remindReq(rNoDept, examBody()), "actor", "department_admin", rDeptAdminDept))
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "user not found")
+	assert.Equal(t, 0, fr.calls)
 }

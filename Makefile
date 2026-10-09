@@ -21,5 +21,5 @@ test:
 # AC-7 (FR-BB64): dependency integrity and vulnerability checks required in CI.
 security-check:
 	cd backend && go mod verify
-	# Production dependencies gate the build; the dev toolchain (vitest 2.x) is audited non-blocking in CI.
+	# Production dependencies gate the build; the full tree (incl. dev toolchain) is audited blocking in security.yml.
 	cd frontend && npm audit --omit=dev --audit-level=high

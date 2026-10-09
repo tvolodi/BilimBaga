@@ -20,7 +20,6 @@ import { useRefreshToken } from '@/api/auth'
 import { useLocaleDirection } from '@/hooks/useLocaleDirection'
 import { SkipLink } from '@/components/SkipLink'
 import { PasswordChangeGuard } from '@/components/PasswordChangeGuard'
-import { PreferredLocaleSync } from '@/components/PreferredLocaleSync'
 import { createAppQueryClient } from '@/lib/passwordChangeRequired'
 
 // Login stays eager (first paint); other employee/auth routes are lazy (FR-BB65 initial JS budget, #200)
@@ -41,6 +40,10 @@ const ProfilePage = lazy(() =>
 )
 const ProfileRedirect = lazy(() =>
   import('@/pages/profile/ProfilePage').then((m) => ({ default: m.ProfileRedirect })),
+)
+// FR-BB116 AC-7 side-effect component (renders null); lazy so it stays out of the initial JS budget (FR-BB65)
+const PreferredLocaleSync = lazy(() =>
+  import('@/components/PreferredLocaleSync').then((m) => ({ default: m.PreferredLocaleSync })),
 )
 const ResetPasswordPage = lazy(() =>
   import('@/pages/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
@@ -170,7 +173,9 @@ function AuthedRoutes() {
   return (
     <>
       <PasswordChangeGuard />
-      <PreferredLocaleSync />
+      <Suspense fallback={null}>
+        <PreferredLocaleSync />
+      </Suspense>
       <Suspense fallback={<FullPageSpinner />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

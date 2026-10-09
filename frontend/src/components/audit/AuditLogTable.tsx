@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
@@ -67,9 +67,8 @@ export function AuditLogTable({ entries }: AuditLogTableProps) {
           {entries.map((entry) => {
             const isExpanded = expandedRows.has(entry.id)
             return (
-              <>
+              <Fragment key={entry.id}>
                 <TableRow
-                  key={entry.id}
                   className="cursor-pointer"
                   onClick={() => toggleRow(entry.id)}
                 >
@@ -116,7 +115,7 @@ export function AuditLogTable({ entries }: AuditLogTableProps) {
                 </TableRow>
 
                 {isExpanded && (
-                  <TableRow key={`${entry.id}-meta`}>
+                  <TableRow>
                     <TableCell colSpan={7} className="bg-muted/30 py-2">
                       <pre className="overflow-auto rounded bg-muted p-2 text-xs">
                         {JSON.stringify(entry.metadata, null, 2)}
@@ -124,7 +123,7 @@ export function AuditLogTable({ entries }: AuditLogTableProps) {
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </Fragment>
             )
           })}
         </TableBody>

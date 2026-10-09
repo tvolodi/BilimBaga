@@ -469,6 +469,12 @@ async function startSession(employeeToken: string, examId: string): Promise<stri
       console.log('[seed] Max attempts exhausted for this exam — skipping session creation')
       return null
     }
+    if (result.error === 'INSUFFICIENT_QUESTIONS') {
+      // ISS-132: the server now refuses to start an exam that resolves to zero questions (e.g. the
+      // seeded exam's question went draft after the editor specs). Do not kill global-setup.
+      console.warn(`[seed] WARNING: exam ${examId} cannot start (INSUFFICIENT_QUESTIONS) — skipping session creation`)
+      return null
+    }
     throw new Error(`Failed to start session: ${result.error}`)
   }
   return result.data?.session_id ?? null

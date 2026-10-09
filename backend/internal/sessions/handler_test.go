@@ -1,9 +1,12 @@
 package sessions
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -334,6 +337,31 @@ func TestCreateSession_Handler_422_InsufficientQuestions(t *testing.T) {
 	body := decodeBody(t, w.Body.Bytes())
 	errObj, _ := body["error"].(map[string]any)
 	assert.Equal(t, "INSUFFICIENT_QUESTIONS", errObj["code"])
+}
+
+// ISS-132: a refused start is logged with its wrapped cause (no more silent 4xx/5xx).
+func TestCreateSession_Handler_LogsRefusalCause(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	svc := &mockSvc{
+		createSessionFn: func(_ context.Context, _, _, _ string) (*CreateSessionResponse, error) {
+			return nil, fmt.Errorf("sessions: CreateSession: exam exam-1 resolved to zero questions: %w", ErrInsufficientQuestions)
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodPost, "/portal/exams/exam-1/sessions", nil)
+	req = withChiParam(req, "id", "exam-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.CreateSession(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, buf.String(), "resolved to zero questions")
+	assert.Contains(t, buf.String(), "exam_id=exam-1")
 }
 
 // ── 500 internal error ───────────────────────────────────────────────────────

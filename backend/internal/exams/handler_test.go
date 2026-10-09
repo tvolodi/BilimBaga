@@ -847,6 +847,17 @@ func TestPublish_UnsatisfiedRules_Returns422(t *testing.T) {
 	assert.Equal(t, "EXAM_RULES_UNSATISFIED", env.Error.Code)
 }
 
+func TestPublish_NoRules_Returns422InsufficientQuestions(t *testing.T) {
+	h := newHandler(&mockSvc{
+		publishFn: func(_ context.Context, _ string) (*Exam, error) { return nil, ErrNoQuestionRules },
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/publish", nil), "id", "exam-1")
+	h.Publish(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Equal(t, "INSUFFICIENT_QUESTIONS", decode(t, w).Error.Code)
+}
+
 func TestPublish_NotDraft_Returns409(t *testing.T) {
 	h := newHandler(&mockSvc{
 		publishFn: func(_ context.Context, _ string) (*Exam, error) { return nil, ErrNotDraft },

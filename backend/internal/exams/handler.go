@@ -346,6 +346,9 @@ func (h *Handler) Publish(w http.ResponseWriter, r *http.Request) {
 					"details": pve.Details,
 				},
 			})
+		case errors.Is(err, ErrNoQuestionRules):
+			api.WriteError(w, http.StatusUnprocessableEntity, "INSUFFICIENT_QUESTIONS",
+				"The exam has no questions. Add at least one question rule before publishing.")
 		case errors.Is(err, ErrNotFound):
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "exam not found")
 		case errors.Is(err, ErrNotDraft):

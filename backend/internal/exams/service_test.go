@@ -827,6 +827,15 @@ func TestPublish_DraftWithSatisfiedRules_Succeeds(t *testing.T) {
 	assert.Equal(t, "active", e.Status)
 }
 
+// ISS-132: publishing a fixed-form exam with zero rules is refused (it would start empty).
+func TestPublish_NoRules_ReturnsErrNoQuestionRules(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	_, err := svc.Publish(context.Background(), "exam-1")
+	assert.ErrorIs(t, err, ErrNoQuestionRules)
+}
+
 func TestPublish_UnsatisfiedRule_Returns422Error(t *testing.T) {
 	repo := newMockRepo()
 	seedExam(repo, "exam-1", "draft")

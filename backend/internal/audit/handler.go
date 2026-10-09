@@ -34,7 +34,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	page := parseIntParam(r, "page", 1)
 	perPage := parseIntParam(r, "per_page", 50)
 
-	filters := parseFilters(r)
+	filters, ok := parseFilters(w, r)
+	if !ok {
+		return
+	}
 
 	entries, total, err := h.svc.List(r.Context(), tenantID, filters, page, perPage)
 	if err != nil {
@@ -65,7 +68,10 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filters := parseFilters(r)
+	filters, ok := parseFilters(w, r)
+	if !ok {
+		return
+	}
 
 	entries, err := h.svc.Export(r.Context(), tenantID, filters)
 	if err != nil {
@@ -124,9 +130,13 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 // Only explicitly allowlisted params are mapped — free-form WHERE injection is not possible.
 // The "actor" param is a free-text partial match on actor full_name (ILIKE).
 // The "actor_id" param is an exact UUID match.
-func parseFilters(r *http.Request) AuditFilters {
+func parseFilters(w http.ResponseWriter, r *http.Request) (AuditFilters, bool) {
 	var f AuditFilters
-	if v := r.URL.Query().Get("actor_id"); v != "" {
+	v, ok := api.UUIDQuery(w, r, "actor_id")
+	if !ok {
+		return f, false
+	}
+	if v != "" {
 		f.ActorID = &v
 	}
 	if v := r.URL.Query().Get("actor"); v != "" {
@@ -148,7 +158,7 @@ func parseFilters(r *http.Request) AuditFilters {
 			f.To = &t
 		}
 	}
-	return f
+	return f, true
 }
 
 // parseIntParam reads an integer query param, returning defaultVal on missing or invalid input.

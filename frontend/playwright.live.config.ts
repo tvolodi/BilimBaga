@@ -79,6 +79,7 @@ export default defineConfig({
         '**/my-results.spec.ts',
         '**/tab-switch.spec.ts',
         '**/locale-switcher.spec.ts',
+        '**/exam-start-failure.spec.ts',
       ],
       use: {
         ...devices['Desktop Chrome'],

@@ -2,6 +2,7 @@
 
 | ID | Title | Severity | Layer | Module | Status | Resolved |
 |----|-------|----------|-------|--------|--------|---------|
+| [ISS-141](ISS-141-uuid-params-422.md) | Malformed UUID id params (query and path) reach Postgres and return 500 | medium | backend | users | resolved | 2026-10-09 |
 | [ISS-102](ISS-102-e2e-specs-uncovered-flows.md) | Add e2e specs for uncovered flows (issue #16) | low | frontend | e2e | resolved | 2026-10-09 |
 | [ISS-001](ISS-001-stale-dist-usematches-crash.md) | Stale dist `useMatches` crash on page load | high | frontend | auth | resolved | 2026-05-16 |
 | [ISS-002](ISS-002-e2e-walkthrough-false-positive-passes.md) | E2E walkthrough false-positive passes | high | frontend | auth | resolved | 2026-05-16 |

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/bilimbaga/bilimbaga/internal/ai"
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/categories"
@@ -78,6 +79,9 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		r.Group(func(r chi.Router) {
 			r.Use(ratelimit.GlobalLimiter())
 			r.Use(authenticate(jwtSecret, db))
+			// Malformed UUID path params 404 here instead of reaching Postgres (500).
+			// Runs after routing, so chi URL params are resolved (ISS-141).
+			r.Use(api.RequireUUIDPathParams(api.UUIDPathParamNames...))
 			r.Post("/auth/change-password", authHandler.ChangePassword)
 
 			// Tenant configuration — requires super_admin.

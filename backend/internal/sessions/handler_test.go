@@ -1,9 +1,12 @@
 package sessions
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -334,6 +337,31 @@ func TestCreateSession_Handler_422_InsufficientQuestions(t *testing.T) {
 	body := decodeBody(t, w.Body.Bytes())
 	errObj, _ := body["error"].(map[string]any)
 	assert.Equal(t, "INSUFFICIENT_QUESTIONS", errObj["code"])
+}
+
+// ISS-132: a refused start is logged with its wrapped cause (no more silent 4xx/5xx).
+func TestCreateSession_Handler_LogsRefusalCause(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	svc := &mockSvc{
+		createSessionFn: func(_ context.Context, _, _, _ string) (*CreateSessionResponse, error) {
+			return nil, fmt.Errorf("sessions: CreateSession: exam exam-1 resolved to zero questions: %w", ErrInsufficientQuestions)
+		},
+	}
+	h := NewHandler(svc)
+	req := httptest.NewRequest(http.MethodPost, "/portal/exams/exam-1/sessions", nil)
+	req = withChiParam(req, "id", "exam-1")
+	req = withUserCtx(req, "user-1", "dept-1")
+	w := httptest.NewRecorder()
+
+	h.CreateSession(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, buf.String(), "resolved to zero questions")
+	assert.Contains(t, buf.String(), "exam_id=exam-1")
 }
 
 // ── 500 internal error ───────────────────────────────────────────────────────
@@ -1527,4 +1555,36 @@ func TestGetNextQuestion_500_ServiceError(t *testing.T) {
 	h.GetNextQuestion(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// ISS-141: exam_id filter is a UUID column; malformed -> 422, valid passes through.
+func TestHandleListGradingQueue_ExamIDFilter(t *testing.T) {
+	const examID = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	var got *string
+	called := false
+	svc := &mockSvc{
+		listGradingQueueFn: func(_ context.Context, e *string, _, _ *time.Time, _, _ int) (*GradingQueueResponse, error) {
+			called = true
+			got = e
+			return &GradingQueueResponse{Items: []GradingQueueItem{}, Meta: GradingQueueMeta{Page: 1, PerPage: 20}}, nil
+		},
+	}
+	h := NewHandler(svc)
+	do := func(q string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/admin/grading?"+q, nil)
+		req = req.WithContext(context.WithValue(req.Context(), ctxkeys.CtxTenantID, "tenant-1"))
+		w := httptest.NewRecorder()
+		h.HandleListGradingQueue(w, req)
+		return w
+	}
+
+	w := do("exam_id=not-a-uuid")
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, w.Body.String(), "VALIDATION_ERROR")
+	assert.False(t, called)
+
+	w = do("exam_id=" + examID)
+	assert.Equal(t, http.StatusOK, w.Code)
+	require.NotNil(t, got)
+	assert.Equal(t, examID, *got)
 }

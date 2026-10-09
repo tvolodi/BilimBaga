@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { usePortalExams, useCreateSession } from '@/api/portal'
-import type { PortalExam } from '@/api/portal'
+import type { PortalExam, PortalApiError } from '@/api/portal'
 import { ExamCard } from './ExamCard'
 import { ExamCardSkeleton } from './ExamCardSkeleton'
 import { StartExamModal } from './StartExamModal'
@@ -11,6 +12,7 @@ import { EmptyPortal } from './EmptyPortal'
 export function EmployeePortal() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: exams, isLoading, isError } = usePortalExams()
   const [selectedExam, setSelectedExam] = useState<PortalExam | null>(null)
 
@@ -27,8 +29,18 @@ export function EmployeePortal() {
         setSelectedExam(null)
         navigate(`/portal/sessions/${data.session_id}`)
       },
+      onError: () => {
+        // The exam list may be stale (e.g. a session is already open): refresh it so the card reflects reality.
+        void queryClient.invalidateQueries({ queryKey: ['portal', 'exams'] })
+      },
     })
   }
+
+  // Map a backend error code to a translated message; unknown codes fall back to a generic one.
+  const startError = createSession.error as PortalApiError | null
+  const startErrorMessage = startError
+    ? t(`portal.startError.${startError.code}`, { defaultValue: t('portal.startError.generic') })
+    : null
 
   function handleClose() {
     setSelectedExam(null)
@@ -67,6 +79,7 @@ export function EmployeePortal() {
             onClose={handleClose}
             onConfirm={handleConfirm}
             isLoading={createSession.isPending}
+            errorMessage={startErrorMessage}
           />
         )}
       </div>

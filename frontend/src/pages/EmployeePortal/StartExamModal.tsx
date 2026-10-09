@@ -15,6 +15,8 @@ interface StartExamModalProps {
   onClose: () => void
   onConfirm: () => void
   isLoading: boolean
+  /** Already-translated message shown when starting the exam failed. */
+  errorMessage?: string | null
 }
 
 export function StartExamModal({
@@ -23,6 +25,7 @@ export function StartExamModal({
   onClose,
   onConfirm,
   isLoading,
+  errorMessage,
 }: StartExamModalProps) {
   const { t } = useTranslation()
   const remaining = exam.max_attempts - exam.attempts_used
@@ -40,6 +43,11 @@ export function StartExamModal({
           <p>{t('portal.modal.passingScore', { pct: exam.passing_score_pct })}</p>
           <p>{t('portal.modal.maxAttempts', { remaining })}</p>
           <p className="text-amber-600 font-medium">{t('portal.modal.warning')}</p>
+          {errorMessage && (
+            <p role="alert" className="text-destructive font-medium">
+              {errorMessage}
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isLoading}>

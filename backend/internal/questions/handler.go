@@ -164,14 +164,21 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Page:    parseIntParam(r, "page", 1),
 		PerPage: parseIntParam(r, "per_page", 20),
 	}
-	if v := r.URL.Query().Get("category_id"); v != "" {
-		filter.CategoryID = &v
+	categoryID, ok := api.UUIDQuery(w, r, "category_id")
+	if !ok {
+		return
+	}
+	if categoryID != "" {
+		filter.CategoryID = &categoryID
 	}
 	// tag_ids accepts comma-separated UUIDs; tag_id is a backward-compat alias.
 	if v := r.URL.Query().Get("tag_ids"); v != "" {
 		filter.TagIDs = splitCommaSeparated(v)
 	} else if v := r.URL.Query().Get("tag_id"); v != "" {
 		filter.TagIDs = []string{v}
+	}
+	if !api.ValidateUUIDList(w, "tag_ids", filter.TagIDs) {
+		return
 	}
 	// difficulties accepts comma-separated values; difficulty is a backward-compat alias.
 	if v := r.URL.Query().Get("difficulties"); v != "" {

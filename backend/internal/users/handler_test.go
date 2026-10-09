@@ -664,3 +664,47 @@ func TestHandlerListUsers_RoleIDFilter_NonUUID_Returns422(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
 	assert.False(t, called, "service must not be called for an invalid role_id")
 }
+
+// ISS-141: department_id is a UUID column too; malformed values must 422.
+func TestHandlerListUsers_DepartmentIDFilter_PassedToService(t *testing.T) {
+	const deptID = "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22"
+	var got ListFilters
+	svc := &mockUserService{
+		listFn: func(_ context.Context, _, _ string, f ListFilters) (*ListResult, error) {
+			got = f
+			return &ListResult{Items: []User{}, Meta: Meta{Page: 1, PerPage: 20}}, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users?department_id="+deptID, nil)
+	req = withAuthCtx(req, "caller-1", "super_admin", "")
+	w := httptest.NewRecorder()
+	h.ListUsers(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	require.NotNil(t, got.DepartmentID)
+	assert.Equal(t, deptID, *got.DepartmentID)
+}
+
+func TestHandlerListUsers_DepartmentIDFilter_NonUUID_Returns422(t *testing.T) {
+	called := false
+	svc := &mockUserService{
+		listFn: func(_ context.Context, _, _ string, _ ListFilters) (*ListResult, error) {
+			called = true
+			return &ListResult{}, nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users?department_id=engineering", nil)
+	req = withAuthCtx(req, "caller-1", "super_admin", "")
+	w := httptest.NewRecorder()
+	h.ListUsers(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
+	assert.False(t, called)
+}

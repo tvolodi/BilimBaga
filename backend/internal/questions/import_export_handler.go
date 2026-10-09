@@ -125,12 +125,22 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusBadRequest, "ERR_INVALID_PARAM", "ids: maximum 100 IDs allowed")
 			return
 		}
+		if !api.ValidateUUIDList(w, "ids", filter.IDs) {
+			return
+		}
 	} else {
-		if v := r.URL.Query().Get("category_id"); v != "" {
-			filter.CategoryID = &v
+		categoryID, ok := api.UUIDQuery(w, r, "category_id")
+		if !ok {
+			return
+		}
+		if categoryID != "" {
+			filter.CategoryID = &categoryID
 		}
 		if v := r.URL.Query().Get("tag_ids"); v != "" {
 			filter.TagIDs = splitCommaSeparated(v)
+			if !api.ValidateUUIDList(w, "tag_ids", filter.TagIDs) {
+				return
+			}
 		}
 		if v := r.URL.Query().Get("difficulties"); v != "" {
 			filter.Difficulties = splitCommaSeparated(v)

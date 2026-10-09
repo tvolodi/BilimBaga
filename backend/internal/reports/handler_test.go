@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"testing"
 	"time"
@@ -803,4 +804,65 @@ func TestDashboardExportPDF_200_PDFBody(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "application/pdf", w.Header().Get("Content-Type"))
 	assert.True(t, bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF")))
+}
+
+// ── ISS-163: CSV export must not return an empty 200 on failure ─────────────
+
+func TestExamResultsCSV_500_ServiceError_NoCSVHeaders(t *testing.T) {
+	svc := &mockSvc{
+		streamExamResultsCSVFn: func(_ context.Context, w http.ResponseWriter, _, _ string) error {
+			// Partial output before failing must be discarded.
+			_, _ = w.Write([]byte("employee_name,department\n"))
+			return errors.New("db error")
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/api/v1/admin/exams/exam-uuid/results/export", "exam-uuid")
+	w := httptest.NewRecorder()
+	h.ExamResultsCSV(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.NotContains(t, w.Header().Get("Content-Type"), "text/csv")
+	assert.Empty(t, w.Header().Get("Content-Disposition"))
+	assert.NotContains(t, w.Body.String(), "employee_name")
+	assert.Contains(t, w.Body.String(), "INTERNAL_ERROR")
+}
+
+func TestExamResultsCSV_200_HeaderAndDataRows(t *testing.T) {
+	svc := &mockSvc{
+		streamExamResultsCSVFn: func(_ context.Context, w http.ResponseWriter, _, _ string) error {
+			_, _ = w.Write([]byte("employee_name,score_pct\nAibek,84.50\n"))
+			return nil
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/x", "exam-uuid")
+	w := httptest.NewRecorder()
+	h.ExamResultsCSV(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	lines := strings.Split(strings.TrimSpace(w.Body.String()), "\n")
+	require.Len(t, lines, 2)
+	assert.Equal(t, "employee_name,score_pct", lines[0])
+	assert.Equal(t, "Aibek,84.50", lines[1])
+}
+
+func TestUserRecordCSV_500_ServiceError_NoCSVHeaders(t *testing.T) {
+	svc := &mockSvc{
+		streamUserRecordCSVFn: func(_ context.Context, w http.ResponseWriter, _, _ string) error {
+			_, _ = w.Write([]byte("exam_title\n"))
+			return errors.New("db error")
+		},
+	}
+	h := NewHandler(svc, nil)
+
+	req := newRequestWithID(http.MethodGet, "/x", "user-uuid")
+	w := httptest.NewRecorder()
+	h.UserRecordCSV(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.NotContains(t, w.Header().Get("Content-Type"), "text/csv")
+	assert.NotContains(t, w.Body.String(), "exam_title")
 }

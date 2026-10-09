@@ -2,6 +2,7 @@ package reports
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -862,4 +863,36 @@ func TestStreamExamResultsCSV_AcceptsResponseWriter(t *testing.T) {
 	var w http.ResponseWriter = httptest.NewRecorder()
 	// Must not panic — interface compatibility confirmed.
 	_ = svc.StreamExamResultsCSV(context.Background(), w, "e", "t")
+}
+
+// ISS-163: happy path with real rows — header row plus data rows with question scores.
+func TestStreamExamResultsCSV_HeaderAndDataRows(t *testing.T) {
+	db, f := newFakeDB(t)
+	f.queue(
+		[]string{"session_id", "employee_name", "department", "started_at", "submitted_at", "score_pct", "passed", "time_taken_seconds"},
+		[][]driver.Value{
+			{"s1", "Aibek", "Ops", "2026-05-14T10:00:00Z", "2026-05-14T10:30:00Z", 84.5, true, int64(1800)},
+		},
+	)
+	score := 1.0
+	repo := &mockRepo{
+		getExamQuestionsFn: func(_ context.Context, _, _ string) ([]ExamQuestion, error) {
+			return []ExamQuestion{{QuestionID: "q1", Position: 1}}, nil
+		},
+		streamExamResultSessionsFn: func(ctx context.Context, _, _ string) (*sqlx.Rows, error) {
+			return db.QueryxContext(ctx, "SELECT 1")
+		},
+		getSessionQuestionScoresFn: func(_ context.Context, _ []string) ([]QuestionScore, error) {
+			return []QuestionScore{{SessionID: "s1", QuestionID: "q1", Score: &score}}, nil
+		},
+	}
+	svc := NewService(repo)
+
+	w := httptest.NewRecorder()
+	require.NoError(t, svc.StreamExamResultsCSV(context.Background(), w, "exam-uuid", "tenant-uuid"))
+
+	lines := strings.Split(strings.TrimSpace(w.Body.String()), "\n")
+	require.Len(t, lines, 2)
+	assert.Equal(t, "employee_name,department,started_at,submitted_at,score_pct,passed,time_taken_seconds,question_1_score", lines[0])
+	assert.Equal(t, "Aibek,Ops,2026-05-14T10:00:00Z,2026-05-14T10:30:00Z,84.50,true,1800,1", lines[1])
 }

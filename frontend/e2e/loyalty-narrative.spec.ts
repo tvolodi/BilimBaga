@@ -81,9 +81,9 @@ async function seedLoyaltySession(adminToken: string, employeeId: string): Promi
         default_locale: 'en',
         translations: { en: { stem: 'E2E Loyalty: Rate your commitment.', explanation: '' } },
         answer_options: [
-          { sort_order: 1, is_correct: false, likert_weight: 1, likert_polarity: 'positive', translations: { en: { body: 'Strongly Agree' } } },
-          { sort_order: 2, is_correct: false, likert_weight: 2, likert_polarity: 'positive', translations: { en: { body: 'Agree' } } },
-          { sort_order: 3, is_correct: false, likert_weight: 3, likert_polarity: 'positive', translations: { en: { body: 'Neutral' } } },
+          { sort_order: 1, is_correct: false, likert_weight: 1, likert_polarity: 'positive', translations: { en: { text: 'Strongly Agree' } } },
+          { sort_order: 2, is_correct: false, likert_weight: 2, likert_polarity: 'positive', translations: { en: { text: 'Agree' } } },
+          { sort_order: 3, is_correct: false, likert_weight: 3, likert_polarity: 'positive', translations: { en: { text: 'Neutral' } } },
         ],
       }, adminToken)
       if (!qRes.ok || !qRes.data?.id) return null

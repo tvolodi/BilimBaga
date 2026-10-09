@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -136,6 +137,33 @@ func (h *Handler) GetUserProgress(w http.ResponseWriter, r *http.Request) {
 
 // ── FR-BB54: Export API ──────────────────────────────────────────────────────
 
+// csvBuffer is an http.ResponseWriter that collects the body in memory so the
+// handler can decide the status code only after the export has fully succeeded.
+type csvBuffer struct {
+	hdr http.Header
+	buf bytes.Buffer
+}
+
+func (b *csvBuffer) Header() http.Header         { return b.hdr }
+func (b *csvBuffer) Write(p []byte) (int, error) { return b.buf.Write(p) }
+func (b *csvBuffer) WriteHeader(int)             {}
+
+// writeBufferedCSV runs fn against an in-memory writer. Only when fn succeeds
+// are the CSV headers and body sent to w (status 200). On error nothing is
+// written to w, so the caller can still reply with a proper error status
+// instead of an empty 200 file (ISS-163).
+func writeBufferedCSV(w http.ResponseWriter, filename string, fn func(http.ResponseWriter) error) error {
+	b := &csvBuffer{hdr: http.Header{}}
+	if err := fn(b); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write(b.buf.Bytes())
+	return err
+}
+
 // ExamResultsCSV handles GET /api/v1/admin/exams/:id/results/export (FR-BB54 AC-2,3,4,8,10).
 // Role restriction (examiner+) is enforced by the router via rbac.RequirePermission.
 func (h *Handler) ExamResultsCSV(w http.ResponseWriter, r *http.Request) {
@@ -148,12 +176,12 @@ func (h *Handler) ExamResultsCSV(w http.ResponseWriter, r *http.Request) {
 	tenantID := auth.TenantIDFromCtx(r.Context())
 	filename := fmt.Sprintf("results-%s-%s.csv", examID, time.Now().UTC().Format("20060102"))
 
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-
-	if err := h.svc.StreamExamResultsCSV(r.Context(), w, examID, tenantID); err != nil {
-		// Headers already sent — we cannot change status code. Log and return.
+	err := writeBufferedCSV(w, filename, func(bw http.ResponseWriter) error {
+		return h.svc.StreamExamResultsCSV(r.Context(), bw, examID, tenantID)
+	})
+	if err != nil {
 		slog.Error("reports: exam results CSV export failed", "error", err, "examId", examID)
+		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to export exam results")
 	}
 }
 
@@ -169,12 +197,12 @@ func (h *Handler) UserRecordCSV(w http.ResponseWriter, r *http.Request) {
 	tenantID := auth.TenantIDFromCtx(r.Context())
 	filename := fmt.Sprintf("record-%s-%s.csv", userID, time.Now().UTC().Format("20060102"))
 
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-
-	if err := h.svc.StreamUserRecordCSV(r.Context(), w, userID, tenantID); err != nil {
-		// Headers already sent — we cannot change status code; log it.
+	err := writeBufferedCSV(w, filename, func(bw http.ResponseWriter) error {
+		return h.svc.StreamUserRecordCSV(r.Context(), bw, userID, tenantID)
+	})
+	if err != nil {
 		slog.Error("reports: user record CSV export failed", "error", err, "userId", userID)
+		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to export user record")
 	}
 }
 

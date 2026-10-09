@@ -22,9 +22,9 @@ Hard-coded status lists in `backend/internal/reports/repository.go` were never u
 Real `session_status` enum values (migrations 014, 015): `in_progress`, `submitted`, `auto_submitted`, `grading_pending`.
 
 ## Fix Applied
-Seven status predicates now use `IN ('submitted','auto_submitted','grading_pending')`: GetCompletionRateByExam,
-GetRecentActivity, GetAvgScoreByTrack (was `= 'submitted'`), GetUserTrackActivity, GetUserRequiredExams,
-GetDashboardCompletionRatesForRange, GetTopBottomQuestions. deptscope placeholders untouched. No migration.
+Seven status predicates changed. Split rule: completion counts include grading_pending, score aggregates exclude it (partial scores).
+- Completion (`IN ('submitted','auto_submitted','grading_pending')`): GetCompletionRateByExam, GetRecentActivity, GetUserTrackActivity, GetUserRequiredExams, GetDashboardCompletionRatesForRange.
+- Score aggregates (`IN ('submitted','auto_submitted')`): GetAvgScoreByTrack (was `= 'submitted'`), GetTopBottomQuestions (correct rate). deptscope placeholders untouched. No migration.
 
 ## Per-item outcome
 | # | Item | Outcome |

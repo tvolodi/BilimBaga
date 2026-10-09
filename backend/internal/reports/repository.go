@@ -393,7 +393,7 @@ FROM exam_sessions es
 JOIN session_question_scores sqs ON sqs.session_id = es.id
 JOIN questions q                  ON q.id = sqs.question_id
 JOIN categories c                 ON c.id = q.category_id
-WHERE es.status IN ('submitted', 'auto_submitted', 'grading_pending')
+WHERE es.status IN ('submitted', 'auto_submitted')
   AND @SCOPE@
   AND es.submitted_at >= NOW() - INTERVAL '90 days'
   AND c.track IN ('security', 'safety', 'loyalty')
@@ -969,7 +969,7 @@ WITH question_rates AS (
   JOIN session_question_scores sqs ON sqs.session_id = es.id
   JOIN questions q                  ON q.id = sqs.question_id
   JOIN question_translations qt     ON qt.question_id = q.id AND qt.locale = q.default_locale
-  WHERE es.status IN ('submitted', 'auto_submitted', 'grading_pending')
+  WHERE es.status IN ('submitted', 'auto_submitted')
     AND es.submitted_at BETWEEN $1 AND $2
     AND @SCOPE@
   GROUP BY q.id, qt.stem

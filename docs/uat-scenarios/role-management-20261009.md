@@ -2,7 +2,7 @@
 slug: role-management
 title: "Role Management (custom roles and permission matrix) — UAT Scenario"
 feature: role-management (FR-BB117; GitHub issue #135)
-version: 3
+version: 4
 created: 2026-10-09
 author: Business Analyst
 ---
@@ -95,7 +95,7 @@ Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (as
 | 2 | Custom2 user | `POST /api/v1/users/{super_admin_in_A}/reset-password` | 403 `FORBIDDEN`, body has no `temporary_password` (D-1, shipped in PR #222; the check runs before any password is generated) | |
 | 3 | Custom2 user | `PUT /api/v1/users/{department_admin_in_A}` / `POST .../deactivate` / `POST .../unlock` / `POST .../reset-password` | 403 for the same reason (D-1); an employee target whose permissions the caller holds is allowed (reset-password 200) | |
 | 4 | Custom user (`qa_reviewer`, `reports:read`) | `GET /api/v1/admin/dashboard` and `/admin/reports/exams/{id}` | Data limited to the caller's department like `department_admin` (FR-BB117 D-2). Expected to FAIL until #218 is merged (branch `swarm/218-deptscope-all-roles`) | |
-| 5 | Custom2 user | `PUT /api/v1/users/{self}` changing own role (there is no `PUT /users/me`) | 403 `FORBIDDEN` (self role change blocked for every role except super_admin) | |
+| 5 | Custom2 user | `PUT /api/v1/users/{self}` changing own role (there is no `PUT /users/me`) | 403 `FORBIDDEN` (self role change blocked for every role, including super_admin; D-4b, issue #240) | |
 | 6 | Custom2 user | Via `PUT /api/v1/users/{employee_in_A}` and `POST /api/v1/users`, assign role `department_admin` or `super_admin` | 403 `FORBIDDEN` always (a custom role never reaches a built-in role of department_admin rank or higher). Assigning a custom role whose permissions are not a subset of the caller's, or that holds `roles:read`/`roles:manage`/`tenant:manage`, is also 403 | |
 | 7 | Dept admin A1 | Using `uat.deptadmin` (department A) against a peer `department_admin` A2 in the same department: `POST /api/v1/users/{A2}/reset-password`, `PUT /api/v1/users/{A2}`, `POST /api/v1/users/{A2}/deactivate`, `POST /api/v1/users/{A2}/unlock` | 403 `FORBIDDEN` on each (strict rank hierarchy, FR-BB117 D-1); the response body contains no temporary password; A2 can still log in with the old password | |
 | 8 | Dept admin A1 | Same four calls against a `super_admin` user and against an `examiner` and an `employee` in department A | `super_admin` target: 403 on all four. `examiner` and `employee` targets: allowed (200), because they are of strictly lower rank | |
@@ -108,6 +108,10 @@ Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (as
 | 15 | Dept admin A1 | In the UI try reset password, deactivate, unlock on a peer department_admin | Deactivate, create, edit and import show the localized message "You are not allowed to assign this role or act on this user." (`users.messages.forbidden`). Known gap G6: on the routed users page reset-password shows no message and unlock shows the generic unlock error | |
 | 16 | Dept admin A1 | CSV import (preview, then commit) with rows: employee in A, examiner in A, `department_admin` in A, `super_admin` in A, employee in B | Employee and examiner rows valid; the other three listed under errors with HTTP 200 (`role department_admin cannot be assigned by your role` for the role rows; `department B is outside your scope` for the last); commit creates only the valid rows | |
 | 17 | Custom2 user | `GET /api/v1/users/roles` | `assignable` evaluated by the permission-subset rule; same verdicts as steps 6 and 10 | |
+| 18 | Super admin | `PUT /api/v1/users/{self}` changing own role; `POST /api/v1/users/{self}/deactivate` (D-4b, issue #240) | 403 `FORBIDDEN` each; role and active flag unchanged; admin can still log in. Same for a dept admin deactivating self | |
+| 19 | Custom2 user | Reset/update a peer whose custom role has EXACTLY Custom2's permission set; assign that role to an employee (D-4a strict subset) | 403 `FORBIDDEN` for both (equal set is a peer); a role with a strictly smaller set is allowed; `GET /users/roles` shows `assignable:false` for the equal-set role | |
+| 20 | Dept admin A1 | `PUT /api/v1/users/{random-uuid}` and `PUT /api/v1/users/{employee_in_B}` (also reset-password/deactivate/unlock) (D-4c) | Identical status and body (404 `NOT_FOUND`) for unknown and out-of-scope ids; existence cannot be probed | |
+| 21 | Dept admin A1 / Custom2 | Obtain token, then super admin demotes (changes role of) or deactivates that user; reuse the old access token on `GET /api/v1/users` and a manage call (D-4 stale claims) | Request is rejected (401/403) or evaluated with the new role immediately, not with stale JWT claims; refresh with the old refresh token fails after deactivation | |
 
 ### S7 curl recipe (D-1, issue #217)
 

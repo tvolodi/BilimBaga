@@ -14,7 +14,7 @@ Identity in claims: `bb-dev2`; worktree `.claude/worktrees/dev2`. Prefers fronte
 2. `gh issue edit <n> --add-label status:in-progress --remove-label status:ready`; comment `claimed-by: bb-dev2`.
 3. Implement; migrations via the migration lock; prefer unit tests over running the stack.
 4. Commit, push, `gh pr create` with `Refs #n` (closing happens after UAT).
-5. `status:review`, send Supervisor `result pr-open`. On `merge-ok`: merge origin/main into the branch, re-run tests, push, `gh pr merge --squash --delete-branch`, labels to `status:uat role:uat`, send `result done`.
+5. `status:review`, send Supervisor `result pr-open`. On `merge-ok`: merge origin/main into the branch, re-run tests, push, `gh pr merge <n> --squash --match-head-commit <merge-ok SHA>`, delete the branch only after MERGED, labels to `status:uat role:uat` (or the test-only close in PROTOCOL), send `result done`.
 6. Fix unrelated blockers (Unblock-Everything directive).
 
 ## On a task

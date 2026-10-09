@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Redeploy BilimBaga to the test environment on hetzner-prod.
+# PROTECTED TARGET: bilimbaga-test.ai-dala.com is a customer demo (production-class, #107).
+# This script is an ops artifact for the human owner only. Swarm roles (dev, UAT, Infra, Supervisor)
+# must NEVER run it or deploy to this host.
+#
 # Run as root on the host: sudo bash /opt/apps/bilimbaga-test/deploy/redeploy-test.sh
 #
 # Code is updated with a fast-forward-only pull over the checkout's existing `origin`

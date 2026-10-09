@@ -1,17 +1,27 @@
 /**
  * seed-test-env.ts
  *
- * Populates bilimbaga-test.ai-dala.com with realistic test data covering
+ * Populates a test environment (E2E_API_URL, required) with realistic test data covering
  * all business processes in the BilimBaga platform.
  *
- * Run: npx tsx scripts/seed-test-env.ts
+ * Run: E2E_API_URL=http://localhost:8080 npx tsx scripts/seed-test-env.ts
  *   from the repo root (requires Node 18+, tsx installed globally or via npx)
  *
  * Idempotent: safe to run multiple times; skips already-existing data.
  */
 
-// Defaults to the shared test server; set E2E_API_URL (e.g. http://localhost:18080) to target a local stack.
-const BASE = process.env.E2E_API_URL || 'https://bilimbaga-test.ai-dala.com'
+// E2E_API_URL is REQUIRED (no default): this script WRITES seed data. bilimbaga-test.ai-dala.com is a
+// customer demo (production-class) and is refused unless ALLOW_PROTECTED_HOST=1 is also set; swarm roles
+// must never set it. Targets: a local stack (http://localhost:8080) or the QA instance.
+const BASE = (process.env.E2E_API_URL || '').replace(/\/+$/, '')
+if (!BASE) {
+  console.error('E2E_API_URL is required (e.g. E2E_API_URL=http://localhost:8080). Refusing to run without an explicit target.')
+  process.exit(1)
+}
+if (/bilimbaga-test\.ai-dala\.com/i.test(BASE) && process.env.ALLOW_PROTECTED_HOST !== '1') {
+  console.error(`Refusing to seed ${BASE}: protected production-class host (customer demo). Set ALLOW_PROTECTED_HOST=1 only with explicit user approval.`)
+  process.exit(1)
+}
 const ADMIN_EMAIL = 'admin@bilimbaga.local'
 const ADMIN_INITIAL_PASS = 'Admin1234!'
 const ADMIN_KNOWN_PASS = 'Admin2024!'

@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { seedEmployeeFixtures } from './fixtures/seed'
 
+const APP_URL = (process.env.E2E_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '')
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_DIR = path.join(__dirname, '..', '.auth')
 export const STORAGE_STATE_PATH = path.join(AUTH_DIR, 'admin.json')
@@ -48,11 +50,11 @@ export default async function globalSetup() {
   } else {
     // ── Fresh login ───────────────────────────────────────────────────────────
     const browser = await chromium.launch()
-    const context = await browser.newContext({ baseURL: 'http://localhost:5173' })
+    const context = await browser.newContext({ baseURL: APP_URL })
     const page = await context.newPage()
 
     // Navigate first so relative URLs resolve correctly.
-    await page.goto('http://localhost:5173/login')
+    await page.goto(`${APP_URL}/login`)
 
     // Call the login API directly (1 request per full test run — keeps us under the rate limit).
     const res = await page.evaluate(async ({ email, pass }: { email: string; pass: string }) => {

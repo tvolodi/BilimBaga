@@ -14,6 +14,8 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 
+const APP_URL = (process.env.E2E_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '')
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_DIR = path.join(__dirname, '..', '..', '.auth')
 export const EMPLOYEE_STORAGE_STATE = path.join(AUTH_DIR, 'employee.json')
@@ -742,9 +744,9 @@ export async function seedEmployeeFixtures(adminToken: string): Promise<void> {
   //    HTTP-only refresh cookie is captured in the storageState. Without the
   //    cookie the token cannot be refreshed when it expires during the test run.
   const browser = await chromium.launch()
-  const context = await browser.newContext({ baseURL: 'http://localhost:5173' })
+  const context = await browser.newContext({ baseURL: APP_URL })
   const page = await context.newPage()
-  await page.goto('http://localhost:5173/login')
+  await page.goto(`${APP_URL}/login`)
 
   // Browser-fetch login with credentials:include to set the refresh cookie.
   const browserLoginResult = await page.evaluate(

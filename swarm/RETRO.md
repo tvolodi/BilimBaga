@@ -16,6 +16,7 @@ Owner: Supervisor. Trigger: `closed_count - retro.json.last_retro_closed_count >
    - idle time per role (ticks where the role had no ready work or was reported idle; from `workers.json` history and Supervisor tick reports)
    - escalations (`escalations.json`) and `status:blocked` count and duration
    - duplicate or invalid issues, PR conflicts, lock contention incidents
+2b. Send the metrics table to `bb-architect` (`architect-review`, trigger T2). The architect writes steps 3-4 (narrative, root causes, decisions, plus an assessment of the team's way of working and model fit) and returns the draft; you then continue at step 5.
 3. Narrative: what went well, what went badly, root causes (protocol gap, role-prompt gap, tooling, environment).
 4. Decisions: a numbered list of concrete changes to `swarm/roles/*` and `swarm/PROTOCOL.md` (exact text changes), each with the metric it should move. The Supervisor approves them itself (autonomy), except anything that touches reserved user decisions, which is only listed as a recommendation.
 5. Write `docs/retrospectives/retro-NNN.md` (NNN = `retro_number + 1`, zero-padded to 3) on a branch `swarm/retro-NNN`, open a PR. Template:

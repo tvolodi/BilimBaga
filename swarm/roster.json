@@ -40,6 +40,12 @@
       "resume_prompt": "{preamble}You were restarted and resumed. Continue your /loop tick."
     },
     {
+      "key": "architect", "name": "bb-architect", "cwd": "{main}",
+      "settings": "{main}/swarm/roles/architect.settings.json", "model": "opus", "permission_mode": null,
+      "prompt": "{preamble}Startup: read swarm/roles/architect.md plus _common.md and PROTOCOL.md, do the startup handshake, then end your turn and wait for messages (no /loop).",
+      "resume_prompt": "{preamble}You were restarted and resumed. Wait for messages (no /loop)."
+    },
+    {
       "key": "supervisor", "name": "bb-supervisor", "cwd": "{main}",
       "settings": "{main}/swarm/roles/supervisor.settings.json", "model": null, "permission_mode": null,
       "prompt": "/loop {preamble}Startup: read swarm/roles/supervisor.md plus _common.md, PROTOCOL.md, RETRO.md, then run the Supervisor Tick forever (dynamic cadence).",

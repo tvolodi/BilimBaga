@@ -349,11 +349,62 @@ func TestTransitionStatus_ActivateBlankOptionText(t *testing.T) {
 
 func TestTransitionStatus_NonActivateTargetsIgnoreBlankOptions(t *testing.T) {
 	blank := []AnswerOptionDetail{optDetail(map[string]string{"kk": ""})}
-	for _, tc := range []struct{ from, to string }{{"draft", "review"}, {"active", "archived"}, {"archived", "draft"}} {
+	for _, tc := range []struct{ from, to string }{{"active", "archived"}, {"archived", "draft"}} {
 		svc, _ := activateSvc("single", tc.from, blank)
 		_, err := svc.TransitionStatus(context.Background(), "q-1", tc.to)
 		require.NoError(t, err, tc.from+"->"+tc.to)
 	}
+}
+
+func TestTransitionStatus_ReviewBlankOptionText(t *testing.T) {
+	cases := []struct {
+		name    string
+		qType   string
+		opts    []AnswerOptionDetail
+		wantIdx []int
+	}{
+		{"blank default rejected", "single", []AnswerOptionDetail{optDetail(map[string]string{"kk": "A"}), optDetail(map[string]string{"kk": " "})}, []int{1}},
+		{"valid moves to review", "single", []AnswerOptionDetail{optDetail(map[string]string{"kk": "A"}), optDetail(map[string]string{"kk": "B"})}, nil},
+		{"shorttext unaffected", "shorttext", []AnswerOptionDetail{optDetail(map[string]string{"kk": ""})}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, repo := activateSvc(tc.qType, "draft", tc.opts)
+			q, err := svc.TransitionStatus(context.Background(), "q-1", "review")
+			if tc.wantIdx == nil {
+				require.NoError(t, err)
+				assert.Equal(t, "review", q.Status)
+				return
+			}
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, ErrInvalidOptionText))
+			var oe *OptionValidationError
+			require.True(t, errors.As(err, &oe))
+			require.Len(t, oe.Fields, len(tc.wantIdx))
+			assert.Equal(t, "draft", repo.questions["q-1"].Status, "status must not change on rejection")
+		})
+	}
+}
+
+func TestQHandlerTransitionStatus_ReviewBlankOptions_Returns422(t *testing.T) {
+	svc := &mockQService{
+		transitionStatusFn: func(_ context.Context, _, status string) (*Question, error) {
+			if status != "review" {
+				t.Fatalf("unexpected status %q", status)
+			}
+			return nil, fmt.Errorf("wrap: %w", &OptionValidationError{Fields: []fieldError{
+				{Field: "answer_options[0].translations.kk.text", Message: "blank"},
+			}})
+		},
+	}
+	h := NewHandler(svc, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/q-1/status", strings.NewReader(`{"status":"review"}`))
+	req = withQChiParam(req, "id", "q-1")
+	w := httptest.NewRecorder()
+	h.TransitionStatus(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, w.Body.String(), `"ERR_VALIDATION"`)
+	assert.Contains(t, w.Body.String(), `"data":null`)
 }
 
 func TestQHandlerTransitionStatus_BlankOptions_Returns422WithFields(t *testing.T) {

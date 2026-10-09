@@ -298,10 +298,10 @@ func (s *service) TransitionStatus(ctx context.Context, id, newStatus string) (*
 		}
 	}
 
-	// Activating a choice question requires non-blank default-locale option text,
-	// so legacy rows with blank options cannot be presented to examinees (ISS-173b).
-	// Already-active questions and other transitions are untouched.
-	if newStatus == "active" {
+	// Moving a choice question to review or active requires non-blank default-locale
+	// option text, so legacy rows with blank options are caught early and cannot be
+	// presented to examinees (ISS-173b, ISS-228). Other transitions are untouched.
+	if newStatus == "review" || newStatus == "active" {
 		detail, err := s.repo.GetWithDetails(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("questions: TransitionStatus: load options: %w", err)

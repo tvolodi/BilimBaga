@@ -5,7 +5,7 @@ import '@/i18n'
 import { ExportCSVButton } from '../ExportCSVButton'
 
 function blobResponse(status = 200): Response {
-  return new Response(new Blob(['csv,data']), { status })
+  return new Response('csv,data', { status })
 }
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

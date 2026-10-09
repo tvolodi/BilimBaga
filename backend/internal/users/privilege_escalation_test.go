@@ -308,7 +308,7 @@ func TestD1_AssignmentHierarchy(t *testing.T) {
 }
 
 func TestD1_CustomRoleWithSensitivePermsNotAssignable(t *testing.T) {
-	repo, svc := d1Setup()
+	repo, _ := d1Setup()
 	repo.roles["sensitive_custom"] = "role-sens"
 	repo.roleByID["role-sens"] = "sensitive_custom"
 	// even a caller that holds roles:read may not hand it out
@@ -322,7 +322,7 @@ func TestD1_CustomRoleWithSensitivePermsNotAssignable(t *testing.T) {
 		}
 		return false
 	}
-	svc = WithPermissionsLookup(WithPermissionChecker(NewService(repo), has), func(r string) []string { return perms[r] })
+	svc := WithPermissionsLookup(WithPermissionChecker(NewService(repo), has), func(r string) []string { return perms[r] })
 	_, err := svc.CreateUser(context.Background(), CreateRequest{Email: "n@example.com", FullName: "N", DepartmentID: strPtr("dept-1"), RoleID: "role-sens"}, "department_admin", "dept-1", "actor", "")
 	assert.ErrorIs(t, err, ErrForbidden)
 }

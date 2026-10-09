@@ -64,6 +64,20 @@ The first migration seeds a default super-admin account:
 
 ---
 
+## Continuous integration
+
+GitHub Actions workflows in `.github/workflows/`:
+
+| Workflow | Runs |
+|----------|------|
+| `tests.yml` | `backend-tests`: `go vet`, `staticcheck`, `go test -p 2 ./...` against a throwaway Postgres 16 service (`TEST_DATABASE_URL`). `frontend-tests`: `tsc --noEmit`, `npm run lint`, `npm run check:i18n`, `vitest run`. On every PR and push to `main`. |
+| `security.yml` | Dependency integrity and vulnerability audit (`make security-check`); also weekly. |
+| `docker-build.yml` | Docker image builds. |
+
+Playwright e2e is not part of CI (it needs the full stack). Migrations are still applied by the API at startup.
+
+---
+
 ## Migrations and deploy order
 
 The API applies pending migrations at startup, before it serves requests (`backend/cmd/api/main.go`, `dbpkg.RunMigrations`); the migrations are copied into the image (`backend/Dockerfile`), and `deploy/redeploy-*.sh` have no separate migrate step. If a migration fails, the container exits with status 1 and never serves.

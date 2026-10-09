@@ -6,7 +6,7 @@ import { exportAuditLog } from './audit'
 import { downloadDashboardPdf, downloadExamCsv } from './reports'
 
 function blobResponse(status = 200): Response {
-  return new Response(new Blob(['x']), { status })
+  return new Response('x', { status })
 }
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })

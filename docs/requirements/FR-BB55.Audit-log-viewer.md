@@ -89,7 +89,7 @@ function buildAuditURL(filters: AuditFilters, page: number): string {
 
 ```ts
 export const AUDIT_ACTIONS = [
-  'user.login', 'user.logout', 'user.create', 'user.update', 'user.deactivate',
+  'user.login', 'user.logout', 'user.create', 'user.update', 'user.deactivate', 'user.reactivate',
   'exam.create', 'exam.update', 'exam.publish', 'exam.archive',
   'session.start', 'session.submit', 'session.expire', 'session.pending_manual_grade',
   'answer.grade',

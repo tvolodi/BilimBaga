@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { RequireAuth } from './RequireAuth'
+import { endRevokedSession } from '@/lib/sessionRevoked'
 
 /**
  * Seed the query cache to a specific state.
@@ -77,5 +78,18 @@ describe('RequireAuth', () => {
     renderWithQC(qc)
     expect(screen.getByText('Protected Content')).toBeInTheDocument()
     expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
+  })
+
+  it('redirects to /login when the session ends while the page is mounted (ISS-249)', async () => {
+    // A 401 TOKEN_REVOKED that cannot be refreshed calls endRevokedSession while the protected
+    // page is on screen. The guard must re-render and redirect, not keep showing the page.
+    const qc = makeQC({ token: 'some.valid.token' })
+    renderWithQC(qc)
+    expect(screen.getByText('Protected Content')).toBeInTheDocument()
+
+    act(() => endRevokedSession(qc))
+
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 })

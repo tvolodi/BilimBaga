@@ -187,6 +187,19 @@ export function useDeactivateUser(id: string) {
   })
 }
 
+/** FR-BB18 AC-13: reactivate a deactivated user (same authorisation as deactivate). */
+export function useReactivateUser(id: string) {
+  const queryClient = useQueryClient()
+  return useMutation<Record<string, never>, Error, void>({
+    mutationFn: () => {
+      return apiFetch<Record<string, never>>(queryClient, `/api/v1/users/${id}/reactivate`, { method: 'POST' })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
+}
+
 export function useResetPassword(id: string) {
   const qc = useQueryClient()
   return useMutation<ResetPasswordResponse, Error, void>({

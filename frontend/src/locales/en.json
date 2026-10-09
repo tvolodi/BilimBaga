@@ -67,7 +67,8 @@
       "reset_password": "Reset Password",
       "import": "Bulk Import",
       "view_record": "View Record",
-      "unlock": "Unlock account"
+      "unlock": "Unlock account",
+      "reactivate": "Reactivate"
     },
     "status": {
       "active": "Active",
@@ -98,6 +99,12 @@
       "title": "Deactivate User",
       "message": "Are you sure you want to deactivate {{name}}? They will no longer be able to log in.",
       "confirm": "Deactivate",
+      "cancel": "Cancel"
+    },
+    "reactivate_dialog": {
+      "title": "Reactivate User",
+      "message": "Are you sure you want to reactivate {{name}}? They will be able to log in again.",
+      "confirm": "Reactivate",
       "cancel": "Cancel"
     },
     "reset_password_modal": {

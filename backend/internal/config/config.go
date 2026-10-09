@@ -69,6 +69,9 @@ type Config struct {
 	// Anthropic AI (FR-BB71)
 	AnthropicAPIKey string
 	AnthropicModel  string
+	// AIInsightsDailyLimit (AI_INSIGHTS_DAILY_LIMIT, ISS-232) caps paid AI insight
+	// calls per user per 24 h; 0 disables the cap. Default 50.
+	AIInsightsDailyLimit int
 }
 
 // Load reads all required environment variables and returns a validated Config.
@@ -164,6 +167,14 @@ func Load() (*Config, error) {
 	// Anthropic AI (FR-BB71) — optional; handlers return 503 if key is blank.
 	cfg.AnthropicAPIKey = getEnv("ANTHROPIC_API_KEY", "")
 	cfg.AnthropicModel = getEnv("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
+
+	cfg.AIInsightsDailyLimit, err = getEnvInt("AI_INSIGHTS_DAILY_LIMIT", 50)
+	if err != nil {
+		return nil, fmt.Errorf("config: AI_INSIGHTS_DAILY_LIMIT: %w", err)
+	}
+	if cfg.AIInsightsDailyLimit < 0 {
+		return nil, fmt.Errorf("config: AI_INSIGHTS_DAILY_LIMIT must be >= 0")
+	}
 
 	if err := cfg.validate(); err != nil {
 		return nil, err

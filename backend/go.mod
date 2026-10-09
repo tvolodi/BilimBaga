@@ -24,6 +24,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
+	golang.org/x/sync v0.18.0
 	golang.org/x/sys v0.44.0 // indirect
 )
 

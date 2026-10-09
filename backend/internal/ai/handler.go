@@ -72,6 +72,7 @@ func (h *Handler) HandleGenerateQuestions(w http.ResponseWriter, r *http.Request
 // AC-3: Cache hit within 24 h returns cached result with "cached":true.
 // AC-4: ?refresh=true bypasses cache and calls Anthropic.
 // AC-6: Anthropic errors → 503 AI_UNAVAILABLE.
+// ISS-232: daily per-user cap exceeded → 429 AI_RATE_LIMITED.
 func (h *Handler) HandleGetInsights(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 	if userID == "" {
@@ -93,6 +94,9 @@ func (h *Handler) HandleGetInsights(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, ErrExamNotFound):
 			api.WriteError(w, http.StatusNotFound, "EXAM_NOT_FOUND", "exam not found or access denied")
+		case errors.Is(err, ErrAIRateLimited):
+			api.WriteError(w, http.StatusTooManyRequests, "AI_RATE_LIMITED",
+				"You have reached the daily AI insights limit. Please try again tomorrow.")
 		case errors.Is(err, ErrAIUnavailable):
 			api.WriteError(w, http.StatusServiceUnavailable, "AI_UNAVAILABLE", "AI service unavailable")
 		default:

@@ -168,8 +168,9 @@ func (s *service) Publish(ctx context.Context, id string) (*Exam, error) {
 		return nil, fmt.Errorf("exams: Publish: list rules: %w", err)
 	}
 
-	// ISS-132: a fixed-form exam without any question rule would start as an empty exam.
-	if !e.Adaptive && len(rules) == 0 {
+	// ISS-132 / ISS-151: an exam (fixed-form or adaptive) without any question rule
+	// would start as an empty exam, so it is refused on publish.
+	if len(rules) == 0 {
 		return nil, fmt.Errorf("exams: Publish: exam %s: %w", id, ErrNoQuestionRules)
 	}
 

@@ -858,6 +858,20 @@ func TestPublish_NoRules_Returns422InsufficientQuestions(t *testing.T) {
 	assert.Equal(t, "INSUFFICIENT_QUESTIONS", decode(t, w).Error.Code)
 }
 
+// ISS-151: the wrapped error returned for an adaptive exam with zero rules maps to the same 422.
+func TestPublish_AdaptiveNoRules_Returns422InsufficientQuestions(t *testing.T) {
+	h := newHandler(&mockSvc{
+		publishFn: func(_ context.Context, _ string) (*Exam, error) {
+			return nil, fmt.Errorf("exams: Publish: exam exam-1: %w", ErrNoQuestionRules)
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPost, "/api/v1/exams/exam-1/publish", nil), "id", "exam-1")
+	h.Publish(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Equal(t, "INSUFFICIENT_QUESTIONS", decode(t, w).Error.Code)
+}
+
 func TestPublish_NotDraft_Returns409(t *testing.T) {
 	h := newHandler(&mockSvc{
 		publishFn: func(_ context.Context, _ string) (*Exam, error) { return nil, ErrNotDraft },

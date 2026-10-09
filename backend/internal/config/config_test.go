@@ -156,3 +156,38 @@ func TestLoad_PublicAppURLOverride(t *testing.T) {
 		t.Error("expected PublicAppURLDefaulted=false when PUBLIC_APP_URL is set")
 	}
 }
+
+func TestLoad_SMTPFrom(t *testing.T) {
+	tests := []struct {
+		name, host, from   string
+		wantErr, defaulted bool
+		wantFrom           string
+	}{
+		{"no host, from unset", "", "", false, false, ""},
+		{"host, from unset -> default", "smtp.x.io", "", false, true, config.DefaultSMTPFrom},
+		{"host, bare address", "smtp.x.io", "a@b.io", false, false, "a@b.io"},
+		{"host, name <addr>", "smtp.x.io", "Name <a@b.io>", false, false, "Name <a@b.io>"},
+		{"host, invalid", "smtp.x.io", "not an address", true, false, ""},
+		{"no host, invalid ignored", "", "not an address", false, false, "not an address"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("JWT_SECRET", "this-is-a-valid-32-character-secret!")
+			t.Setenv("SMTP_HOST", tc.host)
+			t.Setenv("SMTP_FROM", tc.from)
+			cfg, err := config.Load()
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if cfg.SMTPFrom != tc.wantFrom || cfg.SMTPFromDefaulted != tc.defaulted {
+				t.Errorf("from=%q defaulted=%v", cfg.SMTPFrom, cfg.SMTPFromDefaulted)
+			}
+		})
+	}
+}

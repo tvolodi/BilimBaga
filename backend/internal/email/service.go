@@ -226,7 +226,7 @@ func (s *EmailService) GetUserEmail(ctx context.Context, userID string) (string,
 func (s *EmailService) TestSend(to string) error {
 	fromAddr, err := extractEmailAddress(s.cfg.From)
 	if err != nil {
-		fromAddr = s.cfg.From
+		return err
 	}
 	subject := "BilimBaga — Test Notification"
 	textBody := "This is a test email from BilimBaga. If you received this, email delivery is working correctly."
@@ -254,7 +254,7 @@ func (s *EmailService) send(to, tmplName string, data map[string]any, userLocale
 
 	fromAddr, err := extractEmailAddress(s.cfg.From)
 	if err != nil {
-		fromAddr = s.cfg.From
+		return err
 	}
 
 	msg := buildMIMEMessage(s.cfg.From, sanitiseHeader(to), sanitiseHeader(rendered.Subject), rendered.TextBody, rendered.HTMLBody)
@@ -280,7 +280,12 @@ func sanitiseHeader(s string) string {
 }
 
 // extractEmailAddress parses an RFC 5322 address and returns the bare addr-spec.
+// An empty or unparseable value is an explicit error: falling back to the raw
+// string would send an empty/invalid envelope sender (SMTP 550) (ISS-125).
 func extractEmailAddress(from string) (string, error) {
+	if strings.TrimSpace(from) == "" {
+		return "", fmt.Errorf("email: SMTP_FROM is not configured; set SMTP_FROM to a valid sender address")
+	}
 	addr, err := mail.ParseAddress(from)
 	if err != nil {
 		return "", fmt.Errorf("email: parse from address %q: %w", from, err)

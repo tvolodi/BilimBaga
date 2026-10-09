@@ -200,12 +200,18 @@ func TestSend_RenderErrorIsWrapped(t *testing.T) {
 	}
 }
 
-func TestSend_UnparseableFromFallsBackToRaw(t *testing.T) {
-	srv := startFakeSMTP(t, nil)
-	svc := svcFor(newStubRepo(), srv)
-	svc.cfg.From = "not an address"
-	if err := svc.send("to@x.io", "password_reset", map[string]any{"TempPassword": "x"}, "en"); err != nil {
-		t.Fatalf("send should tolerate unparseable From: %v", err)
+func TestSend_InvalidFromReturnsError(t *testing.T) {
+	for _, from := range []string{"", "   ", "not an address"} {
+		srv := startFakeSMTP(t, nil)
+		svc := svcFor(newStubRepo(), srv)
+		svc.cfg.From = from
+		err := svc.send("to@x.io", "password_reset", map[string]any{"TempPassword": "x"}, "en")
+		if err == nil || !strings.Contains(err.Error(), "email:") {
+			t.Fatalf("from=%q: expected explicit error, got %v", from, err)
+		}
+		if err := svc.TestSend("to@x.io"); err == nil {
+			t.Fatalf("from=%q: TestSend must fail with invalid From", from)
+		}
 	}
 }
 

@@ -2,24 +2,28 @@ package config
 
 import (
 	"fmt"
+	"net/mail"
 	"os"
 	"strconv"
 	"time"
 )
 
+// DefaultSMTPFrom is applied when SMTP_HOST is set but SMTP_FROM is empty (ISS-125).
+const DefaultSMTPFrom = "BilimBaga <noreply@localhost>"
+
 // Config holds all application configuration loaded once at startup.
 type Config struct {
 	// Database
-	DBHost              string
-	DBPort              string
-	DBName              string
-	DBUser              string
-	DBPassword          string
-	DBSSLMode           string
-	DBMaxOpenConns      int
-	DBMaxIdleConns      int
+	DBHost               string
+	DBPort               string
+	DBName               string
+	DBUser               string
+	DBPassword           string
+	DBSSLMode            string
+	DBMaxOpenConns       int
+	DBMaxIdleConns       int
 	DBConnMaxIdleSeconds int
-	DBConnMaxLifetime   time.Duration
+	DBConnMaxLifetime    time.Duration
 
 	// API
 	APIPort    string
@@ -41,13 +45,15 @@ type Config struct {
 	CookieSecure bool
 
 	// Email / SMTP
-	SMTPHost       string
-	SMTPPort       int
-	SMTPUser       string
-	SMTPPass       string
-	SMTPTLS        bool
-	SMTPFrom       string
-	TenantTimezone string
+	SMTPHost string
+	SMTPPort int
+	SMTPUser string
+	SMTPPass string
+	SMTPTLS  bool
+	SMTPFrom string
+	// SMTPFromDefaulted is true when SMTP_FROM was unset and DefaultSMTPFrom was applied (ISS-125).
+	SMTPFromDefaulted bool
+	TenantTimezone    string
 
 	// Logging
 	LogLevel string // debug | info | warn | error; default "info"
@@ -154,6 +160,14 @@ func Load() (*Config, error) {
 
 // validate checks that all required fields meet their constraints.
 func (c *Config) validate() error {
+	if c.SMTPHost != "" {
+		if c.SMTPFrom == "" {
+			c.SMTPFrom = DefaultSMTPFrom
+			c.SMTPFromDefaulted = true
+		} else if _, err := mail.ParseAddress(c.SMTPFrom); err != nil {
+			return fmt.Errorf("config: SMTP_FROM %q is not a valid address (use user@host or Name <user@host>): %w", c.SMTPFrom, err)
+		}
+	}
 	if len(c.JWTSecret) < 32 {
 		return fmt.Errorf("config: JWT_SECRET must be at least 32 characters (got %d); set a strong secret before starting the server", len(c.JWTSecret))
 	}

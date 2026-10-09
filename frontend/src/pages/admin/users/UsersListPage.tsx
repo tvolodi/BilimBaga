@@ -8,7 +8,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { useUsers, useResetPassword, type User, type UsersFilters } from '@/api/users'
-import { useDepartments } from '@/api/departments'
+import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
 import { UserCreateDrawer } from './UserCreateDrawer'
 import { UserEditDrawer } from './UserEditDrawer'
 import { ImportModal } from './ImportModal'
@@ -45,7 +45,6 @@ export function UsersListPage() {
   const [createdPasswordOpen, setCreatedPasswordOpen] = useState(false)
 
   const { data, isLoading, isError } = useUsers(filters)
-  const { data: departments } = useDepartments()
 
   function setFilter(key: keyof UsersFilters, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value || undefined, page: 1 }))
@@ -111,16 +110,15 @@ export function UsersListPage() {
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
-        <Select
-          className="w-48"
-          value={filters.department_id ?? ''}
-          onChange={(e) => setFilter('department_id', e.target.value)}
-        >
-          <option value="">{t('users.filters.department')}</option>
-          {(departments ?? []).map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </Select>
+        <div className="w-64">
+          <DepartmentTreeSelect
+            value={filters.department_id ?? null}
+            onChange={(id) => setFilter('department_id', id ?? '')}
+            placeholder={t('users.filters.department')}
+            aria-label={t('users.filters.department')}
+            clearable
+          />
+        </div>
 
         <Select
           className="w-48"

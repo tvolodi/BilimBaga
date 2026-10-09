@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"io"
 	"sync"
 	"testing"
@@ -37,7 +36,13 @@ type fakeRows struct {
 
 func (c fakeConn) Prepare(q string) (driver.Stmt, error) { return fakeStmt{c.f, q}, nil }
 func (c fakeConn) Close() error                          { return nil }
-func (c fakeConn) Begin() (driver.Tx, error)             { return nil, errors.New("no tx") }
+func (c fakeConn) Begin() (driver.Tx, error)             { return fakeTx{}, nil }
+
+// fakeTx is a no-op transaction: statements run on the fake directly (#311).
+type fakeTx struct{}
+
+func (fakeTx) Commit() error   { return nil }
+func (fakeTx) Rollback() error { return nil }
 func (s fakeStmt) Close() error                          { return nil }
 func (s fakeStmt) NumInput() int                         { return -1 }
 func (s fakeStmt) Exec(a []driver.Value) (driver.Result, error) {

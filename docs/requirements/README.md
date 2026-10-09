@@ -23,7 +23,7 @@
 | FR-BB111 | Frontend-admin-shell | Frontend: Admin Shell | Implemented |
 | FR-BB112 | Frontend-branding-settings | Frontend: Branding Settings | Implemented |
 | FR-BB113 | Frontend-department-management | Frontend: Department Management | Implemented |
-| FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Partial |
+| FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Implemented |
 | FR-BB115 | Account-recovery | Account Recovery: Forgot Password and Lockout Unlock | Validated |
 | FR-BB116 | User-profile-and-preferred-locale | User Profile Page and Persisted Preferred Locale | Validated |
 | FR-BB21 | Categories-and-tags | Categories and Tags | Implemented |
@@ -53,8 +53,8 @@
 | FR-BB42 | Manual-grading-queue | Manual Grading Queue | Implemented |
 | FR-BB43 | Certificate-generation | Certificate Generation | Implemented |
 | FR-BB44 | PDF-generation | PDF Generation | Implemented |
-| FR-BB45 | Frontend-result-screen | Frontend: Result Screen | Partial |
-| FR-BB46 | Frontend-employee-history | Frontend: Employee History | Partial |
+| FR-BB45 | Frontend-result-screen | Frontend: Result Screen | Implemented |
+| FR-BB46 | Frontend-employee-history | Frontend: Employee History | Implemented |
 | FR-BB47 | Frontend-manual-grading-UI | Frontend: Manual Grading UI | Implemented |
 | FR-BB48 | Public-certificate-verification-page | Public Certificate Verification Page | Implemented |
 | FR-BB51 | Dashboard-metrics-API | Dashboard Metrics API | Partial |
@@ -81,7 +81,7 @@
 | FR-BB316 | FR-BB316-portal-locale-switcher | Portal Locale Switcher | Implemented |
 | FR-BB317 | department-treeview | Department Treeview Selector | Partial |
 | FR-BB318 | exam-unpublish | Unpublish Exam | Implemented |
-| FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Partial |
+| FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Implemented |
 | FR-BB510 | Overdue-reminder-action | Overdue Employee Reminder: Real "Send Reminder" Action | Validated |
 
 ## Status Values

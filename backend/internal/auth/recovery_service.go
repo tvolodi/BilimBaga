@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/bilimbaga/bilimbaga/internal/api"
 )
 
 const (
@@ -51,7 +52,7 @@ type RecoveryService interface {
 // IssueResetToken locks no row and stops early. The mail is sent asynchronously by the
 // mailer, and the HTTP handler additionally pads every response to a minimum duration.
 func (s *service) ForgotPassword(ctx context.Context, req *ForgotPasswordRequest, ipAddr string) (string, error) {
-	email := strings.TrimSpace(req.Email)
+	email := api.NormalizeEmail(req.Email)
 	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email {
 		return "", &ServiceError{Code: "VALIDATION_ERROR", Message: "a valid email is required", HTTPStatus: http.StatusUnprocessableEntity}
 	}

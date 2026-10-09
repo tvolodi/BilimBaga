@@ -209,7 +209,7 @@ type pgBootstrapStore struct{ db *sqlx.DB }
 func NewBootstrapStore(db *sqlx.DB) BootstrapStore { return &pgBootstrapStore{db: db} }
 
 func (s *pgBootstrapStore) GetAdminCredentials(ctx context.Context, email string) (string, string, error) {
-	const q = `SELECT id, password_hash FROM users WHERE email = $1`
+	const q = `SELECT id, password_hash FROM users WHERE lower(email) = lower($1)`
 	var row struct {
 		ID           string `db:"id"`
 		PasswordHash string `db:"password_hash"`

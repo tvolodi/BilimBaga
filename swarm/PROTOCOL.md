@@ -83,7 +83,7 @@ Every worker must always have a next action: (a) assigned `task`; else (b) oldes
 - GitHub issues + labels = source of truth for work.
 - `docs/handoffs/<run-id>/` = pipeline payloads.
 - **Report numbering (retro-002)**: issue/review report files use `ISS-<github issue number>` (e.g. issue #88 -> `docs/issue-reports/ISS-088-<slug>.md`, `docs/code-reviews/ISS-088-review.md`). Never take "highest existing + 1": parallel sessions collide. This overrides the numbering step of `.claude/commands/issue-resolution.md` in the swarm.
-- `swarm/state/*.json` (git-ignored runtime; examples committed): `workers.json`, `retro.json`, `escalations.json`.
+- `swarm/state/*.json` (git-ignored runtime; examples committed): `workers.json`, `retro.json`, `escalations.json`. Per-role checkpoint/heartbeat files `<role>.json`: section 11.
 - `docs/retrospectives/retro-NNN.md` = audits.
 
 ## 10. Resources
@@ -92,3 +92,20 @@ Every worker must always have a next action: (a) assigned `task`; else (b) oldes
 - Devs run tests with capped parallelism: `npx vitest run --maxWorkers=2` (frontend), `go test -p 2 ./...` (backend).
 - UAT live runs (full stack + browsers) need >= 8 GB free memory; UAT checks before starting and defers the run if below.
 - The Supervisor checks free memory each tick while UAT is running and reports low memory in the tick report.
+
+## 11. Checkpoints and heartbeats
+
+Purpose: a restarted session or another worker can continue exactly where a worker stopped, and the Supervisor can detect a stalled worker without waiting for issue activity.
+
+- **File**: one per role, named after the role: `swarm/state/<role>.json` (`dev1`, `dev2`, `ba`, `uat`, `infra`, `supervisor`). `swarm/state/*.json` is git-ignored runtime and lives in the **main checkout** like `swarm/locks`; workers in worktrees MUST use the absolute path `C:\Users\tvolo\dev\ai-dala\BilimBaga\swarm\state\<role>.json` (Git Bash: `/c/Users/tvolo/dev/ai-dala/BilimBaga/swarm/state/<role>.json`). A worker writes only its own file.
+- **When**: at every step change (issue picked up, branch created, each pipeline step, PR opened, blocked, done) and at least once per loop tick while busy. Idle workers write `status: idle` with `issue: null` each tick, so the heartbeat keeps running.
+- **Schema** (all timestamps UTC ISO 8601), example in `swarm/state/checkpoint.example.json`:
+
+```json
+{"role":"dev2","status":"busy","issue":148,"branch":"swarm/148-checkpoints-heartbeats","step":"code-review","next_action":"fix review findings, then open PR","last_tick_utc":"2026-10-09T07:55:00Z","blockers":""}
+```
+
+  `status` is `busy`, `idle` or `blocked`; `issue` is the GitHub issue number or `null`; `blockers` is empty when none.
+- **Atomic write**: write a temp file in the same directory, then rename it over the target, so readers never see half-written JSON. `swarm/bin/checkpoint.sh <role> <issue> <branch> <step> <next_action> [blockers]` does this (bash, `date`, `printf` only, no `jq`; `SWARM_STATUS=idle|blocked` overrides the default `busy`; `SWARM_STATE_DIR` overrides the target directory for tests only).
+- **Issue mirror**: at each step change (not on plain per-tick heartbeats, which are file-only to avoid comment spam) also post a short `gh issue comment` (step, next action, blockers, branch/PR). **GitHub issue comments stay the source of truth**; the file is a convenience. On restart, trust the issue comments if they disagree with the file.
+- **Heartbeat**: `last_tick_utc` is the heartbeat. The Supervisor treats a `busy` worker whose heartbeat is older than `N = 45` minutes (configurable as `stale_heartbeat_min` in `swarm/state/retro.json`; 45 when absent) as stalled and applies the stall handling in `roles/supervisor.md` and section 6. A missing file for a live worker counts as stale after the same interval. `idle` and `blocked` workers are checked only for a very old heartbeat (> 2 x N), which indicates a dead session.

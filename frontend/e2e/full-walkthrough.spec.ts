@@ -507,11 +507,27 @@ test.describe('Full application walkthrough', () => {
     await shot(page, '20b-analytics-heading-visible')
   })
 
-  test('21 — Employee portal — login as employee (if seeded) or redirect check', async ({ page }) => {
-    // Attempt to reach /portal without an employee session → should redirect to login
+  test('21a — Employee portal — unauthenticated visitor is redirected to /login', async ({ browser, baseURL }) => {
+    // FR-BB313: /portal is auth-guarded. Use a fresh context (no admin storageState)
+    // so the guard sees no session.
+    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } })
+    const page = await context.newPage()
+    try {
+      await page.goto('/portal')
+      await expect(page).toHaveURL(/\/login/, { timeout: 10_000 })
+      await shot(page, '21a-portal-unauth-redirect')
+    } finally {
+      await context.close()
+    }
+  })
+
+  test('21b — Employee portal — admin session is redirected to the admin area', async ({ page }) => {
+    // RequireRole roles={['employee']} sends a signed-in non-employee to /admin
+    // (which then lands on /admin/dashboard). Admins do not use the employee portal.
+    await loginAsAdmin(page)
     await page.goto('/portal')
-    await expect(page).toHaveURL(/\/login|\/portal/, { timeout: 10_000 })
-    await shot(page, '21-portal-redirect-check')
+    await expect(page).toHaveURL(/\/admin/, { timeout: 10_000 })
+    await shot(page, '21b-portal-admin-redirect')
   })
 
   test('22 — Accessibility: no console errors on main admin screens', async ({ page }) => {

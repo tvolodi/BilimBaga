@@ -58,3 +58,22 @@ backend/internal/auth/hardening_test.go (sequence equality, padding, concurrency
 |------|---------|--------------|
 
 Note: user-initiated change-password intentionally does not stamp password_changed_at (current session kept; other sessions of that user stay valid until expiry). Reset and admin reset stamp with the DB clock (now()). IssueResetToken uses an explicit READ COMMITTED transaction.
+
+## Deploy order and migration application
+
+The API applies pending migrations itself at startup, before it serves traffic:
+
+- `backend/cmd/api/main.go:101` calls `dbpkg.RunMigrations(db, "migrations")` (golang-migrate `Up`; `ErrNoChange` is fine; a dirty DB returns an error). This happens before the HTTP server is created (~line 244). On failure it prints `startup error: run migrations` and exits with status 1 (lines 102-103).
+- `backend/Dockerfile:22` copies `/app/migrations` into the image, so the migrations ship with the code (`ENTRYPOINT ["/app/api"]`, line 26).
+- `deploy/redeploy-test.sh` (build l.43, `up -d --force-recreate` l.47) and `deploy/redeploy-qa.sh` (build l.40, `up -d --force-recreate` l.44) contain no explicit migrate step; they rely on this self-migration. The `deploy/docker-compose.{test,qa,prod}.yml` files have no migrate service or command either.
+
+Consequences for migration 032 (`users.password_changed_at`, nullable):
+
+- Normal deploy: the new image applies 032 before it serves, so the fail-closed `Authenticate` (HTTP 500 if the column is missing) cannot be reached.
+- Migration failure: the new container exits and never serves (safe; the redeploy script's rollback tags apply).
+- Rollback to an old image after 032: safe, the column is nullable and old code ignores it.
+- DB restored from a backup that lacks 032 plus the new image: the API re-migrates at startup.
+
+General rule: any migration used by fail-closed code must ship in the same image as the code; the API applies pending migrations at startup before serving.
+
+Separate finding (not fixed here): `make migrate` runs `docker compose run --rm api ./bin/api migrate`, but `main.go` does not handle a `migrate` argument (no `os.Args` handling), and the image binary is `/app/api`, not `./bin/api`. The target therefore does not do what its description says; migrations only run as a side effect of starting the API.

@@ -60,3 +60,11 @@ The first migration seeds a default super-admin account:
 | `make test`          | Run backend and frontend test suites |
 | `make build`         | Build production binaries           |
 | `make security-check`| Dependency vulnerability audit     |
+
+---
+
+## Migrations and deploy order
+
+The API applies pending migrations at startup, before it serves requests (`backend/cmd/api/main.go`, `dbpkg.RunMigrations`); the migrations are copied into the image (`backend/Dockerfile`), and `deploy/redeploy-*.sh` have no separate migrate step. If a migration fails, the container exits with status 1 and never serves.
+
+Rule: any migration used by fail-closed code must ship in the same image as the code. Migrations should stay backward compatible (e.g. nullable columns) so that rolling back to the previous image is safe. Note: `make migrate` currently does not work as described (`main.go` has no `migrate` subcommand); see `docs/issue-reports/ISS-105-recovery-hardening.md`.

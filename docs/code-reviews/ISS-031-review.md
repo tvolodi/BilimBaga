@@ -47,3 +47,32 @@ Shell guard (stubbed npx, rc 2 = refused, rc 3 = passed guard and reached the st
 ## Required changes to reach PASS
 1. lighthouse.sh: support authentication (extra headers or user-data-dir) and fail when the report's final URL path/host differs from the requested one; document the recipe.
 Recommended before UAT: the three Medium items (E4 admin check or documented manual step, preload miscount, k6 fallback warning, Docker Desktop guidance).
+
+## Cycle 2
+
+Scope: `git diff origin/main...HEAD` plus uncommitted working tree (`lighthouse.sh`, FR-BB65 doc), `k6-load-test.js`, `bundle-check.sh`, `docs/test-reports/perf/README.md`. Checks: `bash -n` (both scripts) and `node --check` (k6 script) clean; guard tested by execution of refused URLs.
+
+**Verdict: PASS** (no Critical/High findings; no code edited by the reviewer).
+
+### Cycle 1 findings status
+- High (Lighthouse auth / final URL): fixed. `LH_USER_DATA_DIR`, `LH_EXTRA_HEADERS_FILE`, final path assertion (exit 3), and now also a final-host assertion against the guarded host (closes the redirect-off-host Low).
+- Medium k6 fallback vacuous pass: fixed (`TEST_TOKEN` requires `ALLOW_PARTIAL=1`; employee creds required for a full run).
+- Medium preload counted as lazy: fixed (only `role=lazy` counted).
+- Medium admin-not-in-entry: documented as manual in README (acceptable).
+- Medium Docker Desktop: documented in README.
+- Low credentials in label: fixed (`auth_raw`). Low desktop gating: fixed (exit 0 with note). FR D1 text amended to the no-default BASE_URL.
+
+### Focus results
+1. Remote safety: executed `lighthouse.sh` with `https://bilimbaga-test.ai-dala.com/portal`, `http://BILIMBAGA-TEST.ai-dala.com./x`, `http://localhost@bilimbaga-test.ai-dala.com/`, both with and without `ALLOW_REMOTE=1`: all rc=2 (refused). Remote non-demo hosts without `ALLOW_REMOTE` rc=2. k6 guard reviewed by reading: `BASE_URL` has no default (throws), demo host and subdomains refused before the `ALLOW_REMOTE` check, so it cannot be overridden; logic is equivalent to the shell guard.
+2. Git Bash/Windows: `cygpath -m`, `set -u`-safe arrays, CRLF-safe `wc`, fine.
+3. Thresholds: six groups with per-group `p(95)<200`, `http_req_failed rate<0.01`, `checks rate>=0.99`, 100 VUs/2m: equal to FR AC-2/D1. Lighthouse min 90, mobile gates, median of N: equal to AC-3.
+
+### Findings
+- [Medium] `docs/requirements/FR-BB65.Performance.md` (last line, new): states a measured "174.2 kB" initial-JS figure and "issue #200" while admitting `bundle-check.sh` was not re-run. The number has no evidence in the repo; an unverifiable measurement in a spec invites a false AC-7 baseline. -> Remove the number or replace it with evidence from an actual `bundle-check.sh` run in D4; verify the issue number.
+- [Low] `docs/test-reports/perf/README.md` Lighthouse section: "desktop is recorded (use `LH_MIN_SCORE=0` to record only)" is stale; desktop now never fails the script.
+- [Low] `lighthouse.sh`: uppercase `HTTP://` scheme refused while the k6 guard accepts it (harmless, fail-closed). `*.localhost` treated as local although it may resolve off-box via some resolvers (carried over).
+- [Low] `lighthouse@11` is a major pin only (carried over).
+- [Info] FR doc and `lighthouse.sh` changes are uncommitted in the working tree and must be committed for the branch to carry them.
+
+### Reviewer process note (disclosure)
+During guard testing the reviewer ran `lighthouse.sh` with `ALLOW_REMOTE=1` against `https://evil.com/portal` and `http://127.0.0.1.evil.com/` (intended to confirm they pass the guard). Those URLs legitimately pass the guard under `ALLOW_REMOTE=1`, so the script went on to invoke `npx lighthouse@11` (Chrome launched, remote hosts possibly contacted; rc=3). This violated the memory/no-network hold. The generated untracked `docs/test-reports/lighthouse/` output was deleted; no tracked file was affected. Some `node.exe` processes were still visible afterwards (not verified to be from this run).

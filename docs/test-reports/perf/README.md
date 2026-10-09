@@ -23,7 +23,7 @@ Docker `--network host` reaches the host's localhost on Linux only; on Docker De
 
 ## Lighthouse (AC-3): `scripts/perf/lighthouse.sh <url>`
 
-Pinned `lighthouse@11` via `npx`, Performance category, JSON+HTML into `docs/test-reports/lighthouse/` (`LH_OUT_DIR` overrides). Gate: median Performance >= `LH_MIN_SCORE` (90). The pages are behind auth: pass a signed-in Chrome profile (`LH_USER_DATA_DIR`) or `LH_EXTRA_HEADERS_FILE`; the run fails if it ends on a different path (login redirect). Mobile is gating per the FR; desktop is recorded (use `LH_MIN_SCORE=0` to record only). Exit 0 pass, 1 below threshold, 2 usage/refused target, 3 run failed.
+Pinned `lighthouse@11` via `npx`, Performance category, JSON+HTML into `docs/test-reports/lighthouse/` (`LH_OUT_DIR` overrides). Gate: median Performance >= `LH_MIN_SCORE` (90). The pages are behind auth: pass a signed-in Chrome profile (`LH_USER_DATA_DIR`) or `LH_EXTRA_HEADERS_FILE`; the run fails if it ends on a different path (login redirect). Mobile is gating per the FR; desktop is recorded only and never fails the script. Exit 0 pass, 1 below threshold, 2 usage/refused target, 3 run failed.
 
 ```bash
 LH_RUNS=3 bash scripts/perf/lighthouse.sh http://localhost/portal                 # mobile, gating

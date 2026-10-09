@@ -12,6 +12,7 @@
 #        LH_EXTRA_HEADERS_FILE  JSON file passed to --extra-headers (e.g. an Authorization header)
 # The run fails (exit 3) if the page Lighthouse ended on differs from the requested path (login redirect).
 #        ALLOW_REMOTE=1 required for any non-local host. bilimbaga-test.ai-dala.com is ALWAYS refused.
+#        Desktop preset is recorded only (never fails the gate); mobile gates.
 # Writes <out>/<label>-<preset>-run<N>.report.{json,html}; exits 1 when the median is below the minimum,
 # 2 on usage/safety errors, 3 when a run produced no score.
 set -eu
@@ -37,6 +38,7 @@ case "$url" in
 esac
 rest=${url#*://}
 auth=${rest%%[/?#]*}
+auth_raw=$auth
 bs=$(printf '\\')
 case "$auth" in
   *"$bs"*|*%*) echo "refusing: forbidden characters in host part: $auth" >&2; exit 2 ;;
@@ -78,7 +80,7 @@ out=${LH_OUT_DIR:-$repo_root/docs/test-reports/lighthouse}
 mkdir -p "$out"
 label=${LH_LABEL:-}
 if [ -z "$label" ]; then
-  p=${rest#"$auth"}; p=${p%%[?#]*}
+  p=${rest#"$auth_raw"}; p=${p%%[?#]*}
   label=$(printf '%s' "$p" | tr -c 'A-Za-z0-9' '-' | sed 's/^-*//; s/-*$//')
   [ -n "$label" ] || label=root
 fi
@@ -101,7 +103,7 @@ if [ -n "${LH_EXTRA_HEADERS_FILE:-}" ]; then
   [ -f "$LH_EXTRA_HEADERS_FILE" ] || { echo "LH_EXTRA_HEADERS_FILE not found" >&2; exit 2; }
   hdr_arg=(--extra-headers="$(native "$LH_EXTRA_HEADERS_FILE")")
 fi
-req_path=${rest#"$auth"}; req_path=${req_path%%[?#]*}; [ -n "$req_path" ] || req_path=/
+req_path=${rest#"$auth_raw"}; req_path=${req_path%%[?#]*}; [ -n "$req_path" ] || req_path=/
 
 scores=()
 i=1
@@ -119,7 +121,14 @@ while [ "$i" -le "$runs" ]; do
   [ -f "$json" ] || { echo "no report written: $json" >&2; exit 3; }
   s=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const c=r.categories&&r.categories.performance;console.log(c&&typeof c.score==="number"?Math.round(c.score*100):"")' "$(native "$json")") || s=
   case "$s" in ''|*[!0-9]*) echo "run $i produced no performance score (see $json)" >&2; exit 3 ;; esac
-  final_path=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));try{console.log(new URL(r.finalDisplayedUrl||r.finalUrl).pathname)}catch(e){console.log("")}' "$(native "$json")") || final_path=
+  final=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));try{const u=new URL(r.finalDisplayedUrl||r.finalUrl);console.log(u.hostname.toLowerCase().replace(/^\[|\]$/g,"")+" "+u.pathname)}catch(e){console.log("")}' "$(native "$json")") || final=
+  final_host=${final%% *}; final_path=${final#* }
+  [ "$final" != "$final_host" ] || final_path=
+  final_host=${final_host%.}
+  if [ -n "$final" ] && [ "$final_host" != "$host" ]; then
+    echo "run $i ended on host '$final_host' instead of '$host' (redirect off the guarded host); refusing to trust the result" >&2
+    exit 3
+  fi
   if [ "${final_path%/}" != "${req_path%/}" ]; then
     echo "run $i ended on '$final_path' instead of '$req_path' (probably redirected to login): sign in via LH_USER_DATA_DIR / LH_EXTRA_HEADERS_FILE" >&2
     exit 3
@@ -137,6 +146,8 @@ printf '%-12s %-8s %-6s %s\n' "$label" "$preset" "$runs" "${scores[*]}"
 printf 'median Performance: %s (minimum %s)\n' "$median" "$min"
 if [ "$median" -ge "$min" ]; then
   echo "PASS"
+elif [ "$preset" = desktop ]; then
+  echo "NOTE: desktop median $median < $min; FR-BB65 AC-3 gates on mobile only, desktop is recorded (exit 0)" >&2
 else
   echo "FAIL: median $median < $min (record failing audits from the JSON, then apply D2)" >&2
   exit 1

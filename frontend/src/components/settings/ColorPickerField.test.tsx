@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@/i18n'
 import { ColorPickerField, contrastRatio } from './ColorPickerField'
@@ -94,5 +94,93 @@ describe('ColorPickerField', () => {
     await userEvent.click(hexInput)
     await userEvent.paste('#abc')
     expect(onChange).toHaveBeenLastCalledWith('#aabbcc')
+  })
+
+  it('emits the native colour picker value unchanged', () => {
+    const onChange = vi.fn()
+    render(
+      <ColorPickerField
+        label="Primary"
+        value="#0ea5e9"
+        onChange={onChange}
+        contrastAgainst="#ffffff"
+      />,
+    )
+    fireEvent.change(screen.getByLabelText('Primary', { selector: 'input[type="color"]' }), {
+      target: { value: '#123456' },
+    })
+    expect(onChange).toHaveBeenCalledWith('#123456')
+  })
+
+  it('normalises an uppercase 6-digit hex to lowercase', () => {
+    const onChange = vi.fn()
+    render(
+      <ColorPickerField
+        label="Primary"
+        value="#0ea5e9"
+        onChange={onChange}
+        contrastAgainst="#ffffff"
+      />,
+    )
+    fireEvent.change(screen.getByLabelText('Primary hex'), { target: { value: '#ABCDEF' } })
+    expect(onChange).toHaveBeenLastCalledWith('#abcdef')
+  })
+
+  it('passes an incomplete hex through unchanged so the user can keep typing', () => {
+    const onChange = vi.fn()
+    render(
+      <ColorPickerField
+        label="Primary"
+        value="#0ea5e9"
+        onChange={onChange}
+        contrastAgainst="#ffffff"
+      />,
+    )
+    fireEvent.change(screen.getByLabelText('Primary hex'), { target: { value: '#12' } })
+    expect(onChange).toHaveBeenLastCalledWith('#12')
+  })
+
+  it('falls back to a black swatch when the stored value is not a valid hex', () => {
+    render(
+      <ColorPickerField
+        label="Primary"
+        value="not-a-colour"
+        onChange={() => {}}
+        contrastAgainst="#ffffff"
+      />,
+    )
+    const swatch = screen.getByLabelText('Primary', { selector: 'input[type="color"]' }) as HTMLInputElement
+    expect(swatch.value).toBe('#000000')
+    expect(screen.getByLabelText('Primary hex')).toHaveValue('not-a-colour')
+  })
+
+  it('reports the contrast ratio to two decimals in the warning', () => {
+    render(
+      <ColorPickerField
+        label="Primary"
+        value="#ffff00"
+        onChange={() => {}}
+        contrastAgainst="#ffffff"
+      />,
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('ratio: 1.07:1')
+  })
+
+  it('accepts the 3-digit shorthand for the contrast background', () => {
+    render(
+      <ColorPickerField
+        label="Primary"
+        value="#000"
+        onChange={() => {}}
+        contrastAgainst="#fff"
+      />,
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('contrastRatio shorthand', () => {
+  it('treats #fff and #ffffff as the same colour', () => {
+    expect(contrastRatio('#000', '#fff')).toBeCloseTo(21, 1)
   })
 })

@@ -32,7 +32,7 @@ describe('ResultActions certificate download', () => {
   })
 
   it('sends the Bearer token to the portal certificate endpoint', async () => {
-    fetchMock.mockResolvedValueOnce(new Response(new Blob(['pdf']), { status: 200 }))
+    fetchMock.mockResolvedValueOnce(new Response('pdf', { status: 200 }))
     renderActions()
     fireEvent.click(screen.getByRole('button', { name: /certificate/i }))
     await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock'))

@@ -2,7 +2,7 @@
 slug: role-management
 title: "Role Management (custom roles and permission matrix) — UAT Scenario"
 feature: role-management (FR-BB117; GitHub issue #135)
-version: 2
+version: 3
 created: 2026-10-09
 author: Business Analyst
 ---
@@ -85,24 +85,29 @@ Target: local | qa (default: local; never the production-class demo instance, se
 | 8 | Super admin | Re-add `reports:read` | Custom user regains access without re-login | |
 | 9 | Custom user | Try `GET /api/v1/users` (needs `users:read`) | 403, and no cross-department user data is exposed | |
 
-## Scenario S7: Scoping and escalation limits (added from static conformance review; expected to FAIL until GAP G1/G2 are fixed)
+## Scenario S7: Scoping and escalation limits (D-1 shipped in PR #222, #227, #231; scoping steps 1 and 4 depend on D-2 / #218, not yet merged)
 
 Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (assign `uat.custom2@test.com`, department A). Department A also contains one `department_admin` user and one `super_admin` test user; department B contains an employee.
 
 | Step | Actor | Action | Expected Outcome | Pass/Fail |
 |------|-------|--------|-----------------|-----------|
 | 1 | Custom2 user | `GET /api/v1/users` | Only department A users; department B employee absent | |
-| 2 | Custom2 user | `POST /api/v1/users/{super_admin_in_A}/reset-password` | 403 `FORBIDDEN`, body has no `temporary_password` (D-1, fixed by issue #217; before the fix it returned the temporary password: GAP G2) | |
+| 2 | Custom2 user | `POST /api/v1/users/{super_admin_in_A}/reset-password` | 403 `FORBIDDEN`, body has no `temporary_password` (D-1, shipped in PR #222; the check runs before any password is generated) | |
 | 3 | Custom2 user | `PUT /api/v1/users/{department_admin_in_A}` / `POST .../deactivate` / `POST .../unlock` / `POST .../reset-password` | 403 for the same reason (D-1); an employee target whose permissions the caller holds is allowed (reset-password 200) | |
-| 4 | Custom user (`qa_reviewer`, `reports:read`) | `GET /api/v1/admin/dashboard` and `/admin/reports/exams/{id}` | Data limited to the caller's department like `department_admin`, or the product explicitly accepts org-wide reports for a granted `reports:read` (decision required; today org-wide: GAP G1) | |
-| 5 | Custom2 user | `PUT /api/v1/users/{self}` changing own role | 403 (self role change blocked) | |
-| 6 | Custom2 user | Assign role `department_admin` to a department A employee | 403 if `department_admin` holds permissions the caller lacks | |
+| 4 | Custom user (`qa_reviewer`, `reports:read`) | `GET /api/v1/admin/dashboard` and `/admin/reports/exams/{id}` | Data limited to the caller's department like `department_admin` (FR-BB117 D-2). Expected to FAIL until #218 is merged (branch `swarm/218-deptscope-all-roles`) | |
+| 5 | Custom2 user | `PUT /api/v1/users/{self}` changing own role (there is no `PUT /users/me`) | 403 `FORBIDDEN` (self role change blocked for every role except super_admin) | |
+| 6 | Custom2 user | Via `PUT /api/v1/users/{employee_in_A}` and `POST /api/v1/users`, assign role `department_admin` or `super_admin` | 403 `FORBIDDEN` always (a custom role never reaches a built-in role of department_admin rank or higher). Assigning a custom role whose permissions are not a subset of the caller's, or that holds `roles:read`/`roles:manage`/`tenant:manage`, is also 403 | |
 | 7 | Dept admin A1 | Using `uat.deptadmin` (department A) against a peer `department_admin` A2 in the same department: `POST /api/v1/users/{A2}/reset-password`, `PUT /api/v1/users/{A2}`, `POST /api/v1/users/{A2}/deactivate`, `POST /api/v1/users/{A2}/unlock` | 403 `FORBIDDEN` on each (strict rank hierarchy, FR-BB117 D-1); the response body contains no temporary password; A2 can still log in with the old password | |
 | 8 | Dept admin A1 | Same four calls against a `super_admin` user and against an `examiner` and an `employee` in department A | `super_admin` target: 403 on all four. `examiner` and `employee` targets: allowed (200), because they are of strictly lower rank | |
 | 9 | Dept admin A1 | Same calls against an `employee` in department B | 403 or 404 (outside own department; no data leaked) | |
 | 10 | Custom2 user | Reset password of a peer user holding a custom role whose permissions are NOT a subset of Custom2's | 403; a role with a subset of Custom2's permissions is allowed | |
-| 11 | Dept admin A1 | `PUT /api/v1/users/{employee_in_A}` with `role_id` = `department_admin`; then with `role_id` = `super_admin`; then `POST /api/v1/users` creating a user with role `department_admin` | 403 `FORBIDDEN` each (department_admin may assign `examiner` or `employee` only; FR-BB18 AC-4/AC-6, PR #222) | |
+| 11 | Dept admin A1 | `PUT /api/v1/users/{employee_in_A}` with `role_id` = `department_admin`; then with `role_id` = `super_admin`; then `POST /api/v1/users` creating a user with role `department_admin` | 403 `FORBIDDEN` each, user unchanged / not created (department_admin may assign `examiner` or `employee` only; FR-BB18 AC-4/AC-6, PR #222). A malformed or unknown `role_id` is 422 `VALIDATION_ERROR` (unknown) or, today, 500 (malformed UUID; conformance gap G4) | |
 | 12 | Dept admin A1 | `PUT /api/v1/users/{employee_in_A}` with `role_id` = `examiner`; then back to `employee` | 200 each | |
+| 13 | Dept admin A1 | `GET /api/v1/users/roles` (PR #231) | Every row has boolean `assignable`: `examiner` and `employee` true, `department_admin` and `super_admin` false, a custom role true only if its permissions are a subset of department_admin's and it holds no `roles:*`/`tenant:manage`. Only the boolean is returned, never another role's permission list. Super admin: all true | |
+| 14 | Dept admin A1 | Open Users, "Create user" and "Edit user" drawers; open Import modal (PR #227) | Role select lists exactly the `assignable: true` roles (no `department_admin`, no `super_admin`); editing a peer/higher user shows the role select disabled with the current role and the text "This user's current role cannot be changed by you." (en/ru/kk); Import modal shows "Roles you may assign: examiner, employee" (or "You cannot assign any role.") | |
+| 15 | Dept admin A1 | In the UI try reset password, deactivate, unlock on a peer department_admin | Deactivate, create, edit and import show the localized message "You are not allowed to assign this role or act on this user." (`users.messages.forbidden`). Known gap G6: on the routed users page reset-password shows no message and unlock shows the generic unlock error | |
+| 16 | Dept admin A1 | CSV import (preview, then commit) with rows: employee in A, examiner in A, `department_admin` in A, `super_admin` in A, employee in B | Employee and examiner rows valid; the other three listed under errors with HTTP 200 (`role department_admin cannot be assigned by your role` for the role rows; `department B is outside your scope` for the last); commit creates only the valid rows | |
+| 17 | Custom2 user | `GET /api/v1/users/roles` | `assignable` evaluated by the permission-subset rule; same verdicts as steps 6 and 10 | |
 
 ### S7 curl recipe (D-1, issue #217)
 
@@ -134,7 +139,9 @@ curl -s -o /dev/null -w '%{http_code}
 ' -X POST $API/users/$EMP_ID/reset-password -H "$(H $DA1)"        # 200
 curl -s -o /dev/null -w '%{http_code}
 ' -X POST $API/users/$EX_ID/reset-password -H "$(H $DA1)"         # 200
-# 5. cleanup: deactivate uat.helper@test.com, DELETE $API/roles/$ROLE
+# 5. assignable flag (PR #231)
+curl -s $API/users/roles -H "$(H $DA1)" | jq '.data[]|{name,assignable}'   # examiner,employee true; department_admin,super_admin false
+# 6. cleanup: deactivate uat.helper@test.com, DELETE $API/roles/$ROLE
 ```
 
 ## Scenario S6: Localization and accessibility

@@ -28,6 +28,7 @@ type mockUserService struct {
 	createFn     func(ctx context.Context, req CreateRequest, callerRole, callerDeptID, callerUserID, ip string) (*CreateResponse, error)
 	updateFn     func(ctx context.Context, id string, req UpdateRequest, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	deactivateFn func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
+	reactivateFn func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
 	resetPwdFn   func(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
 	importFn     func(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
 	listRolesFn  func(ctx context.Context, callerRole string) ([]RoleRow, error)
@@ -57,6 +58,9 @@ func (m *mockUserService) UpdateUser(ctx context.Context, id string, req UpdateR
 }
 func (m *mockUserService) DeactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error {
 	return m.deactivateFn(ctx, id, callerRole, callerDeptID, callerUserID, ip)
+}
+func (m *mockUserService) ReactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error {
+	return m.reactivateFn(ctx, id, callerRole, callerDeptID, callerUserID, ip)
 }
 func (m *mockUserService) ResetPassword(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error) {
 	return m.resetPwdFn(ctx, id, callerRole, callerDeptID, callerUserID, ip)
@@ -1086,4 +1090,62 @@ func TestHandlerReads_IncludePreferredLocale(t *testing.T) {
 	assert.Equal(t, "ru", list.Items[0]["preferred_locale"])
 	assert.Contains(t, list.Items[1], "preferred_locale")
 	assert.Nil(t, list.Items[1]["preferred_locale"])
+}
+
+// ── ReactivateUser (FR-BB18 AC-13) ───────────────────────────────────────────
+
+func TestHandlerReactivateUser_Returns200AndAuditsOnce(t *testing.T) {
+	svc := &mockUserService{
+		reactivateFn: func(_ context.Context, _, _, _, _, _ string) error { return nil },
+	}
+	spy := &spyWriter{}
+	h := &Handler{svc: svc, writer: spy}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/u1/reactivate", nil)
+	req = withAuthCtx(req, "caller", "super_admin", "")
+	req = withChiID(req, "u1")
+	w := httptest.NewRecorder()
+	h.ReactivateUser(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "user reactivated")
+	assert.Equal(t, "user.reactivate", spy.action)
+	assert.Equal(t, "user", spy.entity)
+	require.NotNil(t, spy.id)
+	assert.Equal(t, "u1", *spy.id)
+}
+
+func TestHandlerReactivateUser_ErrorMapping_NoAudit(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		status int
+		code   string
+	}{
+		{"not found", ErrNotFound, http.StatusNotFound, "NOT_FOUND"},
+		{"forbidden", ErrForbidden, http.StatusForbidden, "FORBIDDEN"},
+		{"already active", ErrUserAlreadyActive, http.StatusConflict, "USER_ALREADY_ACTIVE"},
+		{"unexpected", errors.New("db down"), http.StatusInternalServerError, "INTERNAL_ERROR"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &mockUserService{
+				reactivateFn: func(_ context.Context, _, _, _, _, _ string) error { return tc.err },
+			}
+			spy := &spyWriter{}
+			h := &Handler{svc: svc, writer: spy}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/users/u1/reactivate", nil)
+			req = withAuthCtx(req, "caller", "super_admin", "")
+			req = withChiID(req, "u1")
+			w := httptest.NewRecorder()
+			h.ReactivateUser(w, req)
+
+			assert.Equal(t, tc.status, w.Code)
+			_, apiErr := decodeHandlerEnvelope(t, w)
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tc.code, apiErr.Code)
+			assert.Equal(t, 0, spy.n, "a failed reactivation must not be audited")
+		})
+	}
 }

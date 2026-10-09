@@ -563,6 +563,8 @@ func TestRouterUsersAuthz_PatchMeRejectsPrivilegeFields(t *testing.T) {
 	}
 }
 
+func (r *authzRepo) Reactivate(context.Context, string) error { return nil }
+
 // UserInDeptScope: this file tests role gates, not department scope, so every target is in scope.
 func (r *authzRepo) UserInDeptScope(context.Context, deptscope.Scope, string) (bool, error) {
 	return true, nil

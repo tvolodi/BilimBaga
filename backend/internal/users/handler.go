@@ -316,6 +316,31 @@ func (h *Handler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "error": nil})
 }
 
+// ReactivateUser handles POST /api/v1/users/:id/reactivate (FR-BB18 AC-13).
+func (h *Handler) ReactivateUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	callerRole := auth.RoleFromCtx(r.Context())
+	callerDeptID := auth.DepartmentIDFromCtx(r.Context())
+	callerUserID := auth.UserIDFromCtx(r.Context())
+
+	if err := h.svc.ReactivateUser(r.Context(), id, callerRole, callerDeptID, callerUserID, clientIP(r)); err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			api.WriteError(w, http.StatusNotFound, "NOT_FOUND", "user not found")
+		case errors.Is(err, ErrForbidden):
+			api.WriteError(w, http.StatusForbidden, "FORBIDDEN", "insufficient permissions")
+		case errors.Is(err, ErrUserAlreadyActive):
+			api.WriteError(w, http.StatusConflict, "USER_ALREADY_ACTIVE", "user is already active")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to reactivate user")
+		}
+		return
+	}
+	h.userChanged(id)
+	h.writer.Write(r.Context(), r, "user.reactivate", "user", &id, nil)
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"message": "user reactivated"}, "error": nil})
+}
+
 // ResetPassword handles POST /api/v1/users/:id/reset-password.
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

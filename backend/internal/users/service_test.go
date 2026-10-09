@@ -141,6 +141,15 @@ func (m *mockRepo) Deactivate(_ context.Context, id string) error {
 	return nil
 }
 
+func (m *mockRepo) Reactivate(_ context.Context, id string) error {
+	u, ok := m.users[id]
+	if !ok {
+		return ErrNotFound
+	}
+	u.Status = "active"
+	return nil
+}
+
 func (m *mockRepo) RevokeAllTokens(_ context.Context, userID string) error {
 	m.revoked = append(m.revoked, userID)
 	return nil
@@ -732,4 +741,72 @@ func TestPreferredLocale_ExposedOnReads(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "u2 must appear in the admin list")
+}
+
+// ── FR-BB18 AC-13: reactivate ────────────────────────────────────────────────
+
+func TestReactivateUser_RestoresInactiveUserWithoutRevokingTokens(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("u1", "dept-1", "role-emp", "employee")
+	u.Status = "inactive"
+	repo.users["u1"] = u
+
+	svc := NewService(repo)
+	err := svc.ReactivateUser(context.Background(), "u1", "super_admin", "", "caller-id", "127.0.0.1")
+
+	require.NoError(t, err)
+	assert.Equal(t, "active", repo.users["u1"].Status)
+	assert.Empty(t, repo.revoked, "reactivation must not revoke refresh tokens")
+}
+
+func TestReactivateUser_AlreadyActiveIsConflictWithNoChange(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("u1", "dept-1", "role-emp", "employee")
+	u.Status = "active"
+	repo.users["u1"] = u
+
+	svc := NewService(repo)
+	err := svc.ReactivateUser(context.Background(), "u1", "super_admin", "", "caller-id", "127.0.0.1")
+
+	assert.ErrorIs(t, err, ErrUserAlreadyActive)
+	assert.Equal(t, "active", repo.users["u1"].Status)
+}
+
+func TestReactivateUser_DeptAdminOutOfDepartmentIsNotFound(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("u1", "dept-2", "role-emp", "employee")
+	u.Status = "inactive"
+	repo.users["u1"] = u
+
+	svc := NewService(repo)
+	err := svc.ReactivateUser(context.Background(), "u1", "department_admin", "dept-1", "caller-id", "127.0.0.1")
+
+	assert.ErrorIs(t, err, ErrNotFound)
+	assert.Equal(t, "inactive", repo.users["u1"].Status, "an out-of-scope target must not change")
+}
+
+func TestReactivateUser_PeerRankIsForbiddenBeforeWrite(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("u2", "dept-1", "role-da", "department_admin")
+	u.Status = "inactive"
+	repo.users["u2"] = u
+
+	svc := NewService(repo)
+	err := svc.ReactivateUser(context.Background(), "u2", "department_admin", "dept-1", "caller-id", "127.0.0.1")
+
+	assert.ErrorIs(t, err, ErrForbidden)
+	assert.Equal(t, "inactive", repo.users["u2"].Status, "a rank violation must not write")
+}
+
+func TestReactivateUser_SelfIsForbidden(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("caller-id", "dept-1", "role-emp", "employee")
+	u.Status = "inactive"
+	repo.users["caller-id"] = u
+
+	svc := NewService(repo)
+	err := svc.ReactivateUser(context.Background(), "caller-id", "super_admin", "", "caller-id", "127.0.0.1")
+
+	assert.ErrorIs(t, err, ErrForbidden)
+	assert.Equal(t, "inactive", repo.users["caller-id"].Status)
 }

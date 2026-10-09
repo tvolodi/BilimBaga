@@ -42,6 +42,7 @@ export const AUDIT_ACTIONS = [
   'user.create',
   'user.update',
   'user.deactivate',
+  'user.reactivate',
   'exam.create',
   'exam.update',
   'exam.publish',

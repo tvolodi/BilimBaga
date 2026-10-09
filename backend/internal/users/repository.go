@@ -20,6 +20,7 @@ type Repository interface {
 	Create(ctx context.Context, email, fullName, passwordHash string, departmentID *string, roleID string) (*User, error)
 	Update(ctx context.Context, id, fullName string, departmentID *string, roleID string) (*User, error)
 	Deactivate(ctx context.Context, id string) error
+	Reactivate(ctx context.Context, id string) error
 	RevokeAllTokens(ctx context.Context, userID string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
 	Unlock(ctx context.Context, id string) error
@@ -198,6 +199,20 @@ func (r *pgRepository) Deactivate(ctx context.Context, id string) error {
 	result, err := r.db.ExecContext(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("users.Deactivate: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// Reactivate sets a user's status back to 'active'. Password, lockout and revoked tokens are not touched (FR-BB18 AC-13).
+func (r *pgRepository) Reactivate(ctx context.Context, id string) error {
+	const q = `UPDATE users SET status = 'active', updated_at = now() WHERE id = $1`
+	result, err := r.db.ExecContext(ctx, q, id)
+	if err != nil {
+		return fmt.Errorf("users.Reactivate: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {

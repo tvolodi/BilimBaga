@@ -192,7 +192,7 @@ SELECT
     COUNT(DISTINCT ra.user_id)                                                   AS assigned_count,
     COUNT(DISTINCT CASE WHEN es.status IN ('submitted','auto_submitted','grading_pending') THEN ra.user_id END)
                                                                                  AS completed_count,
-    COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)               AS passed_count
+    COUNT(DISTINCT CASE WHEN es.passed = TRUE AND es.status IN ('submitted','auto_submitted') THEN ra.user_id END) AS passed_count
 FROM exams e
 LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id AND @SCOPE@
 LEFT JOIN exam_sessions es ON es.exam_id = e.id AND es.user_id = ra.user_id
@@ -476,7 +476,7 @@ SELECT
   COUNT(*) AS count
 FROM exam_sessions
 WHERE exam_id = $1
-  AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@
+  AND status IN ('submitted','auto_submitted') AND @SCOPE@
 GROUP BY bucket`, "user_id", "$2")
 
 	type bucketRow struct {
@@ -505,12 +505,13 @@ GROUP BY bucket`, "user_id", "$2")
 func (r *postgresRepository) GetExamSummaryStats(ctx context.Context, examID string) (*examSummaryRow, error) {
 	q := withScope(`
 SELECT
-  ROUND(AVG(score_pct)::numeric, 1)                                           AS avg_score,
-  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score_pct)                      AS median_score,
+  ROUND((AVG(score_pct) FILTER (WHERE status IN ('submitted','auto_submitted')))::numeric, 1) AS avg_score,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score_pct) FILTER (WHERE status IN ('submitted','auto_submitted')) AS median_score,
   COUNT(*)                                                                     AS total_attempts,
   COUNT(DISTINCT user_id)                                                      AS unique_participants,
   ROUND(
-    COUNT(*) FILTER (WHERE passed = TRUE)::DECIMAL / NULLIF(COUNT(*), 0), 4
+    COUNT(*) FILTER (WHERE passed = TRUE AND status IN ('submitted','auto_submitted'))::DECIMAL
+    / NULLIF(COUNT(*) FILTER (WHERE status IN ('submitted','auto_submitted')), 0), 4
   )                                                                            AS pass_rate
 FROM exam_sessions
 WHERE exam_id = $1
@@ -540,7 +541,7 @@ JOIN question_translations qt ON qt.question_id = q.id AND qt.locale = q.default
 LEFT JOIN session_question_scores sqs ON sqs.question_id = q.id
   AND sqs.session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted','grading_pending') AND @SCOPE@
+    WHERE exam_id = $1 AND status IN ('submitted','auto_submitted') AND @SCOPE@
   )
 WHERE q.id IN (
   SELECT DISTINCT question_id FROM session_questions
@@ -733,7 +734,7 @@ SELECT
   e.id AS exam_id,
   e.title,
   exam_track.track,
-  BOOL_OR(es.passed) AS passed,
+  BOOL_OR(es.passed) FILTER (WHERE es.status IN ('submitted','auto_submitted')) AS passed,
   COUNT(es.id) AS attempts
 FROM exams e
 JOIN LATERAL (
@@ -907,7 +908,7 @@ SELECT
   COUNT(DISTINCT ra.user_id)                                                     AS assigned_count,
   COUNT(DISTINCT CASE WHEN es.status IN ('submitted','auto_submitted','grading_pending') THEN ra.user_id END)
                                                                                  AS completed_count,
-  COUNT(DISTINCT CASE WHEN es.passed = TRUE THEN ra.user_id END)                 AS passed_count
+  COUNT(DISTINCT CASE WHEN es.passed = TRUE AND es.status IN ('submitted','auto_submitted') THEN ra.user_id END) AS passed_count
 FROM exams e
 LEFT JOIN resolved_assignments ra ON ra.exam_id = e.id AND @SCOPE@
 LEFT JOIN exam_sessions es

@@ -22,7 +22,7 @@ Hard-coded status lists in `backend/internal/reports/repository.go` were never u
 Real `session_status` enum values (migrations 014, 015): `in_progress`, `submitted`, `auto_submitted`, `grading_pending`.
 
 ## Fix Applied
-Seven status predicates changed. Split rule: completion counts include grading_pending, score aggregates exclude it (partial scores).
+Status predicates changed. Split rule: completion counts include grading_pending, score aggregates exclude it (partial scores).
 - Completion (`IN ('submitted','auto_submitted','grading_pending')`): GetCompletionRateByExam, GetRecentActivity, GetUserTrackActivity, GetUserRequiredExams, GetDashboardCompletionRatesForRange.
 - Score aggregates (`IN ('submitted','auto_submitted')`): GetAvgScoreByTrack (was `= 'submitted'`), GetTopBottomQuestions (correct rate). deptscope placeholders untouched. No migration.
 
@@ -47,3 +47,23 @@ repository_autosubmitted_test.go (fake-driver SQL text assertions; no legacy lis
 - Tests: go test -p 1 ./... all pass; go vet and staticcheck clean
 - Migration applied: no
 - Build clean: yes
+
+## Classification of every touched query (supervisor decision)
+Rule: score statistics (AVG/median/histogram/pass rate/correct rate/passed counts) use `('submitted','auto_submitted')`; counts keep `('submitted','auto_submitted','grading_pending')`. `@SCOPE@` unchanged everywhere.
+
+| Query | Classification | Predicate |
+|-------|----------------|-----------|
+| GetCompletionRateByExam | completed_count = count; passed_count = score stat | 3 statuses / `AND es.status IN (2)` in passed_count |
+| GetDashboardCompletionRatesForRange | same | same |
+| GetRecentActivity | count/list of completed sessions | 3 |
+| GetUserTrackActivity | count (questions answered, last activity) | 3 |
+| GetUserRequiredExams | attempts = count; passed = score stat | 3 join; `BOOL_OR(passed) FILTER (2)` |
+| GetAvgScoreByTrack | score stat | 2 |
+| GetTopBottomQuestions | score stat (correct rate) | 2 |
+| GetExamScoreDistribution | score stat (histogram) | 2 |
+| GetExamSummaryStats | total_attempts, unique_participants = count (3); avg, median, pass rate = score stat (`FILTER (2)`, pass-rate numerator and denominator) | mixed |
+| GetPerQuestionStats | question set = presence (3); correct_rate and avg_time (sqs join) = 2 | mixed |
+| GetAnswerDistribution | selection counts | 3 |
+
+Unchanged on purpose: GetOverdueEmployees (existence of a passing session, not an aggregate), per-session list/stream queries (raw rows).
+Note: avg_time_seconds in GetPerQuestionStats shares the sqs join, so it also excludes grading_pending sessions.

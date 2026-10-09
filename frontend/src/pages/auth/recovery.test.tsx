@@ -221,4 +221,11 @@ describe('ResetPasswordPage (FR-BB115 AC-7)', () => {
     await user.click(screen.getAllByRole('button', { name: /show password/i })[0])
     expect(field).toHaveAttribute('type', 'text')
   })
+
+  it('sets <meta name="referrer" content="no-referrer"> while mounted and removes it on unmount (ISS-105)', () => {
+    const { unmount } = renderAt('/reset-password?token=abc')
+    expect(document.querySelector('meta[name="referrer"][content="no-referrer"]')).not.toBeNull()
+    unmount()
+    expect(document.querySelector('meta[name="referrer"]')).toBeNull()
+  })
 })

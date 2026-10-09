@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff } from 'lucide-react'
@@ -15,6 +15,18 @@ export function ResetPasswordPage() {
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
   const reset = useCompletePasswordReset()
+
+  // ISS-105: the reset token is in the URL, so never leak it via the Referer header
+  // (outbound links, third-party requests) while this page is mounted.
+  useEffect(() => {
+    const meta = document.createElement('meta')
+    meta.name = 'referrer'
+    meta.content = 'no-referrer'
+    document.head.appendChild(meta)
+    return () => {
+      meta.remove()
+    }
+  }, [])
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')

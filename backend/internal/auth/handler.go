@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 )
@@ -15,6 +16,9 @@ import (
 type Handler struct {
 	svc    Service
 	writer auditWriter
+	// forgotMin / sleep: constant-time padding for forgot-password (sleep is injectable in tests).
+	forgotMin time.Duration
+	sleep     func(time.Duration)
 }
 
 // auditWriter is the subset of *audit.Writer the handler uses (allows a fake in tests).
@@ -24,7 +28,7 @@ type auditWriter interface {
 
 // NewHandler creates a new Handler backed by the given Service and audit Writer.
 func NewHandler(svc Service, writer *audit.Writer) *Handler {
-	return &Handler{svc: svc, writer: writer}
+	return &Handler{svc: svc, writer: writer, forgotMin: forgotMinDuration}
 }
 
 // apiResponse is the standard JSON envelope for all API responses.

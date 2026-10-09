@@ -1,6 +1,8 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/bilimbaga/bilimbaga/internal/ai"
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/audit"
@@ -76,7 +78,7 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		// Protected routes — Bearer JWT required; general rate limit (AC-1).
 		r.Group(func(r chi.Router) {
 			r.Use(ratelimit.GlobalLimiter())
-			r.Use(auth.Authenticate(jwtSecret))
+			r.Use(authenticate(jwtSecret, db))
 			// Malformed UUID path params 404 here instead of reaching Postgres (500).
 			// Runs after routing, so chi URL params are resolved (ISS-141).
 			r.Use(api.RequireUUIDPathParams(api.UUIDPathParamNames...))
@@ -311,4 +313,14 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 	})
 
 	return r
+}
+
+// authenticate builds the JWT middleware. With a database it also rejects access tokens
+// issued before the user's last password reset (ISS-105); with a nil db (route tests that
+// never reach a handler) only the signature/expiry checks apply.
+func authenticate(jwtSecret string, db *sqlx.DB) func(http.Handler) http.Handler {
+	if db == nil {
+		return auth.Authenticate(jwtSecret)
+	}
+	return auth.Authenticate(jwtSecret, auth.WithPasswordEpoch(auth.NewDBPasswordEpochLookup(db)))
 }

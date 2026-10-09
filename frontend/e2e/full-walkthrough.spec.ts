@@ -2,7 +2,7 @@
  * Full visual walkthrough E2E test — hits a real running backend.
  *
  * Prerequisites:
- *   make dev   (starts DB + backend on :8080 + Vite dev server on :5173)
+ *   make dev   (starts DB + backend on :8080 (or BB_API_PORT) + Vite dev server on :5173)
  *
  * Run:
  *   npm run test:e2e:live

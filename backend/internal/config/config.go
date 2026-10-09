@@ -55,6 +55,9 @@ type Config struct {
 // Load reads all required environment variables and returns a validated Config.
 // It returns an error if any required variable is missing or invalid.
 func Load() (*Config, error) {
+	// API_PORT wins; BB_API_PORT is the project-wide port override; default 8080.
+	apiPort := getEnv("API_PORT", getEnv("BB_API_PORT", "8080"))
+
 	cfg := &Config{
 		DBHost:       getEnv("DB_HOST", "localhost"),
 		DBPort:       getEnv("DB_PORT", "5432"),
@@ -62,8 +65,8 @@ func Load() (*Config, error) {
 		DBUser:       getEnv("DB_USER", "bilimbaga"),
 		DBPassword:   getEnv("DB_PASSWORD", ""),
 		DBSSLMode:    getEnv("DB_SSLMODE", "disable"),
-		APIPort:      getEnv("API_PORT", "8080"),
-		APIBaseURL:   getEnv("API_BASE_URL", "http://localhost:8080"),
+		APIPort:      apiPort,
+		APIBaseURL:   getEnv("API_BASE_URL", "http://localhost:"+apiPort),
 		JWTSecret:    getEnv("JWT_SECRET", ""),
 		CookieDomain: getEnv("COOKIE_DOMAIN", "localhost"),
 	}

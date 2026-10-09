@@ -10,7 +10,8 @@
  * Idempotent: safe to run multiple times; skips already-existing data.
  */
 
-const BASE = 'https://bilimbaga-test.ai-dala.com'
+// Defaults to the shared test server; set E2E_API_URL (e.g. http://localhost:18080) to target a local stack.
+const BASE = process.env.E2E_API_URL || 'https://bilimbaga-test.ai-dala.com'
 const ADMIN_EMAIL = 'admin@bilimbaga.local'
 const ADMIN_INITIAL_PASS = 'Admin1234!'
 const ADMIN_KNOWN_PASS = 'Admin2024!'

@@ -2,10 +2,13 @@
  * Playwright config for full visual E2E walkthrough against a real running stack.
  *
  * Prerequisites (run before executing tests):
- *   make dev          — starts DB, backend (port 8080), and frontend dev server (port 5173)
+ *   make dev          — starts DB, backend (port 8080, or BB_API_PORT), and frontend dev server (port 5173)
  *
  * Run with:
  *   npm run test:e2e:live
+ *
+ * Free-port run: start the stack with BB_API_PORT=18080 and export the same var for the tests
+ * (E2E_API_URL overrides the full API URL).
  */
 import { defineConfig, devices } from '@playwright/test'
 import path from 'path'

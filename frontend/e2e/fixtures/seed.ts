@@ -20,7 +20,7 @@ export const EMPLOYEE_STORAGE_STATE = path.join(AUTH_DIR, 'employee.json')
 const EMPLOYEE_TOKEN_PATH = path.join(AUTH_DIR, 'employee-token.txt')
 const EMPLOYEE_ID_PATH = path.join(AUTH_DIR, 'employee-id.txt')
 
-const BASE = 'http://localhost:8080'
+const BASE = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
 
 // ---------------------------------------------------------------------------
 // Low-level fetch helpers (Node 18+ global fetch)

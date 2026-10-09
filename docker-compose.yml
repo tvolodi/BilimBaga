@@ -23,8 +23,12 @@ services:
   api:
     build: ./backend
     env_file: .env
+    environment:
+      # Container-internal port is fixed (nginx proxies to api:8080);
+      # only the host mapping is configurable via BB_API_PORT.
+      API_PORT: "8080"
     ports:
-      - "${HOST_API_PORT:-8080}:8080"
+      - "${BB_API_PORT:-${HOST_API_PORT:-8080}}:8080"
     depends_on:
       db:
         condition: service_healthy

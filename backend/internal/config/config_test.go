@@ -23,6 +23,38 @@ func TestLoad_ValidConfig(t *testing.T) {
 	}
 }
 
+func TestLoad_BBAPIPortFallback(t *testing.T) {
+	t.Setenv("JWT_SECRET", "this-is-a-valid-32-character-secret!")
+	t.Setenv("API_PORT", "")
+	t.Setenv("BB_API_PORT", "18080")
+	t.Setenv("API_BASE_URL", "")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.APIPort != "18080" {
+		t.Errorf("expected APIPort=18080, got %s", cfg.APIPort)
+	}
+	if cfg.APIBaseURL != "http://localhost:18080" {
+		t.Errorf("expected APIBaseURL derived from port, got %s", cfg.APIBaseURL)
+	}
+}
+
+func TestLoad_APIPortOverridesBBAPIPort(t *testing.T) {
+	t.Setenv("JWT_SECRET", "this-is-a-valid-32-character-secret!")
+	t.Setenv("API_PORT", "9000")
+	t.Setenv("BB_API_PORT", "18080")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.APIPort != "9000" {
+		t.Errorf("expected APIPort=9000, got %s", cfg.APIPort)
+	}
+}
+
 func TestLoad_JWTSecretTooShort(t *testing.T) {
 	os.Unsetenv("JWT_SECRET")
 	t.Setenv("JWT_SECRET", "tooshort")

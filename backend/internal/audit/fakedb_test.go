@@ -78,7 +78,7 @@ func (r *fakeRows) Next(dest []driver.Value) error {
 
 type fakeConnector struct{ f *fakeDB }
 
-func (c fakeConnector) Connect(_ context.Context) (driver.Conn, error) { return fakeConn{c.f}, nil }
+func (c fakeConnector) Connect(_ context.Context) (driver.Conn, error) { return fakeConn(c), nil }
 func (c fakeConnector) Driver() driver.Driver                          { return nil }
 
 func newFakeDB(t *testing.T) (*sqlx.DB, *fakeDB) {

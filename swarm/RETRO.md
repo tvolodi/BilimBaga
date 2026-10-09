@@ -7,7 +7,7 @@ Owner: Supervisor. Trigger: `closed_count - retro.json.last_retro_closed_count >
 ```
 
 ## Procedure
-1. `gh issue list --label swarm --state closed --json number,title,createdAt,closedAt,labels,comments --limit 1000`; take issues closed since the last retro (the last `interval` ones).
+1. `gh issue list --label swarm --state closed --json number,title,createdAt,closedAt,labels,comments --limit 1000`; take the first `interval` closures after the last retro by `closedAt` (ranks `last_retro_closed_count`+1 to `last_retro_closed_count`+`interval`). Period names the rank range and the first and last issue.
 2. Metrics (compute with `gh` + `jq`, put in a table):
    - cycle time per issue (created -> closed), median and p90, split by type
    - time in each status (from label events: `gh api repos/{owner}/{repo}/issues/N/events`)
@@ -22,5 +22,5 @@ Owner: Supervisor. Trigger: `closed_count - retro.json.last_retro_closed_count >
 5. Write `docs/retrospectives/retro-NNN.md` (NNN = `retro_number + 1`, zero-padded to 3) on a branch `swarm/retro-NNN`, open a PR. Template:
    `# Retro NNN`, `Period`, `Metrics`, `Went well`, `Went badly`, `Decisions`, `Applied changes (PR links)`, `Open recommendations for the user`.
 6. Apply improvements: create a `type:tech-debt` issue "retro-NNN: apply swarm improvements" with the exact diffs, label `role:dev`, assign it via the normal dispatch (action `retro-apply`). The Dev edits `swarm/roles/*` / `PROTOCOL.md` via a PR; Supervisor merges after the check. Role changes take effect when a session restarts or re-reads the file: the Supervisor sends each affected worker a `reload-role` message (first line self-contained) after the merge.
-7. Update `retro.json` (`last_retro_closed_count` = current closed count, `retro_number` + 1). Never skip this, otherwise the retro re-triggers every tick.
+7. Update `retro.json` (`last_retro_closed_count` = the cut from step 1, that is last + interval, not the live count; `retro_number` + 1). Closures after the cut are the next retro's scope.. Never skip this, otherwise the retro re-triggers every tick.
 8. Also run a retro on demand when 3 escalations accumulate or an incident (data loss, repeated merge conflict) happens.

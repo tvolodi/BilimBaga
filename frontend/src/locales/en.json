@@ -524,7 +524,11 @@
         "ruleStatusNone": "No matching questions",
         "ruleUnsatisfied": "Rule {{id}}…: needs {{required}}, only {{available}} available",
         "ruleSummary": "Rule {{n}}: {{mode}}, {{count}} questions",
-        "published": "Published"
+        "published": "Published",
+        "adaptiveInsufficient": "This adaptive exam cannot be published: at least 5 questions per difficulty level are required for every question rule. Add more questions or adjust the rules.",
+        "adaptiveInsufficientCounts": "This adaptive exam cannot be published: a question rule has only {{available}} matching questions, {{required}} are required per difficulty level.",
+        "adaptiveInsufficientDetailed": "This adaptive exam cannot be published: rule {{id}}… has only {{available}} {{difficulty}} questions, {{required}} are required per difficulty level. Add more questions or adjust the rule.",
+        "genericError": "The operation failed. Please try again."
       },
       "validationWarning": "Some question rules cannot be satisfied. Fix them before publishing.",
       "validationWarningHint": "Only questions with 'active' status are counted. Open the Question Bank and approve your questions before publishing.",

@@ -23,3 +23,5 @@ checkRoleAssignment outcome for 9 callers x 11 roles, handler JSON backward comp
 Results: `go test -p 1 ./internal/users/` ok; `go vet ./internal/users/` ok; vitest
 assignableRoles.test.ts 11/11; `npm run check:i18n` ok. Full suites, tsc, go build ./... left
 to CI (host memory constraint).
+
+Follow-up: the roles query key is now `['users', 'roles', userId']` (userId = JWT `sub`; query disabled without it) so one browser session never shows a previous user's `assignable` flags; `invalidateQueries(['users','roles'])` still prefix-matches.

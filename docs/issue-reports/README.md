@@ -44,3 +44,4 @@
 | [ISS-049](ISS-049-uat-defect-exam-analytics-score-display-inflated.md) | UAT Defect: Analytics & Reporting — Exam Analytics average/median score inflated (×100 double multiply) | high | frontend | analytics / per-exam | resolved | 2026-06-09 |
 | [ISS-050](ISS-050-seed-script-blocked-live-test-env.md) | seed-test-env.ts blocked by rate limiting, wrong question type/field names, invalid likert_polarity | medium | config | questions | resolved | 2026-09-01 |
 | [ISS-051](ISS-051-frontend-lint-config-coverage.md) | Frontend lint cannot parse TypeScript; low coverage; unlocalized strings and a11y warnings | medium | frontend | tenant | resolved | 2026-10-09 |
+| [ISS-052](ISS-052-admin-audit-reports-route-guards.md) | /admin/audit and /admin/reports route guards disagree with RBAC | medium | frontend | audit / reports | resolved | 2026-10-09 |

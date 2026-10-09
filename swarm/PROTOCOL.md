@@ -10,8 +10,8 @@ Line 1: a self-contained sentence. Then one JSON object. Types: `task` (issue, a
 
 ## Label state machine
 Labels: `role:dev|ba|uat|infra`, `status:ready|in-progress|review|uat|blocked|done`, `type:bug|feature|infra|tech-debt|test`, `prio:p0|p1|p2`, `swarm`, `needs-live-db`.
-new -> ready; ready -> in-progress (worker starts); in-progress -> review (PR open, review passed); review -> uat (merged, role flips to `role:uat`); uat -> done (closed); uat -> ready + `role:dev` on FAIL (reopen +1); any -> blocked with a reason comment.
-Claiming: Supervisor assigns; workers take only matching role + `ready` (or own `in-progress`), by prio then number; `claimed-by: bb-devN` comment; one dev per issue.
+new -> ready; ready -> in-progress (worker starts); in-progress -> review (PR open, review passed); review -> uat (merged, role flips to `role:uat`); uat -> done (closed), only after the PR is merged to main and the UAT check ran on main; a PASS on a branch build is a comment and does not change status; uat -> ready + `role:dev` on FAIL or PARTIAL, and on any BA or Supervisor send-back (reopen +1 comment each time); any -> blocked with a reason comment. Every status change is one `gh issue edit` that also removes the previous `status:*` label.
+Claiming: Supervisor assigns and posts `supervisor: assigned to bb-devN` on the issue before sending the task; workers take only matching role + `ready` (or own `in-progress`), by prio then number; before posting `claimed-by: bb-devN`, read the issue comments and skip the issue if another dev holds a claim without a later release; one dev per issue. While more than 5 `status:uat` issues are open, workers do not self-claim `type:feature`.
 
 ## Branches, merges, migrations
 - Branches `swarm/<issue>-<slug>`.
@@ -33,6 +33,7 @@ GitHub issues and labels are the truth. `docs/handoffs/<run-id>/` payloads. Repo
 - SQL-changing PRs: real-Postgres test, or label `needs-live-db`; the `internal/schemaguard` test stays green.
 - Test parallelism: `npx vitest run --maxWorkers=2`, `go test -p 2 ./...`.
 - UAT live runs need >= 8 GB free memory; the Supervisor reports low memory.
+- Memory hold: when free RAM < 2.5 GB, devs run only targeted single-package tests (no full suite, tsc or docker) and merge on GitHub CI plus UAT evidence; the Supervisor announces the hold and the release at 4 GB free.
 
 ## Environments (workflow part)
 Test traffic goes to local stacks and the QA instance `bilimbaga-qa.ai-dala.com` (not built yet, #106). UAT scenarios declare `Target: local | qa`; seed scripts need an explicit `E2E_API_URL`. See `docs/requirements/DEC-001.Environments-production-class-demo-and-qa.md`.

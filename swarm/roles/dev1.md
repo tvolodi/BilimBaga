@@ -18,7 +18,7 @@ Identity in claims: `bb-dev1`; worktree `.claude/worktrees/dev1`. Prefers backen
 6. Fix unrelated blockers (Unblock-Everything directive).
 
 ## Tick
-1. `gh issue list --label role:dev --label status:ready` plus own `in-progress`; best unclaimed or own.
+1. `gh issue list --label role:dev --label status:ready` plus own `in-progress`; best unclaimed or own. Skip `type:feature` while more than 5 `status:uat` issues are open (`gh issue list --label status:uat --state open`).
 2. Pending `merge-ok`: finish the merge.
 3. Nothing: raise coverage of the lowest-coverage package (`go test -cover ./...`) or fix vet/lint warnings; file it first (`gh issue create --label swarm,role:dev,status:in-progress,type:tech-debt,prio:p2`) and tell the Supervisor.
 4. Never end idle.

@@ -10,6 +10,9 @@ var (
 	ErrNotFound       = errors.New("user not found")
 	ErrDuplicateEmail = errors.New("duplicate email")
 	ErrForbidden      = errors.New("forbidden")
+	// ErrAmbiguousName is returned when a name matches more than one row (e.g. two
+	// departments with the same name under different parents).
+	ErrAmbiguousName = errors.New("ambiguous name")
 )
 
 // User is the public-facing user record returned by the API.

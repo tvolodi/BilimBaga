@@ -81,11 +81,11 @@ func TestScoping_GetUser_CustomRole(t *testing.T) {
 	_, err := svc.GetUser(context.Background(), "u1", customRole, "caller", "dept-1")
 	assert.NoError(t, err, "same dept allowed with users:read")
 	_, err = svc.GetUser(context.Background(), "u3", customRole, "caller", "dept-1")
-	assert.ErrorIs(t, err, ErrForbidden, "other dept denied")
+	assert.ErrorIs(t, err, ErrNotFound, "other dept hidden (404)")
 	_, err = svc.GetUser(context.Background(), "u3", customRole, "u3", "dept-1")
 	assert.NoError(t, err, "self allowed")
 	_, err = svc.GetUser(context.Background(), "u1", customRole, "caller", "")
-	assert.ErrorIs(t, err, ErrForbidden, "no department => no scope")
+	assert.ErrorIs(t, err, ErrNotFound, "no department => no scope")
 }
 
 func TestScoping_GetUser_CustomRoleWithoutUsersReadOrChecker(t *testing.T) {
@@ -107,12 +107,12 @@ func TestScoping_Mutations_CustomRoleOtherDeptForbidden(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := svc.UpdateUser(ctx, "u3", UpdateRequest{FullName: "X", DepartmentID: strPtr("dept-1"), RoleID: "role-emp"}, customRole, "dept-1", "c", "")
-	assert.ErrorIs(t, err, ErrForbidden)
-	assert.ErrorIs(t, svc.DeactivateUser(ctx, "u3", customRole, "dept-1", "c", ""), ErrForbidden)
+	assert.ErrorIs(t, err, ErrNotFound)
+	assert.ErrorIs(t, svc.DeactivateUser(ctx, "u3", customRole, "dept-1", "c", ""), ErrNotFound)
 	_, err = svc.ResetPassword(ctx, "u3", customRole, "dept-1", "c", "")
-	assert.ErrorIs(t, err, ErrForbidden)
+	assert.ErrorIs(t, err, ErrNotFound)
 	_, err = svc.UnlockUser(ctx, "u3", customRole, "dept-1", "c", "")
-	assert.ErrorIs(t, err, ErrForbidden)
+	assert.ErrorIs(t, err, ErrNotFound)
 	_, err = svc.CreateUser(ctx, CreateRequest{Email: "n@example.com", FullName: "N", DepartmentID: strPtr("dept-2"), RoleID: "role-emp"}, customRole, "dept-1", "c", "")
 	assert.ErrorIs(t, err, ErrForbidden)
 	// A caller with no department cannot create department-less users either.

@@ -13,16 +13,16 @@
 Provides a single aggregated dashboard endpoint for HR admins and examiners. Returns four metric groups: per-exam completion/pass rates, a list of overdue employees, a recent activity feed, and average scores per compliance track. All data is scoped to the caller's tenant. Heavy queries are designed to be index-friendly and complete within a single SQL round-trip per group.
 
 ## Acceptance Criteria
-- [ ] AC-1: The endpoint requires `role IN (examiner, hr_admin, super_admin)`; employees receive HTTP 403.
-- [ ] AC-2: `completion_rate_by_exam` includes every active exam in the tenant; `assigned_count` is the number of distinct users assigned to the exam; `completed_count` is those with at least one `submitted`, `auto_submitted` or `grading_pending` session (amended 2026-10-09, PR #205 / ISS-195: timer-expired `auto_submitted` sessions are genuine completions); `passed_count` is those with at least one `passed = true` session whose status is `submitted` or `auto_submitted` (a `grading_pending` session is not yet a final result).
-- [ ] AC-3: `overdue_employees` contains at most 20 entries; an assignment is overdue when `deadline < NOW()` AND the user has no session with `passed = true` for that exam.
-- [ ] AC-4: `recent_activity` contains the last 20 sessions (by `submitted_at` DESC) with `status IN ('submitted', 'auto_submitted', 'grading_pending')`.
-- [ ] AC-5: `avg_score_by_track` is computed over sessions submitted within the last 90 days; a track's average is null (not 0) if no sessions exist for that track in the period.
-- [ ] AC-6: Track attribution is resolved by joining `session_question_scores → questions → categories` and reading `categories.track`; tracks are `security`, `safety`, `loyalty`.
-- [ ] AC-7: The endpoint returns HTTP 200 with all four keys present even if individual arrays are empty or track averages are null.
-- [ ] AC-8: All queries are scoped by `tenant_id` and never cross tenant boundaries.
+- [x] AC-1: The endpoint requires `role IN (examiner, hr_admin, super_admin)`; employees receive HTTP 403.
+- [x] AC-2: `completion_rate_by_exam` includes every active exam in the tenant; `assigned_count` is the number of distinct users assigned to the exam; `completed_count` is those with at least one `submitted`, `auto_submitted` or `grading_pending` session (amended 2026-10-09, PR #205 / ISS-195: timer-expired `auto_submitted` sessions are genuine completions); `passed_count` is those with at least one `passed = true` session whose status is `submitted` or `auto_submitted` (a `grading_pending` session is not yet a final result).
+- [x] AC-3: `overdue_employees` contains at most 20 entries; an assignment is overdue when `deadline < NOW()` AND the user has no session with `passed = true` for that exam.
+- [x] AC-4: `recent_activity` contains the last 20 sessions (by `submitted_at` DESC) with `status IN ('submitted', 'auto_submitted', 'grading_pending')`.
+- [x] AC-5: `avg_score_by_track` is computed over sessions submitted within the last 90 days; a track's average is null (not 0) if no sessions exist for that track in the period.
+- [x] AC-6: Track attribution is resolved by joining `session_question_scores → questions → categories` and reading `categories.track`; tracks are `security`, `safety`, `loyalty`.
+- [x] AC-7: The endpoint returns HTTP 200 with all four keys present even if individual arrays are empty or track averages are null.
+- [x] AC-8: The schema is single-tenant (no `tenant_id` on `exams`/`exam_sessions`); queries are scoped by the caller's role and department scope only (spec drift resolved by BA 2026-10-09; see conformance/PR77-PR83-PR86-conformance-20261009.md G2).
 - [ ] AC-9: The endpoint responds in under 500 ms for tenants with up to 10,000 sessions (enforced via integration test or documented index requirements).
-- [ ] AC-10: An audit log entry is NOT written for dashboard reads (read-only reporting does not require audit).
+- [x] AC-10: An audit log entry is NOT written for dashboard reads (read-only reporting does not require audit).
 
 ## Technical Specification
 

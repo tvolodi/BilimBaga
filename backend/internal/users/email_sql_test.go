@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,7 @@ type recDB struct {
 	queries      []string
 	args         [][]driver.Value
 	existsResult bool
+	idRows       []string // when non-nil, queries return these ids in a single "id" column
 }
 
 type recConn struct{ f *recDB }
@@ -47,13 +49,20 @@ func (s recStmt) Query(args []driver.Value) (driver.Rows, error) {
 	defer s.f.mu.Unlock()
 	s.f.queries = append(s.f.queries, s.q)
 	s.f.args = append(s.f.args, append([]driver.Value(nil), args...))
+	if s.f.idRows != nil {
+		data := [][]driver.Value{}
+		for _, id := range s.f.idRows {
+			data = append(data, []driver.Value{id})
+		}
+		return &recRows{cols: []string{"id"}, data: data}, nil
+	}
 	return &recRows{cols: []string{"exists"}, data: [][]driver.Value{{s.f.existsResult}}}, nil
 }
 func (r *recRows) Columns() []string { return r.cols }
 func (r *recRows) Close() error      { return nil }
 func (r *recRows) Next(dest []driver.Value) error {
 	if r.i >= len(r.data) {
-		return errors.New("EOF")
+		return io.EOF
 	}
 	copy(dest, r.data[r.i])
 	r.i++
@@ -71,7 +80,7 @@ func TestRepositoryCreate_DuplicateProbeIsCaseInsensitive(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 	repo := NewRepository(db)
 
-	_, err := repo.Create(context.Background(), "john.doe@corp.com", "John", "hash", nil, "role")
+	_, err := repo.Create(context.Background(), "john.doe@corp.com", "John", "hash", nil, "11111111-1111-4111-8111-111111111111")
 
 	assert.ErrorIs(t, err, ErrDuplicateEmail)
 	require.Len(t, f.queries, 1, "no INSERT may be issued when a case-insensitive twin exists")

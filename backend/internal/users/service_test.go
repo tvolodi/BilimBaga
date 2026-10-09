@@ -1,10 +1,10 @@
 package users
 
 import (
-	"strings"
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,11 +26,12 @@ type mockRepo struct {
 	unlocked   []string
 
 	// FR-BB510
-	exams       map[string]bool
-	overdue     map[string]bool // userID+"|"+examID
-	lastRemind  *time.Time
-	reminders   []string
-	insertErr   error
+	exams      map[string]bool
+	overdue    map[string]bool // userID+"|"+examID
+	lastRemind *time.Time
+	reminders  []string
+	insertErr  error
+	ambiguous  map[string]bool // department names that resolve to more than one row
 }
 
 func newMockRepo() *mockRepo {
@@ -161,6 +162,9 @@ func (m *mockRepo) Unlock(_ context.Context, id string) error {
 }
 
 func (m *mockRepo) GetDepartmentIDByName(_ context.Context, name string) (string, error) {
+	if m.ambiguous[name] {
+		return "", ErrAmbiguousName
+	}
 	id, ok := m.depts[name]
 	if !ok {
 		return "", ErrNotFound
@@ -352,7 +356,7 @@ func TestDeactivateUser_DeptAdminWrongDept(t *testing.T) {
 	err := svc.DeactivateUser(context.Background(), "u1", "department_admin", "dept-1", "caller-id", "127.0.0.1")
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrForbidden))
+	assert.True(t, errors.Is(err, ErrNotFound))
 }
 
 func TestResetPassword(t *testing.T) {
@@ -488,7 +492,7 @@ func TestUnlockUser_DeptAdminOtherDept_ReturnsForbidden(t *testing.T) {
 
 	_, err := NewService(repo).UnlockUser(context.Background(), "u1", "department_admin", "dept-1", "da-1", "")
 
-	assert.True(t, errors.Is(err, ErrForbidden))
+	assert.True(t, errors.Is(err, ErrNotFound))
 	assert.Empty(t, repo.unlocked)
 	assert.True(t, repo.users["u1"].IsLocked)
 }

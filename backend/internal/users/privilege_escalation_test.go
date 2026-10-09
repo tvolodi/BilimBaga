@@ -31,6 +31,9 @@ func d1Perms() map[string][]string {
 		"big_custom":       {"users:read", "audit:read"},
 		"ex_custom":        {"users:manage", "questions:read", "questions:write", "exams:read", "exams:write", "exams:assign", "reports:read"},
 		"sensitive_custom": {"roles:read"},
+		"peer_custom":      {"users:manage", "users:read"},
+		"da_clone":         {"users:read", "users:manage", "questions:read", "exams:read", "exams:assign", "reports:read"},
+		"ex_clone":         {"questions:read", "questions:write", "exams:read", "exams:write", "exams:assign", "reports:read"},
 	}
 }
 
@@ -53,7 +56,10 @@ func d1Setup() (*mockRepo, Service) {
 	repo.users["cust"] = makeUser("cust", "dept-1", "role-cust", d1Custom)
 	repo.users["narrow"] = makeUser("narrow", "dept-1", "role-narrow", "narrow_custom")
 	repo.users["big"] = makeUser("big", "dept-1", "role-big", "big_custom")
-	for id, name := range map[string]string{"role-cust": d1Custom, "role-narrow": "narrow_custom", "role-big": "big_custom"} {
+	repo.users["peerc"] = makeUser("peerc", "dept-1", "role-peerc", "peer_custom")
+	repo.users["clone"] = makeUser("clone", "dept-1", "role-clone", "da_clone")
+	repo.users["exclone"] = makeUser("exclone", "dept-1", "role-exclone", "ex_clone")
+	for id, name := range map[string]string{"role-cust": d1Custom, "role-narrow": "narrow_custom", "role-big": "big_custom", "role-peerc": "peer_custom", "role-clone": "da_clone", "role-exclone": "ex_clone"} {
 		repo.roles[name] = id
 		repo.roleByID[id] = name
 	}
@@ -121,6 +127,11 @@ func TestD1_ForbiddenTargets(t *testing.T) {
 		{"dept_admin vs custom role with perms it lacks", "department_admin", "big"},
 		{"dept_admin vs unknown/legacy empty role", "department_admin", "legacy"},
 		{"custom vs unknown/legacy empty role", d1Custom, "legacy"},
+		// FR-BB117 D-4: the subset rule is STRICT -- an equal permission set is a peer.
+		{"custom vs same custom role (equal set)", d1Custom, "cust"},
+		{"custom vs different custom role with equal set", d1Custom, "peerc"},
+		{"dept_admin vs custom clone of department_admin", "department_admin", "clone"},
+		{"examiner vs custom clone of examiner", "examiner", "exclone"},
 	}
 	for _, c := range cases {
 		for _, call := range d1Calls() {
@@ -142,7 +153,6 @@ func TestD1_AllowedTargets(t *testing.T) {
 		{"examiner vs employee", "examiner", "emp"},
 		{"custom holding all examiner perms vs examiner (subset)", "ex_custom", "ex"},
 		{"dept_admin vs custom subset role", "department_admin", "narrow"},
-		{"custom vs same custom role", d1Custom, "cust"},
 		{"custom vs narrower custom", d1Custom, "narrow"},
 		{"portal custom vs employee (subset)", "portal_custom", "emp"},
 		{"super_admin vs super_admin", "super_admin", "sa"},
@@ -172,7 +182,7 @@ func TestD1_OtherDepartmentStillForbiddenEvenWhenSubset(t *testing.T) {
 	repo, svc := d1Setup()
 	repo.users["emp2"] = makeUser("emp2", "dept-2", "role-emp", "employee")
 	_, err := svc.ResetPassword(context.Background(), "emp2", "department_admin", "dept-1", "actor", "")
-	assert.ErrorIs(t, err, ErrForbidden)
+	assert.ErrorIs(t, err, ErrNotFound, "FR-BB117 D-4: out-of-scope looks like an unknown id")
 	assert.False(t, repo.users["emp2"].ForcePasswordChange)
 }
 

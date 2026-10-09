@@ -157,3 +157,74 @@ function Update-SessionsFromLive($Roster, $Live, [string]$StateDir) {
     if ($id) { Save-Session $StateDir $r.key $r.name $id }
   }
 }
+
+# --- backup / status helpers (backup-state.ps1, status.ps1) ---
+$script:QueueStatuses = 'ready', 'in-progress', 'review', 'uat', 'blocked', 'done'
+
+# Removes anything token-like from text that may leave the machine (GitHub snapshot). Over-redaction is fine.
+function Remove-Secrets([string]$Text) {
+  if (-not $Text) { return $Text }
+  $t = $Text
+  $t = $t -replace '(?i)\b(gh[pousr]_[A-Za-z0-9]{10,}|github_pat_[A-Za-z0-9_]{10,}|sk-[A-Za-z0-9_-]{10,}|xox[abprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{12,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_.-]+)', '[REDACTED]'
+  $t = $t -replace '(?i)\b(bearer|token|secret|password|passwd|api[_-]?key|authorization)\b(\s*[:=]\s*|\s+)\S+', '$1 [REDACTED]'
+  $t = $t -replace '\b[A-Za-z0-9+/_-]{32,}={0,2}', '[REDACTED]'
+  $t
+}
+
+# Open swarm issues. -QueueJsonFile is the test stub (same shape as `gh issue list --json number,title,labels`).
+# Throws if unreadable; callers decide how to degrade.
+function Get-SwarmIssues([string]$QueueJsonFile) {
+  if ($QueueJsonFile) { $raw = Get-Content -Raw -LiteralPath $QueueJsonFile }
+  else {
+    $raw = (& gh issue list --label swarm --state open --limit 300 --json number,title,labels) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw "gh issue list failed (exit $LASTEXITCODE)" }
+  }
+  if (-not $raw -or -not $raw.TrimStart().StartsWith('[')) { throw 'gh issue list output is not a JSON array (unrecognised)' }
+  @(,($raw | ConvertFrom-Json) | ForEach-Object { $_ })
+}
+
+function Get-LabelNames($Issue) { @($Issue.labels | ForEach-Object { if ($_ -is [string]) { $_ } else { $_.name } }) }
+
+# ordered hashtable status -> count
+function Get-QueueCounts($Issues) {
+  $c = [ordered]@{}
+  foreach ($s in $script:QueueStatuses) { $c[$s] = @($Issues | Where-Object { (Get-LabelNames $_) -contains "status:$s" }).Count }
+  $c
+}
+
+# Checkpoint summary from <StateDir>/<key>.json; heartbeat age in minutes (null if unknown).
+function Get-Checkpoint([string]$StateDir, [string]$Key, [datetime]$NowUtc) {
+  $f = Join-Path $StateDir "$Key.json"
+  if (-not (Test-Path -LiteralPath $f)) { return $null }
+  try { $j = Get-Content -Raw -LiteralPath $f | ConvertFrom-Json } catch { return [pscustomobject]@{ unreadable = $true; age_min = $null } }
+  $age = $null
+  try { $age = ($NowUtc.ToUniversalTime() - ([datetime]$j.last_tick_utc).ToUniversalTime()).TotalMinutes } catch {}
+  [pscustomobject]@{ unreadable = $false; status = $j.status; issue = $j.issue; branch = $j.branch; step = $j.step; next_action = $j.next_action; blockers = $j.blockers; age_min = $age }
+}
+
+
+# Run a backup script as a child process with a hard timeout (the whole process tree is killed on timeout).
+# The throttle marker is written BEFORE the child starts, so a hung or timed-out backup is retried at most
+# once per IntervalMin instead of on every 5-minute watchdog run. Never throws. Returns ok|failed|timeout|throttled.
+function Invoke-BoundedBackup([string]$Script, [string[]]$ScriptArgs, [string]$MarkerFile, [datetime]$NowUtc, [int]$TimeoutSec = 120, [int]$IntervalMin = 60) {
+  try {
+    if (Test-Path -LiteralPath $MarkerFile) {
+      try { $t = ([datetime](Get-Content -Raw -LiteralPath $MarkerFile | ConvertFrom-Json).started_utc).ToUniversalTime() } catch { $t = (Get-Item -LiteralPath $MarkerFile).LastWriteTimeUtc }
+      if (($NowUtc - $t).TotalMinutes -lt $IntervalMin) { Write-Host 'backup: attempted less than an hour ago, skipping'; return 'throttled' }
+    }
+    $md = Split-Path -Parent $MarkerFile
+    if (-not (Test-Path -LiteralPath $md)) { New-Item -ItemType Directory -Path $md -Force | Out-Null }
+    Set-Content -LiteralPath $MarkerFile -Value ('{"started_utc":"' + $NowUtc.ToString('yyyy-MM-ddTHH:mm:ssZ') + '"}') -Encoding UTF8
+    $argList = @('-NoProfile', '-File', ('"' + $Script + '"')) + @($ScriptArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } })
+    $p = Start-Process powershell.exe -ArgumentList $argList -NoNewWindow -PassThru; $null = $p.Handle
+    if (-not $p.WaitForExit($TimeoutSec * 1000)) {
+      Write-Warning "backup timed out after $TimeoutSec s, killing it and its children"
+      & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null
+      Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+      return 'timeout'
+    }
+    $p.WaitForExit()   # flush so ExitCode is populated
+    if ($p.ExitCode -ne 0) { Write-Warning "backup exited with $($p.ExitCode)"; return 'failed' }
+    return 'ok'
+  } catch { Write-Warning "backup failed: $_"; return 'failed' }
+}

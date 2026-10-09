@@ -102,7 +102,8 @@ Use the newest valid token `T2` from S3.
 | 6 | Anonymous | Log in with old `NewPass123!` | 401 | |
 | 7 | Anonymous | Reopen the same reset link | Error "invalid or expired" with link to `/forgot-password` | |
 | 8 | Tester | Replay `POST /auth/reset-password` with `T2` | 400 `INVALID_TOKEN`, same body as for garbage and expired tokens | |
-| 9 | Anonymous | Open `/reset-password` with no token and with `token=garbage` | Error state with link to `/forgot-password`; no crash | |
+| 9a | Anonymous | Open `/reset-password` with no token (or `token=`) | Error state on open, with link to `/forgot-password`; no form; no crash | |
+| 9b | Anonymous | Open `/reset-password?token=garbage`, enter a valid new password twice, submit | The form is shown on open (token validity is judged only by the server, there is no pre-check endpoint); after submit the "invalid or expired" error with link to `/forgot-password` (API 400 `INVALID_TOKEN`); no crash | |
 
 ## Scenario S5: Reset clears lock and revokes sessions
 
@@ -137,7 +138,10 @@ Use the newest valid token `T2` from S3.
 | 4 | Admin | Click "Unlock account" | Localized success toast; row refreshes, action disappears | |
 | 5 | Employee | Log in with correct password | Success without waiting for expiry | |
 | 6 | Tester | `POST /api/v1/users/{random-uuid}/unlock` as admin | 404 | |
-| 7 | Tester | Unlock with employee token; with department_admin token | 403 for employee; permission is `users:manage`, department-scoped: department_admin gets 403 for a user in another department and 200 within own department | |
+| 7a | Tester | Unlock with the employee token | 403 `FORBIDDEN` (no `users:manage`) | |
+| 7b | Tester | Unlock with the department_admin token for a locked user of strictly lower rank in its OWN department | 200 | |
+| 7c | Tester | Unlock with the department_admin token for a user in ANOTHER department | 404 `NOT_FOUND` (out-of-scope and unknown ids are indistinguishable, FR-BB117 D-4c / D-5); the target stays locked | |
+| 7d | Tester | Unlock with the department_admin token for a peer `department_admin` or a `super_admin` in its own department | 403 `FORBIDDEN` (rank rule, FR-BB117 D-1); target unchanged | |
 | 8 | Tester | Unlock without token | 401 | |
 
 ## Scenario S8: Audit trail
@@ -153,7 +157,7 @@ Use the newest valid token `T2` from S3.
 - PASS: all steps match; mail arrives in Mailhog with correct link; enumeration checks identical; lock cleared by reset and by admin unlock; audit present.
 - FAIL (defect): differing response for known/unknown/inactive; plaintext token stored or logged; reusable or non-expiring token; weak password consumes token; reset leaves lock or refresh tokens; employee can unlock; missing login link; hardcoded strings.
 - ENV ISSUE: Mailhog unreachable or SMTP not wired (Gap 1); no DB access (skip DB-only steps); #33 not merged; migration not applied.
-- REQ GAP candidates: (resolved: unlock uses users:manage, department_admin limited to own department — verify 403 for another department); purge mechanism.
+- REQ GAP candidates: (resolved: unlock uses users:manage, department_admin limited to own department; decision #346: another department answers 404, a peer or higher rank in its own department answers 403); purge mechanism.
 
 ## Acceptance Criteria Coverage
 

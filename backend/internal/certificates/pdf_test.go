@@ -62,3 +62,10 @@ func TestGeneratePDF_EmptyLogoFallsBackToCompanyName(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "%PDF-", string(b[:5]))
 }
+
+func TestBuildVerifyURL(t *testing.T) {
+	code := "550e8400-e29b-41d4-a716-446655440000"
+	require.Equal(t, "https://app.example.kz/verify/"+code, BuildVerifyURL("https://app.example.kz", code))
+	require.Equal(t, "https://app.example.kz/verify/"+code, BuildVerifyURL("https://app.example.kz/", code))
+	require.Equal(t, "https://app.example.kz/verify/"+code, BuildVerifyURL("https://app.example.kz///", code))
+}

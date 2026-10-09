@@ -210,7 +210,7 @@ func main() {
 	// Wire up certificates (FR-BB43).
 	certsRepo := certificates.NewRepository(db)
 	certsSvc := certificates.NewService(certsRepo, tenantSvc)
-	certHandler := certificates.NewHandler(certsSvc, cfg.APIBaseURL)
+	certHandler := certificates.NewHandler(certsSvc, cfg.PublicAppURL)
 
 	// Wire up dashboard metrics (FR-BB51) and export API (FR-BB54).
 	reportsRepo := reports.NewRepository(db)

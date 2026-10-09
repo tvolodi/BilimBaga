@@ -1005,5 +1005,18 @@
     "exporting_csv": "Exporting...",
     "no_exams": "No exams found.",
     "loading": "Loading..."
+  },
+  "verify": {
+    "title": "Certificate verification",
+    "valid": "Certificate is valid",
+    "invalid": "Certificate not found or invalid",
+    "unavailable": "Verification temporarily unavailable",
+    "retry": "Retry",
+    "employee": "Employee",
+    "exam": "Exam",
+    "score": "Score",
+    "issuedOn": "Issued on",
+    "loading": "Verifying certificate…",
+    "footer": "This page confirms the authenticity of certificates issued by this organization."
   }
 }

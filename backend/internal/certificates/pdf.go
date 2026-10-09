@@ -10,6 +10,12 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
+// BuildVerifyURL returns the public SPA verification URL for a certificate code,
+// tolerating trailing slashes on the base URL.
+func BuildVerifyURL(publicAppURL, code string) string {
+	return strings.TrimRight(publicAppURL, "/") + "/verify/" + code
+}
+
 // GeneratePDF produces an A4-landscape PDF certificate.
 // cert must not be nil. snap is the TemplateSnapshot captured at issuance time.
 // Returns raw PDF bytes or an error.
@@ -79,7 +85,7 @@ func GeneratePDF(cert *Certificate, snap TemplateSnapshot, verifyBaseURL string)
 	pdf.CellFormat(90, 5, snap.SignatoryTitle, "", 0, "L", false, 0, "")
 
 	// --- Footer: QR code (bottom-right quadrant, ≥30mm×30mm) ---
-	verifyURL := fmt.Sprintf("%s/verify/%s", verifyBaseURL, cert.VerificationCode)
+	verifyURL := BuildVerifyURL(verifyBaseURL, cert.VerificationCode)
 	qrBytes, err := qrcode.Encode(verifyURL, qrcode.Medium, 128)
 	if err != nil {
 		return nil, fmt.Errorf("certificates: qr generation failed: %w", err)

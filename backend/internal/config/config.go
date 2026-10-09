@@ -24,6 +24,8 @@ type Config struct {
 	// API
 	APIPort    string
 	APIBaseURL string
+	// PublicAppURL is the public base URL of the SPA (used for certificate QR verify links).
+	PublicAppURL string
 
 	// JWT
 	JWTSecret           string
@@ -67,6 +69,7 @@ func Load() (*Config, error) {
 		DBSSLMode:    getEnv("DB_SSLMODE", "disable"),
 		APIPort:      apiPort,
 		APIBaseURL:   getEnv("API_BASE_URL", "http://localhost:"+apiPort),
+		PublicAppURL: getEnv("PUBLIC_APP_URL", "http://localhost:5173"),
 		JWTSecret:    getEnv("JWT_SECRET", ""),
 		CookieDomain: getEnv("COOKIE_DOMAIN", "localhost"),
 	}

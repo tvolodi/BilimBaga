@@ -124,3 +124,29 @@ func TestLoad_DBSSLModeFromEnv(t *testing.T) {
 		t.Errorf("expected DBSSLMode=require, got %q", cfg.DBSSLMode)
 	}
 }
+
+func TestLoad_PublicAppURLDefault(t *testing.T) {
+	t.Setenv("JWT_SECRET", "this-is-a-valid-32-character-secret!")
+	t.Setenv("PUBLIC_APP_URL", "")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.PublicAppURL != "http://localhost:5173" {
+		t.Errorf("expected default PublicAppURL, got %s", cfg.PublicAppURL)
+	}
+}
+
+func TestLoad_PublicAppURLOverride(t *testing.T) {
+	t.Setenv("JWT_SECRET", "this-is-a-valid-32-character-secret!")
+	t.Setenv("PUBLIC_APP_URL", "https://app.example.kz")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.PublicAppURL != "https://app.example.kz" {
+		t.Errorf("expected override PublicAppURL, got %s", cfg.PublicAppURL)
+	}
+}

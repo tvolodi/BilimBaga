@@ -9,8 +9,8 @@ Normative rules for all swarm roles. Roles: `bb-supervisor`, `bb-dev1`, `bb-dev2
 | Supervisor | `bb-supervisor` | repo root | `swarm/roles/supervisor.settings.json` |
 | Dev1 | `bb-dev1` | `.claude/worktrees/dev1` | `dev1.settings.json` |
 | Dev2 | `bb-dev2` | `.claude/worktrees/dev2` | `dev2.settings.json` |
-| BA | `bb-ba` | repo root | `ba.settings.json` |
-| UAT | `bb-uat` | repo root (owns the live stack) | `uat.settings.json` |
+| BA | `bb-ba` | `.claude/worktrees/ba` | `ba.settings.json` |
+| UAT | `bb-uat` | `.claude/worktrees/uat` (owns the live stack) | `uat.settings.json` |
 | Infra | `ai-dala-infra-fc` (reused) or `bb-infra` | `..\ai-dala-infra` (reused session's cwd is a per-run dir such as `ai-dala-infra\runs\<run-id>`; project root is still `..\ai-dala-infra`) | `infra.settings.json` |
 
 Addressing is by name via `SendMessage`. Names given with `-n` are kept as is, but sessions without one get a derived suffix (observed: `ai-dala-infra-fc`, `bilimbaga-e0`), so always resolve the exact name from `ListAgents` by prefix (`bb-dev1`...) before sending; `claude agents --json` gives the same list to scripts. Verify liveness with `ListAgents`. Reply to an incoming message by copying its `from` attribute into `to`.
@@ -57,11 +57,11 @@ Claiming: **the Supervisor assigns** (changes `role:*` and sends a `task`). A wo
 
 ## 5. Merge and lock rules
 
-- Devs work in separate git worktrees on branches `swarm/<issue>-<slug>`, never on `main` directly.
+- **Worktree-only**: every role except the Supervisor works in its own git worktree (`.claude/worktrees/<role>`), on branches `swarm/<issue>-<slug>`, never on `main` directly. The repo-root checkout is read-only for everyone but the Supervisor: no `git switch`/`checkout`, commit, pull or file edits there (reading is fine).
 - **Migration number lock**: before creating a migration, take `swarm/locks/migration.lock` (create with `set -o noclobber`; content = role, issue, UTC time). Pick `max(existing on origin/main)+1`, commit the migration on a pushed branch, and release the lock only after the branch is merged or abandoned. Stale lock (> 60 min) can be broken by Supervisor.
-- **Stack lock**: only one session at a time may run `make dev`/docker on the host. `swarm/locks/stack.lock` is owned by `bb-uat` by default (it needs the stack for UAT/E2E). Devs needing a running stack for integration tests ask UAT via Supervisor, or use unit tests and `go test` with their own ports only if non-conflicting. Stack restarts to deploy a merged change are done by UAT before a test run (`git pull` in repo root, `make dev` rebuild).
+- **Stack lock**: only one session at a time may run `make dev`/docker on the host. `swarm/locks/stack.lock` is owned by `bb-uat` by default (it needs the stack for UAT/E2E). Devs needing a running stack for integration tests ask UAT via Supervisor, or use unit tests and `go test` with their own ports only if non-conflicting. Stack restarts to deploy a merged change are done by UAT before a test run (`git pull --ff-only` in the UAT worktree `.claude/worktrees/uat`, `make dev` rebuild there; the repo root stays read-only).
 - Lock dir `swarm/locks/` is git-ignored and lives in the **main checkout** (`C:\Users\tvolo\dev\ai-dala\BilimBaga\swarm\locks`); worktrees use the absolute path.
-- **Merge**: devs finish through the existing Release Finalizer pipeline but open a PR instead of pushing to main; Supervisor checks `gh pr view --json mergeable,mergeStateStatus` and conflicts with other open PRs, then tells the dev (or the dev itself, once told `merge-ok`) to merge with `gh pr merge --squash`. Rebase onto latest `origin/main` before merge. Docs-only and swarm/state changes by Supervisor go via PR too.
+- **Merge**: devs finish through the existing Release Finalizer pipeline but open a PR instead of pushing to main; Supervisor checks `gh pr view --json mergeable,mergeStateStatus` and conflicts with other open PRs, then tells the dev (or the dev itself, once told `merge-ok`) to merge with `gh pr merge --squash`. Before merge, bring the branch up to date with latest `origin/main`: for an already-pushed branch, force-push is denied, so the sanctioned path is `git merge origin/main` into the branch (not rebase) and a plain push; the squash-merge then hides the merge commit. Docs-only and swarm/state changes by Supervisor go via PR too.
 - Never force-push shared branches, never rewrite history, never edit existing migrations.
 
 ## 6. Escalation
@@ -84,3 +84,9 @@ Infra handles remote/test environments (hetzner-prod `bilimbaga-test`, QA Keyclo
 - `docs/handoffs/<run-id>/` = pipeline payloads.
 - `swarm/state/*.json` (git-ignored runtime; examples committed): `workers.json`, `retro.json`, `escalations.json`.
 - `docs/retrospectives/retro-NNN.md` = audits.
+
+## 10. Resources
+
+- Devs run tests with capped parallelism: `npx vitest run --maxWorkers=2` (frontend), `go test -p 2 ./...` (backend).
+- UAT live runs (full stack + browsers) need >= 8 GB free memory; UAT checks before starting and defers the run if below.
+- The Supervisor checks free memory each tick while UAT is running and reports low memory in the tick report.

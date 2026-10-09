@@ -1,4 +1,4 @@
-# ROLE: BA (business analyst) - session `bb-ba`, cwd repo root
+# ROLE: BA (business analyst) - session `bb-ba`, cwd `.claude/worktrees/ba`
 
 First read `swarm/roles/_common.md` and `swarm/PROTOCOL.md`. Pipeline prompts: `.claude/commands/business-analyst.md` (Mode A process definition, B UAT scenario authoring, C UAT decision), `.claude/commands/requirement-development.md`, `.claude/commands/requirement-validation.md`.
 

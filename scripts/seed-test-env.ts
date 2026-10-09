@@ -1,17 +1,32 @@
 /**
  * seed-test-env.ts
  *
- * Populates bilimbaga-test.ai-dala.com with realistic test data covering
+ * Populates a test environment (E2E_API_URL, required) with realistic test data covering
  * all business processes in the BilimBaga platform.
  *
- * Run: npx tsx scripts/seed-test-env.ts
+ * Run: E2E_API_URL=http://localhost:8080 npx tsx scripts/seed-test-env.ts
  *   from the repo root (requires Node 18+, tsx installed globally or via npx)
  *
  * Idempotent: safe to run multiple times; skips already-existing data.
  */
 
-// Defaults to the shared test server; set E2E_API_URL (e.g. http://localhost:18080) to target a local stack.
-const BASE = process.env.E2E_API_URL || 'https://bilimbaga-test.ai-dala.com'
+import { checkTarget } from './lib/target-guard'
+
+// E2E_API_URL is REQUIRED (no default): this script WRITES seed data. The URL is parsed and checked against
+// an allowlist (localhost, 127.0.0.1, ::1, *.localhost, bilimbaga-qa.ai-dala.com) on the normalised hostname;
+// anything else, including the customer demo bilimbaga-test.ai-dala.com, is refused unless
+// ALLOW_PROTECTED_HOST=1 (user approval only; swarm roles must never set it).
+if (!process.env.E2E_API_URL) {
+  console.error('E2E_API_URL is required (e.g. E2E_API_URL=http://localhost:8080). Refusing to run without an explicit target.')
+  process.exit(1)
+}
+const targetDecision = checkTarget('E2E_API_URL', process.env.E2E_API_URL, process.env)
+if (!targetDecision.ok) {
+  console.error(`Refusing to seed: ${targetDecision.reason}`)
+  process.exit(1)
+}
+if (targetDecision.warning) console.error(targetDecision.warning)
+const BASE = targetDecision.url as string
 const ADMIN_EMAIL = 'admin@bilimbaga.local'
 const ADMIN_INITIAL_PASS = 'Admin1234!'
 const ADMIN_KNOWN_PASS = 'Admin2024!'

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
+import { downloadErrorKey } from '@/api/download'
 import { Loader2, Download, BarChart2 } from 'lucide-react'
 import { useExamsListForReports, downloadDashboardPdf, downloadExamCsv } from '@/api/reports'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +23,8 @@ function statusVariant(status: ExamListItem['status']): 'default' | 'secondary' 
 
 function DashboardPdfCard() {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [exportError, setExportError] = useState<string | null>(null)
 
   // Default range: last 30 days
   const today = new Date()
@@ -34,8 +38,11 @@ function DashboardPdfCard() {
   async function handleExport() {
     if (!fromDate || !toDate) return
     setIsExporting(true)
+    setExportError(null)
     try {
-      await downloadDashboardPdf(fromDate, toDate)
+      await downloadDashboardPdf(qc, fromDate, toDate)
+    } catch (err) {
+      setExportError(downloadErrorKey(err))
     } finally {
       setIsExporting(false)
     }
@@ -92,6 +99,11 @@ function DashboardPdfCard() {
             )}
           </Button>
         </div>
+        {exportError && (
+          <p role="alert" className="text-sm text-red-700">
+            {t(exportError)}
+          </p>
+        )}
       </CardContent>
     </Card>
   )
@@ -102,13 +114,18 @@ function DashboardPdfCard() {
 function ExamReportsCard() {
   const { t } = useTranslation()
   const { data: exams, isLoading } = useExamsListForReports()
+  const qc = useQueryClient()
   const [exportingId, setExportingId] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   async function handleExportCsv(exam: ExamListItem) {
     if (exportingId) return
     setExportingId(exam.id)
+    setExportError(null)
     try {
-      await downloadExamCsv(exam.id, exam.title)
+      await downloadExamCsv(qc, exam.id, exam.title)
+    } catch (err) {
+      setExportError(downloadErrorKey(err))
     } finally {
       setExportingId(null)
     }
@@ -120,6 +137,11 @@ function ExamReportsCard() {
         <CardTitle>{t('reports.exam_reports_title')}</CardTitle>
       </CardHeader>
       <CardContent>
+        {exportError && (
+          <p role="alert" className="text-sm text-red-700">
+            {t(exportError)}
+          </p>
+        )}
         {isLoading ? (
           <div className="space-y-2">
             {[...Array(4)].map((_, i) => (

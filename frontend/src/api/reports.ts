@@ -1,4 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
+import { downloadFile } from '@/api/download'
 import type { ExamListItem } from '@/api/exams'
 
 // ---- Types ------------------------------------------------------------------
@@ -33,36 +35,19 @@ export function useExamsListForReports() {
 // ---- Download helpers -------------------------------------------------------
 
 /** Download the dashboard PDF report for the given date range. */
-export async function downloadDashboardPdf(from: string, to: string): Promise<void> {
-  const res = await fetch(
+export function downloadDashboardPdf(qc: QueryClient, from: string, to: string): Promise<void> {
+  return downloadFile(
+    qc,
     `/api/v1/admin/dashboard/export?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-    { credentials: 'include' },
+    `dashboard-report-${from}-${to}.pdf`,
   )
-  if (!res.ok) throw new Error('ERR_EXPORT_PDF')
-  const blob = await res.blob()
-  const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `dashboard-report-${from}-${to}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  window.URL.revokeObjectURL(url)
 }
 
 /** Download the per-exam results CSV. */
-export async function downloadExamCsv(examId: string, examTitle: string): Promise<void> {
-  const res = await fetch(`/api/v1/admin/exams/${examId}/results/export`, {
-    credentials: 'include',
-  })
-  if (!res.ok) throw new Error('ERR_EXPORT_CSV')
-  const blob = await res.blob()
-  const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `exam-results-${examTitle.replace(/\s+/g, '-').toLowerCase()}.csv`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  window.URL.revokeObjectURL(url)
+export function downloadExamCsv(qc: QueryClient, examId: string, examTitle: string): Promise<void> {
+  return downloadFile(
+    qc,
+    `/api/v1/admin/exams/${examId}/results/export`,
+    `exam-results-${examTitle.replace(/\s+/g, '-').toLowerCase()}.csv`,
+  )
 }

@@ -12,7 +12,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDuration } from '@/utils/format'
 import type { SessionRecord } from '@/api/employees'
+import { useQueryClient } from '@tanstack/react-query'
 import { downloadAdminCertificate } from '@/api/employees'
+import { downloadErrorKey } from '@/api/download'
 
 interface SessionHistoryTableProps {
   sessions: SessionRecord[]
@@ -20,16 +22,16 @@ interface SessionHistoryTableProps {
 
 export function SessionHistoryTable({ sessions }: SessionHistoryTableProps) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
   async function handleDownload(session: SessionRecord) {
     if (!session.certificate_id) return
     setDownloadError(null)
     try {
-      await downloadAdminCertificate(session.session_id, session.certificate_id)
+      await downloadAdminCertificate(qc, session.session_id, session.certificate_id)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'ERR_INTERNAL'
-      setDownloadError(msg)
+      setDownloadError(downloadErrorKey(err))
       setTimeout(() => setDownloadError(null), 5000)
     }
   }
@@ -44,7 +46,7 @@ export function SessionHistoryTable({ sessions }: SessionHistoryTableProps) {
     <div className="space-y-2">
       {downloadError && (
         <div className="px-4 py-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800">
-          {downloadError}
+          {t(downloadError)}
         </div>
       )}
       <div className="rounded-md border">

@@ -129,8 +129,16 @@ foreach ($k in $cases.Keys) {
 # failing command (not a file): cannot be simulated without running claude; covered by the throw on $LASTEXITCODE in lib.ps1
 Remove-Item $ndF, $hbF, (Join-Path $sd 'sessions.json') -ErrorAction SilentlyContinue
 
-# 6. up.ps1 dry run
-$o = Run 'up.ps1' @('-WhatIf', '-AgentsJsonFile', $live, '-Roles', 'dev1,dev2,infra')
+# 6. up.ps1 dry run. up.ps1 is the minimal launcher from #285 (no -WhatIf / -AgentsJsonFile), so the wrapper
+#    shadows `claude` (live list comes from the stub file) and Start-Process (prints instead of opening a tab).
+$upWrap = Join-Path $tmp 'up-dryrun.ps1'
+Set-Content $upWrap @"
+param([string]`$Stub, [string]`$Up)
+function claude { Get-Content -Raw -LiteralPath `$Stub }
+function Start-Process { param(`$FilePath, `$ArgumentList, `$WorkingDirectory) Write-Host "STUB no launch: `$FilePath" }
+& `$Up -Roles dev1,dev2,infra
+"@
+$o = (& powershell.exe -NoProfile -File $upWrap -Stub $live -Up (Join-Path $swarm 'up.ps1') 2>&1 | Out-String)
 Check 'up skips running dev1' ($o -match 'dev1 already running')
 Check 'up reuses ai-dala-infra' ($o -match 'infra: reusing running session \(ai-dala-infra-fc\)')
 Check 'up launches dev2' ($o -match 'launching dev2')

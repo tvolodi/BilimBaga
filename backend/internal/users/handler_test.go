@@ -924,7 +924,7 @@ func TestHandlerUpdateMe_ExtraField_Returns400AndNothingPersisted(t *testing.T) 
 			assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 			_, apiErr := decodeHandlerEnvelope(t, w)
 			require.NotNil(t, apiErr)
-			assert.Equal(t, "VALIDATION_ERROR", apiErr.Code)
+			assert.Equal(t, "INVALID_BODY", apiErr.Code)
 			assert.False(t, called, "service must not be reached")
 			assert.Empty(t, aw.actions)
 		})
@@ -962,7 +962,7 @@ func TestHandlerUpdateMe_TrailingData_Returns400(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code, body)
 		_, apiErr := decodeHandlerEnvelope(t, w)
 		require.NotNil(t, apiErr, body)
-		assert.Equal(t, "VALIDATION_ERROR", apiErr.Code, body)
+		assert.Equal(t, "INVALID_BODY", apiErr.Code, body)
 	}
 }
 
@@ -994,6 +994,9 @@ func TestHandlerUpdateMe_MalformedJSON_Returns400(t *testing.T) {
 	w := patchMe(h, "u-caller", `{"preferred_locale":`)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	_, apiErr := decodeHandlerEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "INVALID_BODY", apiErr.Code)
 }
 
 func TestHandlerUpdateMe_UserNotFound_Returns404NoAudit(t *testing.T) {

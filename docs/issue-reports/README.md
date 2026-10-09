@@ -61,3 +61,4 @@
 | [ISS-176](ISS-176-api-inconsistencies.md) | API inconsistencies: VALIDATION_ERROR 422, import body cap, DISABLE_RATE_LIMIT answer-save | medium | backend | auth | resolved | 2026-10-09 |
 | [ISS-181](ISS-181-unique-email-index-guarded.md) | UNIQUE INDEX on lower(email) that can never break startup (migration 035) + duplicate-twin admin report (#181) | medium | database | users | resolved | 2026-10-09 |
 | [ISS-240](ISS-240-users-authz-d4.md) | Users authz hardening D-4: strict subset, no self role/deactivate, stale JWT claims, 404 parity, malformed ids, ambiguous import dept | high | backend | users | resolved | 2026-10-09 |
+| [ISS-218](ISS-218-deptscope-all-roles.md) | Department scoping must apply to every role except super_admin (custom roles/examiner saw org-wide data) | high | backend | reports | resolved | 2026-10-09 |

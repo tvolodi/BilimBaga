@@ -304,7 +304,7 @@ func TestAuthenticate_Epoch_UnknownUserRejected_LookupErrorFailsClosed(t *testin
 
 func TestAccountStateCache_CachesPerUserWithinTTL(t *testing.T) {
 	var fetches int
-	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	clock := testNow(0)
 	c := NewAccountStateCache(func(context.Context, string) (AccountState, error) {
 		fetches++
 		return AccountState{PasswordChangedAt: clock}, nil

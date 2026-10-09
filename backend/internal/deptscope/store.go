@@ -16,6 +16,9 @@ import (
 type Store interface {
 	UserInScope(ctx context.Context, s Scope, userID string) (inScope, found bool, err error)
 	SessionUserInScope(ctx context.Context, s Scope, sessionID string) (inScope, found bool, err error)
+	// GradingSessionInScope is SessionUserInScope widened for the manual-grading
+	// flow: a session of an exam created by the examiner in s is also in scope.
+	GradingSessionInScope(ctx context.Context, s Scope, sessionID string) (inScope, found bool, err error)
 }
 
 type pgStore struct{ db *sqlx.DB }
@@ -33,6 +36,19 @@ func (p *pgStore) SessionUserInScope(ctx context.Context, s Scope, sessionID str
 	return p.scan(ctx, "SessionUserInScope", q, sessionID, s.Arg())
 }
 
+func (p *pgStore) GradingSessionInScope(ctx context.Context, s Scope, sessionID string) (bool, bool, error) {
+	q := `SELECT CASE WHEN ` + GradingPredicate("es.user_id", "$2", "e", "$3") +
+		` THEN 1 ELSE 0 END AS in_scope FROM exam_sessions es JOIN exams e ON e.id = es.exam_id WHERE es.id = $1`
+	var n int
+	if err := p.db.QueryRowContext(ctx, q, sessionID, s.Arg(), s.OwnerArg()).Scan(&n); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, false, nil
+		}
+		return false, false, fmt.Errorf("deptscope: GradingSessionInScope: %w", err)
+	}
+	return n == 1, true, nil
+}
+
 // withScope substitutes @SCOPE@ with the subtree predicate for userCol bound to $2.
 func withScope(q, userCol string) string {
 	return strings.ReplaceAll(q, "@SCOPE@", Predicate(userCol, "$2"))
@@ -47,4 +63,17 @@ func (p *pgStore) scan(ctx context.Context, op, q, id string, arg any) (bool, bo
 		return false, false, fmt.Errorf("deptscope: %s: %w", op, err)
 	}
 	return n == 1, true, nil
+}
+
+// SubtreeIDs returns the sorted ids of the departments a restricted scope may
+// see (its department subtree). It returns nil for an unrestricted scope.
+func SubtreeIDs(ctx context.Context, db sqlx.QueryerContext, s Scope) ([]string, error) {
+	if !s.Restricted {
+		return nil, nil
+	}
+	var ids []string
+	if err := sqlx.SelectContext(ctx, db, &ids, SubtreeSQL, s.SubtreeArg()); err != nil {
+		return nil, fmt.Errorf("deptscope: SubtreeIDs: %w", err)
+	}
+	return ids, nil
 }

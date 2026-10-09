@@ -5,6 +5,8 @@ package upload
 
 import (
 	"errors"
+	"io"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -92,13 +94,39 @@ func ValidateCSVFile(data []byte) error {
 // oversize upload is rejected without being parsed. It returns ErrFileTooLarge when the body
 // exceeds the cap; any other error means the body is not valid multipart/form-data.
 func ParseImportMultipart(w http.ResponseWriter, r *http.Request) error {
-	r.Body = http.MaxBytesReader(w, r.Body, MaxImportBodyBytes)
+	capped := &errRecordingReader{r: http.MaxBytesReader(w, r.Body, MaxImportBodyBytes)}
+	r.Body = capped
 	if err := r.ParseMultipartForm(MaxCSVBytes); err != nil {
-		var mbe *http.MaxBytesError
-		if errors.As(err, &mbe) {
+		// The multipart parser may wrap or replace the underlying read error, so also
+		// consult the error the body reader itself reported.
+		if isTooLarge(err) || isTooLarge(capped.err) {
 			return ErrFileTooLarge
 		}
 		return err
 	}
 	return nil
 }
+
+func isTooLarge(err error) bool {
+	if err == nil {
+		return false
+	}
+	var mbe *http.MaxBytesError
+	return errors.As(err, &mbe) || errors.Is(err, multipart.ErrMessageTooLarge)
+}
+
+// errRecordingReader remembers the first non-EOF error returned by the wrapped reader.
+type errRecordingReader struct {
+	r   io.ReadCloser
+	err error
+}
+
+func (e *errRecordingReader) Read(p []byte) (int, error) {
+	n, err := e.r.Read(p)
+	if err != nil && err != io.EOF && e.err == nil {
+		e.err = err
+	}
+	return n, err
+}
+
+func (e *errRecordingReader) Close() error { return e.r.Close() }

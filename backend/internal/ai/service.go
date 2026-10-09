@@ -47,6 +47,9 @@ type aiService struct {
 	client AnthropicClient
 	model  string
 	logger *slog.Logger
+	// scoped holds insights generated for department-scoped callers, keyed by
+	// exam id + scope hash (see scopedInsightCache).
+	scoped *scopedInsightCache
 }
 
 // NewService returns a Service backed by the given Repository and AnthropicClient.
@@ -56,6 +59,7 @@ func NewService(repo Repository, client AnthropicClient, model string, logger *s
 		client: client,
 		model:  model,
 		logger: logger,
+		scoped: newScopedInsightCache(maxScopedInsightEntries, insightCacheTTL),
 	}
 }
 
@@ -150,20 +154,44 @@ func (s *aiService) validateRequest(req GenerateQuestionsRequest) error {
 // AC-6: Anthropic error → ErrAIUnavailable (no stale-cache fallback).
 // AC-8: Every Anthropic call is logged in ai_usage_log with feature="exam_insights".
 func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID string, forceRefresh bool) (*InsightResult, error) {
-	// ISS-165: a department_admin's insights are computed over its own
-	// department subtree only, so they must neither read nor populate the
-	// exam-wide shared cache.
-	scoped := deptscope.FromContext(ctx).Restricted
+	// ISS-218: every role except super_admin gets insights computed over its
+	// own department subtree. Those results must never touch the exam-wide
+	// ai_insight_cache table (one row per exam, no scope column), so they live
+	// in an in-process cache keyed by exam id + scope hash: callers with equal
+	// department-id sets share an entry, different sets never do.
+	scope := deptscope.FromContext(ctx)
+	scoped := scope.Restricted
+	var scopedKey scopedInsightKey
+	scopedCacheable := false
+	if scoped {
+		ids, idErr := s.repo.GetScopeDepartmentIDs(ctx, scope)
+		if idErr != nil {
+			// Fail safe: no scope key means no cache read or write; the
+			// data query below is still scoped in SQL.
+			s.logger.Warn("insight scope lookup failed; skipping cache", "exam_id", examID, "error", idErr)
+		} else {
+			scopedKey = scopedInsightKey{examID: examID, scope: deptscope.ScopeKey(scope, ids)}
+			scopedCacheable = true
+		}
+	}
 
 	// AC-3: Check cache first when not forcing refresh.
-	if !forceRefresh && !scoped {
-		cached, err := s.repo.GetInsightCache(ctx, examID)
-		if err != nil {
-			s.logger.Warn("insight cache read failed", "exam_id", examID, "error", err)
-			// Non-fatal: fall through to generate fresh.
-		}
-		if cached != nil && time.Since(cached.GeneratedAt) < insightCacheTTL {
-			return cached, nil
+	if !forceRefresh {
+		if scoped {
+			if scopedCacheable {
+				if hit := s.scoped.get(scopedKey); hit != nil {
+					return hit, nil
+				}
+			}
+		} else {
+			cached, err := s.repo.GetInsightCache(ctx, examID)
+			if err != nil {
+				s.logger.Warn("insight cache read failed", "exam_id", examID, "error", err)
+				// Non-fatal: fall through to generate fresh.
+			}
+			if cached != nil && time.Since(cached.GeneratedAt) < insightCacheTTL {
+				return cached, nil
+			}
 		}
 	}
 
@@ -210,11 +238,16 @@ func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID st
 		s.logger.Error("failed to log insight usage", "error", logErr)
 	}
 
-	// Upsert cache (never for department-scoped results; see above).
+	// Write cache: scoped results go to the scope-keyed in-process cache only;
+	// the shared DB row is written exclusively by unrestricted (super_admin).
 	if scoped {
+		now := time.Now().UTC()
+		if scopedCacheable {
+			s.scoped.put(scopedKey, insights, now)
+		}
 		return &InsightResult{
 			Insights:    insights,
-			GeneratedAt: time.Now().UTC(),
+			GeneratedAt: now,
 			Cached:      false,
 		}, nil
 	}

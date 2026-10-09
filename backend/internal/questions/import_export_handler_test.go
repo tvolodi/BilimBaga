@@ -489,3 +489,45 @@ func TestImportHandler_BodyOverCap_Returns413BeforeParse(t *testing.T) {
 	require.NotNil(t, apiErr)
 	assert.Equal(t, "ERR_FILE_TOO_LARGE", apiErr.Code)
 }
+
+// ISS-176 round 2: over-cap body over a real HTTP server -> 413 JSON envelope, clean connection;
+// non-multipart body stays 400.
+func TestImportHandler_OverCapOverHTTP_Returns413(t *testing.T) {
+	h := NewHandler(&mockQService{}, nil)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.Import(w, withQImportAuthCtx(r))
+	}))
+	defer srv.Close()
+
+	for _, mb := range []int{11, 12, 30} {
+		body, ct := buildQCSVMultipart(t, validCSV+strings.Repeat("a", mb<<20), "questions.csv")
+		resp, err := http.Post(srv.URL, ct, body)
+		require.NoError(t, err, "%d MiB", mb)
+		var env struct {
+			Data  any `json:"data"`
+			Error *struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&env))
+		resp.Body.Close()
+		assert.Equal(t, http.StatusRequestEntityTooLarge, resp.StatusCode, "%d MiB", mb)
+		require.NotNil(t, env.Error)
+		assert.Equal(t, "ERR_FILE_TOO_LARGE", env.Error.Code)
+		assert.Nil(t, env.Data)
+	}
+}
+
+func TestImportHandler_NonMultipartBody_Returns400(t *testing.T) {
+	h := NewHandler(&mockQService{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/questions/import", strings.NewReader(`{"a":1}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = withQImportAuthCtx(req)
+	w := httptest.NewRecorder()
+	h.Import(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	_, apiErr := decodeQEnvelope(t, w)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, "ERR_INVALID_BODY", apiErr.Code)
+}

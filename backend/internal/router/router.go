@@ -100,6 +100,10 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			sessionScope := func(param string) func(http.Handler) http.Handler {
 				return deptscope.RequireSessionInScope(scopeStore, param)
 			}
+			// Manual grading (ISS-218): also admits sessions of exams the examiner created.
+			gradingScope := func(param string) func(http.Handler) http.Handler {
+				return deptscope.RequireGradingSessionInScope(scopeStore, param)
+			}
 			// Malformed UUID path params 404 here instead of reaching Postgres (500).
 			// Runs after routing, so chi URL params are resolved (ISS-141).
 			r.Use(api.RequireUUIDPathParams(api.UUIDPathParamNames...))
@@ -323,8 +327,8 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Manual grading queue (FR-BB42).
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading", sessionsHandler.HandleListGradingQueue)
-			r.With(rbac.RequirePermission(rbacCache, "grading", "read"), sessionScope("sessionId")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)
-			r.With(rbac.RequirePermission(rbacCache, "grading", "write"), sessionScope("sessionId")).Post("/admin/grading/{sessionId}/answers/{questionId}", sessionsHandler.HandleGradeAnswer)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "read"), gradingScope("sessionId")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "write"), gradingScope("sessionId")).Post("/admin/grading/{sessionId}/answers/{questionId}", sessionsHandler.HandleGradeAnswer)
 
 			// Certificate generation (FR-BB43).
 			r.Get("/portal/sessions/{id}/certificate", certHandler.HandleGetPortalCertificate)

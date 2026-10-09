@@ -1,0 +1,21 @@
+{
+  "run_id": "FR-BB510",
+  "step": 2,
+  "agent": "requirement-validation",
+  "requirement": "FR-BB510",
+  "result": "PASS",
+  "date": "2026-10-09",
+  "gap_evidence": [
+    "roadmap 5.6: overdue employees table with quick-assign-reminder action",
+    "backend/internal/users/handler.go RemindEmployee is an unconditional 200 no-op stub",
+    "reports.OverdueEmployee omits exam_id; OverdueTable posts an empty exam_id",
+    "FR-BB56 AC-7 allowed the stub until the notification system is built; FR-BB61 now provides it; no FR covers the real behavior"
+  ],
+  "scan_conclusion": "Phase 7 (FR-BB71-75) and Phase 5 endpoints/pages are covered by FR docs and shipped; this is the most valuable uncovered roadmap item. Scheduled reports and cross-period comparisons are not in the roadmap.",
+  "checks": {
+    "acs_testable": "pass (9 ACs, error paths 400/404/409/429/502)",
+    "conventions": "pass: envelope, UUID, UTC, migration-only schema, i18n en/ru/kk, handler/service/repo split, email package isolation",
+    "dependencies": "pass: FR-BB51, 56, 61, 19, 16, 62 exist",
+    "findings": []
+  }
+}

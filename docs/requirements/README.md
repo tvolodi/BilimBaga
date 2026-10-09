@@ -82,6 +82,7 @@
 | FR-BB317 | department-treeview | Department Treeview Selector | Partial |
 | FR-BB318 | exam-unpublish | Unpublish Exam | Implemented |
 | FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Partial |
+| FR-BB510 | Overdue-reminder-action | Overdue Employee Reminder: Real "Send Reminder" Action | Validated |
 
 ## Status Values
 

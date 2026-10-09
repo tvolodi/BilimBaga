@@ -118,6 +118,9 @@ func main() {
 		APIBaseURL:   cfg.APIBaseURL,
 		PublicAppURL: cfg.PublicAppURL,
 	}, db, slogger)
+	if cfg.SMTPFromDefaulted {
+		slogger.Warn("SMTP_FROM is not set; using default sender", "default", cfg.SMTPFrom)
+	}
 	emailHandler := email.NewHandler(emailSvc)
 	go email.StartDeadlineReminderScheduler(appCtx, emailSvc, cfg.TenantTimezone)
 

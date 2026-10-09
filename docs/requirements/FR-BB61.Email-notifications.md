@@ -209,3 +209,7 @@ func (s *EmailService) Send(to, tmplName string, data map[string]any, locale str
 - HTML templates must not load external resources (images, fonts) to comply with the Content-Security-Policy in FR-BB64.
 - If `AttemptsRemaining` is 0, the `exam_failed` template body should omit the retake section.
 - **Intentional deviation from roadmap §6.1**: The roadmap specifies a "password reset link" email. This requirement instead sends a temporary cleartext password, consistent with the existing `force_password_change` mechanism in the `users` table. Token-based password reset links are deferred to a future FR. The `auth` service MUST set `force_password_change = true` when issuing a temporary password so the user is forced to change it on first login.
+
+### SMTP_FROM validation (ISS-125)
+
+When `SMTP_HOST` is set: an empty `SMTP_FROM` falls back to `BilimBaga <noreply@localhost>` and the API logs a startup warning; a non-empty but unparseable value (not `user@host` / `Name <user@host>`) fails startup. The email service returns an explicit error (never an empty envelope sender) when the sender is invalid, including on the admin test-notification endpoint (HTTP 503 `EMAIL_UNAVAILABLE`).

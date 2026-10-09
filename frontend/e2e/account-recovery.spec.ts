@@ -75,6 +75,15 @@ test.describe('Account recovery (FR-BB115)', () => {
     const { adminToken } = await getSeedData()
     const user = await createTestUser(adminToken, 'recovery')
     try {
+      // The shared storage state (global-setup/seed) forces the Russian UI; these selectors are English.
+      // i18n.ts reads localStorage 'i18n-lang' at load, so set it before any page script runs.
+      await page.addInitScript(() => {
+        try {
+          localStorage.setItem('i18n-lang', 'en')
+        } catch {
+          /* storage unavailable */
+        }
+      })
       await page.goto('/forgot-password')
       await page.getByLabel(/email/i).fill(user.email)
       await page.getByRole('button', { name: /send reset link/i }).click()

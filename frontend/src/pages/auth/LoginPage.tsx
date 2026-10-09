@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useTenantConfig } from '@/api/useTenantConfig'
 import { useLogin, type ApiError } from '@/api/auth'
@@ -17,7 +17,10 @@ export function LoginPage() {
   const { data: config, isLoading: configLoading } = useTenantConfig()
   const login = useLogin()
   const navigate = useNavigate()
+  const location = useLocation()
   const { t } = useTranslation()
+  // FR-BB115 AC-7: success notice after a completed password reset.
+  const resetNotice = (location.state as { passwordReset?: boolean } | null)?.passwordReset === true
 
   if (configLoading) return <FullPageSpinner />
 
@@ -43,6 +46,14 @@ export function LoginPage() {
         <h1 className="mt-4 text-xl font-semibold text-center">
           {t('auth.login.title', { appName: config?.app_name ?? 'BilimBaga' })}
         </h1>
+        {resetNotice && (
+          <p
+            role="status"
+            className="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+          >
+            {t('auth.recovery.resetSuccess')}
+          </p>
+        )}
         <LoginForm
           onSubmit={handleSubmit}
           isPending={login.isPending}

@@ -17,5 +17,9 @@
 
   "email.password_reset.subject":   "Уақытша құпия сөз — BilimBaga",
   "email.password_reset.body_text": "Сәлем,\n\nСіздің құпия сөзіңіз қалпына келтірілді. Уақытша құпия сөз:\n\n{{.TempPassword}}\n\nЖүйеге кіріп, құпия сөзді дереу өзгертіңіз.\n\nЕң жақсы тілектермен,\nBilimBaga",
-  "email.password_reset.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p>Сіздің құпия сөзіңіз қалпына келтірілді. Уақытша құпия сөз:</p><p style=\"font-size:1.2em;font-weight:bold;letter-spacing:2px\">{{.TempPassword}}</p><p>Жүйеге кіріп, құпия сөзді дереу өзгертіңіз.</p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>"
+  "email.password_reset.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p>Сіздің құпия сөзіңіз қалпына келтірілді. Уақытша құпия сөз:</p><p style=\"font-size:1.2em;font-weight:bold;letter-spacing:2px\">{{.TempPassword}}</p><p>Жүйеге кіріп, құпия сөзді дереу өзгертіңіз.</p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
+
+  "email.password_reset_link.subject":   "Құпия сөзді қалпына келтіру — BilimBaga",
+  "email.password_reset_link.body_text": "Сәлеметсіз бе,\n\nBilimBaga құпия сөзін қалпына келтіру сұрауы алынды. Жаңа құпия сөз орнату үшін төмендегі сілтемені ашыңыз. Сілтеме 60 минут жарамды және бір рет қана қолданылады.\n\n{{.ResetLink}}\n\nЕгер сіз сұрау жібермесеңіз, бұл хатқа назар аудармаңыз.\n\nЕң жақсы тілектермен,\nBilimBaga",
+  "email.password_reset_link.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлеметсіз бе,</p><p>BilimBaga құпия сөзін қалпына келтіру сұрауы алынды. Сілтеме 60 минут жарамды және бір рет қана қолданылады.</p><p><a href=\"{{.ResetLink}}\">Құпия сөзді қалпына келтіру</a></p><p>Егер сіз сұрау жібермесеңіз, бұл хатқа назар аудармаңыз.</p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>"
 }

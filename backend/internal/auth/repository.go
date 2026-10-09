@@ -25,6 +25,9 @@ type Repository interface {
 	RevokeRefreshToken(ctx context.Context, tokenID string) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
 	UpdatePassword(ctx context.Context, userID, passwordHash string) error
+
+	// Password recovery (FR-BB115) — see recovery_repository.go.
+	RecoveryRepository
 }
 
 type pgRepository struct {

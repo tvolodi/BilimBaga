@@ -52,6 +52,12 @@ func TestRenderTemplate_AllTemplates(t *testing.T) {
 				"TempPassword": "Tmp!Abc123",
 			},
 		},
+		{
+			name: "password_reset_link",
+			data: map[string]any{
+				"ResetLink": "https://app.example.com/reset-password?token=abc_DEF-123",
+			},
+		},
 	}
 
 	localeList := []string{"en", "kk", "ru"}
@@ -119,5 +125,25 @@ func TestResolveLocale(t *testing.T) {
 					tt.userLocale, tt.tenantLocale, got, tt.want)
 			}
 		})
+	}
+}
+
+// FR-BB115 AC-3: the reset link appears in both the plain-text and HTML parts for every locale.
+func TestPasswordResetLinkTemplate_ContainsLinkInAllLocales(t *testing.T) {
+	const link = "https://app.example.com/reset-password?token=abc_DEF-123"
+	for _, locale := range []string{"en", "ru", "kk"} {
+		rendered, err := renderTemplate("password_reset_link", map[string]any{"ResetLink": link}, locale)
+		if err != nil {
+			t.Fatalf("%s: %v", locale, err)
+		}
+		if !strings.Contains(rendered.TextBody, link) {
+			t.Errorf("%s: text body missing link", locale)
+		}
+		if !strings.Contains(rendered.HTMLBody, `href="`+link+`"`) {
+			t.Errorf("%s: html body missing href link: %s", locale, rendered.HTMLBody)
+		}
+		if strings.Contains(rendered.Subject, "{{") {
+			t.Errorf("%s: unrendered subject", locale)
+		}
 	}
 }

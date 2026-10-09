@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/select'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { StatusBadge } from '@/components/admin/StatusBadge'
-import { useUsers, useResetPassword, type User, type UsersFilters } from '@/api/users'
+import { useUsers, useResetPassword, useUnlockUser, type User, type UsersFilters } from '@/api/users'
 import { DepartmentTreeSelect } from '@/components/DepartmentTreeSelect'
 import { UserCreateDrawer } from './UserCreateDrawer'
 import { UserEditDrawer } from './UserEditDrawer'
@@ -45,6 +45,20 @@ export function UsersListPage() {
   const [createdPasswordOpen, setCreatedPasswordOpen] = useState(false)
 
   const { data, isLoading, isError } = useUsers(filters)
+
+  // FR-BB115 AC-8: unlock action with an inline, auto-dismissing notice.
+  const unlockMutation = useUnlockUser()
+  const [notice, setNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  async function handleUnlock(user: User) {
+    try {
+      await unlockMutation.mutateAsync(user.id)
+      setNotice({ text: t('users.messages.unlock_success'), type: 'success' })
+    } catch {
+      setNotice({ text: t('users.messages.unlock_error'), type: 'error' })
+    }
+    setTimeout(() => setNotice(null), 5000)
+  }
 
   function setFilter(key: keyof UsersFilters, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value || undefined, page: 1 }))
@@ -107,6 +121,19 @@ export function UsersListPage() {
           </Button>
         </div>
       </div>
+
+      {notice && (
+        <p
+          role={notice.type === 'error' ? 'alert' : 'status'}
+          className={`rounded-md border px-4 py-3 text-sm ${
+            notice.type === 'error'
+              ? 'border-red-200 bg-red-50 text-red-800'
+              : 'border-green-200 bg-green-50 text-green-800'
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
@@ -194,6 +221,11 @@ export function UsersListPage() {
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={user.status} />
+                  {user.is_locked && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                      {t('users.status.locked')}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
@@ -210,6 +242,16 @@ export function UsersListPage() {
                     <Button size="sm" variant="ghost" onClick={() => handleResetPassword(user)}>
                       {t('users.actions.reset_password')}
                     </Button>
+                    {user.is_locked && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={unlockMutation.isPending}
+                        onClick={() => handleUnlock(user)}
+                      >
+                        {t('users.actions.unlock')}
+                      </Button>
+                    )}
                     {user.status === 'active' && (
                       <Button
                         size="sm"

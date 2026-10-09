@@ -17,5 +17,9 @@
 
   "email.password_reset.subject":   "Ваш временный пароль — BilimBaga",
   "email.password_reset.body_text": "Здравствуйте,\n\nВаш пароль был сброшен. Временный пароль:\n\n{{.TempPassword}}\n\nПожалуйста, войдите в систему и немедленно смените пароль.\n\nС уважением,\nBilimBaga",
-  "email.password_reset.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Ваш пароль был сброшен. Временный пароль:</p><p style=\"font-size:1.2em;font-weight:bold;letter-spacing:2px\">{{.TempPassword}}</p><p>Пожалуйста, войдите в систему и немедленно смените пароль.</p><p>С уважением,<br>BilimBaga</p></body></html>"
+  "email.password_reset.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Ваш пароль был сброшен. Временный пароль:</p><p style=\"font-size:1.2em;font-weight:bold;letter-spacing:2px\">{{.TempPassword}}</p><p>Пожалуйста, войдите в систему и немедленно смените пароль.</p><p>С уважением,<br>BilimBaga</p></body></html>",
+
+  "email.password_reset_link.subject":   "Сброс пароля — BilimBaga",
+  "email.password_reset_link.body_text": "Здравствуйте,\n\nМы получили запрос на сброс пароля BilimBaga. Откройте ссылку ниже, чтобы задать новый пароль. Ссылка действует 60 минут и может быть использована один раз.\n\n{{.ResetLink}}\n\nЕсли вы не запрашивали сброс, просто проигнорируйте это письмо.\n\nС уважением,\nBilimBaga",
+  "email.password_reset_link.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Мы получили запрос на сброс пароля BilimBaga. Ссылка действует 60 минут и может быть использована один раз.</p><p><a href=\"{{.ResetLink}}\">Сбросить пароль</a></p><p>Если вы не запрашивали сброс, просто проигнорируйте это письмо.</p><p>С уважением,<br>BilimBaga</p></body></html>"
 }

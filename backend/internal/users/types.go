@@ -23,6 +23,7 @@ type User struct {
 	RoleName            string    `db:"role_name"            json:"role_name"`
 	Status              string    `db:"status"               json:"status"`
 	ForcePasswordChange bool      `db:"force_password_change" json:"force_password_change"`
+	IsLocked            bool      `db:"is_locked"            json:"is_locked"`
 	CreatedAt           time.Time `db:"created_at"           json:"created_at"`
 }
 

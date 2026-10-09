@@ -1,6 +1,7 @@
 package users
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -20,7 +21,12 @@ import (
 // Handler handles HTTP requests for the users domain.
 type Handler struct {
 	svc    Service
-	writer *audit.Writer
+	writer auditWriter
+}
+
+// auditWriter is the subset of *audit.Writer the handler uses (allows a fake in tests).
+type auditWriter interface {
+	Write(ctx context.Context, r *http.Request, action, entityType string, entityID *string, metadata any)
 }
 
 // NewHandler creates a new Handler backed by the given Service and audit Writer.
@@ -207,6 +213,29 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	h.writer.Write(r.Context(), r, "user.password_reset", "user", &id, nil)
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": resp, "error": nil})
+}
+
+// UnlockUser handles POST /api/v1/users/:id/unlock (FR-BB115).
+func (h *Handler) UnlockUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	callerRole := auth.RoleFromCtx(r.Context())
+	callerDeptID := auth.DepartmentIDFromCtx(r.Context())
+	callerUserID := auth.UserIDFromCtx(r.Context())
+
+	user, err := h.svc.UnlockUser(r.Context(), id, callerRole, callerDeptID, callerUserID, clientIP(r))
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			api.WriteError(w, http.StatusNotFound, "NOT_FOUND", "user not found")
+		case errors.Is(err, ErrForbidden):
+			api.WriteError(w, http.StatusForbidden, "FORBIDDEN", "insufficient permissions")
+		default:
+			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to unlock user")
+		}
+		return
+	}
+	h.writer.Write(r.Context(), r, "users.unlock", "user", &id, nil)
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": user, "error": nil})
 }
 
 // ImportUsers handles POST /api/v1/users/import.

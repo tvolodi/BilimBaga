@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -13,7 +14,12 @@ import (
 // Handler handles HTTP requests for the auth domain.
 type Handler struct {
 	svc    Service
-	writer *audit.Writer
+	writer auditWriter
+}
+
+// auditWriter is the subset of *audit.Writer the handler uses (allows a fake in tests).
+type auditWriter interface {
+	Write(ctx context.Context, r *http.Request, action, entityType string, entityID *string, metadata any)
 }
 
 // NewHandler creates a new Handler backed by the given Service and audit Writer.

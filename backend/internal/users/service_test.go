@@ -23,6 +23,7 @@ type mockRepo struct {
 	deactivate map[string]bool
 	revoked    []string
 	tokens     map[string]string // id → hash
+	unlocked   []string
 }
 
 func newMockRepo() *mockRepo {
@@ -139,6 +140,16 @@ func (m *mockRepo) UpdatePassword(_ context.Context, id, hash string) error {
 		return ErrNotFound
 	}
 	m.users[id].ForcePasswordChange = true
+	return nil
+}
+
+func (m *mockRepo) Unlock(_ context.Context, id string) error {
+	u, ok := m.users[id]
+	if !ok {
+		return ErrNotFound
+	}
+	u.IsLocked = false
+	m.unlocked = append(m.unlocked, id)
 	return nil
 }
 
@@ -440,4 +451,49 @@ func TestGenerateTempPassword_PassesValidateComplexity(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, auth.ValidateComplexity(pwd), "generated password %q failed complexity", pwd)
 	}
+}
+
+// ---- FR-BB115 AC-5: admin unlock --------------------------------------------
+
+func TestUnlockUser_ClearsLockAndReturnsUpdatedUser(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("u1", "dept-1", "role-emp", "employee")
+	u.IsLocked = true
+	repo.users["u1"] = u
+
+	got, err := NewService(repo).UnlockUser(context.Background(), "u1", "super_admin", "", "admin-1", "127.0.0.1")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"u1"}, repo.unlocked)
+	assert.False(t, got.IsLocked)
+}
+
+func TestUnlockUser_UnknownID_ReturnsNotFound(t *testing.T) {
+	_, err := NewService(newMockRepo()).UnlockUser(context.Background(), "missing", "super_admin", "", "admin-1", "")
+	assert.True(t, errors.Is(err, ErrNotFound))
+}
+
+func TestUnlockUser_DeptAdminOtherDept_ReturnsForbidden(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("u1", "dept-2", "role-emp", "employee")
+	u.IsLocked = true
+	repo.users["u1"] = u
+
+	_, err := NewService(repo).UnlockUser(context.Background(), "u1", "department_admin", "dept-1", "da-1", "")
+
+	assert.True(t, errors.Is(err, ErrForbidden))
+	assert.Empty(t, repo.unlocked)
+	assert.True(t, repo.users["u1"].IsLocked)
+}
+
+func TestUnlockUser_DeptAdminOwnDept_Succeeds(t *testing.T) {
+	repo := newMockRepo()
+	u := makeUser("u1", "dept-1", "role-emp", "employee")
+	u.IsLocked = true
+	repo.users["u1"] = u
+
+	_, err := NewService(repo).UnlockUser(context.Background(), "u1", "department_admin", "dept-1", "da-1", "")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"u1"}, repo.unlocked)
 }

@@ -109,13 +109,14 @@ func main() {
 
 	// Wire up email notification service (FR-BB61).
 	emailSvc := email.NewEmailService(email.Config{
-		Host:       cfg.SMTPHost,
-		Port:       cfg.SMTPPort,
-		User:       cfg.SMTPUser,
-		Pass:       cfg.SMTPPass,
-		TLS:        cfg.SMTPTLS,
-		From:       cfg.SMTPFrom,
-		APIBaseURL: cfg.APIBaseURL,
+		Host:         cfg.SMTPHost,
+		Port:         cfg.SMTPPort,
+		User:         cfg.SMTPUser,
+		Pass:         cfg.SMTPPass,
+		TLS:          cfg.SMTPTLS,
+		From:         cfg.SMTPFrom,
+		APIBaseURL:   cfg.APIBaseURL,
+		PublicAppURL: cfg.PublicAppURL,
 	}, db, slogger)
 	emailHandler := email.NewHandler(emailSvc)
 	go email.StartDeadlineReminderScheduler(appCtx, emailSvc, cfg.TenantTimezone)
@@ -144,7 +145,7 @@ func main() {
 		BcryptCost:        cfg.BcryptCost,
 		CookieDomain:      cfg.CookieDomain,
 		CookieSecure:      cfg.CookieSecure,
-	}, authRepo)
+	}, authRepo, emailSvc)
 	authHandler := auth.NewHandler(authSvc, auditWriter)
 
 	// Load the RBAC permission cache.

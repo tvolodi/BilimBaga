@@ -6,7 +6,7 @@
 | ID | FR-BB115 |
 | Phase | 1 — Foundation (gap closure; completes roadmap 1.4 and 6.1) |
 | Priority | 1 |
-| Status | Validated |
+| Status | Implemented |
 | Depends On | FR-BB14, FR-BB18, FR-BB61, FR-BB64, FR-BB110, FR-BB62, FR-BB48 (`PUBLIC_APP_URL`) |
 
 ## Description
@@ -68,3 +68,5 @@ All responses use the standard `{ data, error }` envelope; IDs UUID v4; timestam
 ## Notes
 - Closes the deliberate deviation recorded in FR-BB61 ("token-based password reset links deferred") and the deferrals in FR-BB14 and FR-BB110.
 - Requires a working SMTP configuration (FR-BB61); in the Docker dev stack Mailhog captures messages for E2E verification.
+
+- Implementation note (FR-BB115): the admin unlock route uses the existing RBAC key `users:manage` (same as `reset-password`); no `users:update`/`users:unlock` key exists, so no RBAC migration was needed. Department admins are additionally scoped to their own department (same as reset-password). Policy failure on reset returns `VALIDATION_ERROR` (per AC-4), not the change-password `WEAK_PASSWORD` code.

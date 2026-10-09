@@ -27,6 +27,7 @@ type Service interface {
 	UpdateUser(ctx context.Context, id string, req UpdateRequest, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	DeactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
 	ResetPassword(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
+	UnlockUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	ImportUsers(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
 	ListRoles(ctx context.Context) ([]RoleRow, error)
 }
@@ -242,6 +243,24 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 	}
 
 	return &ResetPasswordResponse{TemporaryPassword: tmpPwd}, nil
+}
+
+// UnlockUser clears the lockout of a user early and returns the refreshed record (FR-BB115).
+// Department admins may only unlock users in their own department.
+func (s *service) UnlockUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error) {
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if callerRole == "department_admin" {
+		if existing.DepartmentID == nil || *existing.DepartmentID != callerDeptID {
+			return nil, ErrForbidden
+		}
+	}
+	if err := s.repo.Unlock(ctx, id); err != nil {
+		return nil, fmt.Errorf("users.UnlockUser: %w", err)
+	}
+	return s.repo.GetByID(ctx, id)
 }
 
 // ImportUsers validates, and optionally commits, rows from a CSV bulk import.

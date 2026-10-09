@@ -12,6 +12,7 @@ export interface User {
   role_name: string
   status: 'active' | 'inactive'
   force_password_change: boolean
+  is_locked: boolean
   created_at: string
 }
 
@@ -192,6 +193,21 @@ export function useResetPassword(id: string) {
     mutationFn: () => {
       const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       return apiFetch<ResetPasswordResponse>(`/api/v1/users/${id}/reset-password`, token, { method: 'POST' })
+    },
+  })
+}
+
+// FR-BB115 AC-8: admin early unlock. The user id is the mutation variable so one hook
+// instance serves every row of the list.
+export function useUnlockUser() {
+  const queryClient = useQueryClient()
+  return useMutation<User, Error, string>({
+    mutationFn: (id) => {
+      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
+      return apiFetch<User>(`/api/v1/users/${id}/unlock`, token, { method: 'POST' })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
     },
   })
 }

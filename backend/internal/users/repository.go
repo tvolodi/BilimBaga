@@ -19,6 +19,7 @@ type Repository interface {
 	Deactivate(ctx context.Context, id string) error
 	RevokeAllTokens(ctx context.Context, userID string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
+	Unlock(ctx context.Context, id string) error
 	GetDepartmentIDByName(ctx context.Context, name string) (string, error)
 	GetRoleIDByName(ctx context.Context, name string) (string, error)
 	GetRoleNameByID(ctx context.Context, roleID string) (string, error)
@@ -70,7 +71,8 @@ func (r *pgRepository) List(ctx context.Context, f ListFilters, deptScope *strin
 
 	listQ := fmt.Sprintf(`
 		SELECT u.id, u.email, u.full_name, u.department_id, d.name AS department_name,
-		       u.role_id, ro.name AS role_name, u.status, u.force_password_change, u.created_at
+		       u.role_id, ro.name AS role_name, u.status, u.force_password_change,
+		       (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked, u.created_at
 		FROM   users u
 		LEFT JOIN departments d ON d.id = u.department_id
 		JOIN  roles ro ON ro.id = u.role_id
@@ -93,7 +95,8 @@ func (r *pgRepository) List(ctx context.Context, f ListFilters, deptScope *strin
 func (r *pgRepository) GetByID(ctx context.Context, id string) (*User, error) {
 	const q = `
 		SELECT u.id, u.email, u.full_name, u.department_id, d.name AS department_name,
-		       u.role_id, ro.name AS role_name, u.status, u.force_password_change, u.created_at
+		       u.role_id, ro.name AS role_name, u.status, u.force_password_change,
+		       (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked, u.created_at
 		FROM   users u
 		LEFT JOIN departments d ON d.id = u.department_id
 		JOIN  roles ro ON ro.id = u.role_id
@@ -182,6 +185,20 @@ func (r *pgRepository) UpdatePassword(ctx context.Context, id, passwordHash stri
 	result, err := r.db.ExecContext(ctx, q, passwordHash, id)
 	if err != nil {
 		return fmt.Errorf("users.UpdatePassword: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// Unlock clears the lockout and the failed-attempt counter of a user (FR-BB115).
+func (r *pgRepository) Unlock(ctx context.Context, id string) error {
+	const q = `UPDATE users SET locked_until = NULL, failed_attempts = 0, updated_at = now() WHERE id = $1`
+	result, err := r.db.ExecContext(ctx, q, id)
+	if err != nil {
+		return fmt.Errorf("users.Unlock: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {

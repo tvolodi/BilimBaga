@@ -10,52 +10,64 @@ import (
 
 // RecoveryRepository is the data-access contract for password recovery (FR-BB115).
 type RecoveryRepository interface {
-	// CountRecentResetTokens returns how many reset tokens were created for the user since the cutoff.
-	CountRecentResetTokens(ctx context.Context, userID string, since time.Time) (int, error)
-	// CreateResetToken invalidates earlier unused tokens of the user and stores the new token hash.
-	CreateResetToken(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error
+	// IssueResetToken atomically enforces the per-user throttle and stores a new token.
+	// In one transaction it locks the active user's row (FOR UPDATE), counts the tokens
+	// created since windowStart and, only when fewer than maxPerWindow exist, invalidates
+	// earlier unused tokens and inserts the new hash. Concurrent calls for one user are
+	// serialised by the row lock, so the limit cannot be exceeded by a race. Returns false
+	// (nil error) when the user is missing/inactive or the throttle is hit.
+	IssueResetToken(ctx context.Context, userID, tokenHash string, expiresAt, now, windowStart time.Time, maxPerWindow int) (bool, error)
 	// PurgeExpiredResetTokens deletes tokens that expired before the cutoff.
 	PurgeExpiredResetTokens(ctx context.Context, cutoff time.Time) error
 	// CompleteReset atomically consumes the token, stores the new password hash, clears the
-	// lockout and revokes all refresh tokens. Returns ErrNotFound for an unknown, used or
-	// expired token, or one that belongs to an inactive user.
+	// lockout, stamps users.password_changed_at (invalidating earlier access tokens) and
+	// revokes all refresh tokens. Returns ErrNotFound for an unknown, used or expired
+	// token, or one that belongs to an inactive user.
 	CompleteReset(ctx context.Context, tokenHash, passwordHash string, now time.Time) (string, error)
 }
 
-// CountRecentResetTokens counts reset tokens issued for a user since the given time.
-func (r *pgRepository) CountRecentResetTokens(ctx context.Context, userID string, since time.Time) (int, error) {
-	const q = `SELECT COUNT(*) FROM password_reset_tokens WHERE user_id = $1 AND created_at > $2`
-	var n int
-	if err := r.db.GetContext(ctx, &n, q, userID, since); err != nil {
-		return 0, fmt.Errorf("auth.CountRecentResetTokens: %w", err)
-	}
-	return n, nil
-}
+// SQL for IssueResetToken, kept as constants so tests can assert the locking contract.
+const (
+	issueLockUserSQL = `SELECT id FROM users WHERE id = $1 AND status = 'active' FOR UPDATE`
+	issueCountSQL    = `SELECT COUNT(*) FROM password_reset_tokens WHERE user_id = $1 AND created_at > $2`
+	issueInvalidSQL  = `UPDATE password_reset_tokens SET used_at = $2 WHERE user_id = $1 AND used_at IS NULL`
+	issueInsertSQL   = `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, created_at) VALUES ($1, $2, $3, $4)`
+)
 
-// CreateResetToken marks earlier unused tokens as used and inserts the new token hash.
-func (r *pgRepository) CreateResetToken(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
-	tx, err := r.db.BeginTxx(ctx, nil)
+// IssueResetToken implements the atomic throttle-and-insert (see RecoveryRepository).
+// The user row lock is taken before the count so a concurrent request waits, then counts
+// with a fresh statement snapshot that includes the first request's committed insert.
+func (r *pgRepository) IssueResetToken(ctx context.Context, userID, tokenHash string, expiresAt, now, windowStart time.Time, maxPerWindow int) (bool, error) {
+	tx, err := r.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return fmt.Errorf("auth.CreateResetToken: begin: %w", err)
+		return false, fmt.Errorf("auth.IssueResetToken: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	const invalidate = `
-		UPDATE password_reset_tokens SET used_at = now()
-		WHERE  user_id = $1 AND used_at IS NULL`
-	if _, err := tx.ExecContext(ctx, invalidate, userID); err != nil {
-		return fmt.Errorf("auth.CreateResetToken: invalidate previous: %w", err)
+	var locked string
+	if err := tx.GetContext(ctx, &locked, issueLockUserSQL, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("auth.IssueResetToken: lock user: %w", err)
 	}
-	const insert = `
-		INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-		VALUES ($1, $2, $3)`
-	if _, err := tx.ExecContext(ctx, insert, userID, tokenHash, expiresAt); err != nil {
-		return fmt.Errorf("auth.CreateResetToken: insert: %w", err)
+	var n int
+	if err := tx.GetContext(ctx, &n, issueCountSQL, userID, windowStart); err != nil {
+		return false, fmt.Errorf("auth.IssueResetToken: count recent: %w", err)
+	}
+	if n >= maxPerWindow {
+		return false, nil
+	}
+	if _, err := tx.ExecContext(ctx, issueInvalidSQL, userID, now); err != nil {
+		return false, fmt.Errorf("auth.IssueResetToken: invalidate previous: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, issueInsertSQL, userID, tokenHash, expiresAt, now); err != nil {
+		return false, fmt.Errorf("auth.IssueResetToken: insert: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("auth.CreateResetToken: commit: %w", err)
+		return false, fmt.Errorf("auth.IssueResetToken: commit: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 // PurgeExpiredResetTokens deletes reset tokens that expired before the cutoff.
@@ -66,6 +78,15 @@ func (r *pgRepository) PurgeExpiredResetTokens(ctx context.Context, cutoff time.
 	}
 	return nil
 }
+
+// completeResetSetPasswordSQL stamps password_changed_at so access tokens issued before
+// the reset are rejected by Authenticate (ISS-105).
+const completeResetSetPasswordSQL = `
+		UPDATE users
+		SET    password_hash = $1, force_password_change = false,
+		       failed_attempts = 0, locked_until = NULL, updated_at = now(),
+		       password_changed_at = now()
+		WHERE  id = $2 AND status = 'active'`
 
 // CompleteReset runs the whole password reset in one transaction so a token can be used once.
 func (r *pgRepository) CompleteReset(ctx context.Context, tokenHash, passwordHash string, now time.Time) (string, error) {
@@ -88,12 +109,7 @@ func (r *pgRepository) CompleteReset(ctx context.Context, tokenHash, passwordHas
 		return "", fmt.Errorf("auth.CompleteReset: claim token: %w", err)
 	}
 
-	const setPassword = `
-		UPDATE users
-		SET    password_hash = $1, force_password_change = false,
-		       failed_attempts = 0, locked_until = NULL, updated_at = now()
-		WHERE  id = $2 AND status = 'active'`
-	res, err := tx.ExecContext(ctx, setPassword, passwordHash, userID)
+	res, err := tx.ExecContext(ctx, completeResetSetPasswordSQL, passwordHash, userID)
 	if err != nil {
 		return "", fmt.Errorf("auth.CompleteReset: update user: %w", err)
 	}

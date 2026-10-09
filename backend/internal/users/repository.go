@@ -181,7 +181,7 @@ func (r *pgRepository) RevokeAllTokens(ctx context.Context, userID string) error
 
 // UpdatePassword stores a new bcrypt hash and forces a password change on next login.
 func (r *pgRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
-	const q = `UPDATE users SET password_hash = $1, force_password_change = true, updated_at = now() WHERE id = $2`
+	const q = `UPDATE users SET password_hash = $1, force_password_change = true, updated_at = now(), password_changed_at = now() WHERE id = $2`
 	result, err := r.db.ExecContext(ctx, q, passwordHash, id)
 	if err != nil {
 		return fmt.Errorf("users.UpdatePassword: %w", err)

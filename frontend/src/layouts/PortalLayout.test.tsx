@@ -53,3 +53,18 @@ describe('PortalLayout', () => {
     })
   })
 })
+
+describe('PortalLayout narrow-viewport layout (ISS-130)', () => {
+  it('lets the nav wrap and the tabs shrink so nothing overflows at 375px', () => {
+    renderLayout()
+    const nav = screen.getByRole('navigation', { name: /portal navigation/i })
+    expect(nav).toHaveClass('flex-wrap')
+    const tabGroup = nav.firstElementChild as HTMLElement
+    expect(tabGroup).toHaveClass('min-w-0', 'max-w-full')
+    const link = screen.getAllByRole('link')[0]
+    expect(link).toHaveClass('px-2', 'sm:px-4')
+    const cluster = nav.lastElementChild as HTMLElement
+    expect(cluster).toHaveClass('shrink-0')
+    expect(screen.getByRole('combobox')).toHaveClass('w-[104px]', 'sm:w-[120px]')
+  })
+})

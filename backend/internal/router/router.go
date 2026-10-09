@@ -10,6 +10,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/categories"
 	"github.com/bilimbaga/bilimbaga/internal/certificates"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/bilimbaga/bilimbaga/internal/email"
 	"github.com/bilimbaga/bilimbaga/internal/exams"
 	"github.com/bilimbaga/bilimbaga/internal/health"
@@ -79,6 +80,14 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		r.Group(func(r chi.Router) {
 			r.Use(ratelimit.GlobalLimiter())
 			r.Use(authenticate(jwtSecret, db))
+			// Department scoping for session-keyed admin endpoints (ISS-165).
+			var scopeStore deptscope.Store
+			if db != nil {
+				scopeStore = deptscope.NewStore(db)
+			}
+			sessionScope := func(param string) func(http.Handler) http.Handler {
+				return deptscope.RequireSessionInScope(scopeStore, param)
+			}
 			// Malformed UUID path params 404 here instead of reaching Postgres (500).
 			// Runs after routing, so chi URL params are resolved (ISS-141).
 			r.Use(api.RequireUUIDPathParams(api.UUIDPathParamNames...))
@@ -253,7 +262,7 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Result retrieval (FR-BB41) — any authenticated user.
 			r.Get("/portal/sessions/{id}/result", sessionsHandler.GetSessionResult)
-			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).Get("/admin/sessions/{id}/result", sessionsHandler.GetAdminSessionResult)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read"), sessionScope("id")).Get("/admin/sessions/{id}/result", sessionsHandler.GetAdminSessionResult)
 			r.Get("/portal/exams/{id}/history", sessionsHandler.GetExamHistory)
 
 			// My Results (FR-BB46) — any authenticated user.
@@ -288,12 +297,12 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Manual grading queue (FR-BB42).
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading", sessionsHandler.HandleListGradingQueue)
-			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)
-			r.With(rbac.RequirePermission(rbacCache, "grading", "write")).Post("/admin/grading/{sessionId}/answers/{questionId}", sessionsHandler.HandleGradeAnswer)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "read"), sessionScope("sessionId")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "write"), sessionScope("sessionId")).Post("/admin/grading/{sessionId}/answers/{questionId}", sessionsHandler.HandleGradeAnswer)
 
 			// Certificate generation (FR-BB43).
 			r.Get("/portal/sessions/{id}/certificate", certHandler.HandleGetPortalCertificate)
-			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).Get("/admin/sessions/{id}/certificate", certHandler.HandleGetAdminCertificate)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read"), sessionScope("id")).Get("/admin/sessions/{id}/certificate", certHandler.HandleGetAdminCertificate)
 
 			// Email notification test (FR-BB61) — super_admin only.
 			r.With(rbac.RequirePermission(rbacCache, "tenant", "manage")).Post("/admin/notifications/test", emailHandler.HandleTestNotification)

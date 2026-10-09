@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
 const (
@@ -148,8 +150,13 @@ func (s *aiService) validateRequest(req GenerateQuestionsRequest) error {
 // AC-6: Anthropic error → ErrAIUnavailable (no stale-cache fallback).
 // AC-8: Every Anthropic call is logged in ai_usage_log with feature="exam_insights".
 func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID string, forceRefresh bool) (*InsightResult, error) {
+	// ISS-165: a department_admin's insights are computed over its own
+	// department subtree only, so they must neither read nor populate the
+	// exam-wide shared cache.
+	scoped := deptscope.FromContext(ctx).Restricted
+
 	// AC-3: Check cache first when not forcing refresh.
-	if !forceRefresh {
+	if !forceRefresh && !scoped {
 		cached, err := s.repo.GetInsightCache(ctx, examID)
 		if err != nil {
 			s.logger.Warn("insight cache read failed", "exam_id", examID, "error", err)
@@ -203,7 +210,14 @@ func (s *aiService) GetInsights(ctx context.Context, examID, tenantID, userID st
 		s.logger.Error("failed to log insight usage", "error", logErr)
 	}
 
-	// Upsert cache.
+	// Upsert cache (never for department-scoped results; see above).
+	if scoped {
+		return &InsightResult{
+			Insights:    insights,
+			GeneratedAt: time.Now().UTC(),
+			Cached:      false,
+		}, nil
+	}
 	if cacheErr := s.repo.UpsertInsightCache(ctx, examID, userID, insights); cacheErr != nil {
 		s.logger.Error("failed to upsert insight cache", "exam_id", examID, "error", cacheErr)
 	}

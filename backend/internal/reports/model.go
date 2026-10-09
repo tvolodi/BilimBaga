@@ -10,6 +10,10 @@ import (
 // ErrNotFound is returned by repository methods when no matching row exists.
 var ErrNotFound = errors.New("not found")
 
+// ErrForbidden is returned when a department_admin requests data about a user
+// outside its department subtree (ISS-165).
+var ErrForbidden = errors.New("forbidden")
+
 // DashboardMetrics is the top-level response returned by GET /api/v1/admin/dashboard.
 type DashboardMetrics struct {
 	CompletionRateByExam []*ExamCompletionRate `json:"completion_rate_by_exam"`

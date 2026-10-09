@@ -27,6 +27,12 @@ Roles, prompts and paths were hardcoded in `up.ps1`; session ids were never reco
 - `bin/checkpoint.sh` resolves the main checkout from the roster instead of a host path.
 - Docs: `swarm/README.md`, `swarm/PROTOCOL.md` section 12 (restarted worker re-reads checkpoint, label queue, `docs/handoffs/`), `roles/supervisor.md`, `TEMPLATE.md`.
 
+## Supervisor safety conditions (pre-merge hardening)
+1. Fail-safe live list: `ensure-up.ps1` now uses `Get-RecognisedLiveAgents` (swarm/lib.ps1). It proceeds only if `claude agents --json` is a JSON array with at least one entry whose `name` is a non-empty string. Command failure, empty output, `null`, non-JSON, an object, `[]`, scalars, entries with other field names or a non-string name all make the run exit 1 doing nothing: no relaunch, no stop, no nudge, no state writes. A valid recognised list that lacks a role still relaunches that role. Known consequence: if no session at all is live (`[]`, e.g. after a reboot) the watchdog does nothing; use `up.ps1` for a cold start.
+2. Supervisor stop rules: stop happens only when the heartbeat is stale, a nudge exists, it is strictly older than `supervisor_grace_min` (10 min), AND the heartbeat re-read immediately before stopping is still stale and the session has a pid. Otherwise the nudge is cleared and nothing is stopped. A fresh heartbeat at any point clears the nudge.
+3. Tests added (`swarm/tests/test-ensure-up.ps1`): W1-W6 (fresh, stale->nudge only, nudge <10 min, exactly 10 min, nudge >10 min -> stop planned under -WhatIf, refreshed heartbeat -> no stop and nudge cleared, stale again -> nudge first), C1/C2 (8-min relaunch cooldown), and 9 fail-safe cases each run under -WhatIf and as a real run (safe: it exits before any action) asserting zero relaunch/stop/nudge.
+4. Also fixed: PowerShell 5.1 `ConvertFrom-Json` returns a JSON array as one object when assigned; the list is now explicitly unrolled.
+
 ## Files Changed
 | File | Change |
 |------|--------|

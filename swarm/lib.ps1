@@ -52,6 +52,25 @@ function Get-LiveAgents([string]$AgentsJsonFile) {
   @($raw | ConvertFrom-Json)
 }
 
+# Strict variant for ensure-up.ps1 (fail-safe): returns the live list only when it is a JSON array with at least
+# one entry carrying a non-empty string `name`. Anything else (command failure, empty/non-JSON output, null, an
+# object, an empty array, entries with other field names) THROWS, so the caller does nothing: an unrecognised
+# schema must never be read as "every session is dead".
+function Get-RecognisedLiveAgents([string]$AgentsJsonFile) {
+  if ($AgentsJsonFile) {
+    $raw = Get-Content -Raw -LiteralPath $AgentsJsonFile
+  } else {
+    $raw = (& claude agents --json) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw "claude agents --json failed (exit $LASTEXITCODE)" }
+  }
+  if (-not $raw -or -not $raw.Trim()) { throw 'empty output from claude agents --json' }
+  if (-not $raw.TrimStart().StartsWith('[')) { throw 'claude agents --json is not a JSON array (unrecognised schema)' }
+  try { $parsed = @(,($raw | ConvertFrom-Json) | ForEach-Object { $_ }) } catch { throw "claude agents --json is not valid JSON: $_" }
+  $named = @($parsed | Where-Object { $_ -and $_.name -is [string] -and $_.name.Trim() })
+  if ($named.Count -eq 0) { throw 'claude agents --json has no entries with a recognisable name field (empty list or unrecognised schema)' }
+  $named
+}
+
 function Get-AgentSessionId($Agent) {
   foreach ($p in 'sessionId', 'session_id') {
     $v = $Agent.$p

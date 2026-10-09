@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -152,7 +153,7 @@ func (h *Handler) ExamResultsCSV(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.StreamExamResultsCSV(r.Context(), w, examID, tenantID); err != nil {
 		// Headers already sent — we cannot change status code. Log and return.
-		_ = err
+		slog.Error("reports: exam results CSV export failed", "error", err, "examId", examID)
 	}
 }
 
@@ -172,7 +173,8 @@ func (h *Handler) UserRecordCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 
 	if err := h.svc.StreamUserRecordCSV(r.Context(), w, userID, tenantID); err != nil {
-		_ = err
+		// Headers already sent — we cannot change status code; log it.
+		slog.Error("reports: user record CSV export failed", "error", err, "userId", userID)
 	}
 }
 
@@ -219,12 +221,14 @@ func (h *Handler) DashboardExportPDF(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.svc.BuildDashboardReport(r.Context(), tenantID, fromTime, toTime, companyName, logoBase64)
 	if err != nil {
+		slog.Error("reports: build dashboard report failed", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to build dashboard report")
 		return
 	}
 
 	pdfBytes, err := GenerateDashboardPDF(data)
 	if err != nil {
+		slog.Error("reports: generate dashboard PDF failed", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to generate PDF")
 		return
 	}

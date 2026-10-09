@@ -13,11 +13,14 @@ test.describe('Authenticated downloads send Authorization (#37)', () => {
     await page.goto('/admin/reports')
     const exportBtn = page.getByRole('button', { name: /export pdf|экспорт pdf|pdf/i }).first()
     await expect(exportBtn).toBeVisible({ timeout: 10_000 })
-    const [request] = await Promise.all([
-      page.waitForRequest(req => req.url().includes('/api/v1/admin/dashboard/export')),
+    const [response] = await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/v1/admin/dashboard/export')),
       exportBtn.click(),
     ])
-    expect(request.headers()['authorization']).toMatch(/^Bearer /)
+    expect(response.request().headers()['authorization']).toMatch(/^Bearer /)
+    // #75: the export must actually succeed, not just carry the header.
+    expect(response.status()).toBe(200)
+    expect(response.headers()['content-type']).toContain('application/pdf')
   })
 
   test('exam results CSV export carries a Bearer token', async ({ page }) => {

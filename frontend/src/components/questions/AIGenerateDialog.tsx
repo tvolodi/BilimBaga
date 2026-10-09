@@ -229,6 +229,13 @@ export function AIGenerateDialog({ open, onClose, onSuccess }: AIGenerateDialogP
       }
     }
 
+    // Nothing was created: report the failure and keep the dialog open so the user can retry (#338).
+    if (confirmed === 0) {
+      setConfirmProgress(null)
+      setErrorMsg(t('errors.internal'))
+      return
+    }
+
     onSuccess(confirmed)
     handleClose()
   }

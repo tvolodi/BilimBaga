@@ -149,6 +149,8 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/{id}/deactivate", usersHandler.DeactivateUser)
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
+				Post("/users/{id}/reactivate", usersHandler.ReactivateUser)
+			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/{id}/reset-password", usersHandler.ResetPassword)
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/{id}/unlock", usersHandler.UnlockUser)

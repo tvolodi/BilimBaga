@@ -29,6 +29,7 @@ type Service interface {
 	CreateUser(ctx context.Context, req CreateRequest, callerRole, callerDeptID, callerUserID, ip string) (*CreateResponse, error)
 	UpdateUser(ctx context.Context, id string, req UpdateRequest, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	DeactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
+	ReactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error
 	ResetPassword(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*ResetPasswordResponse, error)
 	UnlockUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	ImportUsers(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
@@ -330,6 +331,37 @@ func (s *service) DeactivateUser(ctx context.Context, id, callerRole, callerDept
 	}
 	_ = s.repo.RevokeAllTokens(ctx, id)
 
+	return nil
+}
+
+// ReactivateUser sets a deactivated user back to active (FR-BB18 AC-13). It is authorised
+// exactly like DeactivateUser, and the decision runs before any write. It does not reset the
+// password, the lockout state or the revoked refresh tokens: the user signs in again with
+// the previous password. Reactivating an active user is ErrUserAlreadyActive, with no change.
+func (s *service) ReactivateUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) error {
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
+		return ErrNotFound
+	}
+	// Nobody, super_admin included, may reactivate themselves (same rule as deactivate, FR-BB117 D-4).
+	if id == callerUserID {
+		return ErrForbidden
+	}
+	// FR-BB117 D-1: the target's rank is checked before any status change.
+	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
+		return err
+	}
+	if existing.Status == "active" {
+		return ErrUserAlreadyActive
+	}
+
+	if err := s.repo.Reactivate(ctx, id); err != nil {
+		return fmt.Errorf("users.ReactivateUser: %w", err)
+	}
 	return nil
 }
 

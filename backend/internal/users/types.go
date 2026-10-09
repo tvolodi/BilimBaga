@@ -11,6 +11,8 @@ var (
 	ErrNotFound       = errors.New("user not found")
 	ErrDuplicateEmail = errors.New("duplicate email")
 	ErrForbidden      = errors.New("forbidden")
+	// ErrUserAlreadyActive is returned by ReactivateUser for a user that is not deactivated (FR-BB18 AC-13).
+	ErrUserAlreadyActive = errors.New("user is already active")
 	// ErrAmbiguousName is returned when a name matches more than one row (e.g. two
 	// departments with the same name under different parents).
 	ErrAmbiguousName = errors.New("ambiguous name")

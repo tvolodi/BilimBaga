@@ -124,7 +124,15 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/users/$SA_ID/reset-passwor
 curl -s -X POST $API/users/$DA_ID/reset-password -H "$(H $HELPER)"                                       # 403 FORBIDDEN, no temporary_password
 curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/users/$DA_ID/deactivate -H "$(H $HELPER)"          # 403
 curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/users/$EMP_ID/reset-password -H "$(H $HELPER)"     # 200 (employee perms are a subset)
-# 4. cleanup: deactivate uat.helper@test.com, DELETE $API/roles/$ROLE
+# 4. rank rule (steps 7-8): as a department_admin A1 (DA1 token) against peer DA2, examiner EX_ID, employee EMP_ID
+curl -s -X POST $API/users/$DA2_ID/reset-password -H "$(H $DA1)"                                         # 403 FORBIDDEN, no temporary_password
+for a in deactivate unlock; do curl -s -o /dev/null -w "$a %{http_code}
+" -X POST $API/users/$DA2_ID/$a -H "$(H $DA1)"; done  # 403 403
+curl -s -o /dev/null -w '%{http_code}
+' -X POST $API/users/$EMP_ID/reset-password -H "$(H $DA1)"        # 200
+curl -s -o /dev/null -w '%{http_code}
+' -X POST $API/users/$EX_ID/reset-password -H "$(H $DA1)"         # 200
+# 5. cleanup: deactivate uat.helper@test.com, DELETE $API/roles/$ROLE
 ```
 
 ## Scenario S6: Localization and accessibility

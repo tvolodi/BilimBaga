@@ -10,11 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ISS-217 / FR-BB117 D-1: a non-super_admin caller may act on a target only if the
-// target's role is not super_admin and its permissions are a subset of the caller's
-// (built-in caller vs built-in target keeps the historical behaviour: only super_admin
-// is off limits, because the seeded department_admin set is not a strict superset of
-// examiner/employee).
+// ISS-217 / FR-BB117 D-1 (Supervisor decision): strict rank hierarchy super_admin >
+// department_admin > examiner > employee (builtinRank). A built-in caller may act on a
+// built-in target only of STRICTLY LOWER rank; against a custom-role target the target's
+// permissions must be a subset of the caller's. A custom-role caller ranks below
+// department_admin: never department_admin/super_admin targets, otherwise permission subset.
+// Unknown/empty roles fail closed.
 
 const d1Custom = "user_helper" // custom role holding only users:read + users:manage
 
@@ -28,6 +29,8 @@ func d1Perms() map[string][]string {
 		"narrow_custom":    {"users:read"},
 		"portal_custom":    {"users:read", "users:manage", "portal:read", "portal:submit"},
 		"big_custom":       {"users:read", "audit:read"},
+		"ex_custom":        {"users:manage", "questions:read", "questions:write", "exams:read", "exams:write", "exams:assign", "reports:read"},
+		"sensitive_custom": {"roles:read"},
 	}
 }
 
@@ -101,6 +104,16 @@ func assertNoWrites(t *testing.T, repo *mockRepo, target string) {
 func TestD1_ForbiddenTargets(t *testing.T) {
 	cases := []struct{ name, caller, target string }{
 		{"dept_admin vs super_admin", "department_admin", "sa"},
+		{"dept_admin vs peer dept_admin", "department_admin", "da"},
+		{"examiner vs dept_admin", "examiner", "da"},
+		{"examiner vs peer examiner", "examiner", "ex"},
+		{"examiner vs super_admin", "examiner", "sa"},
+		{"employee vs employee", "employee", "emp"},
+		{"employee vs examiner", "employee", "ex"},
+		{"unknown caller role vs employee", "ghost_role", "emp"},
+		{"empty caller role vs employee", "", "emp"},
+		{"custom holding all examiner perms vs department_admin", "ex_custom", "da"},
+		{"custom narrow (users:read) vs examiner (perms not held)", "narrow_custom", "ex"},
 		{"custom users:manage vs super_admin", d1Custom, "sa"},
 		{"custom users:manage vs department_admin", d1Custom, "da"},
 		{"custom users:manage vs examiner", d1Custom, "ex"},
@@ -126,7 +139,9 @@ func TestD1_AllowedTargets(t *testing.T) {
 	cases := []struct{ name, caller, target string }{
 		{"dept_admin vs employee", "department_admin", "emp"},
 		{"dept_admin vs examiner", "department_admin", "ex"},
-		{"dept_admin vs dept_admin peer", "department_admin", "da"},
+		{"examiner vs employee", "examiner", "emp"},
+		{"custom holding all examiner perms vs examiner (subset)", "ex_custom", "ex"},
+		{"dept_admin vs custom subset role", "department_admin", "narrow"},
 		{"custom vs same custom role", d1Custom, "cust"},
 		{"custom vs narrower custom", d1Custom, "narrow"},
 		{"portal custom vs employee (subset)", "portal_custom", "emp"},
@@ -225,4 +240,115 @@ func TestD1_Handler_DeactivateAndUnlock_Return403(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, w.Code)
 	assert.Equal(t, "active", repo.users["sa"].Status)
 	assert.Empty(t, repo.unlocked)
+}
+
+func TestD1_Handler_DeptAdminVsPeerDeptAdmin_Returns403(t *testing.T) {
+	repo, svc := d1Setup()
+	aw := &fakeAudit{}
+	h := &Handler{svc: svc, writer: aw}
+	w := httptest.NewRecorder()
+	h.ResetPassword(w, d1Req("da", "department_admin"))
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Contains(t, w.Body.String(), `"FORBIDDEN"`)
+	assert.NotContains(t, w.Body.String(), "temporary_password")
+	assert.Empty(t, aw.actions)
+	assert.False(t, repo.users["da"].ForcePasswordChange)
+	for _, fn := range []func(http.ResponseWriter, *http.Request){h.DeactivateUser, h.UnlockUser} {
+		w = httptest.NewRecorder()
+		fn(w, d1Req("da", "department_admin"))
+		assert.Equal(t, http.StatusForbidden, w.Code)
+	}
+	assert.Equal(t, "active", repo.users["da"].Status)
+	for _, target := range []string{"ex", "emp"} {
+		w = httptest.NewRecorder()
+		h.ResetPassword(w, d1Req(target, "department_admin"))
+		assert.Equal(t, http.StatusOK, w.Code, target)
+	}
+}
+
+func TestD1_RankTable(t *testing.T) {
+	assert.Equal(t, map[string]int{"employee": 1, "examiner": 2, "department_admin": 3, "super_admin": 4}, builtinRank)
+}
+
+// Role assignment hierarchy on create/update.
+func TestD1_AssignmentHierarchy(t *testing.T) {
+	cases := []struct {
+		name, caller, roleID string
+		ok                   bool
+	}{
+		{"dept_admin assigns employee", "department_admin", "role-emp", true},
+		{"dept_admin assigns examiner", "department_admin", "role-ex", true},
+		{"dept_admin assigns peer department_admin", "department_admin", "role-da", false},
+		{"dept_admin assigns super_admin", "department_admin", "role-sa", false},
+		{"examiner assigns examiner", "examiner", "role-ex", false},
+		{"examiner assigns employee", "examiner", "role-emp", true},
+		{"examiner assigns department_admin", "examiner", "role-da", false},
+		{"employee assigns employee", "employee", "role-emp", false},
+		{"custom assigns department_admin", d1Custom, "role-da", false},
+		{"custom assigns examiner (perms not held)", d1Custom, "role-ex", false},
+		{"ex_custom assigns examiner (subset)", "ex_custom", "role-ex", true},
+		{"dept_admin assigns custom with perms it lacks", "department_admin", "role-big", false},
+		{"dept_admin assigns custom subset", "department_admin", "role-narrow", true},
+		{"unknown caller assigns employee", "ghost_role", "role-emp", false},
+		{"super_admin assigns super_admin", "super_admin", "role-sa", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name+"/create", func(t *testing.T) {
+			repo, svc := d1Setup()
+			repo.roleByID["role-ex"], repo.roleByID["role-da"] = "examiner", "department_admin"
+			repo.roleByID["role-emp"], repo.roleByID["role-sa"] = "employee", "super_admin"
+			_, err := svc.CreateUser(context.Background(), CreateRequest{Email: "n@example.com", FullName: "N", DepartmentID: strPtr("dept-1"), RoleID: c.roleID}, c.caller, "dept-1", "actor", "")
+			if c.ok {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, ErrForbidden)
+			}
+		})
+	}
+}
+
+func TestD1_CustomRoleWithSensitivePermsNotAssignable(t *testing.T) {
+	repo, svc := d1Setup()
+	repo.roles["sensitive_custom"] = "role-sens"
+	repo.roleByID["role-sens"] = "sensitive_custom"
+	// even a caller that holds roles:read may not hand it out
+	perms := d1Perms()
+	perms["department_admin"] = append(perms["department_admin"], "roles:read")
+	has := func(role, res, act string) bool {
+		for _, p := range perms[role] {
+			if p == res+":"+act {
+				return true
+			}
+		}
+		return false
+	}
+	svc = WithPermissionsLookup(WithPermissionChecker(NewService(repo), has), func(r string) []string { return perms[r] })
+	_, err := svc.CreateUser(context.Background(), CreateRequest{Email: "n@example.com", FullName: "N", DepartmentID: strPtr("dept-1"), RoleID: "role-sens"}, "department_admin", "dept-1", "actor", "")
+	assert.ErrorIs(t, err, ErrForbidden)
+}
+
+func TestD1_FailClosedWithoutPermissionLookup(t *testing.T) {
+	repo := newMockRepo()
+	repo.users["emp"] = makeUser("emp", "dept-1", "role-emp", "employee")
+	repo.users["c"] = makeUser("c", "dept-1", "role-c", "some_custom")
+	svc := NewService(repo)
+	_, err := svc.ResetPassword(context.Background(), "emp", "some_custom", "dept-1", "actor", "")
+	assert.ErrorIs(t, err, ErrForbidden)
+	_, err = svc.ResetPassword(context.Background(), "c", "department_admin", "dept-1", "actor", "")
+	assert.ErrorIs(t, err, ErrForbidden)
+	// built-in vs built-in lower rank needs no lookup
+	_, err = svc.ResetPassword(context.Background(), "emp", "department_admin", "dept-1", "actor", "")
+	assert.NoError(t, err)
+}
+
+func TestD1_SelfServiceUnchanged(t *testing.T) {
+	_, svc := d1Setup()
+	ctx := context.Background()
+	for _, c := range []struct{ id, role, roleID string }{{"da", "department_admin", "role-da"}, {"ex", "examiner", "role-ex"}, {"emp", "employee", "role-emp"}} {
+		_, err := svc.UpdateUser(ctx, c.id, UpdateRequest{FullName: "Me", DepartmentID: strPtr("dept-1"), RoleID: c.roleID}, c.role, "dept-1", c.id, "")
+		assert.NoError(t, err, c.id)
+	}
+	// a stale token role does not unlock self-service on a different stored role
+	_, err := svc.ResetPassword(ctx, "da", "examiner", "dept-1", "da", "")
+	assert.ErrorIs(t, err, ErrForbidden)
 }

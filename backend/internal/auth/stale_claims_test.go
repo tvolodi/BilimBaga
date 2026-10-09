@@ -78,3 +78,43 @@ func TestAccountStateCache_IdentityRefreshedAfterTTL(t *testing.T) {
 	st, _ = c.Lookup(context.Background(), "u1")
 	assert.Equal(t, "employee", st.RoleName, "demotion visible after the TTL")
 }
+
+// ISS-248: after an admin demotes a user the user logs in again and gets a token carrying
+// the NEW role. A cache entry fetched before the change still holds the old role, so the
+// fresh token is spuriously revoked until the TTL lapses -- unless the entry is invalidated.
+func TestAccountStateCache_InvalidateAfterRoleChange(t *testing.T) {
+	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	role := "department_admin"
+	c := NewAccountStateCache(func(context.Context, string) (AccountState, error) {
+		return AccountState{Status: "active", RoleName: role, DepartmentID: "d1"}, nil
+	}, func() time.Time { return clock })
+
+	// The user's old token is accepted and warms the cache.
+	assert.Equal(t, http.StatusOK, runEpoch(t, c.Lookup, claimsToken(t, "department_admin", "d1")).Code)
+
+	role = "employee" // admin demotes the user in the database
+	newTok := claimsToken(t, "employee", "d1")
+
+	rec := runEpoch(t, c.Lookup, newTok)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code, "stale cache entry spuriously revokes the new token")
+
+	c.Invalidate("u1")
+	assert.Equal(t, http.StatusOK, runEpoch(t, c.Lookup, newTok).Code, "fresh token accepted after invalidation")
+	assert.Equal(t, http.StatusUnauthorized, runEpoch(t, c.Lookup, claimsToken(t, "department_admin", "d1")).Code,
+		"old (pre-demotion) token is revoked after invalidation")
+}
+
+// Deactivation must also take effect at once for tokens still in flight.
+func TestAccountStateCache_InvalidateAfterDeactivate(t *testing.T) {
+	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	status := "active"
+	c := NewAccountStateCache(func(context.Context, string) (AccountState, error) {
+		return AccountState{Status: status, RoleName: "employee"}, nil
+	}, func() time.Time { return clock })
+	tok := claimsToken(t, "employee", "")
+	assert.Equal(t, http.StatusOK, runEpoch(t, c.Lookup, tok).Code)
+	status = "inactive"
+	assert.Equal(t, http.StatusOK, runEpoch(t, c.Lookup, tok).Code, "stale allow within the TTL without invalidation")
+	c.Invalidate("u1")
+	assert.Equal(t, http.StatusUnauthorized, runEpoch(t, c.Lookup, tok).Code)
+}

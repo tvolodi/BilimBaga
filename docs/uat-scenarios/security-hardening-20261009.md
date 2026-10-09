@@ -14,7 +14,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 - **Issue #19** (FR-BB64 remaining): (a) `Strict-Transport-Security` in `deploy/nginx.conf` via `map $http_x_forwarded_proto $hsts`; (b) `backend/internal/questions/import_export_handler.go` Import uses `internal/upload` validation (magic bytes, 10 MB limit, 413); (c) `.github/workflows/security.yml` running `make security-check`; (d) tests for ratelimit and temp-password complexity. Status ready, no PR at authoring time.
 - Rebuild/restart nginx (config change) and the API.
 - Expected pre-fix baseline (FR-BB64 Implementation Delta):
-  - S2: Import has only `ParseMultipartForm(32<<20)` and picks CSV vs JSON by filename suffix; no content check and no 10 MB limit. Steps 3-5, 10 FAIL.
+  - S2: baseline is out of date: magic-byte validation exists since #70 and, since PR #197, the body is capped at 10 MiB + 1 MiB before parsing (no 32 MiB parse). Steps 3-5, 7, 10 are expected to PASS now.
   - S1: no HSTS in any case (step 2 FAILS).
   - S3: `.github/workflows/` does not exist (FAIL).
   - S4: PASS at baseline (regression guard).
@@ -42,7 +42,7 @@ S2 (question import) first, then S1, S3, S4.
 | `binary.csv` | 2 KB random bytes including NULs, named `questions.csv` |
 | `big.csv` | Valid header+row padded to 10,485,761 bytes (10 MB + 1) |
 | `exact.csv` | Valid CSV of exactly 10,485,760 bytes (pad a long text cell); if it cannot be made valid, SKIP step 6 |
-| `huge.csv` | 40 MB (over the 32 MB form limit) |
+| `huge.csv` | 40 MB (far over the 11 MiB body cap) |
 | `evil.exe` | `MZ` header bytes, named `questions.exe` |
 | `empty.csv` | 0 bytes |
 | `rows501.csv` | Valid CSV with 501 rows |
@@ -58,9 +58,9 @@ S2 (question import) first, then S1, S3, S4.
 | 2 | Admin | Same with `valid.json` (`application/json`) | 200 | |
 | 3 | Admin | `fake.csv` (PNG bytes named .csv, declared `text/csv`) | 4xx rejection in the standard error envelope; never 200 or 500; nothing written | |
 | 4 | Admin | `binary.csv` | Rejected as in step 3 | |
-| 5 | Admin | `big.csv` (10 MB + 1) | HTTP 413 with a `FILE_TOO_LARGE`-style code (as in users CSV import); server healthy afterwards | |
+| 5 | Admin | `big.csv` (10 MB + 1) | HTTP 413 with code `ERR_FILE_TOO_LARGE` (users import: `FILE_TOO_LARGE`); server healthy afterwards | |
 | 6 | Admin | `exact.csv` (10 MB) | Not rejected for size (200, or 400 only for row content) | |
-| 7 | Admin | `huge.csv` (40 MB) | 413 (no 500 or connection reset); note which layer answered (nginx or API) | |
+| 7 | Admin | `huge.csv` (40 MB) | 413 (no 500 or connection reset); nginx `client_max_body_size 11m` normally answers first, so note the layer; calling the API port 8080 directly must give 413 `ERR_FILE_TOO_LARGE` from `ParseImportMultipart` without buffering the 40 MB | |
 | 8 | Admin | `valid.csv` declared as `image/png`, then as `application/octet-stream` | Spec says validation is by magic bytes regardless of Content-Type: expected 200. Record actual; header-only rejection is a REQ question | |
 | 9 | Admin | `valid.csv` uploaded as `questions.png` | Record behaviour; no 500 | |
 | 10 | Admin | `evil.exe` | Rejected 4xx | |

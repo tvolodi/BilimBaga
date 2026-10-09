@@ -180,6 +180,10 @@ func (h *Handler) ExamResultsCSV(w http.ResponseWriter, r *http.Request) {
 		return h.svc.StreamExamResultsCSV(r.Context(), bw, examID, tenantID)
 	})
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			api.WriteError(w, http.StatusNotFound, "NOT_FOUND", "exam not found")
+			return
+		}
 		slog.Error("reports: exam results CSV export failed", "error", err, "examId", examID)
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to export exam results")
 	}
@@ -200,6 +204,10 @@ func (h *Handler) UserRecordCSV(w http.ResponseWriter, r *http.Request) {
 	err := writeBufferedCSV(w, filename, func(bw http.ResponseWriter) error {
 		return h.svc.StreamUserRecordCSV(r.Context(), bw, userID, tenantID)
 	})
+	if errors.Is(err, ErrNotFound) {
+		api.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
+		return
+	}
 	if err != nil {
 		slog.Error("reports: user record CSV export failed", "error", err, "userId", userID)
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to export user record")

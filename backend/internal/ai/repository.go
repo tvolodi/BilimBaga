@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -52,6 +54,12 @@ type Repository interface {
 	// CollectLikertResponses returns anonymised, polarity-inverted Likert
 	// response data for the given session.
 	CollectLikertResponses(ctx context.Context, sessionID string) ([]LikertResponseData, error)
+}
+
+// withScope substitutes @SCOPE@ with the department-subtree predicate on
+// exam_sessions.user_id bound to $2 (NULL = unrestricted; ISS-165).
+func withScope(q string) string {
+	return strings.ReplaceAll(q, "@SCOPE@", deptscope.Predicate("user_id", "$2"))
 }
 
 type postgresRepository struct {
@@ -194,7 +202,8 @@ func (r *postgresRepository) GetExamInsightData(ctx context.Context, examID, _ s
 
 	// Aggregate session statistics.
 	var summary insightSummaryRow
-	err = r.db.QueryRowxContext(ctx, `
+	scopeArg := deptscope.FromContext(ctx).Arg()
+	err = r.db.QueryRowxContext(ctx, withScope(`
 SELECT
   COUNT(*)                                                                            AS total_attempts,
   ROUND(
@@ -206,14 +215,14 @@ SELECT
   )::numeric, 0)                                                                      AS avg_completion_secs
 FROM exam_sessions
 WHERE exam_id = $1
-  AND status IN ('submitted', 'auto_submitted', 'grading_pending')`, examID,
+  AND status IN ('submitted', 'auto_submitted', 'grading_pending') AND @SCOPE@`), examID, scopeArg,
 	).StructScan(&summary)
 	if err != nil {
 		return nil, fmt.Errorf("ai: GetExamInsightData: aggregate sessions: %w", err)
 	}
 
 	// Per-question stats — use sort_order from session_questions to preserve display order.
-	rows, err := r.db.QueryxContext(ctx, `
+	rows, err := r.db.QueryxContext(ctx, withScope(`
 SELECT
   MIN(sq.sort_order)                                                              AS order_num,
   LEFT(qt.stem, 100)                                                              AS stem,
@@ -227,22 +236,22 @@ JOIN question_translations qt ON qt.question_id = q.id AND qt.locale = q.default
 LEFT JOIN session_question_scores sqs ON sqs.question_id = q.id
   AND sqs.session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending') AND @SCOPE@
   )
 LEFT JOIN session_questions sq ON sq.question_id = q.id
   AND sq.session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending') AND @SCOPE@
   )
 WHERE q.id IN (
   SELECT DISTINCT question_id FROM session_questions
   WHERE session_id IN (
     SELECT id FROM exam_sessions
-    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending')
+    WHERE exam_id = $1 AND status IN ('submitted', 'auto_submitted', 'grading_pending') AND @SCOPE@
   )
 )
 GROUP BY q.id, qt.stem
-ORDER BY order_num`, examID,
+ORDER BY order_num`), examID, scopeArg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ai: GetExamInsightData: per-question stats: %w", err)

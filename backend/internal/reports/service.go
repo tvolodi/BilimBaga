@@ -3,11 +3,15 @@ package reports
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
 // Service defines the business logic for the reports domain.
@@ -245,11 +249,33 @@ func buildTrackProgress(activity []TrackActivity, exams []ExamProgress) []TrackS
 	return result
 }
 
+// authorizeUser enforces department scoping (ISS-165): a department_admin may
+// only read data about users of its own department subtree (or itself); every
+// other role is unrestricted. Returns ErrNotFound otherwise, so an out-of-scope user is
+// indistinguishable from an unknown one (no existence leak).
+func (s *service) authorizeUser(ctx context.Context, userID string) error {
+	sc := deptscope.FromContext(ctx)
+	if !sc.Restricted || sc.UserID == userID {
+		return nil
+	}
+	ok, err := s.repo.UserInScope(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // GetUserRecord validates the target user exists, then returns their paginated
 // session history together with the total session count (AC-2 through AC-5).
 func (s *service) GetUserRecord(ctx context.Context, userID string, page, perPage int) (*UserRecordResponse, int, error) {
 	info, err := s.repo.GetUserInfo(ctx, userID)
 	if err != nil {
+		return nil, 0, fmt.Errorf("reports: GetUserRecord: %w", err)
+	}
+	if err := s.authorizeUser(ctx, userID); err != nil {
 		return nil, 0, fmt.Errorf("reports: GetUserRecord: %w", err)
 	}
 
@@ -284,6 +310,9 @@ func (s *service) GetUserProgress(ctx context.Context, userID string) (*UserProg
 	if err != nil {
 		return nil, fmt.Errorf("reports: GetUserProgress: %w", err)
 	}
+	if err := s.authorizeUser(ctx, userID); err != nil {
+		return nil, fmt.Errorf("reports: GetUserProgress: %w", err)
+	}
 
 	activity, err := s.repo.GetUserTrackActivity(ctx, userID)
 	if err != nil {
@@ -308,6 +337,15 @@ func (s *service) GetUserProgress(ctx context.Context, userID string) (*UserProg
 // directly to the http.ResponseWriter without buffering the full dataset (AC-8).
 // Headers and Content-Disposition are set by the handler before calling this.
 func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWriter, examID, tenantID string) error {
+	// ISS-178: an unknown exam id must yield ErrNotFound (handler maps it to 404)
+	// instead of a header-only CSV.
+	if _, err := s.repo.GetExamTitle(ctx, examID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("reports: StreamExamResultsCSV: exam lookup: %w", err)
+	}
+
 	// Fetch ordered question list to build the dynamic header (AC-3).
 	questions, err := s.repo.GetExamQuestions(ctx, examID, tenantID)
 	if err != nil {
@@ -390,9 +428,11 @@ func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWrite
 			timeTakenStr = strconv.Itoa(*r.TimeTakenSeconds)
 		}
 
+		// ISS-191: text cells are guarded against formula injection; numeric
+		// cells (score_pct, time_taken_seconds, question scores) stay raw.
 		record := []string{
-			r.EmployeeName,
-			r.Department,
+			api.CSVSafe(r.EmployeeName),
+			api.CSVSafe(r.Department),
 			r.StartedAt,
 			r.SubmittedAt,
 			scorePctStr,
@@ -421,6 +461,12 @@ func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWrite
 // StreamUserRecordCSV streams a CSV of all session history for one user
 // directly to the http.ResponseWriter without buffering (AC-5, AC-8).
 func (s *service) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error {
+	if _, err := s.repo.GetUserInfo(ctx, userID); err != nil {
+		return fmt.Errorf("reports: StreamUserRecordCSV: %w", err)
+	}
+	if err := s.authorizeUser(ctx, userID); err != nil {
+		return fmt.Errorf("reports: StreamUserRecordCSV: %w", err)
+	}
 	header := []string{
 		"exam_title", "started_at", "submitted_at",
 		"score_pct", "passed", "time_taken_seconds", "status",
@@ -462,13 +508,13 @@ func (s *service) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter
 		}
 
 		record := []string{
-			r.ExamTitle,
+			api.CSVSafe(r.ExamTitle),
 			r.StartedAt,
 			r.SubmittedAt,
 			scorePctStr,
 			passedStr,
 			timeTakenStr,
-			r.Status,
+			api.CSVSafe(r.Status),
 		}
 
 		if err := csvWriter.Write(record); err != nil {

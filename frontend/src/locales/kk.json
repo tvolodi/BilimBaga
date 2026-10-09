@@ -386,6 +386,7 @@
     },
     "changePassword": {
       "title": "Жаңа құпия сөз орнату",
+      "required": "Жалғастыру үшін құпия сөзді ауыстыру қажет.",
       "currentPasswordLabel": "Ағымдағы құпия сөз",
       "newPasswordLabel": "Жаңа құпия сөз",
       "confirmPasswordLabel": "Жаңа құпия сөзді растаңыз",

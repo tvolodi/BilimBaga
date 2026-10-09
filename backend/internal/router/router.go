@@ -10,6 +10,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/categories"
 	"github.com/bilimbaga/bilimbaga/internal/certificates"
 	"github.com/bilimbaga/bilimbaga/internal/departments"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/bilimbaga/bilimbaga/internal/email"
 	"github.com/bilimbaga/bilimbaga/internal/exams"
 	"github.com/bilimbaga/bilimbaga/internal/health"
@@ -19,6 +20,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/ratelimit"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/reports"
+	"github.com/bilimbaga/bilimbaga/internal/roles"
 	"github.com/bilimbaga/bilimbaga/internal/sessions"
 	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
@@ -35,8 +37,19 @@ import (
 // db is used by the health endpoint to verify database connectivity.
 // version is the build-time Git SHA injected via -ldflags.
 // log is the zerolog logger used by the structured middleware chain.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, aiHandler *ai.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, aiHandler *ai.Handler, rolesHandler *roles.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
 	r := chi.NewRouter()
+
+	// Per-user account state (password epoch + force_password_change), shared by the
+	// authenticate middleware and the password-change handlers so a successful change
+	// takes effect immediately instead of after the cache TTL (ISS-160).
+	var accountState *auth.AccountStateCache
+	if db != nil {
+		accountState = auth.NewDBAccountStateCache(db)
+		if authHandler != nil {
+			authHandler.SetPasswordChangedHook(accountState.Invalidate)
+		}
+	}
 
 	// Structured middleware chain (FR-BB66):
 	//   1. RequestID  — assign UUID correlation ID
@@ -78,7 +91,15 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		// Protected routes — Bearer JWT required; general rate limit (AC-1).
 		r.Group(func(r chi.Router) {
 			r.Use(ratelimit.GlobalLimiter())
-			r.Use(authenticate(jwtSecret, db))
+			r.Use(authenticate(jwtSecret, accountState))
+			// Department scoping for session-keyed admin endpoints (ISS-165).
+			var scopeStore deptscope.Store
+			if db != nil {
+				scopeStore = deptscope.NewStore(db)
+			}
+			sessionScope := func(param string) func(http.Handler) http.Handler {
+				return deptscope.RequireSessionInScope(scopeStore, param)
+			}
 			// Malformed UUID path params 404 here instead of reaching Postgres (500).
 			// Runs after routing, so chi URL params are resolved (ISS-141).
 			r.Use(api.RequireUUIDPathParams(api.UUIDPathParamNames...))
@@ -121,6 +142,20 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Post("/users/{id}/reset-password", usersHandler.ResetPassword)
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/{id}/unlock", usersHandler.UnlockUser)
+
+			// Role management (FR-BB117). /roles/permissions is registered before /roles/{id}.
+			r.With(rbac.RequirePermission(rbacCache, "roles", "read")).
+				Get("/roles", rolesHandler.List)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "read")).
+				Get("/roles/permissions", rolesHandler.ListPermissions)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "manage")).
+				Post("/roles", rolesHandler.Create)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "read")).
+				Get("/roles/{id}", rolesHandler.Get)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "manage")).
+				Put("/roles/{id}", rolesHandler.Update)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "manage")).
+				Delete("/roles/{id}", rolesHandler.Delete)
 
 			// Audit log.
 			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).
@@ -253,7 +288,7 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Result retrieval (FR-BB41) — any authenticated user.
 			r.Get("/portal/sessions/{id}/result", sessionsHandler.GetSessionResult)
-			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).Get("/admin/sessions/{id}/result", sessionsHandler.GetAdminSessionResult)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read"), sessionScope("id")).Get("/admin/sessions/{id}/result", sessionsHandler.GetAdminSessionResult)
 			r.Get("/portal/exams/{id}/history", sessionsHandler.GetExamHistory)
 
 			// My Results (FR-BB46) — any authenticated user.
@@ -288,12 +323,12 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 
 			// Manual grading queue (FR-BB42).
 			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading", sessionsHandler.HandleListGradingQueue)
-			r.With(rbac.RequirePermission(rbacCache, "grading", "read")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)
-			r.With(rbac.RequirePermission(rbacCache, "grading", "write")).Post("/admin/grading/{sessionId}/answers/{questionId}", sessionsHandler.HandleGradeAnswer)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "read"), sessionScope("sessionId")).Get("/admin/grading/{sessionId}", sessionsHandler.HandleGetGradingDetail)
+			r.With(rbac.RequirePermission(rbacCache, "grading", "write"), sessionScope("sessionId")).Post("/admin/grading/{sessionId}/answers/{questionId}", sessionsHandler.HandleGradeAnswer)
 
 			// Certificate generation (FR-BB43).
 			r.Get("/portal/sessions/{id}/certificate", certHandler.HandleGetPortalCertificate)
-			r.With(rbac.RequirePermission(rbacCache, "exams", "read")).Get("/admin/sessions/{id}/certificate", certHandler.HandleGetAdminCertificate)
+			r.With(rbac.RequirePermission(rbacCache, "exams", "read"), sessionScope("id")).Get("/admin/sessions/{id}/certificate", certHandler.HandleGetAdminCertificate)
 
 			// Email notification test (FR-BB61) — super_admin only.
 			r.With(rbac.RequirePermission(rbacCache, "tenant", "manage")).Post("/admin/notifications/test", emailHandler.HandleTestNotification)
@@ -315,12 +350,14 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 	return r
 }
 
-// authenticate builds the JWT middleware. With a database it also rejects access tokens
-// issued before the user's last password reset (ISS-105); with a nil db (route tests that
-// never reach a handler) only the signature/expiry checks apply.
-func authenticate(jwtSecret string, db *sqlx.DB) func(http.Handler) http.Handler {
-	if db == nil {
+// authenticate builds the JWT middleware. With an account-state cache it also rejects
+// access tokens issued before the user's last password reset (ISS-105) and blocks every
+// route except the force-password-change allowlist while users.force_password_change is
+// set (ISS-160); with a nil cache (route tests that never reach a handler) only the
+// signature/expiry checks apply.
+func authenticate(jwtSecret string, state *auth.AccountStateCache) func(http.Handler) http.Handler {
+	if state == nil {
 		return auth.Authenticate(jwtSecret)
 	}
-	return auth.Authenticate(jwtSecret, auth.WithPasswordEpoch(auth.NewDBPasswordEpochLookup(db)))
+	return auth.Authenticate(jwtSecret, auth.WithAccountState(state.Lookup))
 }

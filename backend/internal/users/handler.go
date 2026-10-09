@@ -22,6 +22,20 @@ import (
 type Handler struct {
 	svc    Service
 	writer auditWriter
+	// permsFor resolves a role name to its "resource:action" permissions (GET /users/me, AC-16).
+	permsFor func(role string) []string
+}
+
+// WithPermissionsProvider sets the function used to populate permissions on GET /users/me.
+func (h *Handler) WithPermissionsProvider(fn func(role string) []string) *Handler {
+	h.permsFor = fn
+	return h
+}
+
+// meResponse is the GET /users/me payload: the profile plus the caller's permissions.
+type meResponse struct {
+	*User
+	Permissions []string `json:"permissions"`
 }
 
 // auditWriter is the subset of *audit.Writer the handler uses (allows a fake in tests).
@@ -83,7 +97,13 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to get profile")
 		return
 	}
-	api.WriteJSON(w, http.StatusOK, map[string]any{"data": u, "error": nil})
+	perms := []string{}
+	if h.permsFor != nil {
+		if p := h.permsFor(u.RoleName); p != nil {
+			perms = p
+		}
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"data": meResponse{User: u, Permissions: perms}, "error": nil})
 }
 
 // GetUser handles GET /api/v1/users/:id.

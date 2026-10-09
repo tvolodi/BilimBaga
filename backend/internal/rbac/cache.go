@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/jmoiron/sqlx"
@@ -73,4 +74,19 @@ func (c *Cache) LoadFromMap(data map[string]PermissionSet) {
 	c.mu.Lock()
 	c.data = data
 	c.mu.Unlock()
+}
+
+// PermissionsFor returns the sorted "resource:action" permissions held by role
+// (empty, never nil, for an unknown role).
+func (c *Cache) PermissionsFor(role string) []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make([]string, 0, len(c.data[role]))
+	for k, v := range c.data[role] {
+		if v {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
 }

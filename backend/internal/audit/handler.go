@@ -112,15 +112,17 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 		if e.Metadata != nil {
 			metadata = string(e.Metadata)
 		}
+		// ISS-191: every user-controlled text cell goes through api.CSVSafe
+		// (formula-injection guard); the server-formatted timestamp does not.
 		_ = csvWriter.Write([]string{
 			e.CreatedAt.UTC().Format(time.RFC3339),
-			actorID,
-			actorName,
-			e.Action,
-			entityType,
-			entityID,
-			ip,
-			metadata,
+			api.CSVSafe(actorID),
+			api.CSVSafe(actorName),
+			api.CSVSafe(e.Action),
+			api.CSVSafe(entityType),
+			api.CSVSafe(entityID),
+			api.CSVSafe(ip),
+			api.CSVSafe(metadata),
 		})
 	}
 	csvWriter.Flush()

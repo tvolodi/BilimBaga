@@ -100,3 +100,11 @@ Out of scope (explicit):
 Sizing: L (about 2 PRs: backend roles package + migration + `users/me` permissions, then frontend page + permission-aware guards). Smallest viable slice if needed: AC-1..10, 11-15, 17, 18 without AC-16 (custom-role holders would be redirected to `/admin` but see no items); not recommended because assigning such roles would produce broken logins.
 
 UAT hook: `docs/uat-scenarios/role-management-20261009.md`.
+
+## Implementation notes (backend, issue #137)
+
+- Migration number is `034_role_management` (032/033 were taken by the time of implementation).
+- Validation failures return HTTP 422 `VALIDATION_ERROR` (repo-wide convention, see docs/requirements/api-conventions), not 400; malformed JSON is 400 `INVALID_BODY`.
+- `PUT /roles/{id}` requires the `permissions` field (replace semantics); omitting it is a validation error.
+- Default-deny scoping: only `super_admin` is org-wide in the users service; every other role (custom included) is limited to its own department. Exam assignment is org-wide only for `super_admin` and `examiner`.
+- A cache-reload failure after a committed mutation returns 500 `INTERNAL` and writes no audit entry (per AC-7/AC-8).

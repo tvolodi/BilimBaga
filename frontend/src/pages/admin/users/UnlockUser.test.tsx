@@ -27,6 +27,8 @@ function user(id: string, name: string, isLocked: boolean) {
 let lockedState = true
 let unlockCalls: string[] = []
 let unlockStatus = 200
+let unlockCode = 'INTERNAL_ERROR'
+let resetStatus = 200
 
 const server = setupServer(
   http.get('/api/v1/departments', () => HttpResponse.json({ data: [], error: null })),
@@ -40,11 +42,20 @@ const server = setupServer(
       error: null,
     }),
   ),
+  http.post('/api/v1/users/:id/reset-password', () => {
+    if (resetStatus !== 200) {
+      return HttpResponse.json(
+        { data: null, error: { code: resetStatus === 403 ? 'FORBIDDEN' : 'INTERNAL_ERROR', message: 'x' } },
+        { status: resetStatus },
+      )
+    }
+    return HttpResponse.json({ data: { temporary_password: 'Tmp-Pass-123' }, error: null })
+  }),
   http.post('/api/v1/users/:id/unlock', ({ params }) => {
     unlockCalls.push(String(params.id))
     if (unlockStatus !== 200) {
       return HttpResponse.json(
-        { data: null, error: { code: 'INTERNAL_ERROR', message: 'boom' } },
+        { data: null, error: { code: unlockCode, message: 'boom' } },
         { status: unlockStatus },
       )
     }
@@ -59,6 +70,8 @@ afterEach(() => {
   lockedState = true
   unlockCalls = []
   unlockStatus = 200
+  unlockCode = 'INTERNAL_ERROR'
+  resetStatus = 200
 })
 afterAll(() => server.close())
 
@@ -103,5 +116,44 @@ describe('UsersListPage unlock action (FR-BB115 AC-8)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not unlock/i)
     expect(screen.getByRole('button', { name: /unlock/i })).toBeInTheDocument()
+  })
+
+  it('shows the localized not-allowed message when unlock is forbidden', async () => {
+    unlockStatus = 403
+    unlockCode = 'FORBIDDEN'
+    const u = userEvent.setup()
+    renderPage()
+    await screen.findByText('Locked Larry')
+    await u.click(screen.getByRole('button', { name: /unlock/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not allowed/i)
+  })
+})
+
+describe('UsersListPage reset password errors (ISS-226)', () => {
+  it('shows the not-allowed message on 403', async () => {
+    resetStatus = 403
+    const u = userEvent.setup()
+    renderPage()
+    await screen.findByText('Free Fiona')
+    await u.click(screen.getAllByRole('button', { name: /reset/i })[0])
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not allowed/i)
+  })
+
+  it('shows a generic message on 500', async () => {
+    resetStatus = 500
+    const u = userEvent.setup()
+    renderPage()
+    await screen.findByText('Free Fiona')
+    await u.click(screen.getAllByRole('button', { name: /reset/i })[0])
+    expect(await screen.findByRole('alert')).toHaveTextContent(/an error occurred/i)
+  })
+
+  it('shows the temporary password on success', async () => {
+    const u = userEvent.setup()
+    renderPage()
+    await screen.findByText('Free Fiona')
+    await u.click(screen.getAllByRole('button', { name: /reset/i })[0])
+    expect(await screen.findByText('Tmp-Pass-123')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

@@ -15,6 +15,7 @@ import { ImportModal } from './ImportModal'
 import { DeactivateConfirmDialog } from '@/pages/users/DeactivateConfirmDialog'
 import { PasswordResetModal } from '@/pages/users/PasswordResetModal'
 import type { CreateUserResponse } from '@/api/users'
+import { userErrorKey } from '@/lib/assignableRoles'
 
 type SortKey = 'full_name' | 'email' | 'department_name' | 'role_name' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -55,9 +56,14 @@ export function UsersListPage() {
     try {
       await unlockMutation.mutateAsync(user.id)
       setNotice({ text: t('users.messages.unlock_success'), type: 'success' })
-    } catch {
-      setNotice({ text: t('users.messages.unlock_error'), type: 'error' })
+    } catch (err) {
+      setNotice({ text: t(userErrorKey(err) ?? 'users.messages.unlock_error'), type: 'error' })
     }
+    setTimeout(() => setNotice(null), 5000)
+  }
+
+  function showError(text: string) {
+    setNotice({ text, type: 'error' })
     setTimeout(() => setNotice(null), 5000)
   }
 
@@ -88,12 +94,13 @@ export function UsersListPage() {
 
   async function handleResetPassword(user: User) {
     setResetUserId(user.id)
+    setNotice(null)
     try {
       const resp = await resetMutation.mutateAsync()
       setResetPassword(resp.temporary_password)
       setResetModalOpen(true)
-    } catch {
-      // error surfaced via mutation state
+    } catch (err) {
+      showError(t(userErrorKey(err) ?? 'users.messages.error_generic'))
     }
   }
 

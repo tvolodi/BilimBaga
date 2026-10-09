@@ -75,9 +75,10 @@ export function GradingDetailPage() {
         })
 
         if (result.all_graded) {
-          toast.show(t('grading.success_toast'), 'success')
           setIsSubmitting(false)
-          navigate('/admin/grading')
+          // The success toast is rendered by the queue page (this page unmounts);
+          // pass a flag via navigation state (FR-BB47 AC-9, #84).
+          navigate('/admin/grading', { state: { gradingSuccess: true } })
           return
         }
       } catch {

@@ -3,11 +3,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import '@/i18n'
 import { GradingDetailPage } from './GradingDetailPage'
+import { GradingQueuePage } from './GradingQueuePage'
 import type { GradingSessionDetail } from '@/api/grading'
 
 const useGradingSession = vi.fn()
 const mutateAsync = vi.fn()
+vi.mock('@/api/exams', () => ({ useExams: () => ({ data: { items: [] } }) }))
 vi.mock('@/api/grading', () => ({
+  useGradingQueue: () => ({ data: { items: [], meta: { total: 0, per_page: 20 } }, isLoading: false, isError: false }),
   useGradingSession: (...a: unknown[]) => useGradingSession(...a),
   useSubmitGrade: () => ({ mutateAsync }),
 }))
@@ -50,7 +53,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/admin/grading/s1']}>
       <Routes>
         <Route path="/admin/grading/:sessionId" element={<GradingDetailPage />} />
-        <Route path="/admin/grading" element={<Probe />} />
+        <Route path="/admin/grading" element={<><Probe /><GradingQueuePage /></>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -116,6 +119,11 @@ describe('GradingDetailPage (FR-BB47)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit All Grades' }))
 
     await waitFor(() => expect(screen.getByTestId('loc')).toHaveTextContent('/admin/grading'))
+    // AC-9: the success toast is visible on the queue page, and dismissible.
+    const toast = await screen.findByRole('status')
+    expect(toast).toHaveTextContent('All grades submitted. Session has been finalized.')
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(mutateAsync).toHaveBeenCalledTimes(2)
     expect(mutateAsync).toHaveBeenNthCalledWith(1, { questionId: 'q1', scorePct: 90, feedback: '' })
     expect(mutateAsync).toHaveBeenNthCalledWith(2, {

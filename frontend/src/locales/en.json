@@ -790,6 +790,7 @@
     "submit_all": "Submit All Grades",
     "submitting": "Submitting...",
     "success_toast": "All grades submitted. Session has been finalized.",
+    "dismiss_toast": "Dismiss",
     "error_toast": "Failed to submit grade for question {{question}}. Please retry.",
     "already_graded": "Already graded",
     "ai_graded": "AI Graded",

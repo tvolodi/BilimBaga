@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useGradingQueue } from '@/api/grading'
 import { useExams } from '@/api/exams'
@@ -10,6 +11,26 @@ export function GradingQueuePage() {
   const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [examId, setExamId] = useState('')
+  const location = useLocation()
+  const navigate = useNavigate()
+  // One-shot success notice handed over by GradingDetailPage via navigation state.
+  const [showSuccess, setShowSuccess] = useState(
+    () => (location.state as { gradingSuccess?: boolean } | null)?.gradingSuccess === true,
+  )
+
+  // Clear the navigation state so a refresh / back-forward does not show it again.
+  useEffect(() => {
+    if ((location.state as { gradingSuccess?: boolean } | null)?.gradingSuccess) {
+      navigate(location.pathname + location.search, { replace: true, state: null })
+    }
+  }, [location, navigate])
+
+  // Auto-dismiss after 5s.
+  useEffect(() => {
+    if (!showSuccess) return
+    const id = setTimeout(() => setShowSuccess(false), 5000)
+    return () => clearTimeout(id)
+  }, [showSuccess])
 
   const { data, isLoading, isError } = useGradingQueue(page, examId || undefined)
   const { data: examsData } = useExams({ status: 'active', per_page: 100 })
@@ -41,6 +62,23 @@ export function GradingQueuePage() {
           ))}
         </Select>
       </div>
+
+      {showSuccess && (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-4 px-4 py-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-800"
+        >
+          <span>{t('grading.success_toast')}</span>
+          <button
+            type="button"
+            onClick={() => setShowSuccess(false)}
+            aria-label={t('grading.dismiss_toast')}
+            className="font-medium hover:underline"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {isLoading && (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>

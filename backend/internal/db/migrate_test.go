@@ -92,7 +92,7 @@ func (r *migRows) Next(dest []driver.Value) error {
 
 type migConnector struct{ f *migFake }
 
-func (c migConnector) Connect(context.Context) (driver.Conn, error) { return migConn{c.f}, nil }
+func (c migConnector) Connect(context.Context) (driver.Conn, error) { return migConn(c), nil }
 func (c migConnector) Driver() driver.Driver                        { return nil }
 
 func newMigDB(t *testing.T, f *migFake) *sqlx.DB {

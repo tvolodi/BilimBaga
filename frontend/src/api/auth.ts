@@ -15,6 +15,8 @@ export interface CurrentUser {
   force_password_change: boolean
 }
 
+const E2E_TOKEN_KEY = '__e2e_access_token__'
+
 interface LoginPayload {
   email: string
   password: string
@@ -30,6 +32,14 @@ interface LoginResponse {
 interface ChangePasswordPayload {
   current_password: string
   new_password: string
+}
+
+/** ISS-171: change-password revokes every earlier access token and returns the caller's replacement. */
+interface ChangePasswordResponse {
+  message: string
+  access_token: string
+  token_type: string
+  expires_in: number
 }
 
 /**
@@ -85,7 +95,7 @@ export function useLogin() {
 
 export function useChangePassword() {
   const qc = useQueryClient()
-  return useMutation<void, ApiError, ChangePasswordPayload>({
+  return useMutation<ChangePasswordResponse, ApiError, ChangePasswordPayload>({
     mutationFn: async (payload) => {
       const token = qc.getQueryData<string>(['auth', 'accessToken'])
       const res = await fetch('/api/v1/auth/change-password', {
@@ -99,6 +109,17 @@ export function useChangePassword() {
       })
       const json = await res.json()
       if (!res.ok) throw json.error as ApiError
+      return json.data as ChangePasswordResponse
+    },
+    onSuccess: (data) => {
+      // The pre-change token is now rejected with TOKEN_REVOKED; switch to the new one at once.
+      if (data?.access_token) {
+        qc.setQueryData(['auth', 'accessToken'], data.access_token)
+        // E2E-seeded token (global-setup) would otherwise be re-served by useRefreshToken.
+        try {
+          if (localStorage.getItem(E2E_TOKEN_KEY)) localStorage.setItem(E2E_TOKEN_KEY, data.access_token)
+        } catch { /* ignore */ }
+      }
     },
   })
 }
@@ -119,8 +140,6 @@ export function useLogout() {
     },
   })
 }
-
-const E2E_TOKEN_KEY = '__e2e_access_token__'
 
 export function useRefreshToken() {
   const qc = useQueryClient()

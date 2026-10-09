@@ -21,7 +21,7 @@ type mockService struct {
 	loginFn          func(ctx context.Context, req *LoginRequest, ipAddr string) (*LoginResponse, *http.Cookie, error)
 	refreshFn        func(ctx context.Context, rawToken, ipAddr string) (*RefreshResponse, *http.Cookie, error)
 	logoutFn         func(ctx context.Context, rawToken, ipAddr string) (*http.Cookie, error)
-	changePasswordFn func(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) error
+	changePasswordFn func(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) (*ChangePasswordResponse, *http.Cookie, error)
 	parseTokenFn     func(tokenString string) (*Claims, error)
 	forgotFn         func(ctx context.Context, req *ForgotPasswordRequest, ipAddr string) (string, error)
 	resetFn          func(ctx context.Context, req *ResetPasswordRequest, ipAddr string) (string, error)
@@ -39,7 +39,7 @@ func (m *mockService) Logout(ctx context.Context, rawToken, ipAddr string) (*htt
 	return m.logoutFn(ctx, rawToken, ipAddr)
 }
 
-func (m *mockService) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) error {
+func (m *mockService) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest, ipAddr string) (*ChangePasswordResponse, *http.Cookie, error) {
 	return m.changePasswordFn(ctx, userID, req, ipAddr)
 }
 
@@ -287,9 +287,10 @@ func TestChangePassword_Valid_Returns200(t *testing.T) {
 		parseTokenFn: func(_ string) (*Claims, error) {
 			return makeValidClaims(), nil
 		},
-		changePasswordFn: func(_ context.Context, userID string, _ *ChangePasswordRequest, _ string) error {
+		changePasswordFn: func(_ context.Context, userID string, _ *ChangePasswordRequest, _ string) (*ChangePasswordResponse, *http.Cookie, error) {
 			assert.Equal(t, "user-uuid-1", userID)
-			return nil
+			return &ChangePasswordResponse{Message: "password changed", AccessToken: "new.jwt.token", TokenType: "Bearer", ExpiresIn: 900},
+				&http.Cookie{Name: "refresh_token", Value: "new-refresh"}, nil
 		},
 	}
 	h := NewHandler(svc, nil)
@@ -305,9 +306,20 @@ func TestChangePassword_Valid_Returns200(t *testing.T) {
 	data, apiErr := decodeEnvelope(t, w)
 	assert.Nil(t, apiErr)
 
-	var msg map[string]string
+	var msg map[string]any
 	require.NoError(t, json.Unmarshal(data, &msg))
 	assert.Equal(t, "password changed", msg["message"])
+	// ISS-171: the response carries the caller's replacement session.
+	assert.Equal(t, "new.jwt.token", msg["access_token"])
+	assert.Equal(t, "Bearer", msg["token_type"])
+	var refresh *http.Cookie
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "refresh_token" {
+			refresh = c
+		}
+	}
+	require.NotNil(t, refresh)
+	assert.Equal(t, "new-refresh", refresh.Value)
 }
 
 func TestChangePassword_ShortNewPassword_Returns422(t *testing.T) {
@@ -315,8 +327,8 @@ func TestChangePassword_ShortNewPassword_Returns422(t *testing.T) {
 		parseTokenFn: func(_ string) (*Claims, error) {
 			return makeValidClaims(), nil
 		},
-		changePasswordFn: func(_ context.Context, _ string, _ *ChangePasswordRequest, _ string) error {
-			return &ServiceError{Code: "VALIDATION_ERROR", Message: "new password must be at least 8 characters", HTTPStatus: http.StatusUnprocessableEntity}
+		changePasswordFn: func(_ context.Context, _ string, _ *ChangePasswordRequest, _ string) (*ChangePasswordResponse, *http.Cookie, error) {
+			return nil, nil, &ServiceError{Code: "VALIDATION_ERROR", Message: "new password must be at least 8 characters", HTTPStatus: http.StatusUnprocessableEntity}
 		},
 	}
 	h := NewHandler(svc, nil)
@@ -339,8 +351,8 @@ func TestChangePassword_WrongCurrentPassword_Returns400(t *testing.T) {
 		parseTokenFn: func(_ string) (*Claims, error) {
 			return makeValidClaims(), nil
 		},
-		changePasswordFn: func(_ context.Context, _ string, _ *ChangePasswordRequest, _ string) error {
-			return &ServiceError{Code: "INVALID_CREDENTIALS", Message: "current password is incorrect", HTTPStatus: http.StatusBadRequest}
+		changePasswordFn: func(_ context.Context, _ string, _ *ChangePasswordRequest, _ string) (*ChangePasswordResponse, *http.Cookie, error) {
+			return nil, nil, &ServiceError{Code: "INVALID_CREDENTIALS", Message: "current password is incorrect", HTTPStatus: http.StatusBadRequest}
 		},
 	}
 	h := NewHandler(svc, nil)
@@ -538,7 +550,7 @@ func TestService_ChangePassword_ShortPassword_Returns422(t *testing.T) {
 		BcryptCost: 4,
 	}, &mockRepository{})
 
-	err := svc.ChangePassword(context.Background(), "user-1", &ChangePasswordRequest{
+	_, _, err := svc.ChangePassword(context.Background(), "user-1", &ChangePasswordRequest{
 		CurrentPassword: "OldPass123!",
 		NewPassword:     "short",
 	}, "127.0.0.1")
@@ -607,7 +619,7 @@ type mockRepository struct {
 	getRefreshTokenByHashFn func(ctx context.Context, tokenHash string) (*RefreshToken, error)
 	revokeRefreshTokenFn    func(ctx context.Context, tokenID string) error
 	revokeAllUserTokensFn   func(ctx context.Context, userID string) error
-	updatePasswordFn        func(ctx context.Context, userID, passwordHash string) error
+	updatePasswordFn        func(ctx context.Context, userID, passwordHash string, changedAt time.Time) error
 }
 
 func (m *mockRepository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
@@ -673,9 +685,9 @@ func (m *mockRepository) RevokeAllUserRefreshTokens(ctx context.Context, userID 
 	return nil
 }
 
-func (m *mockRepository) UpdatePassword(ctx context.Context, userID, passwordHash string) error {
+func (m *mockRepository) UpdatePassword(ctx context.Context, userID, passwordHash string, changedAt time.Time) error {
 	if m.updatePasswordFn != nil {
-		return m.updatePasswordFn(ctx, userID, passwordHash)
+		return m.updatePasswordFn(ctx, userID, passwordHash, changedAt)
 	}
 	return nil
 }

@@ -16,7 +16,9 @@ function fakeApi(opts: { good: string; force: boolean; changeOk?: boolean }) {
         { status: 200 },
       )
     }
-    return new Response('{}', { status: opts.changeOk === false ? 400 : 200 })
+    if (opts.changeOk === false) return new Response('{}', { status: 400 })
+    // ISS-171: the change-password response carries the replacement access token.
+    return new Response(JSON.stringify({ data: { message: 'password changed', access_token: 'tok-new' }, error: null }), { status: 200 })
   }) as unknown as typeof fetch
   return { impl, calls }
 }
@@ -29,10 +31,10 @@ describe('loginClearingForceChange (ISS-160)', () => {
     expect(calls.some((c) => c.url.endsWith('/change-password'))).toBe(false)
   })
 
-  it('changes the password with the same token when the login is flagged', async () => {
+  it('changes the password with the login token and returns the NEW token from the response', async () => {
     const { impl, calls } = fakeApi({ good: 'A', force: true })
     const r = await loginClearingForceChange('http://x', 'a@b', ['A'], 'New1234!', impl)
-    expect(r).toEqual({ token: 'tok', password: 'New1234!', changed: true })
+    expect(r).toEqual({ token: 'tok-new', password: 'New1234!', changed: true })
     const change = calls.find((c) => c.url.endsWith('/change-password'))
     expect(change?.auth).toBe('Bearer tok')
     expect(change?.body).toEqual({ current_password: 'A', new_password: 'New1234!' })

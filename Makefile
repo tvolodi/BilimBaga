@@ -10,8 +10,9 @@ build:
 	  -o bin/api ./cmd/api
 	cd frontend && npm ci && npm run build
 
+# Applies pending migrations and exits (no server). The image ENTRYPOINT is /app/api, so "migrate" is its argument.
 migrate:
-	docker compose run --rm api ./bin/api migrate
+	docker compose run --rm api migrate
 
 test:
 	cd backend && go test ./...

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -31,11 +32,15 @@ type Service interface {
 	UnlockUser(ctx context.Context, id, callerRole, callerDeptID, callerUserID, ip string) (*User, error)
 	ImportUsers(ctx context.Context, rows []CSVRow, commit bool, callerRole, callerDeptID, callerUserID, ip string) (*ImportPreview, error)
 	ListRoles(ctx context.Context, callerRole string) ([]RoleRow, error)
+	// RemindEmployee sends a manual overdue-exam reminder (FR-BB510).
+	RemindEmployee(ctx context.Context, actorID, userID, examID string) (*RemindResult, error)
 }
 
 type service struct {
 	repo     Repository
 	emailSvc *email.EmailService
+	reminder Reminder
+	now      func() time.Time
 	// canPerm reports whether a role holds resource:action. nil means "no
 	// permission information": GetUser then grants only self-access to
 	// non-super_admin roles (default-deny).
@@ -84,8 +89,9 @@ func inCallerScope(callerRole, callerDeptID string, target *string) bool {
 // transactional email delivery; pass nil or omit to disable.
 func NewService(repo Repository, emailSvc ...*email.EmailService) Service {
 	s := &service{repo: repo}
-	if len(emailSvc) > 0 {
+	if len(emailSvc) > 0 && emailSvc[0] != nil {
 		s.emailSvc = emailSvc[0]
+		s.reminder = emailReminder{svc: emailSvc[0]}
 	}
 	return s
 }

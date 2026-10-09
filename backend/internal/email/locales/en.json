@@ -21,5 +21,8 @@
 
   "email.password_reset_link.subject":   "Reset your password — BilimBaga",
   "email.password_reset_link.body_text": "Hello,\n\nWe received a request to reset your BilimBaga password. Open the link below to choose a new one. The link is valid for 60 minutes and can be used once.\n\n{{.ResetLink}}\n\nIf you did not request this, you can ignore this email.\n\nBest regards,\nBilimBaga",
-  "email.password_reset_link.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Hello,</p><p>We received a request to reset your BilimBaga password. The link is valid for 60 minutes and can be used once.</p><p><a href=\"{{.ResetLink}}\">Reset password</a></p><p>If you did not request this, you can ignore this email.</p><p>Best regards,<br>BilimBaga</p></body></html>"
+  "email.password_reset_link.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Hello,</p><p>We received a request to reset your BilimBaga password. The link is valid for 60 minutes and can be used once.</p><p><a href=\"{{.ResetLink}}\">Reset password</a></p><p>If you did not request this, you can ignore this email.</p><p>Best regards,<br>BilimBaga</p></body></html>",
+  "email.overdue_reminder.subject": "Overdue: please complete \"{{.ExamTitle}}\"",
+  "email.overdue_reminder.body_text": "Hello,\n\nYour exam \"{{.ExamTitle}}\" is overdue. The deadline was {{.Deadline}}.\n\nPlease complete it as soon as possible: {{.PortalLink}}\n\nBest regards,\nBilimBaga",
+  "email.overdue_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Hello,</p><p>Your exam <strong>{{.ExamTitle}}</strong> is overdue.</p><p><strong>Deadline:</strong> {{.Deadline}}</p><p><a href=\"{{.PortalLink}}\">Open exam</a></p><p>Best regards,<br>BilimBaga</p></body></html>"
 }

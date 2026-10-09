@@ -209,6 +209,46 @@ func (s *EmailService) TriggerPasswordResetLink(userID, token string) {
 	}()
 }
 
+// ReminderResult is the outcome of a successful manual overdue reminder.
+type ReminderResult struct {
+	SentAt    time.Time
+	ExamTitle string
+}
+
+// SendOverdueReminder synchronously sends the overdue_reminder email for (user, exam)
+// (FR-BB510). Every attempt, success or failure, is recorded in email_log. The
+// recipient address is never part of the returned value or of any returned error text
+// beyond the SMTP transport message.
+func (s *EmailService) SendOverdueReminder(ctx context.Context, userID, examID string) (*ReminderResult, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("email: repository not initialised")
+	}
+	data, err := s.repo.GetOverdueReminderData(ctx, userID, examID)
+	if err != nil {
+		return nil, fmt.Errorf("email: overdue reminder context: %w", err)
+	}
+	deadlineStr := "–"
+	if data.Deadline != nil {
+		deadlineStr = data.Deadline.UTC().Format("2006-01-02 15:04 UTC")
+	}
+	base := s.cfg.PublicAppURL
+	if base == "" {
+		base = s.cfg.APIBaseURL
+	}
+	tmplData := map[string]any{
+		"ExamTitle":  data.ExamTitle,
+		"Deadline":   deadlineStr,
+		"PortalLink": strings.TrimRight(base, "/") + "/portal/exams/" + examID,
+	}
+	sendErr := s.send(data.Email, "overdue_reminder", tmplData, data.Locale)
+	s.logAttempt(data.Email, "overdue_reminder", sendErr)
+	if sendErr != nil {
+		s.logger.Error("email send failed", "template", "overdue_reminder", "user_id", userID, "error", sendErr)
+		return nil, fmt.Errorf("email: send overdue reminder: %w", sendErr)
+	}
+	return &ReminderResult{SentAt: time.Now().UTC(), ExamTitle: data.ExamTitle}, nil
+}
+
 // GetUserEmail looks up a user's email address for use in the test notification handler.
 func (s *EmailService) GetUserEmail(ctx context.Context, userID string) (string, error) {
 	if s.repo == nil {

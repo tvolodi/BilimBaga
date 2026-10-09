@@ -2,6 +2,7 @@
 
 | ID | Title | Severity | Layer | Module | Status | Resolved |
 |----|-------|----------|-------|--------|--------|---------|
+| [ISS-061](ISS-061-overdue-reminder-noop.md) | Overdue-reminder Send Reminder is a no-op reporting success | medium | backend | users | resolved | 2026-10-09 |
 | [ISS-241](ISS-241-download-error-i18n.md) | Certificate download errors SESSION_NOT_PASSED / EXAM_NOT_CERTIFIABLE show generic message (FR-BB58 AC-4) | low | frontend | certificates | resolved | 2026-10-09 |
 | [ISS-171](ISS-171-self-change-revokes-tokens.md) | Self change-password does not revoke older access tokens | medium | backend | auth | resolved | 2026-10-09 |
 | [ISS-131](ISS-131-e2e-fixme-and-silent-skips.md) | e2e specs still test.fixme / silently skip (password-reset, tab-switch, certificates) | low | frontend | e2e | resolved | 2026-10-09 |

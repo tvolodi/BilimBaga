@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/jmoiron/sqlx"
@@ -25,6 +26,11 @@ type Repository interface {
 	GetRoleIDByName(ctx context.Context, name string) (string, error)
 	GetRoleNameByID(ctx context.Context, roleID string) (string, error)
 	ListRoles(ctx context.Context) ([]RoleRow, error)
+	// FR-BB510 overdue reminders.
+	ExamExists(ctx context.Context, examID string) (bool, error)
+	IsOverdueTarget(ctx context.Context, userID, examID string) (bool, error)
+	LastReminderAt(ctx context.Context, userID, examID string) (*time.Time, error)
+	InsertReminder(ctx context.Context, userID, examID, sentBy string) error
 }
 
 type pgRepository struct {

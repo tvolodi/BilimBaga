@@ -385,12 +385,6 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// RemindEmployee handles POST /api/v1/admin/users/:userId/remind (FR-BB56 AC-7 stub).
-// Returns HTTP 200 with empty data until the notification system is built.
-func (h *Handler) RemindEmployee(w http.ResponseWriter, r *http.Request) {
-	api.WriteJSON(w, http.StatusOK, map[string]any{"data": nil, "error": nil})
-}
-
 // parseIntParam reads a query param as int, falling back to defaultVal on error or absence.
 func parseIntParam(r *http.Request, name string, defaultVal int) int {
 	v := r.URL.Query().Get(name)

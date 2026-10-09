@@ -302,7 +302,7 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			// My Results (FR-BB46) — any authenticated user.
 			r.Get("/portal/results", sessionsHandler.HandleGetMyResults)
 
-			// Send reminder stub (FR-BB56 AC-7) — examiner+ only.
+			// Send overdue reminder (FR-BB510) — examiner+ only.
 			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
 				Post("/admin/users/{userId}/remind", usersHandler.RemindEmployee)
 

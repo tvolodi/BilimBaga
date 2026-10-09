@@ -15,7 +15,7 @@ export interface OverdueEmployee {
   user_id: string
   name: string
   exam_title: string
-  exam_id?: string
+  exam_id: string
   deadline: string
 }
 
@@ -92,13 +92,13 @@ export function useDashboard() {
 
 export function useRemindEmployee(
   onSuccess?: () => void,
-  onError?: () => void,
+  onError?: (err: Error) => void,
 ) {
   const qc = useQueryClient()
   const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-  return useMutation<void, Error, { userId: string; examId: string }>({
+  return useMutation<unknown, Error, { userId: string; examId: string }>({
     mutationFn: ({ userId, examId }) =>
-      apiPost<void>(`/api/v1/admin/users/${userId}/remind`, { exam_id: examId }, token),
+      apiPost<{ sent_at: string }>(`/api/v1/admin/users/${userId}/remind`, { exam_id: examId }, token),
     onSuccess,
     onError,
   })

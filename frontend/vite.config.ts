@@ -15,8 +15,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // allow serving ../scripts/lib (vitest loads the guard tests from outside frontend/)
-    fs: { allow: ['..'] },
+    // vitest loads ../scripts/lib guard tests from outside frontend/; keep the dev server's default fs
+    // sandbox (do NOT widen it to the repo root: backend/.env would be readable via /@fs/)
+    ...(process.env.VITEST ? { fs: { allow: ['..'] } } : {}),
     proxy: {
       '/api': {
         target: apiTarget,

@@ -593,6 +593,8 @@ func (h *Handler) CreateRule(w http.ResponseWriter, r *http.Request) {
 			writeValidationErrors(w, []fieldError{{"tag_ids", "tag_ids must contain valid UUID strings"}})
 		case errors.Is(err, ErrQuestionNotFound):
 			writeValidationErrors(w, []fieldError{{"questions", "question_id must reference an existing question"}})
+		case errors.Is(err, ErrInvalidQuestionID):
+			writeValidationErrors(w, []fieldError{{"questions", "question_id must be a valid UUID"}})
 		default:
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to create rule")
 		}
@@ -808,6 +810,10 @@ func (h *Handler) SetManualQuestions(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusBadRequest, "RULE_NOT_MANUAL", "manual questions can only be set on manual-mode rules")
 		case errors.Is(err, ErrNotFound):
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "rule not found")
+		case errors.Is(err, ErrInvalidQuestionID):
+			writeValidationErrors(w, []fieldError{{"questions", "question_id must be a valid UUID"}})
+		case errors.Is(err, ErrQuestionNotFound):
+			writeValidationErrors(w, []fieldError{{"questions", "question_id must reference an existing question"}})
 		default:
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to set manual questions")
 		}

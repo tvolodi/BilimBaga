@@ -712,8 +712,8 @@ func TestCreateRule_ManualMode(t *testing.T) {
 		SortOrder: 0,
 		TagIDs:    []string{},
 		Questions: []ManualQuestionInput{
-			{QuestionID: "q-1", SortOrder: 0},
-			{QuestionID: "q-2", SortOrder: 1},
+			{QuestionID: "00000000-0000-4000-8000-000000000001", SortOrder: 0},
+			{QuestionID: "00000000-0000-4000-8000-000000000002", SortOrder: 1},
 		},
 	})
 	require.NoError(t, err)
@@ -757,9 +757,9 @@ func TestSetManualQuestions_Success(t *testing.T) {
 	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 3}
 	svc := NewService(repo)
 	err := svc.SetManualQuestions(context.Background(), "rule-1", []ManualQuestionInput{
-		{QuestionID: "q-10", SortOrder: 0},
-		{QuestionID: "q-11", SortOrder: 1},
-		{QuestionID: "q-12", SortOrder: 2},
+		{QuestionID: "00000000-0000-4000-8000-00000000000a", SortOrder: 0},
+		{QuestionID: "00000000-0000-4000-8000-00000000000b", SortOrder: 1},
+		{QuestionID: "00000000-0000-4000-8000-00000000000c", SortOrder: 2},
 	})
 	require.NoError(t, err)
 	assert.Len(t, repo.manual["rule-1"], 3)
@@ -769,6 +769,29 @@ func TestCreateRule_ExamNotFound(t *testing.T) {
 	svc := NewService(newMockRepo())
 	_, err := svc.CreateRule(context.Background(), "missing", QuestionRuleInput{Mode: "random", Count: 1})
 	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+// #288: a malformed question id is rejected before any row is written.
+func TestCreateRule_MalformedQuestionID_RejectedBeforeWrite(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	_, err := svc.CreateRule(context.Background(), "exam-1", QuestionRuleInput{
+		Mode: "manual", Count: 1,
+		Questions: []ManualQuestionInput{{QuestionID: "not-a-uuid", SortOrder: 1}},
+	})
+	assert.ErrorIs(t, err, ErrInvalidQuestionID)
+	assert.Empty(t, repo.rules, "no rule row may be written for a malformed question id")
+}
+
+// #288: SetManualQuestions applies the same guard before it reaches the repository.
+func TestSetManualQuestions_MalformedQuestionID_RejectedBeforeWrite(t *testing.T) {
+	repo := newMockRepo()
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 1}
+	svc := NewService(repo)
+	err := svc.SetManualQuestions(context.Background(), "rule-1", []ManualQuestionInput{{QuestionID: "not-a-uuid"}})
+	assert.ErrorIs(t, err, ErrInvalidQuestionID)
+	assert.Empty(t, repo.manual["rule-1"], "no question list may be written for a malformed question id")
 }
 
 // #288: an unknown question_id must not leave the new rule row behind.
@@ -825,8 +848,8 @@ func TestSetManualQuestions_Stores(t *testing.T) {
 	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "manual", Count: 2}
 	svc := NewService(repo)
 	qs := []ManualQuestionInput{
-		{QuestionID: "q-1", SortOrder: 0},
-		{QuestionID: "q-2", SortOrder: 1},
+		{QuestionID: "00000000-0000-4000-8000-000000000001", SortOrder: 0},
+		{QuestionID: "00000000-0000-4000-8000-000000000002", SortOrder: 1},
 	}
 	err := svc.SetManualQuestions(context.Background(), "rule-1", qs)
 	require.NoError(t, err)

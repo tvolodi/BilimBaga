@@ -12,6 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { describeExamError } from '@/api/examErrors'
 import { useExam, usePublishExam, useUnpublishExam, useArchiveExam, useEligibleCounts, type PublishValidationDetail, type ExamApiError } from '@/api/exams'
 
 // ---- Types ------------------------------------------------------------------
@@ -62,14 +63,10 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
     } catch (err) {
       setConfirmOpen(false)
       const apiErr = err as ExamApiError
-      if (apiErr.httpStatus === 422 && apiErr.unsatisfiedRules) {
+      if (apiErr.httpStatus === 422 && Array.isArray(apiErr.unsatisfiedRules)) {
         setUnsatisfiedRules(apiErr.unsatisfiedRules)
       } else {
-        setGeneralError(
-          apiErr.code === 'INSUFFICIENT_QUESTIONS'
-            ? t('exam.wizard.step4.noQuestionsError')
-            : apiErr.message,
-        )
+        setGeneralError(describeExamError(apiErr, t))
       }
     }
   }
@@ -83,7 +80,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
     } catch (err) {
       setUnpublishDialogOpen(false)
       const apiErr = err as ExamApiError
-      setGeneralError(apiErr.message)
+      setGeneralError(describeExamError(apiErr, t))
     }
   }
 
@@ -96,7 +93,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
     } catch (err) {
       setArchiveDialogOpen(false)
       const apiErr = err as ExamApiError
-      setGeneralError(apiErr.message || t('exam.archive.error'))
+      setGeneralError(describeExamError(apiErr, t) || t('exam.archive.error'))
     }
   }
 
@@ -129,7 +126,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
 
       {/* 422 validation error */}
       {unsatisfiedRules && unsatisfiedRules.length > 0 && (
-        <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 space-y-2">
+        <div role="alert" className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 space-y-2">
           <div className="flex items-center gap-2 font-medium">
             <AlertTriangle size={16} />
             {t('exam.wizard.validationWarning')}
@@ -156,7 +153,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
 
       {/* General error */}
       {generalError && (
-        <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
           {generalError}
         </div>
       )}

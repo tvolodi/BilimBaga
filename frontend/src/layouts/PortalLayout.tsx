@@ -18,7 +18,7 @@ export function PortalLayout() {
 
   const tabClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+      'px-2 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors text-center',
       isActive
         ? 'border-primary text-primary'
         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground',
@@ -27,8 +27,8 @@ export function PortalLayout() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-background sticky top-0 z-10">
-        <nav className="max-w-7xl mx-auto flex justify-between items-center px-6" aria-label="Portal navigation">
-          <div className="flex">
+        <nav className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-x-2 px-2 sm:px-6" aria-label="Portal navigation">
+          <div className="flex min-w-0 max-w-full">
             <NavLink to="/portal" end className={tabClass}>
               {t('portal.tab_exams', 'My Exams')}
             </NavLink>
@@ -36,7 +36,7 @@ export function PortalLayout() {
               {t('portal.tab_results', 'My Results')}
             </NavLink>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3 ml-auto shrink-0">
             <LocaleSwitcher />
             <Button
               variant="ghost"

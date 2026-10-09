@@ -119,7 +119,7 @@ test.describe('Exam Wizard — Publish flow', () => {
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('publish without rules succeeds and shows success feedback', async ({ page }) => {
+  test('publish without rules is refused with a visible error (ISS-132)', async ({ page }) => {
     await page.goto('/admin/exams/new')
     await waitForContent(page)
     await page.locator('#title').fill('E2E Wizard No Rules Test')
@@ -138,14 +138,10 @@ test.describe('Exam Wizard — Publish flow', () => {
     await publishBtn.click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible({ timeout: 5_000 })
-    // Backend publishes successfully when no rules exist (no 422 — empty unsatisfied list)
+    // ISS-132: the backend refuses to publish an exam without question rules (422 INSUFFICIENT_QUESTIONS).
     const confirmBtn = dialog.getByRole('button', { name: /\u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c|publish/i })
-    if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await confirmBtn.click()
-      // Success banner or no error
-      await expect(page.locator('body')).not.toContainText(/unexpected error|failed to publish/i, { timeout: 10_000 })
-    } else {
-      test.info().annotations.push({ type: 'note', description: 'Publish confirmation dialog not as expected — skipping confirm step' })
-    }
+    await confirmBtn.click()
+    await expect(page.getByText(/no questions|\u043d\u0435\u0442 \u0432\u043e\u043f\u0440\u043e\u0441\u043e\u0432/i).first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/published successfully|\u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d/i)).toHaveCount(0)
   })
 })

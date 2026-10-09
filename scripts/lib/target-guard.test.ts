@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkTarget, requireTarget } from '../../../scripts/lib/target-guard'
+import { checkTarget, requireTarget } from './target-guard'
 
 const none = {}
 const allow = { ALLOW_PROTECTED_HOST: '1' }

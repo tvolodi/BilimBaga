@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import '@/i18n'
@@ -229,5 +230,164 @@ describe('EmployeePortal', () => {
     })
     expect(screen.getByText(/in progress/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view result/i })).toBeNull()
+  })
+
+  // ISS-132: the Start flow must navigate on success and must never fail silently.
+  describe('Start exam flow (ISS-132)', () => {
+    function renderPortalWithRoutes() {
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      qc.setQueryData(['auth', 'accessToken'], EMPLOYEE_TOKEN)
+      return render(
+        <QueryClientProvider client={qc}>
+          <MemoryRouter initialEntries={['/portal']}>
+            <Routes>
+              <Route path="/portal" element={<EmployeePortal />} />
+              <Route path="/portal/sessions/:sessionId" element={<div>SESSION PAGE</div>} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      )
+    }
+
+    async function openStartModal() {
+      server.use(
+        http.get('/api/v1/portal/exams', () =>
+          HttpResponse.json({ data: [makeExam()], error: null }),
+        ),
+      )
+      renderPortalWithRoutes()
+      const user = userEvent.setup()
+      await user.click(await screen.findByRole('button', { name: /start exam/i }))
+      return user
+    }
+
+    it('navigates to the session page after a successful start', async () => {
+      let called = false
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () => {
+          called = true
+          return HttpResponse.json(
+            { data: { session_id: 'sess-42', exam_id: 'exam-1', questions: [] }, error: null },
+            { status: 201 },
+          )
+        }),
+      )
+      const user = await openStartModal()
+      await user.click(screen.getByRole('button', { name: /begin exam/i }))
+      expect(await screen.findByText('SESSION PAGE')).toBeInTheDocument()
+      expect(called).toBe(true)
+    })
+
+    it('shows a translated error in the modal when the backend refuses the start', async () => {
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () =>
+          HttpResponse.json(
+            { data: null, error: { code: 'EXAM_OUTSIDE_WINDOW', message: 'raw backend text' } },
+            { status: 422 },
+          ),
+        ),
+      )
+      const user = await openStartModal()
+      await user.click(screen.getByRole('button', { name: /begin exam/i }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(/not available at this time/i)
+      // The modal stays open and the button is usable again.
+      expect(screen.getByRole('button', { name: /begin exam/i })).toBeEnabled()
+      expect(screen.queryByText('SESSION PAGE')).toBeNull()
+    })
+
+    it('shows the generic error for unknown codes and non-JSON gateway failures', async () => {
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () =>
+          new HttpResponse('<html>Bad Gateway</html>', { status: 502 }),
+        ),
+      )
+      const user = await openStartModal()
+      await user.click(screen.getByRole('button', { name: /begin exam/i }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not start the exam/i)
+    })
+
+    // ISS-132: Start is disabled, with a reason, outside the availability window.
+    it('disables Start and explains why when the exam window is closed', async () => {
+      server.use(
+        http.get('/api/v1/portal/exams', () =>
+          HttpResponse.json({
+            data: [makeExam({ available_until: '2020-01-01T00:00:00Z' })],
+            error: null,
+          }),
+        ),
+      )
+      renderPortal()
+      const btn = await screen.findByRole('button', { name: /start exam/i })
+      expect(btn).toBeDisabled()
+      expect(screen.getByRole('status')).toHaveTextContent(/availability window/i)
+    })
+
+    it('disables Start and shows the opening date before available_from', async () => {
+      server.use(
+        http.get('/api/v1/portal/exams', () =>
+          HttpResponse.json({
+            data: [makeExam({ available_from: '2999-01-01T00:00:00Z' })],
+            error: null,
+          }),
+        ),
+      )
+      renderPortal()
+      expect(await screen.findByRole('button', { name: /start exam/i })).toBeDisabled()
+      expect(screen.getByRole('status')).toHaveTextContent(/opens/i)
+    })
+
+    it('keeps Start enabled inside the window', async () => {
+      server.use(
+        http.get('/api/v1/portal/exams', () =>
+          HttpResponse.json({
+            data: [makeExam({ available_from: '2020-01-01T00:00:00Z', available_until: '2999-01-01T00:00:00Z' })],
+            error: null,
+          }),
+        ),
+      )
+      renderPortal()
+      expect(await screen.findByRole('button', { name: /start exam/i })).toBeEnabled()
+      expect(screen.queryByRole('status')).toBeNull()
+    })
+
+    // Every code POST /sessions can return must map to its own message.
+    it.each([
+      ['EXAM_NOT_ASSIGNED', /not assigned to you/i],
+      ['EXAM_ARCHIVED', /archived/i],
+      ['EXAM_NOT_ACTIVE', /not currently active/i],
+      ['EXAM_OUTSIDE_WINDOW', /not available at this time/i],
+      ['ATTEMPTS_EXHAUSTED', /used all allowed attempts/i],
+      ['SESSION_ALREADY_OPEN', /already have an exam in progress/i],
+      ['INSUFFICIENT_QUESTIONS', /too few questions/i],
+    ])('shows the message for %s', async (code, re) => {
+      server.use(
+        http.get('/api/v1/portal/exams', () => HttpResponse.json({ data: [makeExam()], error: null })),
+        http.post('/api/v1/portal/exams/exam-1/sessions', () =>
+          HttpResponse.json({ data: null, error: { code, message: 'x' } }, { status: 422 }),
+        ),
+      )
+      renderPortalWithRoutes()
+      const user = userEvent.setup()
+      await user.click(await screen.findByRole('button', { name: /start exam/i }))
+      await user.click(screen.getByRole('button', { name: /begin exam/i }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(re)
+    })
+
+    it('clears the error when the modal is closed and reopened', async () => {
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () =>
+          HttpResponse.json(
+            { data: null, error: { code: 'ATTEMPTS_EXHAUSTED', message: 'x' } },
+            { status: 422 },
+          ),
+        ),
+      )
+      const user = await openStartModal()
+      await user.click(screen.getByRole('button', { name: /begin exam/i }))
+      await screen.findByRole('alert')
+      await user.click(screen.getByRole('button', { name: /cancel/i }))
+      await user.click(await screen.findByRole('button', { name: /start exam/i }))
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
   })
 })

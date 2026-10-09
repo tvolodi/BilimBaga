@@ -43,11 +43,21 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		Page:    parseIntParam(r, "page", 1),
 		PerPage: parseIntParam(r, "per_page", 20),
 	}
-	if v := r.URL.Query().Get("department_id"); v != "" {
-		f.DepartmentID = &v
+	// department_id and role_id are UUID columns; reject anything else with a 422
+	// instead of letting Postgres fail with "invalid input syntax for type uuid" (500).
+	deptID, ok := api.UUIDQuery(w, r, "department_id")
+	if !ok {
+		return
 	}
-	if v := r.URL.Query().Get("role_id"); v != "" {
-		f.RoleID = &v
+	if deptID != "" {
+		f.DepartmentID = &deptID
+	}
+	roleID, ok := api.UUIDQuery(w, r, "role_id")
+	if !ok {
+		return
+	}
+	if roleID != "" {
+		f.RoleID = &roleID
 	}
 	if v := r.URL.Query().Get("status"); v != "" {
 		f.Status = &v

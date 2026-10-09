@@ -36,6 +36,9 @@ type PortalExamItem struct {
 	ShuffleQuestions   bool       `json:"shuffle_questions"`
 	ShuffleOptions     bool       `json:"shuffle_options"`
 	CertificateEnabled bool       `json:"certificate_enabled"`
+	// ISS-132: start window so the UI can disable Start while the exam is closed.
+	AvailableFrom  *time.Time `json:"available_from"`
+	AvailableUntil *time.Time `json:"available_until"`
 }
 
 // AttemptHistory is a single historical session entry.
@@ -60,6 +63,8 @@ type PortalExamDetail struct {
 	ShuffleOptions     bool             `json:"shuffle_options"`
 	ShowAnswers        string           `json:"show_answers"`
 	CertificateEnabled bool             `json:"certificate_enabled"`
+	AvailableFrom      *time.Time       `json:"available_from"`
+	AvailableUntil     *time.Time       `json:"available_until"`
 	Deadline           *time.Time       `json:"deadline"`
 	UserStatus         UserStatus       `json:"user_status"`
 	AttemptsUsed       int              `json:"attempts_used"`

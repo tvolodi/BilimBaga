@@ -24,7 +24,15 @@ let lastUsersQuery = ''
 
 const server = setupServer(
   http.get('/api/v1/departments', () => HttpResponse.json({ data: tree, error: null })),
-  http.get('/api/v1/users/roles', () => HttpResponse.json({ data: [], error: null })),
+  http.get('/api/v1/users/roles', () =>
+    HttpResponse.json({
+      data: [
+        { id: 'role-uuid-ex', name: 'examiner' },
+        { id: 'role-uuid-emp', name: 'employee' },
+      ],
+      error: null,
+    }),
+  ),
   http.get('/api/v1/users', ({ request }) => {
     lastUsersQuery = new URL(request.url).search
     return HttpResponse.json({
@@ -89,5 +97,21 @@ describe('admin UsersListPage department filter (FR-BB317.4)', () => {
 
     await user.click(screen.getByLabelText(/clear/i))
     await waitFor(() => expect(lastUsersQuery).not.toContain('department_id'))
+  })
+})
+
+describe('admin UsersListPage role filter (ISS-133)', () => {
+  it('sends the selected role UUID (not the role name) as role_id and clears it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const select = await screen.findByRole('combobox', { name: /role/i })
+    await screen.findByRole('option', { name: 'Examiner' })
+
+    await user.selectOptions(select, 'role-uuid-ex')
+    await waitFor(() => expect(lastUsersQuery).toContain('role_id=role-uuid-ex'))
+    expect(lastUsersQuery).not.toContain('role_id=examiner')
+
+    await user.selectOptions(select, '')
+    await waitFor(() => expect(lastUsersQuery).not.toContain('role_id'))
   })
 })

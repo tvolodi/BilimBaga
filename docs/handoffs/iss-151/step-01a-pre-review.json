@@ -1,0 +1,1 @@
+{"files":["backend/internal/exams/service.go","backend/internal/exams/service_test.go","backend/internal/exams/handler_test.go","docs/issue-reports/ISS-151-adaptive-empty-publish.md"],"root_cause":"Publish skipped empty-rules check for adaptive exams"}

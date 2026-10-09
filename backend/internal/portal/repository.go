@@ -38,6 +38,8 @@ type portalExamRow struct {
 	ShuffleOptions     bool       `db:"shuffle_options"`
 	ShowAnswers        string     `db:"show_answers"`
 	CertificateEnabled bool       `db:"certificate_enabled"`
+	AvailableFrom      *time.Time `db:"available_from"`
+	AvailableUntil     *time.Time `db:"available_until"`
 	Deadline           *time.Time `db:"deadline"`
 }
 
@@ -82,7 +84,7 @@ func (r *postgresRepository) ListAssignedExams(ctx context.Context, userID, dept
 SELECT
     e.id, e.title, e.description, e.time_limit_minutes, e.passing_score_pct,
     e.max_attempts, e.shuffle_questions, e.shuffle_options, e.show_answers,
-    e.certificate_enabled, res.deadline
+    e.certificate_enabled, e.available_from, e.available_until, res.deadline
 FROM resolved res
 JOIN exams e ON e.id = res.exam_id
 WHERE e.status = 'active'
@@ -113,7 +115,7 @@ func (r *postgresRepository) GetAssignedExam(ctx context.Context, examID, userID
 SELECT
     e.id, e.title, e.description, e.time_limit_minutes, e.passing_score_pct,
     e.max_attempts, e.shuffle_questions, e.shuffle_options, e.show_answers,
-    e.certificate_enabled, res.deadline
+    e.certificate_enabled, e.available_from, e.available_until, res.deadline
 FROM resolved res
 JOIN exams e ON e.id = res.exam_id
 WHERE e.status = 'active' AND e.id = $3`

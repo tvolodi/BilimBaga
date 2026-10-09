@@ -32,6 +32,10 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.svc.CreateSession(r.Context(), examID, userID, deptID)
 	if err != nil {
+		// ISS-132: every refused start is logged with its (wrapped) cause so a "Start does nothing"
+		// report can be traced to a specific rule instead of an anonymous 4xx/5xx.
+		slog.Warn("sessions: create session refused",
+			"exam_id", examID, "user_id", userID, "department_id", deptID, "error", err)
 		switch {
 		case errors.Is(err, ErrNotAssigned):
 			api.WriteError(w, http.StatusForbidden, "EXAM_NOT_ASSIGNED",
@@ -55,6 +59,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusUnprocessableEntity, "INSUFFICIENT_QUESTIONS",
 				"This exam cannot be started because the question pool is too small.")
 		default:
+			slog.Error("sessions: create session failed", "exam_id", examID, "user_id", userID, "error", err)
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL",
 				"failed to create session")
 		}
@@ -296,8 +301,12 @@ func (h *Handler) HandleListGradingQueue(w http.ResponseWriter, r *http.Request)
 	q := r.URL.Query()
 
 	var examID *string
-	if v := q.Get("exam_id"); v != "" {
-		examID = &v
+	examIDStr, ok := api.UUIDQuery(w, r, "exam_id")
+	if !ok {
+		return
+	}
+	if examIDStr != "" {
+		examID = &examIDStr
 	}
 
 	var dateFrom, dateTo *time.Time

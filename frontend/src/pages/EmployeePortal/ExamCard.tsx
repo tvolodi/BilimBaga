@@ -21,8 +21,15 @@ interface ExamCardProps {
   onStart: (examId: string) => void
 }
 
+/** Returns why the exam cannot be started right now (ISS-132), or null when its window is open. */
+export function startWindowBlock(exam: PortalExam, now: Date = new Date()): 'notOpen' | 'closed' | null {
+  if (exam.available_from && now < new Date(exam.available_from)) return 'notOpen'
+  if (exam.available_until && now > new Date(exam.available_until)) return 'closed'
+  return null
+}
+
 export function ExamCard({ exam, onStart }: ExamCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const countdown = useCountdown(exam.deadline)
 
@@ -64,7 +71,8 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
     }
   })()
 
-  const ctaDisabled = displayStatus === 'failed' && exam.show_answers === 'never'
+  const windowBlock = displayStatus === 'not_started' ? startWindowBlock(exam) : null
+  const ctaDisabled = (displayStatus === 'failed' && exam.show_answers === 'never') || windowBlock !== null
   const showCta = displayStatus !== 'expired' && ctaLabel !== null && !noAttemptsRemaining
 
   return (
@@ -98,11 +106,21 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
             ? t('portal.card.deadline', { countdown })
             : t('portal.card.noDeadline')}
         </div>
+        {windowBlock && (
+          <p id={`start-reason-${exam.id}`} role="status" className="text-xs text-amber-800 dark:text-amber-400 mb-2">
+            {windowBlock === 'notOpen'
+              ? t('portal.card.windowNotOpen', {
+                  date: new Date(exam.available_from as string).toLocaleString(i18n.language),
+                })
+              : t('portal.card.windowClosed')}
+          </p>
+        )}
         {showCta && (
           <Button
             className="w-full"
             variant={displayStatus === 'not_started' ? 'default' : 'outline'}
             disabled={ctaDisabled}
+            aria-describedby={windowBlock ? `start-reason-${exam.id}` : undefined}
             onClick={handleCta}
           >
             {ctaLabel}

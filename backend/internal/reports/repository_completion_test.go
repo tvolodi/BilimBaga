@@ -110,3 +110,20 @@ func TestGetDashboard_200_UnassignedExamZeroCounts(t *testing.T) {
 		assert.EqualValues(t, 0, env.Data.C[0][k], k)
 	}
 }
+
+// ISS-163: PostgreSQL has no min(uuid); the export question-order query must
+// not apply aggregates to the uuid question_id column.
+func TestGetExamQuestions_NoUUIDAggregate(t *testing.T) {
+	db, f := newFakeDB(t)
+	f.queue([]string{"question_id", "position"}, [][]driver.Value{{"q1", int64(1)}})
+	repo := &postgresRepository{db: db}
+
+	qs, err := repo.GetExamQuestions(context.Background(), "exam", "tenant")
+	require.NoError(t, err)
+	require.Len(t, qs, 1)
+	require.Len(t, f.queries, 1)
+	q := strings.ToLower(f.queries[0])
+	assert.NotContains(t, q, "min(sq.question_id)")
+	assert.NotContains(t, q, "max(sq.question_id)")
+	assert.Contains(t, q, "min(sq.sort_order)")
+}

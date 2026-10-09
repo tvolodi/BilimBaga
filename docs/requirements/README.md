@@ -65,7 +65,7 @@
 | FR-BB55 | Audit-log-viewer | Audit Log Viewer | Implemented |
 | FR-BB56 | Frontend-admin-dashboard | Frontend: Admin Dashboard | Implemented |
 | FR-BB57 | Frontend-per-exam-analytics | Frontend: Per-Exam Analytics | Implemented |
-| FR-BB58 | Frontend-employee-record | Frontend: Employee Record | Partial |
+| FR-BB58 | Frontend-employee-record | Frontend: Employee Record | Implemented |
 | FR-BB61 | Email-notifications | Email Notifications | Implemented |
 | FR-BB62 | Full-i18n-coverage | Full i18n Coverage | Implemented |
 | FR-BB63 | Accessibility | Accessibility | Implemented |

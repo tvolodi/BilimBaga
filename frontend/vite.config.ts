@@ -38,5 +38,7 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.ts',
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+    // minimum of 1 lets `--maxWorkers=N` (N below core count) work without a min/max conflict
+    poolOptions: { threads: { minThreads: 1 }, forks: { minForks: 1 } },
   },
 })

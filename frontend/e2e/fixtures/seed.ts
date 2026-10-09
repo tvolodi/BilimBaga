@@ -10,11 +10,12 @@
  */
 
 import { chromium } from '@playwright/test'
+import { requireTarget } from '../../../scripts/lib/target-guard'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 
-const APP_URL = (process.env.E2E_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '')
+const APP_URL = requireTarget('E2E_BASE_URL', process.env.E2E_BASE_URL || 'http://localhost:5173', process.env)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_DIR = path.join(__dirname, '..', '..', '.auth')
@@ -22,7 +23,7 @@ export const EMPLOYEE_STORAGE_STATE = path.join(AUTH_DIR, 'employee.json')
 const EMPLOYEE_TOKEN_PATH = path.join(AUTH_DIR, 'employee-token.txt')
 const EMPLOYEE_ID_PATH = path.join(AUTH_DIR, 'employee-id.txt')
 
-const BASE = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
+const BASE = requireTarget('E2E_API_URL', process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`, process.env)
 
 // ---------------------------------------------------------------------------
 // Low-level fetch helpers (Node 18+ global fetch)

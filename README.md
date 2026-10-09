@@ -35,7 +35,7 @@ BB_API_PORT=18080 npm run test:e2e:live     # in frontend/
 E2E_API_URL=http://localhost:18080 npm run test:e2e:live
 ```
 
-`E2E_BASE_URL` overrides the frontend URL Playwright drives (default `http://localhost:5173`). Nothing defaults to a remote host: `scripts/seed-test-env.ts` requires `E2E_API_URL` and refuses `bilimbaga-test.ai-dala.com` (customer demo, production-class) unless `ALLOW_PROTECTED_HOST=1`. The API sets no CORS headers (same-origin via proxy/nginx), so there is no CORS setting. The Vite dev proxy honours `BB_API_PORT` / `E2E_API_URL` too. `HOST_DB_PORT` / `HOST_HTTP_PORT` work likewise.
+`E2E_BASE_URL` overrides the frontend URL Playwright drives (default `http://localhost:5173`). Nothing defaults to a remote host: `scripts/seed-test-env.ts` requires `E2E_API_URL`; it and the e2e setup only accept an allowlist of hosts (localhost, 127.0.0.1, ::1, `*.localhost`, `bilimbaga-qa.ai-dala.com`) on the normalised hostname, and refuse anything else, notably `bilimbaga-test.ai-dala.com` (customer demo, production-class), unless `ALLOW_PROTECTED_HOST=1`. The API sets no CORS headers (same-origin via proxy/nginx), so there is no CORS setting. The Vite dev proxy honours `BB_API_PORT` / `E2E_API_URL` too. `HOST_DB_PORT` / `HOST_HTTP_PORT` work likewise.
 
 ---
 

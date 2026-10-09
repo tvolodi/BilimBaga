@@ -10,18 +10,23 @@
  * Idempotent: safe to run multiple times; skips already-existing data.
  */
 
-// E2E_API_URL is REQUIRED (no default): this script WRITES seed data. bilimbaga-test.ai-dala.com is a
-// customer demo (production-class) and is refused unless ALLOW_PROTECTED_HOST=1 is also set; swarm roles
-// must never set it. Targets: a local stack (http://localhost:8080) or the QA instance.
-const BASE = (process.env.E2E_API_URL || '').replace(/\/+$/, '')
-if (!BASE) {
+import { checkTarget } from './lib/target-guard'
+
+// E2E_API_URL is REQUIRED (no default): this script WRITES seed data. The URL is parsed and checked against
+// an allowlist (localhost, 127.0.0.1, ::1, *.localhost, bilimbaga-qa.ai-dala.com) on the normalised hostname;
+// anything else, including the customer demo bilimbaga-test.ai-dala.com, is refused unless
+// ALLOW_PROTECTED_HOST=1 (user approval only; swarm roles must never set it).
+if (!process.env.E2E_API_URL) {
   console.error('E2E_API_URL is required (e.g. E2E_API_URL=http://localhost:8080). Refusing to run without an explicit target.')
   process.exit(1)
 }
-if (/bilimbaga-test\.ai-dala\.com/i.test(BASE) && process.env.ALLOW_PROTECTED_HOST !== '1') {
-  console.error(`Refusing to seed ${BASE}: protected production-class host (customer demo). Set ALLOW_PROTECTED_HOST=1 only with explicit user approval.`)
+const targetDecision = checkTarget('E2E_API_URL', process.env.E2E_API_URL, process.env)
+if (!targetDecision.ok) {
+  console.error(`Refusing to seed: ${targetDecision.reason}`)
   process.exit(1)
 }
+if (targetDecision.warning) console.error(targetDecision.warning)
+const BASE = targetDecision.url as string
 const ADMIN_EMAIL = 'admin@bilimbaga.local'
 const ADMIN_INITIAL_PASS = 'Admin1234!'
 const ADMIN_KNOWN_PASS = 'Admin2024!'

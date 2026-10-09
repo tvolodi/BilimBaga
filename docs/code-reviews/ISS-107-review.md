@@ -6,5 +6,5 @@ Reviewer: see PR; a separate Code Reviewer subagent could not be spawned from th
 - E2E_BASE_URL defaults unchanged; no behaviour change locally. CRLF/LF endings preserved per file.
 - Docs consistent with DEC-001 (prod-class user-only; Infra read-only health check allowed; QA not built).
 - No secrets, no migrations, no Go changes. Risk: low.
-- Gap: frontend tsc not run (see issue report).
-Verdict: APPROVE.
+- Superseded in part by `ISS-107-independent-review.md` (regex bypass); fixed with the shared allowlist guard and tests.
+Verdict: APPROVE after fix.

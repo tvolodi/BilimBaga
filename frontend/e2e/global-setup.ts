@@ -1,10 +1,11 @@
 import { chromium } from '@playwright/test'
+import { requireTarget } from '../../scripts/lib/target-guard'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { seedEmployeeFixtures } from './fixtures/seed'
 
-const APP_URL = (process.env.E2E_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '')
+const APP_URL = requireTarget('E2E_BASE_URL', process.env.E2E_BASE_URL || 'http://localhost:5173', process.env)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_DIR = path.join(__dirname, '..', '.auth')

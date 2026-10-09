@@ -68,6 +68,8 @@ export interface ImportPreview {
 export interface RoleRow {
   id: string
   name: string
+  /** Server-computed (FR-BB117 D-1, ISS-229): may the current caller assign this role? Absent on older backends. */
+  assignable?: boolean
 }
 
 export interface UsersFilters {

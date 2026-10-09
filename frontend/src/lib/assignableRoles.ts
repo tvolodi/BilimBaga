@@ -20,6 +20,8 @@ export interface AssignableRoleCandidate {
   name: string
   /** "resource:action" list; only present when the API exposes it. Unknown = undefined. */
   permissions?: string[]
+  /** Server-computed verdict for the current caller (ISS-229). Preferred over local evaluation when present. */
+  assignable?: boolean
 }
 
 function permissionSubset(role: AssignableRoleCandidate, callerPermissions: readonly string[] | undefined): boolean {
@@ -28,12 +30,13 @@ function permissionSubset(role: AssignableRoleCandidate, callerPermissions: read
   return role.permissions.every((p) => callerPermissions.includes(p))
 }
 
-/** True when `callerRole` may assign `role`. */
+/** True when `callerRole` may assign `role`. A server-provided `assignable` flag wins; otherwise evaluated locally. */
 export function canAssignRole(
   callerRole: string | undefined,
   callerPermissions: readonly string[] | undefined,
   role: AssignableRoleCandidate,
 ): boolean {
+  if (typeof role.assignable === 'boolean') return role.assignable
   if (!callerRole) return false
   if (callerRole === 'super_admin') return true
   if (role.name === 'super_admin') return false

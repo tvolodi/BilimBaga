@@ -45,3 +45,33 @@ describe('userErrorKey', () => {
     expect(userErrorKey(new Error('x'))).toBeNull()
   })
 })
+
+describe('assignableRoles with server-provided assignable flag (ISS-229)', () => {
+  const served = [
+    { id: '2', name: 'department_admin', assignable: false },
+    { id: '3', name: 'examiner', assignable: true },
+    { id: '4', name: 'employee', assignable: true },
+    { id: '5', name: 'qa_lead', assignable: true },
+    { id: '6', name: 'secret_custom', assignable: false },
+  ]
+  it('uses the flag for non-super_admin callers, including custom roles', () => {
+    expect(assignableRoles('department_admin', undefined, served).map((r) => r.name)).toEqual([
+      'examiner', 'employee', 'qa_lead',
+    ])
+  })
+  it('a custom-role caller sees what the server allows even without local permissions', () => {
+    expect(assignableRoles('qa_lead', undefined, served).map((r) => r.name)).toEqual([
+      'examiner', 'employee', 'qa_lead',
+    ])
+  })
+  it('the flag overrides local evaluation in both directions', () => {
+    const mixed = [
+      { id: '1', name: 'employee', assignable: false },
+      { id: '2', name: 'super_admin', assignable: true },
+    ]
+    expect(assignableRoles('department_admin', undefined, mixed).map((r) => r.name)).toEqual(['super_admin'])
+  })
+  it('falls back to local evaluation when the flag is absent', () => {
+    expect(assignableRoles('department_admin', undefined, [{ id: '3', name: 'examiner' }]).map((r) => r.name)).toEqual(['examiner'])
+  })
+})

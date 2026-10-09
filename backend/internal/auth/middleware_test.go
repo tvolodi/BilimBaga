@@ -23,11 +23,6 @@ func makeToken(t *testing.T, secret string, claims jwt.MapClaims) string {
 	return signed
 }
 
-// okHandler is a trivial next handler that returns 200.
-var okHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-})
-
 func decodeErrorEnvelope(t *testing.T, body *httptest.ResponseRecorder) (code string) {
 	t.Helper()
 	var env struct {

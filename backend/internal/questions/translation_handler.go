@@ -74,7 +74,7 @@ func (h *TranslationHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 
 	options := make([]AnswerTextTranslation, 0, len(req.Options))
 	for _, o := range req.Options {
-		options = append(options, AnswerTextTranslation{OptionID: o.OptionID, Text: o.Text})
+		options = append(options, AnswerTextTranslation(o))
 	}
 
 	before, after, err := h.svc.Upsert(r.Context(), id, locale, UpsertTranslationInput{

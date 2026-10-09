@@ -1016,11 +1016,7 @@ ORDER BY MIN(sq.sort_order)`
 		if err := rows.StructScan(&r); err != nil {
 			return nil, fmt.Errorf("sessions: GetSectionScores: scan: %w", err)
 		}
-		result = append(result, SectionScore{
-			SectionID: r.SectionID,
-			Title:     r.Title,
-			ScorePct:  r.ScorePct,
-		})
+		result = append(result, SectionScore(r))
 	}
 	return result, rows.Err()
 }

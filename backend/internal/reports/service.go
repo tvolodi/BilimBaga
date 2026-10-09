@@ -49,15 +49,6 @@ func NewService(repo Repository) Service {
 	return &service{repo: repo}
 }
 
-// queryResult holds the outcome of a single concurrent query.
-type queryResult struct {
-	completion []*ExamCompletionRate
-	overdue    []*OverdueEmployee
-	recent     []*RecentActivity
-	trackMap   map[string]*float64
-	err        error
-}
-
 // GetDashboardMetrics fans out four concurrent DB queries, waits for all to
 // complete, and assembles the DashboardMetrics response.  The first non-nil
 // error encountered is returned (all goroutines are always awaited).

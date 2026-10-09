@@ -294,21 +294,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exam, err := h.svc.UpdateExam(r.Context(), id, UpdateExamInput{
-		Title:              req.Title,
-		Description:        req.Description,
-		TimeLimitMinutes:   req.TimeLimitMinutes,
-		PassingScorePct:    req.PassingScorePct,
-		MaxAttempts:        req.MaxAttempts,
-		AvailableFrom:      req.AvailableFrom,
-		AvailableUntil:     req.AvailableUntil,
-		ShuffleQuestions:   req.ShuffleQuestions,
-		ShuffleOptions:     req.ShuffleOptions,
-		ShowAnswers:        req.ShowAnswers,
-		OnTabSwitch:        req.OnTabSwitch,
-		CertificateEnabled: req.CertificateEnabled,
-		Adaptive:           req.Adaptive,
-	})
+	exam, err := h.svc.UpdateExam(r.Context(), id, UpdateExamInput(req))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):
@@ -511,10 +497,7 @@ func (h *Handler) CreateSection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	section, err := h.svc.CreateSection(r.Context(), examID, SectionInput{
-		Title:     req.Title,
-		SortOrder: req.SortOrder,
-	})
+	section, err := h.svc.CreateSection(r.Context(), examID, SectionInput(req))
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "exam not found")
@@ -540,10 +523,7 @@ func (h *Handler) UpdateSection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	section, err := h.svc.UpdateSection(r.Context(), examID, sectionID, SectionInput{
-		Title:     req.Title,
-		SortOrder: req.SortOrder,
-	})
+	section, err := h.svc.UpdateSection(r.Context(), examID, sectionID, SectionInput(req))
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			api.WriteError(w, http.StatusNotFound, "ERR_NOT_FOUND", "exam or section not found")
@@ -589,7 +569,7 @@ func (h *Handler) CreateRule(w http.ResponseWriter, r *http.Request) {
 
 	questions := make([]ManualQuestionInput, len(req.Questions))
 	for i, q := range req.Questions {
-		questions[i] = ManualQuestionInput{QuestionID: q.QuestionID, SortOrder: q.SortOrder}
+		questions[i] = ManualQuestionInput(q)
 	}
 
 	rule, err := h.svc.CreateRule(r.Context(), examID, QuestionRuleInput{
@@ -638,7 +618,7 @@ func (h *Handler) UpdateRule(w http.ResponseWriter, r *http.Request) {
 
 	questions := make([]ManualQuestionInput, len(req.Questions))
 	for i, q := range req.Questions {
-		questions[i] = ManualQuestionInput{QuestionID: q.QuestionID, SortOrder: q.SortOrder}
+		questions[i] = ManualQuestionInput(q)
 	}
 
 	rule, err := h.svc.UpdateRule(r.Context(), examID, ruleID, QuestionRuleInput{
@@ -814,7 +794,7 @@ func (h *Handler) SetManualQuestions(w http.ResponseWriter, r *http.Request) {
 
 	questions := make([]ManualQuestionInput, len(req.Questions))
 	for i, q := range req.Questions {
-		questions[i] = ManualQuestionInput{QuestionID: q.QuestionID, SortOrder: q.SortOrder}
+		questions[i] = ManualQuestionInput(q)
 	}
 
 	if err := h.svc.SetManualQuestions(r.Context(), ruleID, questions); err != nil {

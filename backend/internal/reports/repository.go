@@ -478,7 +478,7 @@ GROUP BY bucket`
 		if err := rows.StructScan(&row); err != nil {
 			return nil, fmt.Errorf("reports: GetExamScoreDistribution: scan: %w", err)
 		}
-		result = append(result, BucketCount{Bucket: row.Bucket, Count: row.Count})
+		result = append(result, BucketCount(row))
 	}
 	return result, rows.Err()
 }

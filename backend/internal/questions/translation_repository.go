@@ -158,7 +158,7 @@ func (r *translationRepository) LoadLocaleTranslation(ctx context.Context, quest
 		return nil, fmt.Errorf("translations.LoadLocaleTranslation: options: %w", err)
 	}
 	for _, o := range optRows {
-		out.Options = append(out.Options, AnswerTextTranslation{OptionID: o.OptionID, Text: o.Text})
+		out.Options = append(out.Options, AnswerTextTranslation(o))
 	}
 	return out, nil
 }

@@ -22,7 +22,6 @@ type mockRepo struct {
 	createFn   func(ctx context.Context, email, fullName, hash string, deptID *string, roleID string) (*User, error)
 	deactivate map[string]bool
 	revoked    []string
-	tokens     map[string]string // id → hash
 	unlocked   []string
 }
 

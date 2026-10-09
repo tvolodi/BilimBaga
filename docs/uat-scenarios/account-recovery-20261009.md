@@ -149,7 +149,7 @@ Use the newest valid token `T2` from S3.
 - PASS: all steps match; mail arrives in Mailhog with correct link; enumeration checks identical; lock cleared by reset and by admin unlock; audit present.
 - FAIL (defect): differing response for known/unknown/inactive; plaintext token stored or logged; reusable or non-expiring token; weak password consumes token; reset leaves lock or refresh tokens; employee can unlock; missing login link; hardcoded strings.
 - ENV ISSUE: Mailhog unreachable or SMTP not wired (Gap 1); no DB access (skip DB-only steps); #33 not merged; migration not applied.
-- REQ GAP candidates: department_admin unlock permission (spec says "users:update or equivalent"); purge mechanism.
+- REQ GAP candidates: (resolved: unlock uses users:manage, department_admin limited to own department — verify 403 for another department); purge mechanism.
 
 ## Acceptance Criteria Coverage
 

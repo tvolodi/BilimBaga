@@ -22,13 +22,12 @@ jobs:
           cache-dependency-path: backend/go.sum
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
         run: cd frontend && npm ci
       - name: Dependency integrity and audit
         run: make security-check
-      - name: Full audit including dev toolchain (informational)
-        continue-on-error: true
-        run: cd frontend && npm audit --audit-level=high
+      - name: Full audit including dev toolchain
+        run: cd frontend && npm audit

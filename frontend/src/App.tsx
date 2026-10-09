@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { TenantProvider } from '@/components/TenantProvider'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { RequireAuth } from '@/components/RequireAuth'
@@ -81,9 +81,30 @@ const ReportsPage = lazy(() =>
   import('@/pages/admin/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 )
 
+// FR-BB48: public certificate verification page (lazy, own small chunk)
+const VerifyCertificatePage = lazy(() =>
+  import('@/pages/VerifyCertificatePage').then((m) => ({ default: m.VerifyCertificatePage })),
+)
+
 const queryClient = new QueryClient()
 
+// FR-BB48 AC-2/AC-7: /verify/* is fully public — it is rendered outside the auth
+// bootstrap so no token refresh is attempted and no RequireAuth/RequireRole wraps it.
 function AppRoutes() {
+  const { pathname } = useLocation()
+  if (pathname.startsWith('/verify/')) {
+    return (
+      <Suspense fallback={<FullPageSpinner />}>
+        <Routes>
+          <Route path="/verify/:code" element={<VerifyCertificatePage />} />
+        </Routes>
+      </Suspense>
+    )
+  }
+  return <AuthedRoutes />
+}
+
+function AuthedRoutes() {
   const { isLoading } = useRefreshToken()
   if (isLoading)
     return (

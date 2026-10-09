@@ -13,7 +13,7 @@ import (
 // Handler handles HTTP requests for the certificates domain.
 type Handler struct {
 	svc     Service
-	baseURL string // e.g. "https://app.bilimbaga.kz" — used for verify URL in PDF
+	baseURL string // public SPA base URL (PUBLIC_APP_URL), e.g. "https://app.bilimbaga.kz" — used for verify URL in PDF
 }
 
 // NewHandler creates a new Handler.

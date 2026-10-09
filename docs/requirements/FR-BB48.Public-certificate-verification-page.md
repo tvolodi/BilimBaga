@@ -6,7 +6,7 @@
 | ID | FR-BB48 |
 | Phase | 4 — Results & Certificates |
 | Priority | 2 |
-| Status | Validated |
+| Status | Implemented |
 | Depends On | FR-BB43, FR-BB44, FR-BB13, FR-BB62, FR-BB64 |
 
 ## Description

@@ -55,7 +55,7 @@
 | FR-BB45 | Frontend-result-screen | Frontend: Result Screen | Implemented |
 | FR-BB46 | Frontend-employee-history | Frontend: Employee History | Implemented |
 | FR-BB47 | Frontend-manual-grading-UI | Frontend: Manual Grading UI | Implemented |
-| FR-BB48 | Public-certificate-verification-page | Public Certificate Verification Page | Validated |
+| FR-BB48 | Public-certificate-verification-page | Public Certificate Verification Page | Implemented |
 | FR-BB51 | Dashboard-metrics-API | Dashboard Metrics API | Implemented |
 | FR-BB52 | Per-exam-analytics-API | Per-Exam Analytics API | Implemented |
 | FR-BB53 | Per-employee-record-API | Per-Employee Record API | Implemented |

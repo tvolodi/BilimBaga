@@ -1,6 +1,7 @@
 package questions
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/upload"
 )
 
 const maxImportBatch = 500
@@ -33,13 +35,30 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	dryRun := r.URL.Query().Get("dry_run") == "true"
 	actorID := actorFromCtx(r)
 
+	// AC-3 (FR-BB64): read all bytes for size and content-type validation
+	// (magic bytes, not the client-supplied Content-Type) before parsing.
+	// Bound the read so an oversize upload is not fully buffered.
+	rawBytes, err := io.ReadAll(io.LimitReader(file, upload.MaxCSVBytes+1))
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, "ERR_INVALID_BODY", "failed to read uploaded file")
+		return
+	}
+	if err := upload.ValidateCSVFile(rawBytes); err != nil {
+		if errors.Is(err, upload.ErrFileTooLarge) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, "ERR_FILE_TOO_LARGE", "import file must not exceed 10 MB")
+		} else {
+			api.WriteError(w, http.StatusUnsupportedMediaType, "ERR_INVALID_FILE_TYPE", "uploaded file must be plain-text CSV or JSON")
+		}
+		return
+	}
+
 	var rows []ImportRow
 	ct := strings.ToLower(fh.Filename)
 	switch {
 	case strings.HasSuffix(ct, ".json"):
-		rows, err = parseJSONImport(file)
+		rows, err = parseJSONImport(bytes.NewReader(rawBytes))
 	default:
-		rows, err = parseCSVImport(file)
+		rows, err = parseCSVImport(bytes.NewReader(rawBytes))
 	}
 	if err != nil {
 		api.WriteError(w, http.StatusBadRequest, "ERR_INVALID_BODY", err.Error())

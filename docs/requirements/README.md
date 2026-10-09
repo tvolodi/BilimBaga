@@ -68,7 +68,7 @@
 | FR-BB61 | Email-notifications | Email Notifications | Implemented |
 | FR-BB62 | Full-i18n-coverage | Full i18n Coverage | Implemented |
 | FR-BB63 | Accessibility | Accessibility | Implemented |
-| FR-BB64 | Security-hardening | Security Hardening | Validated |
+| FR-BB64 | Security-hardening | Security Hardening | Implemented |
 | FR-BB65 | Performance | Performance | Validated |
 | FR-BB66 | Observability | Observability | Implemented |
 | FR-BB67 | e2e-coverage-employee-portal-exam-taking-grading | E2E Coverage: Employee Portal, Exam Taking, Result & Grading Flows | Implemented |

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -428,5 +429,15 @@ func TestGenerateTempPassword(t *testing.T) {
 		assert.True(t, hasUpper, "password should contain uppercase letters")
 		assert.True(t, hasDigit, "password should contain digits")
 		assert.True(t, hasSpecial, "password should contain special characters")
+	}
+}
+
+// AC-5 (FR-BB64): every generated temporary password must satisfy the
+// password complexity policy enforced on password change.
+func TestGenerateTempPassword_PassesValidateComplexity(t *testing.T) {
+	for i := 0; i < 2000; i++ {
+		pwd, err := generateTempPassword()
+		require.NoError(t, err)
+		require.NoError(t, auth.ValidateComplexity(pwd), "generated password %q failed complexity", pwd)
 	}
 }

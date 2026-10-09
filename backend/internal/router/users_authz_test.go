@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/bilimbaga/bilimbaga/internal/users"
@@ -560,4 +561,9 @@ func TestRouterUsersAuthz_PatchMeRejectsPrivilegeFields(t *testing.T) {
 			assert.Zero(t, repo.writes)
 		})
 	}
+}
+
+// UserInDeptScope: this file tests role gates, not department scope, so every target is in scope.
+func (r *authzRepo) UserInDeptScope(context.Context, deptscope.Scope, string) (bool, error) {
+	return true, nil
 }

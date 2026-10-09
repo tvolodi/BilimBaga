@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -32,6 +33,8 @@ type Repository interface {
 	LastReminderAt(ctx context.Context, userID, examID string) (*time.Time, error)
 	InsertReminder(ctx context.Context, userID, examID, sentBy string) error
 	SetPreferredLocale(ctx context.Context, userID string, locale *string) error
+	// UserInDeptScope reports whether the user is in the caller's department subtree (#253).
+	UserInDeptScope(ctx context.Context, sc deptscope.Scope, userID string) (bool, error)
 }
 
 type pgRepository struct {

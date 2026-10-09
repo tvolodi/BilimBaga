@@ -94,6 +94,7 @@ func TestHandler_GetInsights_ErrorMapping(t *testing.T) {
 		{"exam not found", ErrExamNotFound, http.StatusNotFound, "EXAM_NOT_FOUND"},
 		{"wrapped exam not found", fmt.Errorf("wrap: %w", ErrExamNotFound), http.StatusNotFound, "EXAM_NOT_FOUND"},
 		{"ai unavailable", ErrAIUnavailable, http.StatusServiceUnavailable, "AI_UNAVAILABLE"},
+		{"daily cap", ErrAIRateLimited, http.StatusTooManyRequests, "AI_RATE_LIMITED"},
 		{"other", errors.New("boom"), http.StatusInternalServerError, "INTERNAL_ERROR"},
 	}
 	for _, tc := range cases {

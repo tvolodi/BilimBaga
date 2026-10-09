@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,6 +33,12 @@ type mockRepository struct {
 	scopeIDs        map[string][]string // department id -> subtree ids
 	scopeIDsErr     error
 
+	// ISS-232: daily usage count; lock for concurrent tests.
+	mu          sync.Mutex
+	usageDay    int
+	usageDayErr error
+	dataCalls   int
+
 	// Loyalty narrative fields.
 	sessionTrack       string
 	sessionEmployeeID  string
@@ -46,7 +53,13 @@ func (m *mockRepository) CountAIUsageLastHour(_ context.Context, _, _ string) (i
 	return m.countReturns, m.countErr
 }
 
+func (m *mockRepository) CountAIUsageLastDay(_ context.Context, _, _ string) (int, error) {
+	return m.usageDay, m.usageDayErr
+}
+
 func (m *mockRepository) LogUsage(_ context.Context, log UsageLog) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.logCalled = true
 	m.lastLog = log
 	return m.logErr
@@ -61,7 +74,9 @@ func (m *mockRepository) GetInsightCache(_ context.Context, _ string) (*InsightR
 }
 
 func (m *mockRepository) UpsertInsightCache(_ context.Context, _, _ string, _ []string) error {
+	m.mu.Lock()
 	m.upsertCalled = true
+	m.mu.Unlock()
 	return m.upsertErr
 }
 
@@ -76,6 +91,9 @@ func (m *mockRepository) GetScopeDepartmentIDs(_ context.Context, sc deptscope.S
 }
 
 func (m *mockRepository) GetExamInsightData(_ context.Context, _, _ string) (*ExamInsightData, error) {
+	m.mu.Lock()
+	m.dataCalls++
+	m.mu.Unlock()
 	return m.examInsightData, m.examInsightErr
 }
 

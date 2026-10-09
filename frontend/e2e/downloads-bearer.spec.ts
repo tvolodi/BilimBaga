@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { requireTarget } from '../../scripts/lib/target-guard'
 
 /**
  * Regression for issue #37: authenticated file downloads must carry the Bearer token.
@@ -6,7 +7,7 @@ import { test, expect } from '@playwright/test'
  * Uses the default admin storage state from the live config.
  */
 
-const API_URL = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
+const API_URL = requireTarget('E2E_API_URL', process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`, process.env)
 
 test.describe('Authenticated downloads send Authorization (#37)', () => {
   test('dashboard PDF export carries a Bearer token', async ({ page }) => {

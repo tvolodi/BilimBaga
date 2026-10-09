@@ -7,8 +7,9 @@
 
 import { test, expect } from '@playwright/test'
 import { getSeedData, createTestExam, deleteTestExam, createTestQuestion, deleteTestQuestion } from './fixtures/seed'
+import { requireTarget } from '../../scripts/lib/target-guard'
 
-const API_URL = process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`
+const API_URL = requireTarget('E2E_API_URL', process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`, process.env)
 
 async function waitForContent(page: import('@playwright/test').Page) {
   await page.waitForFunction(() => !document.querySelector('[aria-label="loading"], .animate-spin'), { timeout: 10_000 }).catch(() => {})

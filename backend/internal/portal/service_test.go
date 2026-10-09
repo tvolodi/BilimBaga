@@ -41,10 +41,6 @@ func (m *mockRepo) ListUserSessions(ctx context.Context, examID, userID string) 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-func ptrTime(t time.Time) *time.Time { return &t }
-func ptrStr(s string) *string        { return &s }
-func ptrFloat(f float64) *float64    { return &f }
-
 func baseExamRow(id string) *portalExamRow {
 	return &portalExamRow{
 		ID:               id,

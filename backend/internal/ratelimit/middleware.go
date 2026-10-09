@@ -12,8 +12,6 @@ import (
 	"github.com/go-chi/httprate"
 )
 
-const retryAfterSeconds = 60
-
 // disabled returns true when the DISABLE_RATE_LIMIT env variable is set to "true" or "1".
 // This is intended for E2E test environments only.
 func disabled() bool {

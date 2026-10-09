@@ -21,17 +21,6 @@ func newTestHandler(t *testing.T) *Handler {
 	return NewHandler(svc, nil)
 }
 
-// decodeResponse unmarshals the JSON response body into the standard envelope.
-func decodeResponse(t *testing.T, body *strings.Reader) (data json.RawMessage, apiErr *apiError) {
-	t.Helper()
-	var env struct {
-		Data  json.RawMessage `json:"data"`
-		Error *apiError       `json:"error"`
-	}
-	require.NoError(t, json.NewDecoder(body).Decode(&env))
-	return env.Data, env.Error
-}
-
 // TestGetConfig_Returns200WithPublicKeys verifies the GET /tenant/config response.
 func TestGetConfig_Returns200WithPublicKeys(t *testing.T) {
 	h := newTestHandler(t)

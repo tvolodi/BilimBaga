@@ -180,7 +180,6 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 	// Collect type info alongside IDs so we can build poolQuestion slices for shuffle.
 	type qWithType struct {
 		id     string
-		typ    string
 		ruleID string // rule that produced this question (empty for questions outside any rule)
 	}
 	allQs := make([]qWithType, len(resolvedIDs))
@@ -597,15 +596,6 @@ func (s *service) SubmitSession(ctx context.Context, sessionID, userID, tenantID
 // shufflePoolQuestions shuffles a slice of poolQuestion in-place using the provided rng.
 func shufflePoolQuestions(pool []poolQuestion, rng *rand.Rand) {
 	rng.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
-}
-
-// parseTagIDs is used by tests to verify tag parsing behaviour.
-func parseTagIDs(raw []byte) ([]string, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	var ids []string
-	return ids, json.Unmarshal(raw, &ids)
 }
 
 // buildSessionResult converts a sessionResultRow into a SessionResultResponse,

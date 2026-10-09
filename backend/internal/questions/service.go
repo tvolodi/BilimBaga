@@ -298,6 +298,27 @@ func (s *service) TransitionStatus(ctx context.Context, id, newStatus string) (*
 		}
 	}
 
+	// Activating a choice question requires non-blank default-locale option text,
+	// so legacy rows with blank options cannot be presented to examinees (ISS-173b).
+	// Already-active questions and other transitions are untouched.
+	if newStatus == "active" {
+		detail, err := s.repo.GetWithDetails(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("questions: TransitionStatus: load options: %w", err)
+		}
+		inputs := make([]AnswerOptionInput, 0, len(detail.AnswerOptions))
+		for _, o := range detail.AnswerOptions {
+			tr := make(map[string]AnswerTranslationInput, len(o.Translations))
+			for loc, at := range o.Translations {
+				tr[loc] = AnswerTranslationInput(at)
+			}
+			inputs = append(inputs, AnswerOptionInput{SortOrder: o.SortOrder, Translations: tr})
+		}
+		if err := validateOptionTexts(q.Type, q.DefaultLocale, inputs); err != nil {
+			return nil, fmt.Errorf("questions: TransitionStatus: %w", err)
+		}
+	}
+
 	q.Status = newStatus
 	if err := s.repo.Update(ctx, q); err != nil {
 		return nil, fmt.Errorf("questions: TransitionStatus: update: %w", err)

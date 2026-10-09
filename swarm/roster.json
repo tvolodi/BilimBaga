@@ -1,0 +1,49 @@
+{
+  "_comment": "Committed swarm manifest read by up.ps1, ensure-up.ps1, down.ps1 and bin/checkpoint.sh. Tokens in cwd/settings/prompt: {main} main checkout, {repo} checkout holding this file, {infra} sibling ai-dala-infra repo, {preamble} the common startup preamble. Session ids live in git-ignored swarm/state/sessions.json, never here.",
+  "main_checkout": "auto",
+  "state_dir": "swarm/state",
+  "permission_mode": "bypassPermissions",
+  "model": null,
+  "stale_supervisor_min": 45,
+  "supervisor_grace_min": 10,
+  "preamble": "Re-read your checkpoint file (swarm/state/<role>.json in the main checkout) and your issue queue (GitHub label queue plus docs/handoffs/) before acting. ",
+  "roles": [
+    {
+      "key": "dev1", "name": "bb-dev1", "cwd": "{main}/.claude/worktrees/dev1",
+      "settings": "{main}/swarm/roles/dev1.settings.json", "model": null, "permission_mode": null,
+      "prompt": "{preamble}Startup: read swarm/roles/dev1.md (main checkout path {main}\\swarm\\roles\\dev1.md) plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.",
+      "resume_prompt": "{preamble}You were restarted and resumed. Continue your /loop tick."
+    },
+    {
+      "key": "dev2", "name": "bb-dev2", "cwd": "{main}/.claude/worktrees/dev2",
+      "settings": "{main}/swarm/roles/dev2.settings.json", "model": null, "permission_mode": null,
+      "prompt": "{preamble}Startup: read swarm/roles/dev2.md (main checkout path {main}\\swarm\\roles\\dev2.md) plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.",
+      "resume_prompt": "{preamble}You were restarted and resumed. Continue your /loop tick."
+    },
+    {
+      "key": "ba", "name": "bb-ba", "cwd": "{main}",
+      "settings": "{main}/swarm/roles/ba.settings.json", "model": null, "permission_mode": null,
+      "prompt": "{preamble}Startup: read swarm/roles/ba.md plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.",
+      "resume_prompt": "{preamble}You were restarted and resumed. Continue your /loop tick."
+    },
+    {
+      "key": "uat", "name": "bb-uat", "cwd": "{main}",
+      "settings": "{main}/swarm/roles/uat.settings.json", "model": null, "permission_mode": null,
+      "prompt": "{preamble}Startup: read swarm/roles/uat.md plus _common.md and PROTOCOL.md, do the startup handshake, then start your /loop tick.",
+      "resume_prompt": "{preamble}You were restarted and resumed. Continue your /loop tick."
+    },
+    {
+      "key": "infra", "name": "bb-infra", "cwd": "{infra}",
+      "settings": "{main}/swarm/roles/infra.settings.json", "model": null, "permission_mode": null,
+      "reuse_live_prefix": "ai-dala-infra",
+      "prompt": "{preamble}Startup: read {main}\\swarm\\roles\\infra.md plus _common.md and PROTOCOL.md in that repo, do the startup handshake, then start your /loop tick.",
+      "resume_prompt": "{preamble}You were restarted and resumed. Continue your /loop tick."
+    },
+    {
+      "key": "supervisor", "name": "bb-supervisor", "cwd": "{main}",
+      "settings": "{main}/swarm/roles/supervisor.settings.json", "model": null, "permission_mode": null,
+      "prompt": "/loop {preamble}Startup: read swarm/roles/supervisor.md plus _common.md, PROTOCOL.md, RETRO.md, then run the Supervisor Tick forever (dynamic cadence).",
+      "resume_prompt": "/loop {preamble}You were restarted and resumed. Continue the Supervisor Tick forever (dynamic cadence)."
+    }
+  ]
+}

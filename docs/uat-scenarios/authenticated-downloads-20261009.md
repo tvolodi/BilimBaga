@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **Issue #37** fix (`fix(frontend): authenticated file downloads send no Bearer token`; in-progress, no PR at authoring time) must be on `main` and the frontend rebuilt. Affected: `ResultActions.tsx`, `ResultsTable.tsx`, `downloadAdminCertificate` (`api/employees.ts`), `downloadDashboardPdf` and `downloadExamCsv` (`api/reports.ts`).

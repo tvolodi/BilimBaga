@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **Issue #33** (FR-BB115 implementation: migration for `password_reset_tokens`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /users/{id}/unlock`, `is_locked` on `GET /users`, pages `/forgot-password` and `/reset-password`, login-page link, unlock action in the admin user list). Status ready, no PR at authoring time.

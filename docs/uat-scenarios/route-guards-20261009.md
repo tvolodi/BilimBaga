@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **Issue #39** fix (`fix(frontend): align /admin/audit and /admin/reports route guards`; status ready, no PR at authoring time) must be on `main` and the frontend rebuilt.

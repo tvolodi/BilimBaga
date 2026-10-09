@@ -7,6 +7,8 @@ created: 2026-10-09
 author: Business Analyst
 ---
 
+Target: local | qa (default: local; never the production-class demo instance, see DEC-001)
+
 ## Code that must be merged before running
 
 - **Issue #38** (`fix(reports): completion_rate_by_exam omits active exams without assignments`; LEFT JOIN in `GetCompletionRateByExam` plus test). Status ready, no PR at authoring time.

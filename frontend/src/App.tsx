@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { TenantProvider } from '@/components/TenantProvider'
@@ -105,11 +106,12 @@ function AppRoutes() {
 }
 
 function AuthedRoutes() {
+  const { t } = useTranslation()
   const { isLoading } = useRefreshToken()
   if (isLoading)
     return (
       <main id="main-content" tabIndex={-1} className="outline-none">
-        <h1 className="sr-only">Loading</h1>
+        <h1 className="sr-only">{t('common.loading')}</h1>
         <FullPageSpinner />
       </main>
     )

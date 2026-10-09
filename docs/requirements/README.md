@@ -23,8 +23,9 @@
 | FR-BB111 | Frontend-admin-shell | Frontend: Admin Shell | Implemented |
 | FR-BB112 | Frontend-branding-settings | Frontend: Branding Settings | Implemented |
 | FR-BB113 | Frontend-department-management | Frontend: Department Management | Implemented |
-| FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Implemented |
+| FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Partial |
 | FR-BB115 | Account-recovery | Account Recovery: Forgot Password and Lockout Unlock | Validated |
+| FR-BB116 | User-profile-and-preferred-locale | User Profile Page and Persisted Preferred Locale | Validated |
 | FR-BB21 | Categories-and-tags | Categories and Tags | Implemented |
 | FR-BB22 | Question-model | Question Model | Implemented |
 | FR-BB23 | Question-CRUD-API | Question CRUD API | Implemented |
@@ -52,18 +53,18 @@
 | FR-BB42 | Manual-grading-queue | Manual Grading Queue | Implemented |
 | FR-BB43 | Certificate-generation | Certificate Generation | Implemented |
 | FR-BB44 | PDF-generation | PDF Generation | Implemented |
-| FR-BB45 | Frontend-result-screen | Frontend: Result Screen | Implemented |
-| FR-BB46 | Frontend-employee-history | Frontend: Employee History | Implemented |
+| FR-BB45 | Frontend-result-screen | Frontend: Result Screen | Partial |
+| FR-BB46 | Frontend-employee-history | Frontend: Employee History | Partial |
 | FR-BB47 | Frontend-manual-grading-UI | Frontend: Manual Grading UI | Implemented |
 | FR-BB48 | Public-certificate-verification-page | Public Certificate Verification Page | Implemented |
-| FR-BB51 | Dashboard-metrics-API | Dashboard Metrics API | Implemented |
+| FR-BB51 | Dashboard-metrics-API | Dashboard Metrics API | Partial |
 | FR-BB52 | Per-exam-analytics-API | Per-Exam Analytics API | Implemented |
 | FR-BB53 | Per-employee-record-API | Per-Employee Record API | Implemented |
 | FR-BB54 | Export-API | Export API | Implemented |
 | FR-BB55 | Audit-log-viewer | Audit Log Viewer | Implemented |
 | FR-BB56 | Frontend-admin-dashboard | Frontend: Admin Dashboard | Implemented |
 | FR-BB57 | Frontend-per-exam-analytics | Frontend: Per-Exam Analytics | Implemented |
-| FR-BB58 | Frontend-employee-record | Frontend: Employee Record | Implemented |
+| FR-BB58 | Frontend-employee-record | Frontend: Employee Record | Partial |
 | FR-BB61 | Email-notifications | Email Notifications | Implemented |
 | FR-BB62 | Full-i18n-coverage | Full i18n Coverage | Implemented |
 | FR-BB63 | Accessibility | Accessibility | Implemented |
@@ -78,9 +79,9 @@
 | FR-BB75 | Loyalty-profile-narrative | Loyalty Profile Narrative | Implemented |
 | FR-BB315 | exam-step4-eligible-question-counts | Exam Step 4: Eligible Question Counts per Rule | Implemented |
 | FR-BB316 | FR-BB316-portal-locale-switcher | Portal Locale Switcher | Implemented |
-| FR-BB317 | department-treeview | Department Treeview Selector | Implemented |
+| FR-BB317 | department-treeview | Department Treeview Selector | Partial |
 | FR-BB318 | exam-unpublish | Unpublish Exam | Implemented |
-| FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Implemented |
+| FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Partial |
 
 ## Status Values
 
@@ -90,6 +91,7 @@
 | `validated` | Passed Requirement Validation |
 | `in-progress` | Currently being implemented |
 | `implemented` | Code complete, tests passing, committed |
+| `partial` | Mostly shipped but one or more ACs unmet; see `docs/handoffs/ba-drift-check/report.md` |
 | `archived` | Superseded or cancelled |
 
 ## Backlog / Implementation Order

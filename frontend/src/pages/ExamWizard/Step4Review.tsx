@@ -133,7 +133,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           <ul className="list-disc list-inside space-y-1">
             {unsatisfiedRules.map((r) => (
               <li key={r.rule_id}>
-                Rule {r.rule_id.slice(0, 8)}…: needs {r.required}, only {r.available} available
+                {t('exam.wizard.step4.ruleUnsatisfied', { id: r.rule_id.slice(0, 8), required: r.required, available: r.available })}
               </li>
             ))}
           </ul>
@@ -224,7 +224,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
               return (
                 <li key={r.id} className="text-sm flex items-center">
                   <span>
-                    Rule {i + 1}: {r.mode}, {r.count} questions
+                    {t('exam.wizard.step4.ruleSummary', { n: i + 1, mode: r.mode, count: r.count })}
                     {r.difficulty && `, ${r.difficulty}`}
                   </span>
                   {badge}
@@ -256,7 +256,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 text-sm text-green-700">
               <CheckCircle2 size={16} />
-              Published
+              {t('exam.wizard.step4.published')}
             </div>
             <Button
               type="button"

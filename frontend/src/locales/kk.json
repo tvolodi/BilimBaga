@@ -22,7 +22,12 @@
     "actions": "Әрекеттер",
     "language": "Тіл",
     "aiGenerated": "ЖИ жасады",
-    "toggleExpand": "Жаю/жию"
+    "toggleExpand": "Жаю/жию",
+    "errorBoundary": {
+      "title": "Бірдеңе дұрыс болмады",
+      "message": "Күтпеген қате орын алды. Бетті қайта жүктеңіз.",
+      "reload": "Бетті қайта жүктеу"
+    }
   },
   "nav": {
     "dashboard": "Басты бет",
@@ -45,7 +50,8 @@
       "role": "Рөл",
       "status": "Күй",
       "created_at": "Жасалған",
-      "actions": "Әрекеттер"
+      "actions": "Әрекеттер",
+      "error": "Қате"
     },
     "roles": {
       "super_admin": "Бас Әкімші",
@@ -201,10 +207,14 @@
       "confirm": "Импорттауды растау",
       "dropzone": "Файлды осында жіберіңіз немесе таңдаңыз",
       "cancel": "Болдырмау",
-      "progress": "{{n}} / {{total}} өңделуде"
+      "progress": "{{n}} / {{total}} өңделуде",
+      "row": "{{row}}-жол:",
+      "similarTo": "Ұқсас: «{{stem}}» ({{score}}%)"
     },
     "versions": {
-      "title": "Нұсқалар тарихы"
+      "title": "Нұсқалар тарихы",
+      "empty": "Нұсқалар тарихы жоқ.",
+      "label": "v{{version}}"
     },
     "actions": {
       "edit": "Өңдеу",
@@ -475,7 +485,10 @@
         "eligibleCountError": "Жүктеу мүмкін болмады",
         "ruleStatusOk": "Жеткілікті",
         "ruleStatusInsufficient": "Жеткіліксіз",
-        "ruleStatusNone": "Сәйкес сұрақ жоқ"
+        "ruleStatusNone": "Сәйкес сұрақ жоқ",
+        "ruleUnsatisfied": "{{id}}… ережесі: {{required}} қажет, тек {{available}} қолжетімді",
+        "ruleSummary": "{{n}}-ереже: {{mode}}, сұрақ саны: {{count}}",
+        "published": "Жарияланған"
       },
       "validationWarning": "Кейбір сұрақ ережелері орындалмайды. Жариялаудан бұрын оларды түзетіңіз.",
       "validationWarningHint": "Тек «белсенді» мәртебесіндегі сұрақтар есептеледі. Жариялаудан бұрын Сұрақ банкін ашып, сұрақтарды белсендіріңіз.",
@@ -785,7 +798,7 @@
     "ai_reasoning_hide": "ЖИ негіздемесін жасыру",
     "filter_by_exam": "Емтихан бойынша сүзу",
     "filter_all_exams": "Барлық емтихандар",
-    "showing_range": "{{total}} ішінен {{start}}\u2013{{end}} көрсетілуде",
+    "showing_range": "{{total}} ішінен {{start}}–{{end}} көрсетілуде",
     "prev_page": "Алдыңғы",
     "next_page": "Келесі",
     "nav": "Қолмен бағалау"

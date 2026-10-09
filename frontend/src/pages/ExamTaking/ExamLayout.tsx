@@ -379,6 +379,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
       {showNavigatorMobile && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
           <div
+            aria-hidden="true"
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowNavigatorMobile(false)}
           />

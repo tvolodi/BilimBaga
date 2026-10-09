@@ -106,6 +106,7 @@ export function CategoryTreeNode({
             {menuOpen && (
               <>
                 <div
+                  aria-hidden="true"
                   className="fixed inset-0 z-10"
                   onClick={() => setMenuOpen(false)}
                 />

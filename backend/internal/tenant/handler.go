@@ -45,7 +45,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 // UpdateConfig handles PUT /api/v1/tenant/config.
 // Accepts a partial JSON object and updates the supplied keys.
-// TODO: add super_admin RBAC middleware once FR-BB15/FR-BB16 are implemented.
+// Access control: the route is wired behind rbac.RequirePermission("tenant", "manage") in internal/router.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var updates map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {

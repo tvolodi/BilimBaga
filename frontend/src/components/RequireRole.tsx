@@ -15,13 +15,18 @@ function jwtRole(token: string): string | undefined {
 interface RequireRoleProps {
   children: ReactNode
   roles: string[]
+  /** When set, a signed-in user lacking a required role is sent here instead of their home (FR-BB59 AC-2). */
+  unauthorizedRedirect?: string
 }
 
-export function RequireRole({ children, roles }: RequireRoleProps) {
+export function RequireRole({ children, roles, unauthorizedRedirect }: RequireRoleProps) {
   const qc = useQueryClient()
   const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   if (!token) return <Navigate to="/login" replace />
   const role = jwtRole(token)
-  if (!role || !roles.includes(role)) return <Navigate to={role === 'employee' ? '/portal' : '/admin'} replace />
+  if (!role || !roles.includes(role)) {
+    if (unauthorizedRedirect) return <Navigate to={unauthorizedRedirect} replace />
+    return <Navigate to={role === 'employee' ? '/portal' : '/admin'} replace />
+  }
   return <>{children}</>
 }

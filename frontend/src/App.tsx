@@ -6,6 +6,7 @@ import { TenantProvider } from '@/components/TenantProvider'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { RequireAuth } from '@/components/RequireAuth'
 import { RequireRole } from '@/components/RequireRole'
+import { AUDIT_READ_ROLES, REPORTS_READ_ROLES } from '@/lib/routeRoles'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useRefreshToken } from '@/api/auth'
@@ -251,7 +252,7 @@ function AuthedRoutes() {
         <Route
           path="audit"
           element={
-            <RequireRole roles={['super_admin', 'hr_admin', 'examiner']}>
+            <RequireRole roles={AUDIT_READ_ROLES} unauthorizedRedirect="/login">
               <AuditLogPage />
             </RequireRole>
           }
@@ -259,7 +260,7 @@ function AuthedRoutes() {
         <Route
           path="reports"
           element={
-            <RequireRole roles={['super_admin', 'examiner', 'hr_admin']}>
+            <RequireRole roles={REPORTS_READ_ROLES} unauthorizedRedirect="/login">
               <ReportsPage />
             </RequireRole>
           }

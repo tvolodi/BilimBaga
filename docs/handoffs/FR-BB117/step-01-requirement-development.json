@@ -1,0 +1,17 @@
+{
+  "run_id": "FR-BB117",
+  "step": 1,
+  "agent": "requirement-development",
+  "requirement": "FR-BB117",
+  "doc": "docs/requirements/FR-BB117.Role-management.md",
+  "result": "Draft",
+  "date": "2026-10-09",
+  "decision": "MISSING FEATURE (not discoverability)",
+  "evidence": [
+    "docs/requirements/FR-BB16.RBAC.md:253-256 puts role creation/modification and permission UI out of scope",
+    "backend/internal/router/router.go:99-100 only GET /users/roles (read-only lookup); no /roles routes",
+    "backend/migrations/003 + 005: roles(id,name,created_at) with no is_system/description; no tenant_id",
+    "frontend/src/components/admin/Sidebar.tsx:39-49 has no roles item; App.tsx has no roles route; en.json nav has no roles key",
+    "frontend/src/api/users.ts: only useRoles (id,name) for drawers"
+  ]
+}

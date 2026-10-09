@@ -1,0 +1,22 @@
+{
+  "run_id": "FR-BB117",
+  "step": 2,
+  "agent": "requirement-validation",
+  "requirement": "FR-BB117",
+  "result": "PASS",
+  "date": "2026-10-09",
+  "checks": {
+    "acs_testable": "pass (18 ACs, each with status code/error code/observable UI outcome)",
+    "no_duplicate": "pass: FR-BB117 free; no existing FR defines role CRUD (FR-BB16 explicitly defers it)",
+    "security": "pass: roles:read/manage super_admin only; escalation guard (roles:*, tenant:manage not grantable); system roles immutable; in-use delete blocked; JWT carries role name so name immutable and permission changes apply via cache without re-login",
+    "conventions": "pass: envelope, UUID, UTC, new migration only (032, existing untouched), handler/service/repo split, no os.Getenv in handlers, i18n en/ru/kk, audit via audit.Writer",
+    "dependencies": "FR-BB16, FR-BB18, FR-BB19, FR-BB111, FR-BB62 all Implemented",
+    "risks_noted": [
+      "frontend authorization is role-name based (RequireRole lists, Sidebar roles); AC-16 adds permissions in /users/me and permission-based fallback for custom roles",
+      "users service scoping uses role-name switches; implementer must confirm custom roles do not get org-wide user visibility (Go notes)",
+      "rbac cache is per process; multi-instance sync explicitly out of scope"
+    ],
+    "uat": "docs/uat-scenarios/role-management-20261009.md"
+  },
+  "size_estimate": "L"
+}

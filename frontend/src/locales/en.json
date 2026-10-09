@@ -1080,7 +1080,9 @@
   },
   "download": {
     "failed": "Download failed. Please try again.",
-    "session_expired": "Your session has expired. Please sign in again."
+    "session_expired": "Your session has expired. Please sign in again.",
+    "session_not_passed": "Certificate unavailable: the exam session was not passed.",
+    "exam_not_certifiable": "This exam does not issue certificates."
   },
   "roles": {
     "title": "Roles",

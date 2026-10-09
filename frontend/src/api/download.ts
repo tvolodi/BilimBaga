@@ -13,10 +13,16 @@ function downloadError(code: string, status?: number): DownloadError {
   return err
 }
 
+const DOWNLOAD_ERROR_KEYS: Record<string, string> = {
+  ERR_UNAUTHORIZED: 'download.session_expired',
+  SESSION_NOT_PASSED: 'download.session_not_passed',
+  EXAM_NOT_CERTIFIABLE: 'download.exam_not_certifiable',
+}
+
 /** i18n key describing a download failure, for display to the user. */
 export function downloadErrorKey(err: unknown): string {
   const code = (err as Partial<DownloadError> | null)?.code
-  return code === 'ERR_UNAUTHORIZED' ? 'download.session_expired' : 'download.failed'
+  return code && Object.prototype.hasOwnProperty.call(DOWNLOAD_ERROR_KEYS, code) ? DOWNLOAD_ERROR_KEYS[code] : 'download.failed'
 }
 
 function authInit(qc: QueryClient, options?: RequestInit): RequestInit {

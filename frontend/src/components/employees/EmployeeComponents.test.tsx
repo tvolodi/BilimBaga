@@ -185,11 +185,25 @@ describe('SessionHistoryTable (FR-BB58 AC-3, AC-4)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('shows an i18n error alert when the download fails', async () => {
-    downloadAdminCertificate.mockRejectedValue(Object.assign(new Error('x'), { code: 'SESSION_NOT_PASSED' }))
+  it('shows a generic error alert when the download fails with an unknown code', async () => {
+    downloadAdminCertificate.mockRejectedValue(Object.assign(new Error('x'), { code: 'ERR_DOWNLOAD' }))
     renderTable([makeSession()])
     fireEvent.click(screen.getByRole('button', { name: 'Download' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Download failed. Please try again.')
+  })
+
+  it('maps SESSION_NOT_PASSED to its own i18n message', async () => {
+    downloadAdminCertificate.mockRejectedValue(Object.assign(new Error('x'), { code: 'SESSION_NOT_PASSED' }))
+    renderTable([makeSession()])
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('exam session was not passed')
+  })
+
+  it('maps EXAM_NOT_CERTIFIABLE to its own i18n message', async () => {
+    downloadAdminCertificate.mockRejectedValue(Object.assign(new Error('x'), { code: 'EXAM_NOT_CERTIFIABLE' }))
+    renderTable([makeSession()])
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('does not issue certificates')
   })
 
   it('shows a session-expired message on an unauthorized download', async () => {

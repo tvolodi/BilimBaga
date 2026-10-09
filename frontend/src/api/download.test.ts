@@ -109,6 +109,9 @@ describe('downloadFile', () => {
 
   it('maps errors to i18n keys', () => {
     expect(downloadErrorKey({ code: 'ERR_UNAUTHORIZED' })).toBe('download.session_expired')
+    expect(downloadErrorKey({ code: 'SESSION_NOT_PASSED' })).toBe('download.session_not_passed')
+    expect(downloadErrorKey({ code: 'EXAM_NOT_CERTIFIABLE' })).toBe('download.exam_not_certifiable')
+    expect(downloadErrorKey({ code: 'ERR_OTHER' })).toBe('download.failed')
     expect(downloadErrorKey(new Error('boom'))).toBe('download.failed')
   })
 })

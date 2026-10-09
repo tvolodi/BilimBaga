@@ -1,31 +1,35 @@
 #!/usr/bin/env bash
 # Redeploy BilimBaga to the test environment on hetzner-prod.
-# Run as root on the host: bash /opt/apps/bilimbaga-test/deploy/redeploy-test.sh
+# Run as root on the host: sudo bash /opt/apps/bilimbaga-test/deploy/redeploy-test.sh
+#
+# Code is updated with a fast-forward-only pull over the checkout's existing `origin`
+# remote (a read-only deploy-key SSH alias, git@github.com-bilimbaga:tvolodi/BilimBaga.git).
+# This script never reads any credential file and never rewrites git remotes.
 set -euo pipefail
 
 APP_DIR=/opt/apps/bilimbaga-test
 COMPOSE="docker compose --project-directory $APP_DIR -f $APP_DIR/deploy/docker-compose.test.yml"
-PAT_FILE=/root/.config/ai-dala-infra/github.token
-DATE=$(date +%Y%m%d)
+# Timestamped so a same-day re-run never overwrites an earlier rollback point.
+STAMP=$(date -u +%Y%m%d-%H%M%S)
 
 echo "=== BilimBaga test redeploy: $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 
-# 1. Pull latest code
+# 1. Pull latest code (fast-forward only, on the existing remote)
 cd "$APP_DIR"
-if [[ -f "$PAT_FILE" ]]; then
-  PAT=$(cat "$PAT_FILE")
-  git remote set-url origin "https://${PAT}@github.com/tvolodi/BilimBaga.git"
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "ERROR: working tree in $APP_DIR is not clean; refusing to deploy:" >&2
+  git status --short >&2
+  exit 1
 fi
-git pull
+PREVIOUS_REF=$(git rev-parse --short HEAD)
+git pull --ff-only origin main
 CURRENT_REF=$(git rev-parse --short HEAD)
-echo "Git ref: $CURRENT_REF"
+echo "Git ref: $PREVIOUS_REF -> $CURRENT_REF"
 
-# Restore unauthenticated remote URL so the PAT is never stored in git config
-git remote set-url origin "https://github.com/tvolodi/BilimBaga.git"
-
-# 2. Tag rollback images (best-effort — ignore if images don't exist yet)
-docker tag bilimbaga-test:latest "bilimbaga-test:rollback-${DATE}" 2>/dev/null || true
-docker tag bilimbaga-api-test:latest "bilimbaga-api-test:rollback-${DATE}" 2>/dev/null || true
+# 2. Tag rollback images (best-effort: ignore if images don't exist yet)
+docker tag bilimbaga-test:latest "bilimbaga-test:rollback-${STAMP}" 2>/dev/null || true
+docker tag bilimbaga-api-test:latest "bilimbaga-api-test:rollback-${STAMP}" 2>/dev/null || true
+echo "Rollback tags: bilimbaga-test:rollback-${STAMP}, bilimbaga-api-test:rollback-${STAMP}"
 
 # 3. Build images
 echo "--- Building frontend image ---"
@@ -48,6 +52,7 @@ for i in $(seq 1 10); do
   fi
   if [[ $i -eq 10 ]]; then
     echo "ERROR: health check did not pass after 10 attempts" >&2
+    echo "Rollback: docker tag bilimbaga-test:rollback-${STAMP} bilimbaga-test:latest && docker tag bilimbaga-api-test:rollback-${STAMP} bilimbaga-api-test:latest && $COMPOSE up -d --force-recreate" >&2
     exit 1
   fi
   echo "Waiting... ($i/10)"

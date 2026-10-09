@@ -23,6 +23,7 @@ Provides dedicated endpoints for managing per-locale translations of question st
 - [x] AC-8: `PUT /api/v1/questions/:id/translations/:locale` returns the full updated translation object in the response body, not just a success acknowledgement.
 - [x] AC-9: Attempting to write a translation for a non-existent question ID returns `404` with error code `ERR_QUESTION_NOT_FOUND`.
 - [x] AC-10: The upsert is idempotent — submitting the same translation payload twice produces no error and does not increment any version counter or trigger additional audit entries beyond the second write.
+- [ ] AC-11 (BA decision, issue #228 item 1, 2026-10-09): in a non-default locale that is "present" (stem non-blank OR at least one option text non-blank) every option of the question must have non-blank text (after trim) in that locale; otherwise the write returns `422` with `ERR_VALIDATION` and `details` naming the option indexes. A locale with no non-blank option text at all is treated as untranslated: options fall back to the default-locale text at render time (existing "original language" badge). Applies to PUT translations and to question create/update payloads. Legacy rows are not migrated; they are surfaced by the activation check (#228 item 2).
 
 ## Technical Specification
 

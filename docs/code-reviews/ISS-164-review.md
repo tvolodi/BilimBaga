@@ -43,3 +43,14 @@ internal imports, so no import cycle.
 - Unknown mixed-case stays neutral / wrong email still 401: covered
 - Create/import store normalised email: covered
 - Lowercase users unaffected: covered by existing suites passing
+
+## Cycle 2 - case-insensitive SQL lookups (commit e225f2e)
+
+Result: PASS (0 Critical, 0 High)
+
+- All three queries (`lower(u.email) = $1`, bootstrap `lower(email) = lower($1)`, `users.Create` EXISTS probe) are parameterised; callers (Login, ForgotPassword) pass the normalised value.
+- Create and CSV import share `repo.Create`, so the duplicate probe is consistent; ErrDuplicateEmail mapping intact. UNIQUE(email) remains the concurrency backstop.
+- No other lookup by email address in backend/internal (`internal/email` works by id/status).
+- [Medium] No functional index: lower() lookups cannot use idx_users_email (seq scan). Follow-up migration: `CREATE UNIQUE INDEX ON users (lower(email))` after de-duplicating legacy rows (also closes the probe/insert race).
+- [Low] Ambiguous legacy twins (`John@x.com` + `john@x.com`) would make login pick an arbitrary row; cannot arise for new rows; cleaned up by the same follow-up.
+- [Low] Go ToLower vs Postgres lower() may differ for non-ASCII; no action.

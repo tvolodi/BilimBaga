@@ -637,5 +637,23 @@ describe('AIGenerateDialog', () => {
       expect(call).toBe(3)
       expect(onClose).toHaveBeenCalledTimes(1)
     })
+
+    it('shows an error and stays open when every create fails, without reporting success (#338)', async () => {
+      server.use(
+        http.post(QUESTIONS_URL, () =>
+          HttpResponse.json({ data: null, error: { code: 'VALIDATION', message: 'bad' } }, { status: 422 }),
+        ),
+      )
+      const { onClose, onSuccess } = renderDialog()
+      await generateDrafts()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm Selected (3)' }))
+
+      expect(await screen.findByText('An unexpected error occurred. Please try again.')).toBeInTheDocument()
+      expect(onSuccess).not.toHaveBeenCalled()
+      expect(onClose).not.toHaveBeenCalled()
+      // Drafts stay selectable and confirm is re-enabled so the user can retry.
+      expect(screen.getByRole('button', { name: 'Confirm Selected (3)' })).toBeEnabled()
+    })
   })
 })

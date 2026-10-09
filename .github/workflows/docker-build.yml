@@ -1,0 +1,36 @@
+name: docker-build
+
+# ISS-127: the Docker images must build from the exact contexts compose uses.
+# Catches files that only exist outside frontend/ or backend/ (e.g. tsc importing ../scripts).
+# Build only: nothing is pushed or run.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "scripts/**"
+      - "deploy/**"
+      - ".github/workflows/docker-build.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "scripts/**"
+      - "deploy/**"
+      - ".github/workflows/docker-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend image (context ./frontend)
+        run: docker build -t bilimbaga-frontend:ci ./frontend
+      - name: Build api image (context ./backend)
+        run: docker build -t bilimbaga-api:ci ./backend
+      - name: Build deploy image (context repo root)
+        run: docker build -f deploy/Dockerfile -t bilimbaga-deploy:ci .

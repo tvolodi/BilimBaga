@@ -21,3 +21,14 @@ func WriteError(w http.ResponseWriter, status int, code, message string) {
 		"error": map[string]string{"code": code, "message": message},
 	})
 }
+
+// WriteErrorWithDetails writes the standard error envelope plus a structured
+// machine-readable "details" object:
+//
+//	{ "data": null, "error": { "code": "...", "message": "...", "details": {...} } }
+func WriteErrorWithDetails(w http.ResponseWriter, status int, code, message string, details map[string]interface{}) {
+	WriteJSON(w, status, map[string]interface{}{
+		"data":  nil,
+		"error": map[string]interface{}{"code": code, "message": message, "details": details},
+	})
+}

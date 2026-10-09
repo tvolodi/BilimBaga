@@ -110,12 +110,12 @@ const KNOWN_ERROR_CODES = [
 
 /** Maps a server error to an i18n key + interpolation; unknown codes fall back to a generic key. */
 export function roleErrorKey(err: unknown): { key: string; values?: Record<string, unknown> } {
-  const e = err as { code?: string; message?: string } | null
+  const e = err as { code?: string; details?: { count?: unknown } } | null
   const code = e?.code
   if (code && (KNOWN_ERROR_CODES as readonly string[]).includes(code)) {
     if (code === 'ROLE_IN_USE') {
-      const m = /(\d+)/.exec(e?.message ?? '')
-      return { key: 'roles.errors.ROLE_IN_USE', values: { count: m ? Number(m[1]) : 0 } }
+      const count = Number(e?.details?.count)
+      return { key: 'roles.errors.ROLE_IN_USE', values: { count: Number.isFinite(count) ? count : 0 } }
     }
     return { key: `roles.errors.${code}` }
   }

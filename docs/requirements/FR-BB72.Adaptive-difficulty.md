@@ -14,7 +14,7 @@ Adds an optional adaptive question-serving mode to the exam engine. When a publi
 
 ## Acceptance Criteria
 - [ ] AC-1: Exam configuration gains a nullable boolean field `adaptive` (default `false`); it can be set only for exams in `draft` status and is locked after publishing; existing exams default to `false` and behave identically to current behavior.
-- [ ] AC-2: When publishing an adaptive exam, the system validates that the question bank for each rule contains at least 5 questions at each of the three difficulty levels (`easy`, `medium`, `hard`) and rejects publication with error code `INSUFFICIENT_ADAPTIVE_QUESTIONS` if not.
+- [ ] AC-2: When publishing an adaptive exam, the system validates that the question bank for each rule contains at least 5 questions at each of the three difficulty levels (`easy`, `medium`, `hard`) and rejects publication with error code `INSUFFICIENT_ADAPTIVE_QUESTIONS` if not. Evaluation order: an adaptive exam with zero question rules is refused first with 422 `INSUFFICIENT_QUESTIONS` (same as fixed-form exams; PR #153, ISS-151); only then is the per-difficulty check run. The `INSUFFICIENT_ADAPTIVE_QUESTIONS` error `details` is an object (not an array of unsatisfied rules).
 - [ ] AC-3: For adaptive sessions, `GET /api/v1/portal/sessions/:id/next-question` returns the next question chosen by the difficulty adjustment algorithm; the algorithm selects `medium` difficulty for the first question and adjusts based on the rolling 3-answer window.
 - [ ] AC-4: The difficulty adjustment rule is: if the last 3 answered questions have >2 correct → increase difficulty one level; if <1 correct → decrease difficulty one level; otherwise maintain current difficulty. At the floor (`easy`) or ceiling (`hard`) no further adjustment is made.
 - [ ] AC-5: The selected next question is recorded in session state (e.g. a `current_question_id` or `served_questions` JSONB column) so that repeated calls to `next-question` return the same unanswered question rather than selecting a new one.
@@ -72,6 +72,7 @@ ALTER TABLE exam_sessions
 #### POST /api/v1/admin/exams/:id/publish (modified)
 - If `adaptive = true`: validate ≥5 questions per difficulty per rule set before publishing.
 - Return `422` with `INSUFFICIENT_ADAPTIVE_QUESTIONS` on failure.
+- Return `422` with `INSUFFICIENT_QUESTIONS` first if the exam has zero rules (checked before the per-difficulty validation); `details` of `INSUFFICIENT_ADAPTIVE_QUESTIONS` is an object.
 
 ### Implementation Details
 

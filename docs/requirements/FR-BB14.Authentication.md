@@ -226,3 +226,5 @@ DROP TABLE IF EXISTS users;
 - Admin unlock (FR-BB18) sets `locked_until = NULL` and `failed_attempts = 0`.
 - New password minimum requirements: ≥ 8 characters (see AC-12). Stricter policy (uppercase, digit, special char) is configurable via tenant config in a future phase.
 - Migration `007_auth.up.sql` runs after FR-BB16 (`roles`) and FR-BB17 (`departments`), so both FK targets are guaranteed to exist.
+
+- Implementation note (PR #144, ISS-105): `change-password` does not stamp `users.password_changed_at`; only admin reset (FR-BB61) and token reset (FR-BB115) do, so only those revoke previously issued access tokens. Intended scope still to be decided.

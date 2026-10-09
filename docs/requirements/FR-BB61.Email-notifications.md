@@ -213,3 +213,5 @@ func (s *EmailService) Send(to, tmplName string, data map[string]any, locale str
 ### SMTP_FROM validation (ISS-125)
 
 When `SMTP_HOST` is set: an empty `SMTP_FROM` falls back to `BilimBaga <noreply@localhost>` and the API logs a startup warning; a non-empty but unparseable value (not `user@host` / `Name <user@host>`) fails startup. The email service returns an explicit error (never an empty envelope sender) when the sender is invalid, including on the admin test-notification endpoint (HTTP 503 `EMAIL_UNAVAILABLE`).
+
+- Implementation note (PR #144, ISS-105): admin `reset-password` now also stamps `users.password_changed_at`, so access tokens issued before the reset are rejected with 401 `TOKEN_REVOKED` (see FR-BB115). Self `change-password` (FR-BB14) does not stamp it, so it does not revoke other sessions' access tokens; intended scope is still to be decided.

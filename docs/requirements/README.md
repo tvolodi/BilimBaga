@@ -26,7 +26,7 @@
 | FR-BB114 | Frontend-audit-log-viewer | Frontend: Audit Log Viewer (Phase 1) | Implemented |
 | FR-BB115 | Account-recovery | Account Recovery: Forgot Password and Lockout Unlock | Implemented |
 | FR-BB116 | User-profile-and-preferred-locale | User Profile Page and Persisted Preferred Locale | Validated |
-| FR-BB117 | Role-management | Role Management: custom roles and permission matrix (issue #135) | Validated |
+| FR-BB117 | Role-management | Role Management: custom roles and permission matrix (issue #135) | Validated (backend implemented, migration 034, #137; frontend pending #138) |
 | FR-BB21 | Categories-and-tags | Categories and Tags | Implemented |
 | FR-BB22 | Question-model | Question Model | Implemented |
 | FR-BB23 | Question-CRUD-API | Question CRUD API | Implemented |

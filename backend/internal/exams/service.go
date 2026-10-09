@@ -414,7 +414,7 @@ func (s *service) CreateAssignment(ctx context.Context, input CreateAssignmentIn
 	}
 
 	// AC-6: department admins may only assign within their own department.
-	if input.CallerRole == "department_admin" {
+	if !assignsOrgWide(input.CallerRole) {
 		if input.AssigneeType == "all" {
 			return nil, ErrForbidden
 		}
@@ -459,7 +459,7 @@ func (s *service) DeleteAssignment(ctx context.Context, examID, assignmentID str
 		return ErrAssignmentNotFound
 	}
 	// AC-6: department admins may only remove their own dept assignments.
-	if callerRole == "department_admin" {
+	if !assignsOrgWide(callerRole) {
 		if a.AssigneeType == "all" {
 			return ErrForbidden
 		}
@@ -515,4 +515,12 @@ func (s *service) GetEligibleCounts(ctx context.Context, examID string) ([]RuleE
 		counts = append(counts, RuleEligibleCount{RuleID: rule.ID, Eligible: eligible})
 	}
 	return counts, nil
+}
+
+// assignsOrgWide reports whether the caller role may manage exam assignments
+// beyond its own department. Default-deny (FR-BB117): only the built-in
+// super_admin and examiner roles are org-wide; department_admin and every
+// custom role holding exams:assign are limited to their own department.
+func assignsOrgWide(callerRole string) bool {
+	return callerRole == "super_admin" || callerRole == "examiner"
 }

@@ -35,6 +35,37 @@ type Service interface {
 type service struct {
 	repo     Repository
 	emailSvc *email.EmailService
+	// canPerm reports whether a role holds resource:action. nil means "no
+	// permission information": GetUser then grants only self-access to
+	// non-super_admin roles (default-deny).
+	canPerm PermissionChecker
+}
+
+// PermissionChecker reports whether role holds the resource:action permission
+// (satisfied by (*rbac.Cache).Has).
+type PermissionChecker func(role, resource, action string) bool
+
+// WithPermissionChecker attaches a PermissionChecker to a Service built by NewService.
+func WithPermissionChecker(svc Service, fn PermissionChecker) Service {
+	if s, ok := svc.(*service); ok {
+		s.canPerm = fn
+	}
+	return svc
+}
+
+// Scoping model (FR-BB117, default-deny): only super_admin is organisation-wide.
+// EVERY other role -- built-in department_admin or an admin-created custom role --
+// is confined to its own department, and a caller without a department sees and
+// may touch nothing. Scoping must never branch on a built-in role name other than
+// super_admin, otherwise a custom role would fall through to org-wide access.
+func isOrgWide(callerRole string) bool { return callerRole == "super_admin" }
+
+// inCallerScope reports whether a target department is within the caller's scope.
+func inCallerScope(callerRole, callerDeptID string, target *string) bool {
+	if isOrgWide(callerRole) {
+		return true
+	}
+	return callerDeptID != "" && target != nil && *target == callerDeptID
 }
 
 // NewService creates a new Service backed by the given Repository.
@@ -62,7 +93,11 @@ func (s *service) ListUsers(ctx context.Context, callerRole, callerDeptID string
 	}
 
 	var deptScope *string
-	if callerRole == "department_admin" && callerDeptID != "" {
+	if !isOrgWide(callerRole) {
+		if callerDeptID == "" {
+			// Non-super_admin without a department has no scope: empty result.
+			return &ListResult{Items: []User{}, Meta: Meta{Page: f.Page, PerPage: f.PerPage, Total: 0}}, nil
+		}
 		deptScope = &callerDeptID
 	}
 
@@ -86,19 +121,18 @@ func (s *service) GetUser(ctx context.Context, id, callerRole, callerUserID, cal
 		return nil, err
 	}
 
-	switch callerRole {
-	case "super_admin":
+	switch {
+	case isOrgWide(callerRole):
 		// full access
-	case "department_admin":
-		sameUser := callerUserID == id
-		sameDept := callerDeptID != "" && u.DepartmentID != nil && *u.DepartmentID == callerDeptID
-		if !sameUser && !sameDept {
+	case callerUserID == id:
+		// self-access
+	case callerRole == "department_admin" || (s.canPerm != nil && s.canPerm(callerRole, "users", "read")):
+		// department-scoped read for roles holding users:read
+		if !inCallerScope(callerRole, callerDeptID, u.DepartmentID) {
 			return nil, ErrForbidden
 		}
 	default:
-		if callerUserID != id {
-			return nil, ErrForbidden
-		}
+		return nil, ErrForbidden
 	}
 	return u, nil
 }
@@ -131,10 +165,8 @@ func (s *service) CreateUser(ctx context.Context, req CreateRequest, callerRole,
 	}
 
 	// Department admin scope check.
-	if callerRole == "department_admin" {
-		if req.DepartmentID == nil || *req.DepartmentID != callerDeptID {
-			return nil, ErrForbidden
-		}
+	if !inCallerScope(callerRole, callerDeptID, req.DepartmentID) {
+		return nil, ErrForbidden
 	}
 
 	tmpPwd, err := generateTempPassword()
@@ -163,10 +195,12 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 		return nil, err
 	}
 
-	if callerRole == "department_admin" {
-		if existing.DepartmentID == nil || *existing.DepartmentID != callerDeptID {
-			return nil, ErrForbidden
-		}
+	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
+		return nil, ErrForbidden
+	}
+	// A scoped caller may not move a user out of its own department.
+	if !isOrgWide(callerRole) && !inCallerScope(callerRole, callerDeptID, req.DepartmentID) {
+		return nil, ErrForbidden
 	}
 
 	if req.FullName == "" {
@@ -196,10 +230,8 @@ func (s *service) DeactivateUser(ctx context.Context, id, callerRole, callerDept
 		return err
 	}
 
-	if callerRole == "department_admin" {
-		if existing.DepartmentID == nil || *existing.DepartmentID != callerDeptID {
-			return ErrForbidden
-		}
+	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
+		return ErrForbidden
 	}
 
 	if err := s.repo.Deactivate(ctx, id); err != nil {
@@ -219,10 +251,8 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 		return nil, err
 	}
 
-	if callerRole == "department_admin" {
-		if existing.DepartmentID == nil || *existing.DepartmentID != callerDeptID {
-			return nil, ErrForbidden
-		}
+	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
+		return nil, ErrForbidden
 	}
 
 	tmpPwd, err := generateTempPassword()
@@ -252,10 +282,8 @@ func (s *service) UnlockUser(ctx context.Context, id, callerRole, callerDeptID, 
 	if err != nil {
 		return nil, err
 	}
-	if callerRole == "department_admin" {
-		if existing.DepartmentID == nil || *existing.DepartmentID != callerDeptID {
-			return nil, ErrForbidden
-		}
+	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
+		return nil, ErrForbidden
 	}
 	if err := s.repo.Unlock(ctx, id); err != nil {
 		return nil, fmt.Errorf("users.UnlockUser: %w", err)
@@ -331,8 +359,12 @@ func (s *service) validateImportRow(ctx context.Context, row CSVRow, callerRole,
 		return "department lookup failed"
 	}
 
-	if callerRole == "department_admin" && deptID != callerDeptID {
+	if !inCallerScope(callerRole, callerDeptID, &deptID) {
 		return fmt.Sprintf("department %s is outside your scope", row.DepartmentName)
+	}
+
+	if !isOrgWide(callerRole) && row.RoleName == "super_admin" {
+		return "role super_admin cannot be assigned by your role"
 	}
 
 	_, err = s.repo.GetRoleIDByName(ctx, row.RoleName)
@@ -381,7 +413,7 @@ func (s *service) commitImportRow(ctx context.Context, row CSVRow, callerUserID,
 // checkRoleAssignment returns ErrForbidden if a department_admin tries to assign the
 // super_admin role. super_admin callers may assign any role.
 func (s *service) checkRoleAssignment(ctx context.Context, roleID, callerRole string) error {
-	if callerRole == "super_admin" {
+	if isOrgWide(callerRole) {
 		return nil
 	}
 	roleName, err := s.repo.GetRoleNameByID(ctx, roleID)

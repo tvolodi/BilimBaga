@@ -19,6 +19,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/ratelimit"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/reports"
+	"github.com/bilimbaga/bilimbaga/internal/roles"
 	"github.com/bilimbaga/bilimbaga/internal/sessions"
 	"github.com/bilimbaga/bilimbaga/internal/tags"
 	"github.com/bilimbaga/bilimbaga/internal/tenant"
@@ -35,7 +36,7 @@ import (
 // db is used by the health endpoint to verify database connectivity.
 // version is the build-time Git SHA injected via -ldflags.
 // log is the zerolog logger used by the structured middleware chain.
-func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, aiHandler *ai.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
+func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *departments.Handler, usersHandler *users.Handler, auditHandler *audit.Handler, categoriesHandler *categories.Handler, tagsHandler *tags.Handler, questionsHandler *questions.Handler, translationsHandler *questions.TranslationHandler, examsHandler *exams.Handler, portalHandler *portal.Handler, sessionsHandler *sessions.Handler, certHandler *certificates.Handler, reportsHandler *reports.Handler, emailHandler *email.Handler, aiHandler *ai.Handler, rolesHandler *roles.Handler, jwtSecret string, rbacCache *rbac.Cache, db *sqlx.DB, version string, log zerolog.Logger) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Structured middleware chain (FR-BB66):
@@ -121,6 +122,20 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Post("/users/{id}/reset-password", usersHandler.ResetPassword)
 			r.With(rbac.RequirePermission(rbacCache, "users", "manage")).
 				Post("/users/{id}/unlock", usersHandler.UnlockUser)
+
+			// Role management (FR-BB117). /roles/permissions is registered before /roles/{id}.
+			r.With(rbac.RequirePermission(rbacCache, "roles", "read")).
+				Get("/roles", rolesHandler.List)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "read")).
+				Get("/roles/permissions", rolesHandler.ListPermissions)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "manage")).
+				Post("/roles", rolesHandler.Create)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "read")).
+				Get("/roles/{id}", rolesHandler.Get)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "manage")).
+				Put("/roles/{id}", rolesHandler.Update)
+			r.With(rbac.RequirePermission(rbacCache, "roles", "manage")).
+				Delete("/roles/{id}", rolesHandler.Delete)
 
 			// Audit log.
 			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).

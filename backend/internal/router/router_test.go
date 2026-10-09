@@ -19,7 +19,7 @@ import (
 // dereferenced when a route executes, so routes that are rejected by middleware
 // (auth, heartbeat) can be exercised without a database.
 func newRouter() http.Handler {
-	return router.New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	return router.New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		"test-secret", nil, nil, "test", zerolog.Nop())
 }
 

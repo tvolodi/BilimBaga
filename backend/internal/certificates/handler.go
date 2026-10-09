@@ -3,6 +3,7 @@ package certificates
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
@@ -51,14 +52,22 @@ func (h *Handler) HandleGetAdminCertificate(w http.ResponseWriter, r *http.Reque
 }
 
 // HandleVerifyCertificate handles GET /api/v1/verify/:code.
-// Public — no authentication required. Always returns HTTP 200 (AC-7).
+// Public — no authentication required. An unknown/invalid code is HTTP 200 with
+// valid=false (AC-7, no information leak). Any other (internal) error is logged and
+// returned as HTTP 500 with the standard error envelope so the SPA can show the
+// "temporarily unavailable" state (FR-BB48 AC-5) instead of "invalid certificate".
 func (h *Handler) HandleVerifyCertificate(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 
 	result, err := h.svc.GetByVerificationCode(r.Context(), code)
 	if err != nil {
-		// On unexpected internal error, still return valid=false — never expose error details.
-		api.WriteJSON(w, http.StatusOK, map[string]any{"data": &VerifyResponse{Valid: false}, "error": nil})
+		if errors.Is(err, ErrNotFound) {
+			api.WriteJSON(w, http.StatusOK, map[string]any{"data": &VerifyResponse{Valid: false}, "error": nil})
+			return
+		}
+		slog.Error("certificates: verify certificate failed", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR",
+			"Verification is temporarily unavailable.")
 		return
 	}
 

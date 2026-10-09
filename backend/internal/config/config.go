@@ -26,6 +26,9 @@ type Config struct {
 	APIBaseURL string
 	// PublicAppURL is the public base URL of the SPA (used for certificate QR verify links).
 	PublicAppURL string
+	// PublicAppURLDefaulted is true when PUBLIC_APP_URL was unset and the localhost
+	// default is in use. Certificate QR links would then point at localhost.
+	PublicAppURLDefaulted bool
 
 	// JWT
 	JWTSecret           string
@@ -73,6 +76,8 @@ func Load() (*Config, error) {
 		JWTSecret:    getEnv("JWT_SECRET", ""),
 		CookieDomain: getEnv("COOKIE_DOMAIN", "localhost"),
 	}
+
+	cfg.PublicAppURLDefaulted = os.Getenv("PUBLIC_APP_URL") == ""
 
 	var err error
 

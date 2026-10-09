@@ -136,6 +136,9 @@ func TestLoad_PublicAppURLDefault(t *testing.T) {
 	if cfg.PublicAppURL != "http://localhost:5173" {
 		t.Errorf("expected default PublicAppURL, got %s", cfg.PublicAppURL)
 	}
+	if !cfg.PublicAppURLDefaulted {
+		t.Error("expected PublicAppURLDefaulted=true when PUBLIC_APP_URL is unset")
+	}
 }
 
 func TestLoad_PublicAppURLOverride(t *testing.T) {
@@ -148,5 +151,8 @@ func TestLoad_PublicAppURLOverride(t *testing.T) {
 	}
 	if cfg.PublicAppURL != "https://app.example.kz" {
 		t.Errorf("expected override PublicAppURL, got %s", cfg.PublicAppURL)
+	}
+	if cfg.PublicAppURLDefaulted {
+		t.Error("expected PublicAppURLDefaulted=false when PUBLIC_APP_URL is set")
 	}
 }

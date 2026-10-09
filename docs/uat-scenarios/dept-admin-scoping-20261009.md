@@ -19,7 +19,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 
 ## Decision applied (from issue #165 comment, proposal by developer)
 
-Exam-level analytics for `department_admin`: aggregates are computed over participants of the caller's own department subtree only. `super_admin` (and `examiner`) unchanged: see everything. The issue text says "403, or scoped lists"; this scenario accepts, per surface, exactly what is written in the expected column. If the product owner chooses "aggregate across all" for exam analytics instead, S3 must be revised (REQ GAP 1).
+Exam-level analytics for `department_admin`: aggregates are computed over participants of the caller's own department subtree only. `super_admin` unchanged: sees everything. `examiner` is scoped to its own department like every non-`super_admin` role (FR-BB117 D-2, issue #218); revised by issue #309. The issue text says "403, or scoped lists"; this scenario accepts, per surface, exactly what is written in the expected column. If the product owner chooses "aggregate across all" for exam analytics instead, S3 must be revised (REQ GAP 1).
 
 ## Accounts and data (QA starts with an EMPTY database)
 
@@ -34,6 +34,7 @@ Only `admin@bilimbaga.local` exists. Its current password is `{ADMIN_PW}` (suppl
 | EMP-A2 | `uat.emp.a2@test.com` | employee | Dept A1 (child of A) | `UatScope123!` |
 | EMP-B1 | `uat.emp.b1@test.com` | employee | Dept B | `UatScope123!` |
 | EMP-B2 | `uat.emp.b2@test.com` | employee | Dept B | `UatScope123!` |
+| EXM-A | `uat.examiner.a@test.com` | examiner | Dept A | `UatScope123!` |
 | EXM | `uat.examiner@test.com` | examiner | none | `UatScope123!` |
 
 Departments: `UAT Dept A`, `UAT Dept A1` (parent = Dept A), `UAT Dept B`. Platform at `http://localhost`, API at `http://localhost/api/v1` (QA: its public URL). `ids` below mean UUIDs captured at creation.
@@ -73,7 +74,9 @@ Login as DA-A (token `TA`).
 | 8 | DA-B | Symmetric: DA-B fetches EMP-A1 record and record/export | 403 or 404; DA-B own EMP-B1 record returns 4 sessions | |
 | 9 | DA-A | Record/export/progress for a random valid UUID not in DB; and for malformed id `not-a-uuid` | 404 `NOT_FOUND`; malformed id 404 (path id, per api-conventions section 2.1); no 500 | |
 | 10 | SA | Records of EMP-A1 and EMP-B1 | 200 each, full data (unchanged) | |
-| 11 | EXM | Record of EMP-B1 | 200 (examiner unchanged per PR #182 note) | |
+| 11a | EXM-A | `GET /admin/users/{EMP-A1}/record` (in-department) | 200; 2 sessions (examiner is scoped to its own department, FR-BB117 D-2 / #218) | |
+| 11b | EXM-A | `GET /admin/users/{EMP-B1}/record` (out-of-department) | 404 `NOT_FOUND`; no session data in the body | |
+| 11c | EXM-A | `GET /admin/users/{EMP-B1}/record/export` and `/progress` | 404 `NOT_FOUND`; body is NOT CSV and contains no session row | |
 
 ## Scenario S2: Per-exam analytics and results CSV (API)
 
@@ -117,8 +120,8 @@ Fresh browser context per role.
 
 ## Pass / fail / env-issue criteria
 
-- **PASS:** every S1-S3 expectation holds in API and UI, with the exact counts above, and SA/EXM views are unchanged.
-- **FAIL (defect):** DA-A obtains any Dept B record, record CSV row, exam participant figure, results CSV row, dashboard row or PDF content (this is the issue #165 symptom); SA/EXM view loses data; a 500 or empty-200 on any scoped endpoint; DA-A loses access to its own subtree (e.g. EMP-A2 in child department hidden).
+- **PASS:** every S1-S3 expectation holds in API and UI, with the exact counts above, and the SA view is unchanged (EXM-A sees its own department only).
+- **FAIL (defect):** DA-A obtains any Dept B record, record CSV row, exam participant figure, results CSV row, dashboard row or PDF content (this is the issue #165 symptom); SA view loses data, or EXM-A sees a Dept B record; a 500 or empty-200 on any scoped endpoint; DA-A loses access to its own subtree (e.g. EMP-A2 in child department hidden).
 - **ENV ISSUE:** stack unreachable; seed of S0.6-S0.7 fails for reasons unrelated to scoping (route to Infrastructure Configuration); recursive-subtree SQL error with a Postgres message (this is a defect, not an env issue, because the developer could not verify it live).
 
 ## Pre-fix baseline (before PR #182 merges, expected observations on `main` `a45b92b`)
@@ -136,7 +139,7 @@ S1 steps 1 PASS (already scoped); step 4 and 7 FAIL (200 with Dept B data), step
 | Issue #165 (4) | Dashboard recent activity / overdue / totals scoped | S3 steps 1-6, S4 step 1 |
 | PR #182 note | Descendant departments included | S1 step 3 |
 | PR #182 note | Results CSV, PDF scoped | S2 steps 3, 4; S3 step 4 |
-| PR #182 note | super_admin / examiner unchanged | S1 steps 10, 11; S2 step 6; S3 step 6 |
+| PR #182 note, amended by #309 | super_admin unchanged; examiner scoped to own department (FR-BB117 D-2) | S1 steps 10, 11a-11c; S2 step 6; S3 step 6 |
 | FR-BB54 AC-1 | Employee 403 | S3 step 8 |
 | FR-BB54 AC-2, AC-10 | CSV Content-Type, filename | S1 step 6, S2 step 3 |
 | api-conventions 2.1 | 401 `MISSING_TOKEN`, 403 `FORBIDDEN`, 404 `NOT_FOUND` | S1 steps 4, 9; S3 steps 7, 8 |

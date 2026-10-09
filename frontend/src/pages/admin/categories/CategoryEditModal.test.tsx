@@ -164,10 +164,12 @@ describe('CategoryEditModal - create mode', () => {
     expect(sent[0].body).not.toHaveProperty('track')
   })
 
-  it('blocks submit and shows the name error when the name is empty', async () => {
+  it('blocks submit and shows the name error under the name field when the name is empty', async () => {
     const { onClose } = renderModal()
     await userEvent.click(saveButton())
-    expect(await screen.findByText('Name is required (max 100 characters)')).toBeInTheDocument()
+    const nameError = await screen.findByText('Name is required (max 100 characters)')
+    expect(nameInput().parentElement).toContainElement(nameError)
+    expect(screen.queryByText('Sort order must be a whole number')).not.toBeInTheDocument()
     expect(sent).toEqual([])
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -189,6 +191,11 @@ describe('CategoryEditModal - create mode', () => {
     // Validation stops the request; the modal stays open for correction.
     await waitFor(() => expect(saveButton()).toBeEnabled())
     expect(sent).toEqual([])
+    // The sort-order error uses its own message, shown under the Sort order field (not the name text).
+    const sortError = await screen.findByText('Sort order must be a whole number')
+    expect(sortInput().parentElement).toContainElement(sortError)
+    expect(screen.queryByText('Name is required (max 100 characters)')).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })

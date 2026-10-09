@@ -304,7 +304,8 @@
       "inUse": "Cannot delete: {{count}} question(s) still use this category",
       "cycle": "Cannot set this parent — it would create a cycle",
       "parentNotFound": "Selected parent no longer exists",
-      "invalidName": "Name is required (max 100 characters)"
+      "invalidName": "Name is required (max 100 characters)",
+      "invalidSortOrder": "Sort order must be a whole number"
     },
     "messages": {
       "deleteSuccess": "Category deleted."

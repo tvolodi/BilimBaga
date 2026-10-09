@@ -83,3 +83,22 @@ func TestGetSessionCategoryTrack_Found(t *testing.T) {
 		t.Fatalf("got (%q,%q,%v)", track, uid, err)
 	}
 }
+
+// ISS-093: exams.passing_score_pct is numeric(5,2); pgx hands it over as the
+// string "70.00", which must not break the scan into the insight data.
+func TestGetExamInsightData_NumericPassingScore(t *testing.T) {
+	db, f := newFakeDB(t)
+	f.queue([]string{"title", "passing_score_pct"}, [][]driver.Value{{"Safety 101", "70.00"}})
+	f.queue([]string{"total_attempts", "pass_rate", "avg_score_pct", "avg_completion_secs"},
+		[][]driver.Value{{int64(0), nil, nil, nil}})
+	f.queue([]string{"order_num", "stem", "correct_rate", "avg_time_secs"}, nil)
+	repo := NewRepository(db)
+
+	data, err := repo.GetExamInsightData(context.Background(), "exam-1", "public")
+	if err != nil {
+		t.Fatalf("numeric passing_score_pct must scan: %v", err)
+	}
+	if data.PassingScorePct != 70 {
+		t.Fatalf("PassingScorePct = %d, want 70", data.PassingScorePct)
+	}
+}

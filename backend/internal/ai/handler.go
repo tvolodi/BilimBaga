@@ -3,6 +3,7 @@ package ai
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
@@ -95,6 +96,7 @@ func (h *Handler) HandleGetInsights(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrAIUnavailable):
 			api.WriteError(w, http.StatusServiceUnavailable, "AI_UNAVAILABLE", "AI service unavailable")
 		default:
+			slog.Error("ai: get insights failed", "error", err, "examId", examID)
 			api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "an unexpected error occurred")
 		}
 		return

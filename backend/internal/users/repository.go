@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -93,6 +94,9 @@ func (r *pgRepository) List(ctx context.Context, f ListFilters, deptScope *strin
 
 // GetByID fetches a single user by UUID, joined with department and role names.
 func (r *pgRepository) GetByID(ctx context.Context, id string) (*User, error) {
+	if !api.IsUUID(id) {
+		return nil, ErrNotFound // a malformed id cannot exist; avoid a Postgres cast error (500)
+	}
 	const q = `
 		SELECT u.id, u.email, u.full_name, u.department_id, d.name AS department_name,
 		       u.role_id, ro.name AS role_name, u.status, u.force_password_change,
@@ -116,6 +120,9 @@ const existsEmailQuery = `SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) 
 
 // Create inserts a new user with a pre-hashed password and returns the persisted record.
 func (r *pgRepository) Create(ctx context.Context, email, fullName, passwordHash string, departmentID *string, roleID string) (*User, error) {
+	if err := validateIDs(roleID, departmentID); err != nil {
+		return nil, err
+	}
 	// The UNIQUE(email) constraint is case-sensitive, so a legacy mixed-case row would not
 	// block its lowercase twin. Check case-insensitively first (ISS-164); the constraint
 	// below still catches concurrent inserts.
@@ -155,6 +162,9 @@ func (r *pgRepository) Create(ctx context.Context, email, fullName, passwordHash
 
 // Update sets full_name, department_id, and role_id for an existing user.
 func (r *pgRepository) Update(ctx context.Context, id, fullName string, departmentID *string, roleID string) (*User, error) {
+	if err := validateIDs(roleID, departmentID); err != nil {
+		return nil, err
+	}
 	const q = `
 		UPDATE users
 		SET    full_name = $1, department_id = $2, role_id = $3, updated_at = now()
@@ -223,15 +233,21 @@ func (r *pgRepository) Unlock(ctx context.Context, id string) error {
 
 // GetDepartmentIDByName resolves a department name to its UUID.
 func (r *pgRepository) GetDepartmentIDByName(ctx context.Context, name string) (string, error) {
-	var id string
-	const q = `SELECT id FROM departments WHERE name = $1 LIMIT 1`
-	if err := r.db.GetContext(ctx, &id, q, name); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", ErrNotFound
-		}
+	// Department names are unique only per parent, so fetch up to two rows to detect ambiguity
+	// instead of silently picking one (which could defeat the scope check).
+	var ids []string
+	const q = `SELECT id FROM departments WHERE name = $1 ORDER BY id LIMIT 2`
+	if err := r.db.SelectContext(ctx, &ids, q, name); err != nil {
 		return "", fmt.Errorf("users.GetDepartmentIDByName: %w", err)
 	}
-	return id, nil
+	switch len(ids) {
+	case 0:
+		return "", ErrNotFound
+	case 1:
+		return ids[0], nil
+	default:
+		return "", ErrAmbiguousName
+	}
 }
 
 // ListRoles returns all roles ordered by name.
@@ -259,6 +275,9 @@ func (r *pgRepository) GetRoleIDByName(ctx context.Context, name string) (string
 
 // GetRoleNameByID resolves a role UUID to its name.
 func (r *pgRepository) GetRoleNameByID(ctx context.Context, roleID string) (string, error) {
+	if !api.IsUUID(roleID) {
+		return "", ErrNotFound
+	}
 	var name string
 	const q = `SELECT name FROM roles WHERE id = $1`
 	if err := r.db.GetContext(ctx, &name, q, roleID); err != nil {

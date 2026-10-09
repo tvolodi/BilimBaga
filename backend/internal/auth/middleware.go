@@ -106,6 +106,10 @@ func Authenticate(jwtSecret string, opts ...AuthOption) func(http.Handler) http.
 					}
 					return
 				}
+				if claimsStale(st, role, deptID) {
+					api.WriteError(w, http.StatusUnauthorized, "TOKEN_REVOKED", "account changed; please sign in again")
+					return
+				}
 				if tokenPredatesPasswordChange(int64(iat), st.PasswordChangedAt) {
 					api.WriteError(w, http.StatusUnauthorized, "TOKEN_REVOKED", "password was changed; please sign in again")
 					return
@@ -129,6 +133,16 @@ func Authenticate(jwtSecret string, opts ...AuthOption) func(http.Handler) http.
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// claimsStale reports whether the account is no longer active or its role/department
+// differ from the token's claims (ISS-240). A state without Status carries no identity
+// information (test doubles) and is not checked.
+func claimsStale(st AccountState, role, deptID string) bool {
+	if st.Status == "" {
+		return false
+	}
+	return st.Status != "active" || st.RoleName != role || st.DepartmentID != deptID
 }
 
 func parseJWT(raw, secret string) (jwt.MapClaims, error) {

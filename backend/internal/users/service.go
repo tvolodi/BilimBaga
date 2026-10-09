@@ -140,7 +140,7 @@ func (s *service) GetUser(ctx context.Context, id, callerRole, callerUserID, cal
 	case callerRole == "department_admin" || (s.canPerm != nil && s.canPerm(callerRole, "users", "read")):
 		// department-scoped read for roles holding users:read
 		if !inCallerScope(callerRole, callerDeptID, u.DepartmentID) {
-			return nil, ErrForbidden
+			return nil, ErrNotFound
 		}
 	default:
 		return nil, ErrForbidden
@@ -207,15 +207,16 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 		return nil, err
 	}
 
+	// Out-of-scope targets look exactly like unknown ids (404): no existence probing.
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
-		return nil, ErrForbidden
+		return nil, ErrNotFound
 	}
 	// FR-BB117 D-1: authorise against the target's role before any write or secret.
 	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
 		return nil, err
 	}
-	// A non-super_admin caller may not change its own role (self-escalation).
-	if !isOrgWide(callerRole) && id == callerUserID && req.RoleID != existing.RoleID {
+	// Nobody, super_admin included, may change their own role (FR-BB117 D-4).
+	if id == callerUserID && !sameID(req.RoleID, existing.RoleID) {
 		return nil, ErrForbidden
 	}
 	// A scoped caller may not move a user out of its own department.
@@ -231,7 +232,7 @@ func (s *service) UpdateUser(ctx context.Context, id string, req UpdateRequest, 
 	}
 
 	// An unchanged role needs no assignment check: the target check above already covers it.
-	if req.RoleID != existing.RoleID {
+	if !sameID(req.RoleID, existing.RoleID) {
 		if err := s.checkRoleAssignment(ctx, req.RoleID, callerRole); err != nil {
 			return nil, err
 		}
@@ -254,6 +255,10 @@ func (s *service) DeactivateUser(ctx context.Context, id, callerRole, callerDept
 	}
 
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
+		return ErrNotFound
+	}
+	// Nobody, super_admin included, may deactivate themselves (FR-BB117 D-4).
+	if id == callerUserID {
 		return ErrForbidden
 	}
 	// FR-BB117 D-1: authorise against the target's role before any write or secret.
@@ -279,7 +284,7 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 	}
 
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
-		return nil, ErrForbidden
+		return nil, ErrNotFound
 	}
 	// FR-BB117 D-1: authorise against the target's role before any write or secret.
 	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
@@ -314,7 +319,7 @@ func (s *service) UnlockUser(ctx context.Context, id, callerRole, callerDeptID, 
 		return nil, err
 	}
 	if !inCallerScope(callerRole, callerDeptID, existing.DepartmentID) {
-		return nil, ErrForbidden
+		return nil, ErrNotFound
 	}
 	// FR-BB117 D-1: authorise against the target's role before any write or secret.
 	if err := s.checkTargetActionable(existing, callerRole, callerUserID); err != nil {
@@ -337,7 +342,7 @@ func (s *service) ImportUsers(ctx context.Context, rows []CSVRow, commit bool, c
 
 	for _, row := range rows {
 		row.Email = api.NormalizeEmail(row.Email)
-		errStr := s.validateImportRow(ctx, row, callerRole, callerDeptID)
+		deptID, roleID, errStr := s.validateImportRow(ctx, row, callerRole, callerDeptID)
 		if errStr != "" {
 			errCopy := errStr
 			preview.Errors = append(preview.Errors, ImportRowResult{
@@ -352,7 +357,7 @@ func (s *service) ImportUsers(ctx context.Context, rows []CSVRow, commit bool, c
 		}
 
 		if commit {
-			if err := s.commitImportRow(ctx, row, callerUserID, ip); err != nil {
+			if err := s.commitImportRow(ctx, row, deptID, roleID); err != nil {
 				msg := err.Error()
 				preview.Errors = append(preview.Errors, ImportRowResult{
 					RowNum:         row.RowNum,
@@ -378,55 +383,52 @@ func (s *service) ImportUsers(ctx context.Context, rows []CSVRow, commit bool, c
 	return preview, nil
 }
 
-// validateImportRow returns an error string if the row is invalid, or "" if valid.
-func (s *service) validateImportRow(ctx context.Context, row CSVRow, callerRole, callerDeptID string) string {
+// validateImportRow resolves the row's department and role once and returns their ids with
+// an empty error string, or an error string if the row is invalid. The ids are reused for the
+// commit so the validated department is exactly the one written.
+func (s *service) validateImportRow(ctx context.Context, row CSVRow, callerRole, callerDeptID string) (deptID, roleID, errStr string) {
 	if row.Email == "" || !emailRegex.MatchString(row.Email) {
-		return "invalid email"
+		return "", "", "invalid email"
 	}
 	if row.FullName == "" {
-		return "full_name is required"
+		return "", "", "full_name is required"
 	}
 
 	deptID, err := s.repo.GetDepartmentIDByName(ctx, row.DepartmentName)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return fmt.Sprintf("unknown department: %s", row.DepartmentName)
+		switch {
+		case errors.Is(err, ErrNotFound):
+			return "", "", fmt.Sprintf("unknown department: %s", row.DepartmentName)
+		case errors.Is(err, ErrAmbiguousName):
+			return "", "", fmt.Sprintf("ambiguous department name: %s matches more than one department", row.DepartmentName)
 		}
-		return "department lookup failed"
+		return "", "", "department lookup failed"
 	}
 
 	if !inCallerScope(callerRole, callerDeptID, &deptID) {
-		return fmt.Sprintf("department %s is outside your scope", row.DepartmentName)
+		return "", "", fmt.Sprintf("department %s is outside your scope", row.DepartmentName)
 	}
 
-	roleID, err := s.repo.GetRoleIDByName(ctx, row.RoleName)
+	roleID, err = s.repo.GetRoleIDByName(ctx, row.RoleName)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return fmt.Sprintf("unknown role: %s", row.RoleName)
+			return "", "", fmt.Sprintf("unknown role: %s", row.RoleName)
 		}
-		return "role lookup failed"
+		return "", "", "role lookup failed"
 	}
 	if err := s.checkRoleAssignment(ctx, roleID, callerRole); err != nil {
 		if errors.Is(err, ErrForbidden) {
-			return fmt.Sprintf("role %s cannot be assigned by your role", row.RoleName)
+			return "", "", fmt.Sprintf("role %s cannot be assigned by your role", row.RoleName)
 		}
-		return "role check failed"
+		return "", "", "role check failed"
 	}
 
-	return ""
+	return deptID, roleID, ""
 }
 
-// commitImportRow writes one valid import row to the database.
-func (s *service) commitImportRow(ctx context.Context, row CSVRow, callerUserID, ip string) error {
-	deptID, err := s.repo.GetDepartmentIDByName(ctx, row.DepartmentName)
-	if err != nil {
-		return fmt.Errorf("resolve department: %w", err)
-	}
-	roleID, err := s.repo.GetRoleIDByName(ctx, row.RoleName)
-	if err != nil {
-		return fmt.Errorf("resolve role: %w", err)
-	}
-
+// commitImportRow writes one valid import row to the database using the ids resolved by
+// validateImportRow.
+func (s *service) commitImportRow(ctx context.Context, row CSVRow, deptID, roleID string) error {
 	tmpPwd, err := generateTempPassword()
 	if err != nil {
 		return fmt.Errorf("generate password: %w", err)
@@ -436,17 +438,30 @@ func (s *service) commitImportRow(ctx context.Context, row CSVRow, callerUserID,
 		return fmt.Errorf("hash password: %w", err)
 	}
 
-	u, err := s.repo.Create(ctx, row.Email, row.FullName, string(hash), &deptID, roleID)
-	if err != nil {
+	if _, err := s.repo.Create(ctx, row.Email, row.FullName, string(hash), &deptID, roleID); err != nil {
 		if errors.Is(err, ErrDuplicateEmail) {
 			return fmt.Errorf("email already exists: %s", row.Email)
 		}
 		return fmt.Errorf("create user: %w", err)
 	}
-
-	_ = u // suppress unused warning
 	return nil
 }
+
+// validateIDs rejects a malformed role_id or department_id (ErrValidation, mapped to 422)
+// before it reaches Postgres, where the uuid cast would fail with a 500. Called by the
+// repository write methods, the layer that owns the uuid columns.
+func validateIDs(roleID string, departmentID *string) error {
+	if roleID != "" && !api.IsUUID(roleID) {
+		return fmt.Errorf("%w: role_id must be a valid UUID", ErrValidation)
+	}
+	if departmentID != nil && !api.IsUUID(*departmentID) {
+		return fmt.Errorf("%w: department_id must be a valid UUID", ErrValidation)
+	}
+	return nil
+}
+
+// sameID compares two UUID strings case-insensitively.
+func sameID(a, b string) bool { return strings.EqualFold(a, b) }
 
 // builtinRank is the strict rank hierarchy of the built-in roles (FR-BB117 D-1, Supervisor
 // decision): super_admin > department_admin > examiner > employee. A built-in caller may
@@ -551,7 +566,9 @@ func (s *service) canReachRole(roleName, callerRole string) error {
 	return s.permissionSubset(roleName, callerRole)
 }
 
-// permissionSubset reports nil iff every permission of roleName is held by callerRole.
+// permissionSubset reports nil iff the permissions of roleName are a STRICT subset of those of
+// callerRole (FR-BB117 D-4): a custom role with exactly the caller's permissions is a peer and
+// is refused, so a caller can never mint or manage an equal-power role.
 func (s *service) permissionSubset(roleName, callerRole string) error {
 	if s.permsFor == nil || s.canPerm == nil {
 		return ErrForbidden
@@ -562,13 +579,21 @@ func (s *service) permissionSubset(roleName, callerRole string) error {
 		// permissions: not provably a subset, so fail closed.
 		return ErrForbidden
 	}
+	roleSet := make(map[string]bool, len(rolePerms))
 	for _, p := range rolePerms {
 		res, act, _ := strings.Cut(p, ":")
 		if !s.canPerm(callerRole, res, act) {
 			return ErrForbidden
 		}
+		roleSet[p] = true
 	}
-	return nil
+	// Strictness: the caller must hold at least one permission the role lacks.
+	for _, p := range s.permsFor(callerRole) {
+		if !roleSet[p] {
+			return nil
+		}
+	}
+	return ErrForbidden
 }
 
 // ListRoles returns all roles from the database, each annotated with whether the CURRENT

@@ -87,7 +87,7 @@ type Repository interface {
 	// of an exam, used to build the dynamic CSV header (AC-3).
 	GetExamQuestions(ctx context.Context, examID, tenantID string) ([]ExamQuestion, error)
 
-	// StreamExamResultSessions returns all submitted/grading_pending sessions for
+	// StreamExamResultSessions returns all submitted/auto_submitted/grading_pending sessions for
 	// one exam scoped to the given tenant (AC-3, AC-8). The caller must close the
 	// returned *sqlx.Rows.
 	StreamExamResultSessions(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error)
@@ -753,7 +753,7 @@ SELECT
 FROM session_questions sq
 JOIN exam_sessions es ON es.id = sq.session_id
 WHERE es.exam_id = $1
-  AND es.status IN ('submitted', 'grading_pending')
+  AND es.status IN ('submitted', 'auto_submitted', 'grading_pending')
 GROUP BY sq.question_id
 ORDER BY position`
 
@@ -765,7 +765,7 @@ ORDER BY position`
 }
 
 // StreamExamResultSessions returns an open *sqlx.Rows cursor over
-// submitted/grading_pending sessions for one exam scoped to the tenant.
+// submitted/auto_submitted/grading_pending sessions for one exam scoped to the tenant.
 // The caller is responsible for closing the rows.
 func (r *postgresRepository) StreamExamResultSessions(ctx context.Context, examID, tenantID string) (*sqlx.Rows, error) {
 	const q = `
@@ -782,7 +782,7 @@ FROM exam_sessions es
 JOIN users u ON u.id = es.user_id
 LEFT JOIN departments d ON d.id = u.department_id
 WHERE es.exam_id = $1
-  AND es.status IN ('submitted', 'grading_pending')
+  AND es.status IN ('submitted', 'auto_submitted', 'grading_pending')
 ORDER BY es.started_at`
 
 	rows, err := r.db.QueryxContext(ctx, q, examID)

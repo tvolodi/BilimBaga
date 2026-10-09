@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { downloadFile } from '@/api/download'
 import type { ExamListItem } from '@/api/exams'
+import { errorWithCode } from '@/api/errors'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -23,9 +24,9 @@ export function useExamsListForReports() {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
-      if (!res.ok) throw new Error('ERR_FETCH_EXAMS')
-      const body = await res.json() as { data: ExamListResponse; error: null | { code: string; message: string } }
-      if (body.error) throw new Error(body.error.message)
+      const body = (await res.json().catch(() => null)) as { data: ExamListResponse; error: null | { code: string; message: string } } | null
+      if (body?.error) throw errorWithCode(body.error)
+      if (!res.ok || !body) throw new Error('ERR_FETCH_EXAMS')
       return body.data.items
     },
     staleTime: 60 * 1000,

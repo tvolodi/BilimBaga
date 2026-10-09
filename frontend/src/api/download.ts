@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
+import { markPasswordChangeRequired, PASSWORD_CHANGE_REQUIRED } from '@/lib/passwordChangeRequired'
 
 export interface DownloadError extends Error {
   code: string
@@ -59,6 +60,7 @@ export async function downloadFile(
   if (!res.ok) {
     if (res.status === 401) throw downloadError('ERR_UNAUTHORIZED', 401)
     const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null
+    if (res.status === 403 && body?.error?.code === PASSWORD_CHANGE_REQUIRED) markPasswordChangeRequired(qc)
     throw downloadError(body?.error?.code ?? 'ERR_DOWNLOAD', res.status)
   }
   const blob = await res.blob()

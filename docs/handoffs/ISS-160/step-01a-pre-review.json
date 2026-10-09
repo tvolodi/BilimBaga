@@ -1,0 +1,18 @@
+{
+  "run_id": "ISS-160",
+  "pipeline": "B",
+  "root_cause": "force_password_change enforced only by the SPA; auth.Authenticate never checked it",
+  "files_changed": [
+    "backend/internal/auth/password_epoch.go", "backend/internal/auth/middleware.go",
+    "backend/internal/auth/handler.go", "backend/internal/auth/recovery_handler.go",
+    "backend/internal/router/router.go", "backend/internal/auth/hardening_test.go",
+    "backend/internal/auth/force_password_change_test.go",
+    "frontend/src/lib/passwordChangeRequired.ts", "frontend/src/lib/passwordChangeRequired.test.ts",
+    "frontend/src/components/PasswordChangeGuard.tsx", "frontend/src/components/PasswordChangeGuard.test.tsx",
+    "frontend/src/App.tsx", "frontend/src/api/auth.ts", "frontend/src/api/download.ts", "frontend/src/api/download.test.ts",
+    "frontend/src/pages/auth/ChangePasswordPage.tsx", "frontend/src/locales/en.json", "frontend/src/locales/ru.json", "frontend/src/locales/kk.json",
+    "frontend/e2e/global-setup.ts", "frontend/e2e/fixtures/seed.ts", "scripts/seed-test-env.ts",
+    "scripts/lib/e2e-auth.ts", "scripts/lib/e2e-auth.test.ts",
+    "docs/issue-reports/ISS-160-backend-enforce-password-change.md"
+  ]
+}

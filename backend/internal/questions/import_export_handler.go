@@ -259,7 +259,8 @@ func parseCSVImport(r io.Reader) ([]ImportRow, error) {
 			if !ok || idx >= len(record) {
 				return ""
 			}
-			return strings.TrimSpace(record[idx])
+			// ISS-191: undo the export-side formula guard so exports re-import cleanly.
+			return api.CSVUnsafe(strings.TrimSpace(record[idx]))
 		}
 
 		locale := get("default_locale")
@@ -429,6 +430,7 @@ func rowToCSV(row *ExportRow) []string {
 	maxOpts := len(row.AnswerOptions)
 
 	var rec []string
+	// ISS-191: all cells are text; guard against spreadsheet formula injection.
 	rec = append(rec, row.Type, row.Difficulty, row.CategoryPath, row.DefaultLocale)
 
 	for _, loc := range locales {
@@ -461,7 +463,7 @@ func rowToCSV(row *ExportRow) []string {
 	}
 	rec = append(rec, strings.Join(correctIdxs, ","))
 	rec = append(rec, strings.Join(row.Tags, ";"))
-	return rec
+	return api.CSVSafeRecord(rec)
 }
 
 func sortedLocales(m map[string]TranslationDetail) []string {

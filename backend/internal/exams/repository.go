@@ -58,6 +58,8 @@ type Repository interface {
 	// Assignments (FR-BB33)
 	CreateAssignment(ctx context.Context, a *ExamAssignment) error
 	GetAssignmentByID(ctx context.Context, id string) (*ExamAssignment, error)
+	// UserDepartmentID returns the department of a user ("" when none); ErrAssignmentNotFound is not used - unknown user yields "".
+	UserDepartmentID(ctx context.Context, userID string) (string, error)
 	DeleteAssignment(ctx context.Context, id string) error
 	ListAssignmentsWithStats(ctx context.Context, examID string) ([]*AssignmentDetail, error)
 
@@ -873,4 +875,17 @@ func (r *postgresRepository) CountActiveSessionsForExam(ctx context.Context, exa
 		return 0, fmt.Errorf("exams: CountActiveSessionsForExam: %w", err)
 	}
 	return count, nil
+}
+
+// UserDepartmentID returns the department id of the user, or "" if the user is unknown or has none.
+func (r *postgresRepository) UserDepartmentID(ctx context.Context, userID string) (string, error) {
+	var dept sql.NullString
+	err := r.db.GetContext(ctx, &dept, `SELECT department_id FROM users WHERE id = $1`, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("exams: UserDepartmentID: %w", err)
+	}
+	return dept.String, nil
 }

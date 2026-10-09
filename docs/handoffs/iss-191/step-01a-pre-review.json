@@ -1,0 +1,19 @@
+{
+  "run_id": "iss-191",
+  "issues": ["#191", "#178"],
+  "root_cause": "CSV writers passed raw user text to encoding/csv (formula injection); results export SQL omitted auto_submitted and no exam existence check.",
+  "changed_files": [
+    "backend/internal/api/csv.go",
+    "backend/internal/api/csv_test.go",
+    "backend/internal/reports/service.go",
+    "backend/internal/reports/repository.go",
+    "backend/internal/reports/handler.go",
+    "backend/internal/reports/csv_injection_test.go",
+    "backend/internal/audit/handler.go",
+    "backend/internal/audit/csv_injection_test.go",
+    "backend/internal/questions/import_export_handler.go",
+    "backend/internal/questions/csv_injection_test.go",
+    "docs/issue-reports/ISS-191-csv-formula-injection.md",
+    "docs/issue-reports/README.md"
+  ]
+}

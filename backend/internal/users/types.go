@@ -29,8 +29,10 @@ type User struct {
 
 // RoleRow is a minimal role record returned by the list-roles endpoint.
 type RoleRow struct {
-	ID   string `db:"id"   json:"id"`
-	Name string `db:"name" json:"name"`
+	ID          string `db:"id"          json:"id"`
+	Name        string `db:"name"        json:"name"`
+	Description string `db:"description" json:"description"`
+	IsSystem    bool   `db:"is_system"   json:"is_system"`
 }
 
 // ListFilters holds the query parameters for the paginated list endpoint.

@@ -12,7 +12,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 ## Code that must be merged before running
 
 - **PR #162** (ISS-150 / ISS-152, commit `bd74606`): **MERGED** in `origin/main`. Migration 033 (forces `force_password_change=true` for `admin@bilimbaga.local` while its hash is still the 029/030 default hash), `auth.BootstrapAdmin` at startup (`BOOTSTRAP_ADMIN_PASSWORD` | `BOOTSTRAP_ADMIN_GENERATE` | warning), `scripts/seed-test-env.ts` reads `E2E_ADMIN_PASS`.
-- **PR #180** (ISS-160): server-side enforcement (`403 PASSWORD_CHANGE_REQUIRED` in `auth.Authenticate`, allow-list `POST /auth/change-password` and `GET /users/me`; cache of 10 s per user, invalidated on change/reset; frontend `PasswordChangeGuard`; e2e helpers). **OPEN at authoring time, not in `origin/main` `a45b92b`.** S2-S4 and S6 need it. Without it run them in baseline mode (see below).
+- **PR #180** (ISS-160): server-side enforcement (`403 PASSWORD_CHANGE_REQUIRED` in `auth.Authenticate`, allow-list `POST /auth/change-password` and `GET /users/me`; cache of 10 s per user, invalidated on change/reset; frontend `PasswordChangeGuard`; e2e helpers). **Merged to `origin/main` as d4c03ec (2026-10-09).** S2-S4 and S6 run in enforcement mode; baseline mode is only needed against an older build.
 - Migrations 029 (seed admin, force=true), 030 (resets admin to the documented default hash, force=false), 033 apply automatically at API startup. 030 and 029 are NOT to be edited; behaviour is verified, not changed.
 
 ## Important rule for the Runner (about the default password)

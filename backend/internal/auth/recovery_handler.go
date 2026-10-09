@@ -81,6 +81,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.passwordChanged(userID)
 	ctx := context.WithValue(r.Context(), ctxkeys.CtxUserID, userID)
 	h.writer.Write(ctx, r.WithContext(ctx), "auth.password_reset_completed", "user", &userID, nil)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password has been reset"}, nil)

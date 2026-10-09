@@ -11,6 +11,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/bilimbaga/bilimbaga/internal/rbac"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/rs/zerolog"
 )
@@ -19,7 +20,7 @@ import (
 // dereferenced when a route executes, so routes that are rejected by middleware
 // (auth, heartbeat) can be exercised without a database.
 func newRouter() http.Handler {
-	return router.New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	return router.New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		"test-secret", nil, nil, "test", zerolog.Nop())
 }
 
@@ -154,5 +155,42 @@ func TestRouter_AllPathParamsAreUUIDOrDocumentedExceptions(t *testing.T) {
 	}
 	if routes < 50 {
 		t.Fatalf("walked only %d routes; router construction looks wrong", routes)
+	}
+}
+
+// ISS-165: session-keyed admin endpoints are guarded by the department-scope
+// middleware. The test router has no database, so a department_admin request
+// that reaches the guard fails closed with a 500 before the (nil) handler runs.
+func TestRouter_SessionKeyedAdminRoutesAreDepartmentScoped(t *testing.T) {
+	cache := rbac.NewCache()
+	perms := rbac.PermissionSet{"exams:read": true, "grading:read": true, "grading:write": true}
+	cache.LoadFromMap(map[string]rbac.PermissionSet{"department_admin": perms})
+	h := router.New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		"test-secret", cache, nil, "test", zerolog.Nop())
+
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":           "11111111-1111-4111-8111-111111111111",
+		"role":          "department_admin",
+		"department_id": "22222222-2222-4222-8222-222222222222",
+		"exp":           time.Now().Add(time.Hour).Unix(),
+	})
+	token, err := tok.SignedString([]byte("test-secret"))
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	sid := "33333333-3333-4333-8333-333333333333"
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/admin/sessions/" + sid + "/result"},
+		{http.MethodGet, "/api/v1/admin/sessions/" + sid + "/certificate"},
+		{http.MethodGet, "/api/v1/admin/grading/" + sid},
+		{http.MethodPost, "/api/v1/admin/grading/" + sid + "/answers/" + sid},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusInternalServerError || !strings.Contains(rec.Body.String(), "failed to verify department scope") {
+			t.Errorf("%s %s: department_admin not guarded (status %d body %s)", tc.method, tc.path, rec.Code, rec.Body.String())
+		}
 	}
 }

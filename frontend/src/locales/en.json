@@ -386,6 +386,7 @@
     },
     "changePassword": {
       "title": "Set your new password",
+      "required": "You must change your password before you can continue.",
       "currentPasswordLabel": "Current password",
       "newPasswordLabel": "New password",
       "confirmPasswordLabel": "Confirm new password",

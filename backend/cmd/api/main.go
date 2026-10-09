@@ -24,6 +24,7 @@ import (
 	"github.com/bilimbaga/bilimbaga/internal/portal"
 	"github.com/bilimbaga/bilimbaga/internal/questions"
 	"github.com/bilimbaga/bilimbaga/internal/rbac"
+	"github.com/bilimbaga/bilimbaga/internal/roles"
 	"github.com/bilimbaga/bilimbaga/internal/reports"
 	"github.com/bilimbaga/bilimbaga/internal/router"
 	"github.com/bilimbaga/bilimbaga/internal/sessions"
@@ -196,8 +197,8 @@ func main() {
 
 	// Wire up user management.
 	usersRepo := users.NewRepository(db)
-	usersSvc := users.NewService(usersRepo, emailSvc)
-	usersHandler := users.NewHandler(usersSvc, auditWriter)
+	usersSvc := users.WithPermissionsLookup(users.WithPermissionChecker(users.NewService(usersRepo, emailSvc), rbacCache.Has), rbacCache.PermissionsFor)
+	usersHandler := users.NewHandler(usersSvc, auditWriter).WithPermissionsProvider(rbacCache.PermissionsFor)
 
 	// Wire up audit log.
 	auditSvc := audit.NewService(db)
@@ -264,11 +265,16 @@ func main() {
 	aiSvc := ai.NewService(aiRepo, aiClient, cfg.AnthropicModel, slogger)
 	aiHandler := ai.NewHandler(aiSvc)
 
+	// Wire up role management (FR-BB117); the cache is rebuilt after every mutation.
+	rolesRepo := roles.NewRepository(db)
+	rolesSvc := roles.NewService(rolesRepo, func(ctx context.Context) error { return rbacCache.Load(db) })
+	rolesHandler := roles.NewHandler(rolesSvc, auditWriter)
+
 	r := router.New(
 		tenantHandler, authHandler, deptHandler, usersHandler, auditHandler,
 		categoriesHandler, tagsHandler, questionsHandler, translationsHandler,
 		examsHandler, portalHandler, sessionsHandler, certHandler, reportsHandler,
-		emailHandler, aiHandler, cfg.JWTSecret, rbacCache, db, Version, zlog,
+		emailHandler, aiHandler, rolesHandler, cfg.JWTSecret, rbacCache, db, Version, zlog,
 	)
 
 	srv := &http.Server{

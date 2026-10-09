@@ -44,13 +44,38 @@ type Service interface {
 	BuildDashboardReport(ctx context.Context, tenantID string, from, to time.Time, companyName, logoBase64 string) (*DashboardReportData, error)
 }
 
+// DefaultMaxExportRows is the hard row cap for the exam results CSV export
+// when no explicit limit is configured (EXPORT_MAX_ROWS, ISS-210).
+const DefaultMaxExportRows = 200000
+
+// ErrExportTooLarge is returned when an export would exceed the configured row cap.
+var ErrExportTooLarge = errors.New("export exceeds the maximum number of rows")
+
 type service struct {
-	repo Repository
+	repo          Repository
+	maxExportRows int
+}
+
+// Option customises a Service built by NewService.
+type Option func(*service)
+
+// WithMaxExportRows sets the hard row cap for the exam results CSV export.
+// Values <= 0 keep the default (DefaultMaxExportRows).
+func WithMaxExportRows(n int) Option {
+	return func(s *service) {
+		if n > 0 {
+			s.maxExportRows = n
+		}
+	}
 }
 
 // NewService returns a Service backed by the given Repository.
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+func NewService(repo Repository, opts ...Option) Service {
+	s := &service{repo: repo, maxExportRows: DefaultMaxExportRows}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // GetDashboardMetrics fans out four concurrent DB queries, waits for all to
@@ -333,9 +358,11 @@ func (s *service) GetUserProgress(ctx context.Context, userID string) (*UserProg
 
 // ── FR-BB54: Export API ──────────────────────────────────────────────────────
 
-// StreamExamResultsCSV streams a CSV of all session results for one exam
-// directly to the http.ResponseWriter without buffering the full dataset (AC-8).
-// Headers and Content-Disposition are set by the handler before calling this.
+// StreamExamResultsCSV writes a CSV of all session results for one exam to w.
+// The session rows are collected in memory (the handler also buffers the body so
+// failures can still return a proper error status, ISS-163), so the export is
+// bounded: more than maxExportRows sessions yields ErrExportTooLarge (AC-8, ISS-210).
+// Headers and Content-Disposition are set by the handler.
 func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWriter, examID, tenantID string) error {
 	// ISS-178: an unknown exam id must yield ErrNotFound (handler maps it to 404)
 	// instead of a header-only CSV.
@@ -384,6 +411,9 @@ func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWrite
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
+			if len(sessions) >= s.maxExportRows {
+				return ErrExportTooLarge
+			}
 			var r ExamResultSessionRow
 			if err := rows.StructScan(&r); err != nil {
 				return fmt.Errorf("reports: StreamExamResultsCSV: scan: %w", err)
@@ -459,7 +489,7 @@ func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWrite
 }
 
 // StreamUserRecordCSV streams a CSV of all session history for one user
-// directly to the http.ResponseWriter without buffering (AC-5, AC-8).
+// to the http.ResponseWriter row by row (AC-5, AC-8).
 func (s *service) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error {
 	if _, err := s.repo.GetUserInfo(ctx, userID); err != nil {
 		return fmt.Errorf("reports: StreamUserRecordCSV: %w", err)

@@ -83,6 +83,7 @@ func TestRouter_MalformedUUIDPathParamIs404(t *testing.T) {
 		{http.MethodGet, "/api/v1/portal/sessions/not-a-uuid"},
 		{http.MethodGet, "/api/v1/portal/sessions/not-a-uuid/result"},
 		{http.MethodGet, "/api/v1/admin/grading/not-a-uuid"},
+		{http.MethodGet, "/api/v1/admin/exams/not-a-uuid/results/export"}, // ISS-210 G2
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		req.Header.Set("Authorization", "Bearer "+tok)

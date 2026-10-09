@@ -251,7 +251,7 @@ func serve() {
 
 	// Wire up dashboard metrics (FR-BB51) and export API (FR-BB54).
 	reportsRepo := reports.NewRepository(db)
-	reportsSvc := reports.NewService(reportsRepo)
+	reportsSvc := reports.NewService(reportsRepo, reports.WithMaxExportRows(cfg.ExportMaxRows))
 	reportsHandler := reports.NewHandler(reportsSvc, tenantSvc)
 
 	// Wire up AI question generation (FR-BB71).

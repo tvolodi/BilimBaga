@@ -1,9 +1,12 @@
 package certificates
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -246,6 +249,48 @@ func TestHandleVerifyCertificate_200_ValidFalse_ForUnknownCode(t *testing.T) {
 	require.NotNil(t, env.Data)
 	assert.False(t, env.Data.Valid)
 	assert.Empty(t, env.Data.EmployeeName)
+}
+
+// Internal/repository error → 500 standard envelope, error logged, no internals leaked.
+func TestHandleVerifyCertificate_500_OnInternalError_LoggedNoLeak(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	h := NewHandler(&mockSvc{
+		getByVerificationCodeFn: func(_ context.Context, _ string) (*VerifyResponse, error) {
+			return nil, fmt.Errorf("certificates: GetByVerificationCode: %w", errors.New("pq: connection refused secret-host"))
+		},
+	}, "https://example.com")
+
+	req := httptest.NewRequest(http.MethodGet, "/verify/some-code", nil)
+	w := httptest.NewRecorder()
+	newRouter(h).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	body := w.Body.String()
+	assertErrorCode(t, body, "INTERNAL_ERROR")
+	assert.NotContains(t, body, "secret-host")
+	assert.NotContains(t, body, "pq:")
+	assert.Contains(t, body, `"data":null`)
+	assert.Contains(t, buf.String(), "connection refused secret-host")
+}
+
+// ErrNotFound surfaced directly by a service is still a 200 valid=false.
+func TestHandleVerifyCertificate_200_ValidFalse_OnErrNotFound(t *testing.T) {
+	h := NewHandler(&mockSvc{
+		getByVerificationCodeFn: func(_ context.Context, _ string) (*VerifyResponse, error) {
+			return nil, fmt.Errorf("wrapped: %w", ErrNotFound)
+		},
+	}, "https://example.com")
+
+	req := httptest.NewRequest(http.MethodGet, "/verify/nope", nil)
+	w := httptest.NewRecorder()
+	newRouter(h).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"valid":false`)
 }
 
 // ── Assertion helper ──────────────────────────────────────────────────────────

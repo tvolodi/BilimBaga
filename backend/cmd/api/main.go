@@ -70,6 +70,13 @@ func main() {
 	// zerolog logger for the middleware chain and structured startup messages.
 	zlog := initLogger(cfg.LogLevel)
 
+	// No environment marker (e.g. APP_ENV) exists in Config, so warn whenever the
+	// localhost default is in use: certificate QR verify links would point at localhost.
+	if cfg.PublicAppURLDefaulted {
+		zlog.Warn().Str("public_app_url", cfg.PublicAppURL).
+			Msg("PUBLIC_APP_URL is not set; defaulting to localhost — certificate verify links/QR codes will be wrong in production")
+	}
+
 	// slog.Default() is kept for existing services that were written against *slog.Logger.
 	// They are not migrated here to avoid a large, unrelated diff.
 	slogger := slog.Default()

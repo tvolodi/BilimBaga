@@ -30,4 +30,6 @@ Workers: `bb-dev1`, `bb-dev2`, `bb-ba`, `bb-uat`, and Infra (`ai-dala-infra-fc` 
 - Priority: `prio:p0` interrupts everything (reassign immediately). Reopened issues (`reopen: N>=2`) get a BA look first.
 - Check state before any shared-state action (fetch, open PRs, recent commits). Other sessions may be working.
 - Escalations to the user are only reports; never wait.
+- **BA decisions win (retro-004)**: before sending a design instruction on an issue, read the BA decision comments on it first (`gh issue view <n> --comments`); if your instruction would differ from a BA decision, follow the BA.
+- **Backlog cap (retro-004)**: while more than 15 `role:dev status:ready` issues exist, do not file p2 follow-up issues unless they are security or correctness; fold small review nits into one grouped issue per area.
 - Do not message a worker more than once per tick unless replying.

@@ -15,6 +15,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // allow serving ../scripts/lib (vitest loads the guard tests from outside frontend/)
+    fs: { allow: ['..'] },
     proxy: {
       '/api': {
         target: apiTarget,
@@ -37,6 +39,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test/setup.ts',
+    // scripts/lib guard tests live outside frontend/ so the Docker build (frontend/-only context) never type-checks them
+    include: ['src/**/*.{test,spec}.{ts,tsx}', '../scripts/lib/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
     // minimum of 1 lets `--maxWorkers=N` (N below core count) work without a min/max conflict
     poolOptions: { threads: { minThreads: 1 }, forks: { minForks: 1 } },

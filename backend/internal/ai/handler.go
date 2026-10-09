@@ -46,7 +46,7 @@ func (h *Handler) HandleGenerateQuestions(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrValidation):
-			api.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			api.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		case errors.Is(err, ErrAIRateLimited):
 			api.WriteError(w, http.StatusTooManyRequests, "AI_RATE_LIMITED",
 				"You have reached the AI generation limit. Please try again in an hour.")

@@ -167,7 +167,7 @@ describe('ResetPasswordPage (FR-BB115 AC-7)', () => {
       http.post('/api/v1/auth/reset-password', () =>
         HttpResponse.json(
           { data: null, error: { code: 'VALIDATION_ERROR', message: 'weak' } },
-          { status: 400 },
+          { status: 422 },
         ),
       ),
     )

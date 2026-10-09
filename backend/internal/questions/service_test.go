@@ -799,8 +799,8 @@ func TestValidateCreateRequest_TypeSpecific(t *testing.T) {
 				DefaultLocale: "kk",
 				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
 				AnswerOptions: []answerOptionReq{
-					{SortOrder: 1, IsCorrect: true},
-					{SortOrder: 2, IsCorrect: false},
+					{SortOrder: 1, IsCorrect: true, Translations: map[string]answerTranslationReq{"kk": {Text: "A"}}},
+					{SortOrder: 2, IsCorrect: false, Translations: map[string]answerTranslationReq{"kk": {Text: "B"}}},
 				},
 			},
 			expectError: false,
@@ -837,8 +837,8 @@ func TestValidateCreateRequest_TypeSpecific(t *testing.T) {
 				DefaultLocale: "kk",
 				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
 				AnswerOptions: []answerOptionReq{
-					{SortOrder: 1, IsCorrect: true},
-					{SortOrder: 2, IsCorrect: false},
+					{SortOrder: 1, IsCorrect: true, Translations: map[string]answerTranslationReq{"kk": {Text: "A"}}},
+					{SortOrder: 2, IsCorrect: false, Translations: map[string]answerTranslationReq{"kk": {Text: "B"}}},
 				},
 			},
 			expectError: false,
@@ -866,8 +866,8 @@ func TestValidateCreateRequest_TypeSpecific(t *testing.T) {
 				DefaultLocale: "kk",
 				Translations:  map[string]translationReq{"kk": {Stem: "stem"}},
 				AnswerOptions: []answerOptionReq{
-					{SortOrder: 1, LikertWeight: fp(1.0)},
-					{SortOrder: 2, LikertWeight: fp(2.0)},
+					{SortOrder: 1, LikertWeight: fp(1.0), Translations: map[string]answerTranslationReq{"kk": {Text: "A"}}},
+					{SortOrder: 2, LikertWeight: fp(2.0), Translations: map[string]answerTranslationReq{"kk": {Text: "B"}}},
 				},
 			},
 			expectError: false,

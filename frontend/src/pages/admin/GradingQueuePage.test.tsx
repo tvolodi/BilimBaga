@@ -33,6 +33,21 @@ function renderPage() {
   )
 }
 
+describe('GradingQueuePage success notice (FR-BB47 AC-9)', () => {
+  it('shows the toast once from navigation state and not without it', () => {
+    useGradingQueue.mockReturnValue({ data: undefined, isLoading: true, isError: false })
+    const { unmount } = render(
+      <MemoryRouter initialEntries={[{ pathname: '/admin/grading', state: { gradingSuccess: true } }]}>
+        <GradingQueuePage />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('All grades submitted')
+    unmount()
+    renderPage()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
 describe('GradingQueuePage (FR-BB47)', () => {
   beforeEach(() => {
     useGradingQueue.mockReset()

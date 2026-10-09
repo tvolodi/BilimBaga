@@ -249,7 +249,8 @@ func buildTrackProgress(activity []TrackActivity, exams []ExamProgress) []TrackS
 
 // authorizeUser enforces department scoping (ISS-165): a department_admin may
 // only read data about users of its own department subtree (or itself); every
-// other role is unrestricted. Returns ErrForbidden otherwise.
+// other role is unrestricted. Returns ErrNotFound otherwise, so an out-of-scope user is
+// indistinguishable from an unknown one (no existence leak).
 func (s *service) authorizeUser(ctx context.Context, userID string) error {
 	sc := deptscope.FromContext(ctx)
 	if !sc.Restricted || sc.UserID == userID {
@@ -260,7 +261,7 @@ func (s *service) authorizeUser(ctx context.Context, userID string) error {
 		return err
 	}
 	if !ok {
-		return ErrForbidden
+		return ErrNotFound
 	}
 	return nil
 }
@@ -447,6 +448,9 @@ func (s *service) StreamExamResultsCSV(ctx context.Context, w http.ResponseWrite
 // StreamUserRecordCSV streams a CSV of all session history for one user
 // directly to the http.ResponseWriter without buffering (AC-5, AC-8).
 func (s *service) StreamUserRecordCSV(ctx context.Context, w http.ResponseWriter, userID, tenantID string) error {
+	if _, err := s.repo.GetUserInfo(ctx, userID); err != nil {
+		return fmt.Errorf("reports: StreamUserRecordCSV: %w", err)
+	}
 	if err := s.authorizeUser(ctx, userID); err != nil {
 		return fmt.Errorf("reports: StreamUserRecordCSV: %w", err)
 	}

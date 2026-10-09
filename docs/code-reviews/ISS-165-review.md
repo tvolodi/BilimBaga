@@ -28,3 +28,7 @@ Coverage verified: deptscope (scope/store/middleware), reports repository/servic
 
 ## Conclusion
 No authorization bypass found among the audited endpoints or SQL paths. Fail-closed behaviour is verified in code for a missing department, a nil store and lookup errors. Findings are advisory.
+
+## Addendum 2026-10-09 (BA decision on #165, revision after PASS)
+
+Out-of-scope ids now return 404 instead of 403, with the same code/message/body as the real not-found of each endpoint (`USER_NOT_FOUND` for record, progress and record CSV; `SESSION_NOT_FOUND` / "Session not found." for session result, certificate, grading detail and grade answer). The record CSV export now checks existence first, so unknown ids 404 for every role (findings 2 resolved). The unused `RequireUserInScope` was removed (finding 1 resolved); `ErrForbidden` no longer exists in `reports`. The statements above about 403 refer to the previous revision. The role wording is `examiner` (no `hr_admin`). Tests assert out-of-scope and unknown-id responses are byte-identical (reports handlers, deptscope middleware). Verdict unchanged: PASS.

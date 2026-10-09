@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +38,7 @@ func TestFromContext(t *testing.T) {
 	assert.Equal(t, "00000000-0000-0000-0000-000000000000", FromContext(principal("department_admin", "")).Arg(),
 		"a department_admin without a department matches nothing")
 
-	for _, role := range []string{"super_admin", "hr_admin", "examiner", "employee", ""} {
+	for _, role := range []string{"super_admin", "examiner", "employee", ""} {
 		s := FromContext(principal(role, deptA))
 		assert.False(t, s.Restricted, role)
 		assert.Nil(t, s.Arg(), role)
@@ -135,7 +136,7 @@ func TestMiddleware_Session(t *testing.T) {
 		lookup   bool
 	}{
 		{"own department passes", "department_admin", deptA, &fakeStore{inScope: true, found: true}, target, 200, true, true},
-		{"other department 403", "department_admin", deptA, &fakeStore{inScope: false, found: true}, target, 403, false, true},
+		{"other department 404", "department_admin", deptA, &fakeStore{inScope: false, found: true}, target, 404, false, true},
 		{"unknown session passes to handler 404", "department_admin", deptA, &fakeStore{}, target, 200, true, true},
 		{"malformed id passes to handler", "department_admin", deptA, &fakeStore{}, "not-a-uuid", 200, true, false},
 		{"lookup error 500", "department_admin", deptA, &fakeStore{err: errors.New("db")}, target, 500, false, true},
@@ -148,24 +149,23 @@ func TestMiddleware_Session(t *testing.T) {
 			assert.Equal(t, tc.wantCode, w.Code)
 			assert.Equal(t, tc.reached, reached)
 			assert.Equal(t, tc.lookup, tc.store.calls == 1)
-			if tc.wantCode == 403 {
-				assert.Contains(t, w.Body.String(), `"code":"FORBIDDEN"`)
-				assert.Contains(t, w.Body.String(), `"message":"insufficient permissions"`)
+			if tc.wantCode == 404 {
+				assert.Contains(t, w.Body.String(), `"code":"SESSION_NOT_FOUND"`)
 			}
 		})
 	}
 }
 
-func TestMiddleware_User_SelfAllowed(t *testing.T) {
-	st := &fakeStore{inScope: false, found: true}
-	w, reached := serve(RequireUserInScope(st, "id"), "department_admin", "", callerU)
-	assert.Equal(t, 200, w.Code)
-	assert.True(t, reached)
-	assert.Zero(t, st.calls)
-
-	w, reached = serve(RequireUserInScope(st, "id"), "department_admin", deptA, target)
-	assert.Equal(t, 403, w.Code)
-	assert.False(t, reached)
+// An out-of-scope session must be indistinguishable from an unknown one: the
+// guard's 404 is byte-identical to the sessions/certificates handlers' own
+// "session not found" response.
+func TestMiddleware_OutOfScopeIdenticalToUnknown(t *testing.T) {
+	w, _ := serve(RequireSessionInScope(&fakeStore{inScope: false, found: true}, "id"), "department_admin", deptA, target)
+	want := httptest.NewRecorder()
+	api.WriteError(want, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
+	assert.Equal(t, want.Code, w.Code)
+	assert.Equal(t, want.Body.String(), w.Body.String())
+	assert.Equal(t, want.Header().Get("Content-Type"), w.Header().Get("Content-Type"))
 }
 
 func TestMiddleware_NilStoreFailsClosedForDepartmentAdmin(t *testing.T) {

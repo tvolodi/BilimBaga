@@ -140,18 +140,22 @@ test.afterAll(async () => {
 })
 
 test.describe('department_admin scoping (ISS-165)', () => {
-  test('employee record, progress and CSV: own and descendant department OK, other department 403', async () => {
+  test('employee record, progress and CSV: own and descendant department OK, other department 404', async () => {
     for (const path of ['record', 'progress', 'record/export']) {
       for (const target of [empA, empA1]) {
         const ok = await call('GET', `/api/v1/admin/users/${target.id}/${path}`, deptAdmin.token)
         expect(ok.status, `${path} ${target.email}`).toBe(200)
       }
       const denied = await call('GET', `/api/v1/admin/users/${empB.id}/${path}`, deptAdmin.token)
-      expect(denied.status, `${path} other department`).toBe(403)
-      expect(denied.error?.code).toBe('FORBIDDEN')
+      expect(denied.status, `${path} other department`).toBe(404)
+      expect(denied.error?.code).toBe('USER_NOT_FOUND')
       expect(denied.text).not.toContain(empB.email)
+      // Indistinguishable from an unknown id (no existence leak).
+      const unknown = await call('GET', `/api/v1/admin/users/00000000-0000-4000-8000-000000000000/${path}`, deptAdmin.token)
+      expect(unknown.status).toBe(404)
+      expect(denied.text).toBe(unknown.text)
     }
-    // Same code/shape as GET /users/{id}.
+    // GET /users/{id} is unchanged (403 for another department).
     const viaUsers = await call('GET', `/api/v1/users/${empB.id}`, deptAdmin.token)
     expect(viaUsers.status).toBe(403)
 

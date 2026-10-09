@@ -33,11 +33,6 @@ func NewHandler(svc Service, tenantCfg TenantConfigProvider) *Handler {
 	return &Handler{svc: svc, tenantCfg: tenantCfg}
 }
 
-// writeForbidden writes the same 403 shape as GET /users/{id} (ISS-165).
-func writeForbidden(w http.ResponseWriter) {
-	api.WriteError(w, http.StatusForbidden, "FORBIDDEN", "insufficient permissions")
-}
-
 // GetDashboard handles GET /api/v1/admin/dashboard (FR-BB51).
 // Role restriction (examiner+) is enforced by the router via rbac.RequirePermission.
 func (h *Handler) GetDashboard(w http.ResponseWriter, r *http.Request) {
@@ -103,10 +98,6 @@ func (h *Handler) GetUserRecord(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
 			return
 		}
-		if errors.Is(err, ErrForbidden) {
-			writeForbidden(w)
-			return
-		}
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to load user record")
 		return
 	}
@@ -135,10 +126,6 @@ func (h *Handler) GetUserProgress(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			api.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
-			return
-		}
-		if errors.Is(err, ErrForbidden) {
-			writeForbidden(w)
 			return
 		}
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to load user progress")
@@ -213,8 +200,8 @@ func (h *Handler) UserRecordCSV(w http.ResponseWriter, r *http.Request) {
 	err := writeBufferedCSV(w, filename, func(bw http.ResponseWriter) error {
 		return h.svc.StreamUserRecordCSV(r.Context(), bw, userID, tenantID)
 	})
-	if errors.Is(err, ErrForbidden) {
-		writeForbidden(w)
+	if errors.Is(err, ErrNotFound) {
+		api.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
 		return
 	}
 	if err != nil {

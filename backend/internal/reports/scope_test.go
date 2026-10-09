@@ -61,12 +61,11 @@ func TestScope_GetUserRecord(t *testing.T) {
 		wantProbe bool
 	}{
 		{"own department (incl. descendants) OK", principal("department_admin", deptA), otherUser, true, nil, true},
-		{"other department forbidden", principal("department_admin", deptA), otherUser, false, ErrForbidden, true},
-		{"target without department forbidden", principal("department_admin", deptA), otherUser, false, ErrForbidden, true},
-		{"department_admin without department forbidden", principal("department_admin", ""), otherUser, false, ErrForbidden, true},
+		{"other department not found", principal("department_admin", deptA), otherUser, false, ErrNotFound, true},
+		{"target without department not found", principal("department_admin", deptA), otherUser, false, ErrNotFound, true},
+		{"department_admin without department not found", principal("department_admin", ""), otherUser, false, ErrNotFound, true},
 		{"own record always OK", principal("department_admin", ""), adminUser, false, nil, false},
 		{"super_admin unchanged", principal("super_admin", ""), otherUser, false, nil, false},
-		{"hr_admin unchanged", principal("hr_admin", deptA), otherUser, false, nil, false},
 		{"examiner unchanged", principal("examiner", deptA), otherUser, false, nil, false},
 		{"no principal unchanged", context.Background(), otherUser, false, nil, false},
 	}
@@ -99,7 +98,7 @@ func TestScope_GetUserRecord(t *testing.T) {
 	}
 }
 
-func TestScope_GetUserRecord_NotFoundBeatsForbidden(t *testing.T) {
+func TestScope_GetUserRecord_UnknownUser(t *testing.T) {
 	repo := &mockRepo{getUserInfoFn: func(context.Context, string) (*userInfoRow, error) { return nil, ErrNotFound }}
 	_, _, err := NewService(repo).GetUserRecord(principal("department_admin", deptA), otherUser, 1, 20)
 	require.ErrorIs(t, err, ErrNotFound)
@@ -110,7 +109,7 @@ func TestScope_GetUserRecord_ScopeLookupError(t *testing.T) {
 	repo := &mockRepo{userInScopeFn: func(context.Context, string) (bool, error) { return false, boom }}
 	_, _, err := NewService(repo).GetUserRecord(principal("department_admin", deptA), otherUser, 1, 20)
 	require.ErrorIs(t, err, boom)
-	assert.NotErrorIs(t, err, ErrForbidden)
+	assert.NotErrorIs(t, err, ErrNotFound, "a failed scope lookup is a 500, not a hidden 404")
 }
 
 func TestScope_GetUserProgress(t *testing.T) {
@@ -118,7 +117,7 @@ func TestScope_GetUserProgress(t *testing.T) {
 	svc := NewService(repo)
 
 	_, err := svc.GetUserProgress(principal("department_admin", deptA), otherUser)
-	require.ErrorIs(t, err, ErrForbidden)
+	require.ErrorIs(t, err, ErrNotFound)
 
 	repo.userInScopeFn = func(context.Context, string) (bool, error) { return true, nil }
 	res, err := svc.GetUserProgress(principal("department_admin", deptA), otherUser)
@@ -136,7 +135,7 @@ func TestScope_StreamUserRecordCSV(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	err := svc.StreamUserRecordCSV(principal("department_admin", deptA), w, otherUser, "t")
-	require.ErrorIs(t, err, ErrForbidden)
+	require.ErrorIs(t, err, ErrNotFound)
 	assert.Empty(t, w.Body.String(), "nothing may be written for an out-of-scope user")
 
 	repo.userInScopeFn = func(context.Context, string) (bool, error) { return true, nil }
@@ -149,30 +148,34 @@ func TestScope_StreamUserRecordCSV(t *testing.T) {
 	require.NoError(t, svc.StreamUserRecordCSV(principal("super_admin", ""), w, otherUser, "t"))
 }
 
-// ── Handler: 403 shape identical to GET /users/{id} ───────────────────────────
+// ── Handler: out-of-scope is byte-identical to unknown (no existence leak) ──
 
-func assertForbidden(t *testing.T, w *httptest.ResponseRecorder) {
-	t.Helper()
-	assert.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), `"code":"FORBIDDEN"`)
-	assert.Contains(t, w.Body.String(), `"message":"insufficient permissions"`)
-	assert.Contains(t, w.Body.String(), `"data":null`)
-	assert.NotEqual(t, "text/csv; charset=utf-8", w.Header().Get("Content-Type"))
-}
+func TestScope_Handlers_OutOfScopeIdenticalToUnknown(t *testing.T) {
+	outOfScope := &mockRepo{userInScopeFn: func(context.Context, string) (bool, error) { return false, nil }}
+	unknown := &mockRepo{getUserInfoFn: func(context.Context, string) (*userInfoRow, error) { return nil, ErrNotFound }}
 
-func TestScope_Handlers_DepartmentAdminOtherDepartment403(t *testing.T) {
-	repo := &mockRepo{userInScopeFn: func(context.Context, string) (bool, error) { return false, nil }}
-	h := NewHandler(NewService(repo), nil)
-
-	for name, call := range map[string]func(http.ResponseWriter, *http.Request){
-		"record":   h.GetUserRecord,
-		"progress": h.GetUserProgress,
-		"csv":      h.UserRecordCSV,
-	} {
+	handlers := func(repo *mockRepo) map[string]func(http.ResponseWriter, *http.Request) {
+		h := NewHandler(NewService(repo), nil)
+		return map[string]func(http.ResponseWriter, *http.Request){
+			"record":   h.GetUserRecord,
+			"progress": h.GetUserProgress,
+			"csv":      h.UserRecordCSV,
+		}
+	}
+	scoped, real := handlers(outOfScope), handlers(unknown)
+	for name := range scoped {
 		t.Run(name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			call(w, scopedRequest("department_admin", deptA, otherUser))
-			assertForbidden(t, w)
+			a := httptest.NewRecorder()
+			scoped[name](a, scopedRequest("department_admin", deptA, otherUser))
+			b := httptest.NewRecorder()
+			real[name](b, scopedRequest("department_admin", deptA, otherUser))
+
+			assert.Equal(t, http.StatusNotFound, a.Code)
+			assert.Contains(t, a.Body.String(), `"code":"USER_NOT_FOUND"`)
+			assert.Equal(t, b.Code, a.Code)
+			assert.Equal(t, b.Body.String(), a.Body.String(), "response bodies must be byte-identical")
+			assert.Equal(t, b.Header(), a.Header())
+			assert.NotEqual(t, "text/csv; charset=utf-8", a.Header().Get("Content-Type"))
 		})
 	}
 }
@@ -205,26 +208,8 @@ func TestScope_Handlers_SuperAdminNeverProbesScope(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestScope_Handler_MockedServiceForbidden(t *testing.T) {
-	svc := &mockSvc{
-		getUserRecordFn: func(context.Context, string, int, int) (*UserRecordResponse, int, error) {
-			return nil, 0, ErrForbidden
-		},
-		getUserProgressFn: func(context.Context, string) (*UserProgressResponse, error) { return nil, ErrForbidden },
-		streamUserRecordCSVFn: func(context.Context, http.ResponseWriter, string, string) error {
-			return ErrForbidden
-		},
-	}
-	h := NewHandler(svc, nil)
-	for _, call := range []func(http.ResponseWriter, *http.Request){h.GetUserRecord, h.GetUserProgress, h.UserRecordCSV} {
-		w := httptest.NewRecorder()
-		call(w, newRequestWithID(http.MethodGet, "/x", otherUser))
-		assertForbidden(t, w)
-	}
-}
-
 // Dashboard, exam analytics and exam-results CSV carry the principal to the
-// repository through the request context (no 403: they are filtered).
+// repository through the request context (filtered, never rejected).
 func TestScope_Handlers_PrincipalReachesRepository(t *testing.T) {
 	var seenRole string
 	repo := &mockRepo{
@@ -285,8 +270,8 @@ func TestScope_Repository_AggregateQueriesAreScoped(t *testing.T) {
 			call(NewRepository(db), principal("department_admin", ""))
 			assert.Equal(t, zeroUUID, lastArg(f, 0))
 
-			// super_admin / hr_admin / examiner: parameter is NULL (unrestricted).
-			for _, role := range []string{"super_admin", "hr_admin", "examiner"} {
+			// super_admin / examiner: parameter is NULL (unrestricted).
+			for _, role := range []string{"super_admin", "examiner"} {
 				db, f = newFakeDB(t)
 				call(NewRepository(db), principal(role, deptA))
 				assert.Nil(t, lastArg(f, 0), role)
@@ -324,4 +309,14 @@ func TestScope_Repository_UserInScope(t *testing.T) {
 	ok, err = NewRepository(db).UserInScope(principal("department_admin", deptA), otherUser)
 	require.NoError(t, err)
 	assert.False(t, ok)
+}
+
+func TestScope_StreamUserRecordCSV_UnknownUserIsNotFound(t *testing.T) {
+	repo := &mockRepo{getUserInfoFn: func(context.Context, string) (*userInfoRow, error) { return nil, ErrNotFound }}
+	for _, ctx := range []context.Context{principal("department_admin", deptA), principal("super_admin", "")} {
+		w := httptest.NewRecorder()
+		err := NewService(repo).StreamUserRecordCSV(ctx, w, otherUser, "t")
+		require.ErrorIs(t, err, ErrNotFound)
+		assert.Empty(t, w.Body.String())
+	}
 }

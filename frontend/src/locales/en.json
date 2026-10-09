@@ -111,6 +111,8 @@
       "title": "Import Users",
       "upload_label": "Upload CSV File",
       "upload_hint": "CSV columns: email, full_name, department_name, role_name (max 500 rows)",
+      "assignable_roles_hint": "Roles you may assign: {{roles}}",
+      "no_assignable_roles": "You cannot assign any role.",
       "preview_button": "Preview",
       "commit_button": "Import Valid Rows",
       "valid_count": "{{count}} valid row(s)",
@@ -131,7 +133,9 @@
       "unlock_success": "Account unlocked.",
       "unlock_error": "Could not unlock the account. Please try again.",
       "import_success": "Import completed.",
-      "error_generic": "An error occurred. Please try again."
+      "error_generic": "An error occurred. Please try again.",
+      "forbidden": "You are not allowed to assign this role or act on this user.",
+      "role_locked": "This user's current role cannot be changed by you."
     },
     "pagination": {
       "previous": "Previous",

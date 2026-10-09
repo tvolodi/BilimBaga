@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -171,16 +172,27 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 
 		cw := csv.NewWriter(w)
-		headerWritten := false
 
+		// ISS-199b/#219: the header must describe EVERY row, so a first pass over the
+		// stream collects the union of locales and the maximum option count (it keeps
+		// only those two small summaries, not the rows); the second pass writes
+		// records padded to the header width.
+		scan := newCSVExportScan()
 		exportErr := h.svc.StreamExport(r.Context(), filter, func(row *ExportRow) error {
-			if !headerWritten {
-				cw.Write(buildCSVHeader(row))
-				headerWritten = true
-			}
-			cw.Write(rowToCSV(row))
+			scan.add(row)
 			return nil
 		})
+		if exportErr == nil && scan.rows > 0 { // empty export: no rows, no header (unchanged)
+			cols := scan.columns()
+			if err := cw.Write(cols.header()); err != nil {
+				exportErr = err
+			}
+			if exportErr == nil {
+				exportErr = h.svc.StreamExport(r.Context(), filter, func(row *ExportRow) error {
+					return cw.Write(cols.record(row))
+				})
+			}
+		}
 		cw.Flush()
 		if exportErr != nil {
 			errs = append(errs, exportErr)
@@ -227,6 +239,8 @@ func parseCSVImport(r io.Reader) ([]ImportRow, error) {
 	cr := csv.NewReader(r)
 	cr.LazyQuotes = true
 	cr.TrimLeadingSpace = true
+	// ISS-199b: tolerate ragged records (legacy exports); see the extra-cell check below.
+	cr.FieldsPerRecord = -1
 
 	header, err := cr.Read()
 	if err != nil {
@@ -257,7 +271,17 @@ func parseCSVImport(r io.Reader) ([]ImportRow, error) {
 			// ISS-199: applies to every text column, legacy or <name>_<locale>.
 			return api.CSVUnsafe(strings.TrimSpace(record[pos]))
 		}
-		rows = append(rows, layout.buildRow(rowNum, get))
+		row := layout.buildRow(rowNum, get)
+		// Extra empty cells beyond the header are ignored; a non-empty one is data we
+		// cannot place, so the row is reported as an error instead of silently dropped.
+		for i := len(header); i < len(record); i++ {
+			if strings.TrimSpace(record[i]) != "" {
+				row.ParseErrors = append(row.ParseErrors,
+					fmt.Sprintf("row has %d cells but the header has %d columns (unexpected value in column %d)", len(record), len(header), i+1))
+				break
+			}
+		}
+		rows = append(rows, row)
 	}
 	return rows, nil
 }
@@ -340,84 +364,101 @@ func parseJSONImport(r io.Reader) ([]ImportRow, error) {
 
 // ── CSV export helpers ────────────────────────────────────────────────────────
 
-// buildCSVHeader produces the header row for exported CSV.
-// The column order matches AC-5/AC-8:
-// type, difficulty, category_path, default_locale, stem_{locale}…, explanation_{locale}…,
-// option_N_{locale}…, correct, tags
-func buildCSVHeader(sample *ExportRow) []string {
-	locales := sortedLocales(sample.Translations)
-	maxOpts := len(sample.AnswerOptions)
+// csvExportScan accumulates, across all rows, the locales and option count that
+// determine the export header.
+type csvExportScan struct {
+	locales map[string]struct{}
+	maxOpts int
+	rows    int
+}
 
-	var cols []string
-	cols = append(cols, "type", "difficulty", "category_path", "default_locale")
-	for _, loc := range locales {
+func newCSVExportScan() *csvExportScan {
+	return &csvExportScan{locales: map[string]struct{}{}}
+}
+
+func (s *csvExportScan) add(row *ExportRow) {
+	s.rows++
+	for loc := range row.Translations {
+		s.locales[loc] = struct{}{}
+	}
+	for _, opt := range row.AnswerOptions {
+		for loc := range opt.Translations {
+			s.locales[loc] = struct{}{}
+		}
+	}
+	if n := len(row.AnswerOptions); n > s.maxOpts {
+		s.maxOpts = n
+	}
+}
+
+// csvExportColumns is the fixed column layout of one export.
+type csvExportColumns struct {
+	locales []string // sorted alphabetically (stable, documented order)
+	maxOpts int
+}
+
+func (s *csvExportScan) columns() *csvExportColumns {
+	locs := make([]string, 0, len(s.locales))
+	for l := range s.locales {
+		locs = append(locs, l)
+	}
+	sort.Strings(locs)
+	return &csvExportColumns{locales: locs, maxOpts: s.maxOpts}
+}
+
+// header: type, difficulty, category_path, default_locale, stem_<loc>…,
+// explanation_<loc>…, option_N_<loc>… (N = 1..maxOpts over all rows), correct, tags.
+// Locales are the sorted union over all exported questions.
+func (c *csvExportColumns) header() []string {
+	cols := []string{"type", "difficulty", "category_path", "default_locale"}
+	for _, loc := range c.locales {
 		cols = append(cols, "stem_"+loc)
 	}
-	for _, loc := range locales {
+	for _, loc := range c.locales {
 		cols = append(cols, "explanation_"+loc)
 	}
-	for n := 1; n <= maxOpts; n++ {
-		for _, loc := range locales {
+	for n := 1; n <= c.maxOpts; n++ {
+		for _, loc := range c.locales {
 			cols = append(cols, fmt.Sprintf("option_%d_%s", n, loc))
 		}
 	}
-	cols = append(cols, "correct", "tags")
-	return cols
+	return append(cols, "correct", "tags")
 }
 
-func rowToCSV(row *ExportRow) []string {
-	locales := sortedLocales(row.Translations)
-	maxOpts := len(row.AnswerOptions)
-
-	var rec []string
-	// ISS-191: all cells are text; guard against spreadsheet formula injection.
+// record renders one row at exactly header() width. Missing locales / options are
+// empty cells. Text cells get the ISS-191 formula guard; padding stays empty.
+// Anything outside the scanned layout (data that appeared between the two passes)
+// is dropped rather than misaligning the row.
+func (c *csvExportColumns) record(row *ExportRow) []string {
+	rec := make([]string, 0, 6+len(c.locales)*(2+c.maxOpts))
 	rec = append(rec, row.Type, row.Difficulty, row.CategoryPath, row.DefaultLocale)
-
-	for _, loc := range locales {
+	for _, loc := range c.locales {
 		rec = append(rec, row.Translations[loc].Stem)
 	}
-	for _, loc := range locales {
+	for _, loc := range c.locales {
 		expl := ""
 		if e := row.Translations[loc].Explanation; e != nil {
 			expl = *e
 		}
 		rec = append(rec, expl)
 	}
-	for n := 1; n <= maxOpts; n++ {
-		opt := row.AnswerOptions[n-1]
-		for _, loc := range locales {
+	for n := 1; n <= c.maxOpts; n++ {
+		for _, loc := range c.locales {
 			text := ""
-			if at, ok := opt.Translations[loc]; ok {
-				text = at.Text
+			if n <= len(row.AnswerOptions) {
+				text = row.AnswerOptions[n-1].Translations[loc].Text
 			}
 			rec = append(rec, text)
 		}
 	}
-
-	// correct: 1-based indices of correct options.
 	var correctIdxs []string
 	for n, opt := range row.AnswerOptions {
-		if opt.IsCorrect {
+		if opt.IsCorrect && n < c.maxOpts {
 			correctIdxs = append(correctIdxs, strconv.Itoa(n+1))
 		}
 	}
-	rec = append(rec, strings.Join(correctIdxs, ","))
-	rec = append(rec, strings.Join(row.Tags, ";"))
+	rec = append(rec, strings.Join(correctIdxs, ","), strings.Join(row.Tags, ";"))
 	return api.CSVSafeRecord(rec)
-}
-
-func sortedLocales(m map[string]TranslationDetail) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	// Simple insertion sort — locale count is tiny (2-3).
-	for i := 1; i < len(keys); i++ {
-		for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
-			keys[j], keys[j-1] = keys[j-1], keys[j]
-		}
-	}
-	return keys
 }
 
 func formatFromFilename(name string) string {

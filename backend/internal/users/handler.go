@@ -130,7 +130,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 // ListRoles handles GET /api/v1/users/roles.
 func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
-	roles, err := h.svc.ListRoles(r.Context())
+	roles, err := h.svc.ListRoles(r.Context(), auth.RoleFromCtx(r.Context()))
 	if err != nil {
 		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list roles")
 		return

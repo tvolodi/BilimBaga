@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { userErrorKey } from '@/lib/assignableRoles'
 import { useDeactivateUser, type User } from '@/api/users'
 
 interface DeactivateConfirmDialogProps {
@@ -23,7 +24,8 @@ export function DeactivateConfirmDialog({ user, onClose }: DeactivateConfirmDial
       await deactivate.mutateAsync()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('users.messages.error_generic'))
+      const key = userErrorKey(err)
+      setError(key ? t(key) : err instanceof Error ? err.message : t('users.messages.error_generic'))
     }
   }
 

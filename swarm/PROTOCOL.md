@@ -83,7 +83,7 @@ Every worker must always have a next action: (a) assigned `task`; else (b) oldes
 - GitHub issues + labels = source of truth for work.
 - `docs/handoffs/<run-id>/` = pipeline payloads.
 - **Report numbering (retro-002)**: issue/review report files use `ISS-<github issue number>` (e.g. issue #88 -> `docs/issue-reports/ISS-088-<slug>.md`, `docs/code-reviews/ISS-088-review.md`). Never take "highest existing + 1": parallel sessions collide. This overrides the numbering step of `.claude/commands/issue-resolution.md` in the swarm.
-- `swarm/state/*.json` (git-ignored runtime; examples committed): `workers.json`, `retro.json`, `escalations.json`.
+- `swarm/state/*.json` (git-ignored runtime; examples committed): `workers.json`, `retro.json`, `escalations.json`. Per-role checkpoint/heartbeat files `<role>.json`: section 11.
 - `docs/retrospectives/retro-NNN.md` = audits.
 
 ## 10. Resources

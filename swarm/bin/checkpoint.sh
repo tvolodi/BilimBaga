@@ -28,16 +28,13 @@ esac
 dir=${SWARM_STATE_DIR:-/c/Users/tvolo/dev/ai-dala/BilimBaga/swarm/state}
 [ -d "$dir" ] || { echo "state dir not found: $dir" >&2; exit 1; }
 
-# JSON string escape: backslash, quote, then control chars to spaces.
+# JSON string escape: backslash, quote, then all control chars (0x00-0x1F) to spaces.
 esc() {
   local s=$1
   local bs=$'\\' dq='"'
   s=${s//"$bs"/"$bs$bs"}
   s=${s//"$dq"/"$bs$dq"}
-  s=${s//$'\r'/ }
-  s=${s//$'\n'/ }
-  s=${s//$'\t'/ }
-  printf '%s' "$s"
+  printf '%s' "$s" | tr '\000-\037' ' '
 }
 
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)

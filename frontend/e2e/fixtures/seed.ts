@@ -213,7 +213,7 @@ async function createQuestion(
     is_correct: boolean
     likert_weight: number | null
     likert_polarity: string | null
-    translations: Record<string, { body: string }>
+    translations: Record<string, { text: string }>
   }> = []
 
   if (type === 'single' || type === 'multiple' || type === 'truefalse') {
@@ -226,15 +226,15 @@ async function createQuestion(
       is_correct: o.is_correct,
       likert_weight: null,
       likert_polarity: null,
-      translations: { en: { body: o.text } },
+      translations: { en: { text: o.text } },
     }))
   } else if (type === 'likert') {
     answer_options = [
-      { sort_order: 1, is_correct: false, likert_weight: 1, likert_polarity: 'positive', translations: { en: { body: 'Strongly Agree' } } },
-      { sort_order: 2, is_correct: false, likert_weight: 2, likert_polarity: 'positive', translations: { en: { body: 'Agree' } } },
-      { sort_order: 3, is_correct: false, likert_weight: 3, likert_polarity: 'positive', translations: { en: { body: 'Neutral' } } },
-      { sort_order: 4, is_correct: false, likert_weight: 4, likert_polarity: 'negative', translations: { en: { body: 'Disagree' } } },
-      { sort_order: 5, is_correct: false, likert_weight: 5, likert_polarity: 'negative', translations: { en: { body: 'Strongly Disagree' } } },
+      { sort_order: 1, is_correct: false, likert_weight: 1, likert_polarity: 'positive', translations: { en: { text: 'Strongly Agree' } } },
+      { sort_order: 2, is_correct: false, likert_weight: 2, likert_polarity: 'positive', translations: { en: { text: 'Agree' } } },
+      { sort_order: 3, is_correct: false, likert_weight: 3, likert_polarity: 'positive', translations: { en: { text: 'Neutral' } } },
+      { sort_order: 4, is_correct: false, likert_weight: 4, likert_polarity: 'negative', translations: { en: { text: 'Disagree' } } },
+      { sort_order: 5, is_correct: false, likert_weight: 5, likert_polarity: 'negative', translations: { en: { text: 'Strongly Disagree' } } },
     ]
   }
 
@@ -547,10 +547,10 @@ export async function createTestQuestion(
     is_correct: boolean
     likert_weight: number | null
     likert_polarity: string | null
-    translations: Record<string, { body: string }>
+    translations: Record<string, { text: string }>
   }> = [
-    { sort_order: 1, is_correct: true, likert_weight: null, likert_polarity: null, translations: { en: { body: 'Option A' } } },
-    { sort_order: 2, is_correct: false, likert_weight: null, likert_polarity: null, translations: { en: { body: 'Option B' } } },
+    { sort_order: 1, is_correct: true, likert_weight: null, likert_polarity: null, translations: { en: { text: 'Option A' } } },
+    { sort_order: 2, is_correct: false, likert_weight: null, likert_polarity: null, translations: { en: { text: 'Option B' } } },
   ]
   const result = await apiPost<QuestionData>(
     `${BASE}/api/v1/questions`,

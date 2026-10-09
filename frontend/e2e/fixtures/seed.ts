@@ -11,6 +11,7 @@
 
 import { chromium } from '@playwright/test'
 import { requireTarget } from '../../../scripts/lib/target-guard'
+import { adminPasswordCandidates, loginClearingForceChange } from '../../../scripts/lib/e2e-auth'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
@@ -515,6 +516,9 @@ export async function createTestUser(
     adminToken,
   )
   if (!res.ok || !res.data?.id) throw new Error(`createTestUser failed: ${res.error}`)
+  // ISS-160: the new user has force_password_change=true, so its token is rejected with 403
+  // PASSWORD_CHANGE_REQUIRED on everything but change-password until the password is changed;
+  // use loginClearingForceChange(BASE, email, [password], newPassword) before calling other routes.
   // Return the temp password directly — avoids login calls that can hit the auth rate limit.
   // Tests that need to authenticate as this user should call login() themselves.
   return { id: res.data.id, email, password: res.data.temporary_password ?? '', token: '' }
@@ -697,12 +701,15 @@ export async function getSeedData(): Promise<SeedData> {
   // Token from global-setup may have expired (15-min JWT). Re-login if token check fails.
   const tokenCheckOk = await findUserByEmail(adminToken, 'employee@bilimbaga.local').then(id => id !== null).catch(() => false)
   if (!tokenCheckOk) {
-    const refreshed = await login(
+    // ISS-160: also covers an admin still flagged force_password_change (changes it first).
+    const refreshed = await loginClearingForceChange(
+      BASE,
       process.env.E2E_ADMIN_EMAIL ?? 'admin@bilimbaga.local',
-      process.env.E2E_ADMIN_PASS ?? 'Admin1234!',
+      adminPasswordCandidates(process.env),
+      process.env.E2E_ADMIN_NEW_PASS ?? 'E2eAdmin2024!',
     )
     if (!refreshed) throw new Error('getSeedData: admin re-login failed')
-    adminToken = refreshed
+    adminToken = refreshed.token
     fs.writeFileSync(tokenPath, adminToken, 'utf8')
   }
 

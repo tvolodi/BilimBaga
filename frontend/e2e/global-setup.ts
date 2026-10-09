@@ -1,5 +1,6 @@
 import { chromium } from '@playwright/test'
 import { requireTarget } from '../../scripts/lib/target-guard'
+import { adminPasswordCandidates } from '../../scripts/lib/e2e-auth'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
@@ -58,18 +59,39 @@ export default async function globalSetup() {
     await page.goto(`${APP_URL}/login`)
 
     // Call the login API directly (1 request per full test run — keeps us under the rate limit).
-    const res = await page.evaluate(async ({ email, pass }: { email: string; pass: string }) => {
-      const r = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass }),
-        credentials: 'include',
-      })
-      const json = await r.json()
-      return { ok: r.ok, data: json.data, error: json.error }
+    // ISS-160: the backend now answers 403 PASSWORD_CHANGE_REQUIRED on everything but
+    // change-password while force_password_change is set, so a flagged admin (fresh stack still
+    // on the default password) changes it here with the login token before any other call.
+    // Runs in the page so the refresh cookie lands in the saved storage state. Self-contained on
+    // purpose: page.evaluate serialises the function. Candidate order mirrors adminPasswordCandidates.
+    const res = await page.evaluate(async ({ email, passes, newPass }: { email: string; passes: string[]; newPass: string }) => {
+      let last: { ok: boolean; data: any; error: any } = { ok: false, data: null, error: 'no candidate password worked' }
+      for (const pass of passes) {
+        const r = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: pass }),
+          credentials: 'include',
+        })
+        const json = await r.json()
+        last = { ok: r.ok, data: json.data, error: json.error }
+        if (!r.ok) continue
+        if (json.data?.user?.force_password_change) {
+          const c = await fetch('/api/v1/auth/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${json.data.access_token}` },
+            body: JSON.stringify({ current_password: pass, new_password: newPass }),
+            credentials: 'include',
+          })
+          if (!c.ok) return { ok: false, data: null, error: `forced password change failed (${c.status})` }
+        }
+        return last
+      }
+      return last
     }, {
       email: process.env.E2E_ADMIN_EMAIL ?? 'admin@bilimbaga.local',
-      pass: process.env.E2E_ADMIN_PASS ?? 'Admin1234!',
+      passes: adminPasswordCandidates(process.env),
+      newPass: process.env.E2E_ADMIN_NEW_PASS ?? 'E2eAdmin2024!',
     })
 
     if (!res.ok || !res.data?.access_token) {

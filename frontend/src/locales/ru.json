@@ -386,6 +386,7 @@
     },
     "changePassword": {
       "title": "Установите новый пароль",
+      "required": "Чтобы продолжить, необходимо сменить пароль.",
       "currentPasswordLabel": "Текущий пароль",
       "newPasswordLabel": "Новый пароль",
       "confirmPasswordLabel": "Подтвердите новый пароль",

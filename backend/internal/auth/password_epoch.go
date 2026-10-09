@@ -11,64 +11,101 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// PasswordChangedLookup returns when the user's password was last reset (zero time if
-// never). It returns ErrNotFound when the user no longer exists.
-type PasswordChangedLookup func(ctx context.Context, userID string) (time.Time, error)
+// AccountState is the per-user session-gating state read on every authenticated request:
+// the password epoch (ISS-105) and the forced-password-change flag (ISS-160).
+type AccountState struct {
+	// PasswordChangedAt is when the password was last reset (zero if never).
+	PasswordChangedAt time.Time
+	// ForcePasswordChange mirrors users.force_password_change.
+	ForcePasswordChange bool
+}
+
+// AccountStateLookup returns the user's AccountState. It returns ErrNotFound when the
+// user no longer exists.
+type AccountStateLookup func(ctx context.Context, userID string) (AccountState, error)
 
 const (
-	// passwordEpochTTL bounds how stale the per-user cache may be: after a reset, access
-	// tokens issued earlier stop working within this window (ISS-105).
-	passwordEpochTTL = 10 * time.Second
-	// passwordEpochMaxEntries caps the cache; it is cleared when exceeded.
-	passwordEpochMaxEntries = 10000
+	// accountStateTTL bounds how stale the per-user cache may be: after an admin reset,
+	// access tokens issued earlier stop working within this window (ISS-105). Password
+	// changes made through this process invalidate the entry explicitly (ISS-160).
+	accountStateTTL = 10 * time.Second
+	// accountStateMaxEntries caps the cache; it is cleared when exceeded.
+	accountStateMaxEntries = 10000
 )
 
-type epochEntry struct {
-	changedAt time.Time
+type accountEntry struct {
+	state     AccountState
 	fetchedAt time.Time
 }
 
-// NewPasswordEpochLookup builds a cached PasswordChangedLookup over fetch. now is
-// injectable for tests.
-func NewPasswordEpochLookup(fetch PasswordChangedLookup, now func() time.Time) PasswordChangedLookup {
-	var mu sync.Mutex
-	cache := map[string]epochEntry{}
-	return func(ctx context.Context, userID string) (time.Time, error) {
-		t := now()
-		mu.Lock()
-		e, ok := cache[userID]
-		mu.Unlock()
-		if ok && t.Sub(e.fetchedAt) < passwordEpochTTL {
-			return e.changedAt, nil
-		}
-		changed, err := fetch(ctx, userID)
-		if err != nil {
-			return time.Time{}, err
-		}
-		mu.Lock()
-		if len(cache) >= passwordEpochMaxEntries {
-			cache = map[string]epochEntry{}
-		}
-		cache[userID] = epochEntry{changedAt: changed, fetchedAt: t}
-		mu.Unlock()
-		return changed, nil
-	}
+// AccountStateCache is a short-lived per-user cache over an AccountStateLookup.
+type AccountStateCache struct {
+	fetch AccountStateLookup
+	now   func() time.Time
+	mu    sync.Mutex
+	cache map[string]accountEntry
+	gen   uint64 // bumped by Invalidate; a fetch that raced with it is not stored
 }
 
-// passwordChangedAtSQL reads the epoch column (migration 032).
-const passwordChangedAtSQL = `SELECT password_changed_at FROM users WHERE id = $1`
+// NewAccountStateCache builds a cache over fetch. now is injectable for tests.
+func NewAccountStateCache(fetch AccountStateLookup, now func() time.Time) *AccountStateCache {
+	return &AccountStateCache{fetch: fetch, now: now, cache: map[string]accountEntry{}}
+}
 
-// NewDBPasswordEpochLookup is the production lookup: users.password_changed_at, cached.
-func NewDBPasswordEpochLookup(db *sqlx.DB) PasswordChangedLookup {
-	return NewPasswordEpochLookup(func(ctx context.Context, userID string) (time.Time, error) {
-		var ts sql.NullTime
-		if err := db.GetContext(ctx, &ts, passwordChangedAtSQL, userID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return time.Time{}, ErrNotFound
-			}
-			return time.Time{}, fmt.Errorf("auth.passwordChangedAt: %w", err)
+// Lookup is an AccountStateLookup serving from the cache within the TTL. Errors are
+// never cached.
+func (c *AccountStateCache) Lookup(ctx context.Context, userID string) (AccountState, error) {
+	t := c.now()
+	c.mu.Lock()
+	e, ok := c.cache[userID]
+	gen := c.gen
+	c.mu.Unlock()
+	if ok && t.Sub(e.fetchedAt) < accountStateTTL {
+		return e.state, nil
+	}
+	st, err := c.fetch(ctx, userID)
+	if err != nil {
+		return AccountState{}, err
+	}
+	c.mu.Lock()
+	if gen == c.gen {
+		if len(c.cache) >= accountStateMaxEntries {
+			c.cache = map[string]accountEntry{}
 		}
-		return ts.Time, nil // zero when NULL
+		c.cache[userID] = accountEntry{state: st, fetchedAt: t}
+	}
+	c.mu.Unlock()
+	return st, nil
+}
+
+// Invalidate drops the user's cached entry so the next request re-reads the database.
+// It is called right after a password change/reset so the user is not blocked (or let
+// through) by a stale force_password_change value.
+func (c *AccountStateCache) Invalidate(userID string) {
+	c.mu.Lock()
+	delete(c.cache, userID)
+	c.gen++
+	c.mu.Unlock()
+}
+
+// accountStateSQL reads the epoch column (migration 032) and the force flag in one query.
+const accountStateSQL = `SELECT password_changed_at, force_password_change FROM users WHERE id = $1`
+
+// NewDBAccountStateCache is the production cache over users.password_changed_at and
+// users.force_password_change.
+func NewDBAccountStateCache(db *sqlx.DB) *AccountStateCache {
+	return NewAccountStateCache(func(ctx context.Context, userID string) (AccountState, error) {
+		var row struct {
+			ChangedAt sql.NullTime `db:"password_changed_at"`
+			Force     bool         `db:"force_password_change"`
+		}
+		if err := db.GetContext(ctx, &row, accountStateSQL, userID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return AccountState{}, ErrNotFound
+			}
+			return AccountState{}, fmt.Errorf("auth.accountState: %w", err)
+		}
+		return AccountState{PasswordChangedAt: row.ChangedAt.Time, ForcePasswordChange: row.Force}, nil
 	}, time.Now)
 }
 

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { clearPasswordChangeRequired } from '@/lib/passwordChangeRequired'
 
 export interface ApiError {
   code: string
@@ -57,6 +58,7 @@ export function useLogin() {
     onSuccess: (data) => {
       qc.setQueryData(['auth', 'currentUser'], data.user)
       qc.setQueryData(['auth', 'accessToken'], data.access_token)
+      clearPasswordChangeRequired(qc) // the login response carries the authoritative flag
     },
   })
 }
@@ -93,6 +95,7 @@ export function useLogout() {
     onSettled: () => {
       qc.setQueryData(['auth', 'accessToken'], null)
       qc.setQueryData(['auth', 'currentUser'], null)
+      clearPasswordChangeRequired(qc)
     },
   })
 }

@@ -259,9 +259,9 @@ func epochToken(t *testing.T, iat time.Time, withIAT bool) string {
 	return makeToken(t, testSecret, c)
 }
 
-func runEpoch(t *testing.T, lookup PasswordChangedLookup, tok string) *httptest.ResponseRecorder {
+func runEpoch(t *testing.T, lookup AccountStateLookup, tok string) *httptest.ResponseRecorder {
 	t.Helper()
-	h := Authenticate(testSecret, WithPasswordEpoch(lookup))(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	h := Authenticate(testSecret, WithAccountState(lookup))(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -273,7 +273,7 @@ func runEpoch(t *testing.T, lookup PasswordChangedLookup, tok string) *httptest.
 
 func TestAuthenticate_TokenIssuedBeforePasswordReset_Rejected(t *testing.T) {
 	reset := time.Now()
-	lookup := func(context.Context, string) (time.Time, error) { return reset, nil }
+	lookup := func(context.Context, string) (AccountState, error) { return AccountState{PasswordChangedAt: reset}, nil }
 
 	old := runEpoch(t, lookup, epochToken(t, reset.Add(-5*time.Minute), true))
 	assert.Equal(t, http.StatusUnauthorized, old.Code)
@@ -284,43 +284,43 @@ func TestAuthenticate_TokenIssuedBeforePasswordReset_Rejected(t *testing.T) {
 }
 
 func TestAuthenticate_NeverResetUser_Accepted(t *testing.T) {
-	lookup := func(context.Context, string) (time.Time, error) { return time.Time{}, nil }
+	lookup := func(context.Context, string) (AccountState, error) { return AccountState{}, nil }
 	assert.Equal(t, http.StatusOK, runEpoch(t, lookup, epochToken(t, time.Now(), true)).Code)
 }
 
 func TestAuthenticate_Epoch_MissingIATRejected(t *testing.T) {
-	lookup := func(context.Context, string) (time.Time, error) { return time.Time{}, nil }
+	lookup := func(context.Context, string) (AccountState, error) { return AccountState{}, nil }
 	rec := runEpoch(t, lookup, epochToken(t, time.Now(), false))
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func TestAuthenticate_Epoch_UnknownUserRejected_LookupErrorFailsClosed(t *testing.T) {
-	gone := func(context.Context, string) (time.Time, error) { return time.Time{}, ErrNotFound }
+	gone := func(context.Context, string) (AccountState, error) { return AccountState{}, ErrNotFound }
 	assert.Equal(t, http.StatusUnauthorized, runEpoch(t, gone, epochToken(t, time.Now(), true)).Code)
 
-	broken := func(context.Context, string) (time.Time, error) { return time.Time{}, errors.New("db down") }
+	broken := func(context.Context, string) (AccountState, error) { return AccountState{}, errors.New("db down") }
 	assert.Equal(t, http.StatusInternalServerError, runEpoch(t, broken, epochToken(t, time.Now(), true)).Code)
 }
 
-func TestPasswordEpochLookup_CachesPerUserWithinTTL(t *testing.T) {
+func TestAccountStateCache_CachesPerUserWithinTTL(t *testing.T) {
 	var fetches int
 	clock := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
-	l := NewPasswordEpochLookup(func(context.Context, string) (time.Time, error) {
+	c := NewAccountStateCache(func(context.Context, string) (AccountState, error) {
 		fetches++
-		return clock, nil
+		return AccountState{PasswordChangedAt: clock}, nil
 	}, func() time.Time { return clock })
 
 	for i := 0; i < 5; i++ {
-		_, err := l(context.Background(), "u1")
+		_, err := c.Lookup(context.Background(), "u1")
 		require.NoError(t, err)
 	}
 	assert.Equal(t, 1, fetches, "repeat requests within the TTL hit the cache")
 
-	_, _ = l(context.Background(), "u2")
+	_, _ = c.Lookup(context.Background(), "u2")
 	assert.Equal(t, 2, fetches, "cache is per user")
 
-	clock = clock.Add(passwordEpochTTL + time.Second)
-	_, _ = l(context.Background(), "u1")
+	clock = clock.Add(accountStateTTL + time.Second)
+	_, _ = c.Lookup(context.Background(), "u1")
 	assert.Equal(t, 3, fetches, "entry refreshed after TTL")
 }
 
@@ -328,7 +328,8 @@ func TestTokenPredatesPasswordChange(t *testing.T) {
 	assert.True(t, tokenPredatesPasswordChange(100, time.Unix(200, 0)))
 	assert.False(t, tokenPredatesPasswordChange(200, time.Unix(200, 0)))
 	assert.False(t, tokenPredatesPasswordChange(1, time.Time{}))
-	assert.Contains(t, passwordChangedAtSQL, "password_changed_at")
+	assert.Contains(t, accountStateSQL, "password_changed_at")
+	assert.Contains(t, accountStateSQL, "force_password_change")
 }
 
 // BeginTx lets the fake accept (and record) a non-default isolation level.

@@ -143,7 +143,7 @@ func TestHandler_List_ParsesFiltersAndPaging(t *testing.T) {
 		},
 	}
 	h := audit.NewHandler(svc, nil)
-	url := "/api/v1/audit?actor_id=u1&actor=ann&action=a.b&entity_type=exam" +
+	url := "/api/v1/audit?actor_id=3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22&actor=ann&action=a.b&entity_type=exam" +
 		"&from=2026-01-02T03:04:05Z&to=not-a-date&page=3&per_page=abc"
 	req := httptest.NewRequest(http.MethodGet, url, nil).WithContext(ctxWithTenant("public"))
 	w := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestHandler_List_ParsesFiltersAndPaging(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.NotNil(t, got.ActorID)
-	assert.Equal(t, "u1", *got.ActorID)
+	assert.Equal(t, "3f2b8c1e-9d4a-4b6e-8a1f-0c7d5e9a1b22", *got.ActorID)
 	assert.Equal(t, "ann", *got.Actor)
 	assert.Equal(t, "a.b", *got.Action)
 	assert.Equal(t, "exam", *got.EntityType)
@@ -198,4 +198,29 @@ func TestHandler_Export_ServiceError_Returns500(t *testing.T) {
 	w := httptest.NewRecorder()
 	audit.NewHandler(svc, nil).Export(w, req)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// ISS-141: actor_id is a UUID column; malformed values must 422, not 500.
+func TestHandler_List_ActorIDNonUUID_Returns422(t *testing.T) {
+	called := false
+	svc := &mockService{
+		listFn: func(_ context.Context, _ string, _ audit.AuditFilters, _, _ int) ([]audit.AuditEntry, int, error) {
+			called = true
+			return nil, 0, nil
+		},
+		exportFn: func(_ context.Context, _ string, _ audit.AuditFilters) ([]audit.AuditEntry, error) {
+			called = true
+			return nil, nil
+		},
+	}
+	h := audit.NewHandler(svc, nil)
+
+	for name, fn := range map[string]http.HandlerFunc{"list": h.List, "export": h.Export} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/audit?actor_id=u1", nil).WithContext(ctxWithTenant("public"))
+		w := httptest.NewRecorder()
+		fn(w, req)
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code, name)
+		assert.Contains(t, w.Body.String(), "VALIDATION_ERROR", name)
+	}
+	assert.False(t, called)
 }

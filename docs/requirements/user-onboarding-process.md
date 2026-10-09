@@ -65,6 +65,7 @@ The organisation needs to enrol employees into the platform so they can receive 
 ### Step 4 — Account Maintenance (Super Admin)
 
 - **Deactivate**: Admin deactivates a user who has left the organisation. All historical records are preserved. The user can no longer log in.
+- **Reactivate** (FR-BB18 AC-13, issue #322): Admin restores a deactivated user (returned from leave, deactivated by mistake). The previous password still works; history is unchanged.
 - **Password reset**: If an employee forgets their password, Admin resets it. A new temporary password is set and `force_password_change` is set to true again, repeating Step 3.
 - **Role / department change**: Admin edits the user's profile to update role or department. Changes take effect on the employee's next authenticated request.
 

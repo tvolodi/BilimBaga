@@ -28,6 +28,7 @@ Provides an immutable, append-only record of all significant platform events for
 - [ ] AC-4: The `ip` field is populated from `r.RemoteAddr` as set by Chi's `middleware.RealIP` (applied globally in `router.New()`); `Write` does not re-implement proxy header parsing.
 - [ ] AC-5: `GET /api/v1/audit` returns a paginated list (default `per_page` 50, max 200); accessible to `super_admin` only.
 - [ ] AC-6: The audit list endpoint supports filters: `actor_id` (UUID), `action` (exact match), `entity_type`, `from` (ISO 8601 datetime), `to` (ISO 8601 datetime).
+  Query params are validated as UUIDs where applicable (malformed `actor_id` returns 422 `VALIDATION_ERROR`). Unrecognised query parameters (e.g. `user_id`) are ignored and return the unfiltered list; use `actor_id` (GitHub #158 pending decision on a `user_id` alias).
 - [ ] AC-7: `GET /api/v1/audit/export` returns the filtered result set as a CSV file with `Content-Disposition: attachment; filename="audit_export.csv"` and MIME type `text/csv`; accessible to `super_admin` only.
 - [ ] AC-8: The `audit_log` table has no UPDATE or DELETE migrations, triggers, or application-level code paths that would modify or remove existing rows.
 - [ ] AC-9: At minimum, the following actions must be present in the audit log when triggered: `auth.login.success`, `auth.login.failure`, `auth.logout`, `auth.password_change`, `user.create`, `user.update`, `user.deactivate`, `user.password_reset`, `department.create`, `department.update`, `department.delete`, `tenant_config.update`.

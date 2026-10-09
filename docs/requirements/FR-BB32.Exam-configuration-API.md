@@ -16,7 +16,7 @@ Provides the full REST API surface for creating, reading, updating, and publishi
 - [ ] AC-1: `GET /api/v1/exams` returns paginated exam list filterable by `status`; accessible to users with role `examiner` or higher.
 - [ ] AC-2: `POST /api/v1/exams` creates a new exam with `status = 'draft'`; returns the created exam object with HTTP 201.
 - [ ] AC-3: `PUT /api/v1/exams/:id` returns HTTP 409 if the exam `status` is not `'draft'`.
-- [ ] AC-4: `POST /api/v1/exams/:id/publish` validates that every question rule can be satisfied (sufficient active questions matching category/tags/difficulty exist); returns HTTP 422 with a structured error listing unsatisfied rules if validation fails.
+- [ ] AC-4: `POST /api/v1/exams/:id/publish` validates that every question rule can be satisfied (sufficient active questions matching category/tags/difficulty exist); returns HTTP 422 with a structured error listing unsatisfied rules if validation fails. An exam with zero question rules (fixed-form or adaptive) is refused with HTTP 422 `INSUFFICIENT_QUESTIONS` (standard envelope) before any per-rule check; the exam stays `draft` (PR #153, ISS-151).
 - [ ] AC-5: `POST /api/v1/exams/:id/archive` transitions status from `active` or `draft` to `archived`; subsequent `POST /sessions` against this exam returns HTTP 403.
 - [ ] AC-6: `DELETE /api/v1/exams/:id` is only allowed on draft exams; returns HTTP 404 for non-existent, HTTP 409 for non-draft.
 - [ ] AC-7: Section CRUD endpoints maintain `sort_order` uniqueness per exam and return 404 if section does not belong to the specified exam.

@@ -217,6 +217,9 @@ type ImportRow struct {
 	Translations  map[string]TranslationInput
 	AnswerOptions []AnswerOptionInput
 	Tags          []string
+	// ParseErrors are row-level problems found while parsing the file (e.g. extra
+	// non-empty cells beyond the CSV header); the service reports them as row errors.
+	ParseErrors []string
 }
 
 // ImportRowError describes validation errors for a single import row.

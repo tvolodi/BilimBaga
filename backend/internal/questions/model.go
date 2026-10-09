@@ -79,10 +79,13 @@ type QuestionFilter struct {
 	Locale        *string  // filter: only questions that have a translation for this locale
 	LocaleMissing *string  // filter: only questions that do NOT have a translation for this locale
 	Search        string   // full-text search against the default-locale stem
-	Sort          string   // one of: created_at, updated_at, difficulty
-	Order         string   // asc or desc
-	Page          int
-	PerPage       int
+	// IncludeSuperseded lists old versions (rows that have a newer child version).
+	// Default false: only the latest version of each question is listed.
+	IncludeSuperseded bool
+	Sort              string // one of: created_at, updated_at, difficulty
+	Order             string // asc or desc
+	Page              int
+	PerPage           int
 }
 
 // QuestionListItem is the summary row returned in the paginated list endpoint.

@@ -863,7 +863,9 @@ export function QuestionBankPage() {
   const statuses = parseCSV(searchParams, 'statuses') as QuestionListItem['status'][]
   const difficulties = parseCSV(searchParams, 'difficulties') as QuestionListItem['difficulty'][]
   const type = (searchParams.get('type') as QuestionListItem['type']) || undefined
+  const locale = searchParams.get('locale') ?? undefined
   const localeMissing = searchParams.get('locale_missing') ?? undefined
+  const includeVersions = searchParams.get('include_versions') === 'true'
   const searchParam = searchParams.get('search') ?? ''
 
   // Local search state for debounce
@@ -946,7 +948,9 @@ export function QuestionBankPage() {
     statuses: statuses.length ? statuses : undefined,
     difficulties: difficulties.length ? difficulties : undefined,
     type,
+    locale,
     locale_missing: localeMissing,
+    include_versions: includeVersions || undefined,
     search: debouncedSearch || undefined,
   }
 
@@ -1066,7 +1070,9 @@ export function QuestionBankPage() {
     statuses.length > 0 ||
     difficulties.length > 0 ||
     !!type ||
+    !!locale ||
     !!localeMissing ||
+    includeVersions ||
     !!debouncedSearch
 
   return (
@@ -1146,17 +1152,43 @@ export function QuestionBankPage() {
             <option value="likert">{t('questionBank.type.likert')}</option>
           </Select>
 
-          {/* Locale missing */}
+          {/* Language filter: questions that HAVE a translation in this locale */}
           <Select
             className="w-44"
-            value={localeMissing ?? ''}
-            onChange={(e) => updateParam('locale_missing', e.target.value || undefined)}
+            aria-label={t('questionBank.filter.locale')}
+            value={locale ?? ''}
+            onChange={(e) => updateParam('locale', e.target.value || undefined)}
           >
             <option value="">{t('questionBank.filter.allLocales')}</option>
             <option value="kk">KK</option>
             <option value="ru">RU</option>
             <option value="en">EN</option>
           </Select>
+
+          {/* Missing translation filter: questions WITHOUT a translation in this locale */}
+          <Select
+            className="w-52"
+            aria-label={t('questionBank.filter.localeMissing')}
+            value={localeMissing ?? ''}
+            onChange={(e) => updateParam('locale_missing', e.target.value || undefined)}
+          >
+            <option value="">{t('questionBank.filter.localeMissing')}</option>
+            <option value="kk">KK</option>
+            <option value="ru">RU</option>
+            <option value="en">EN</option>
+          </Select>
+
+          {/* Show superseded (older) versions */}
+          <label className="flex items-center gap-1.5 text-sm">
+            <input
+              type="checkbox"
+              checked={includeVersions}
+              onChange={(e) =>
+                updateParam('include_versions', e.target.checked ? 'true' : undefined)
+              }
+            />
+            {t('questionBank.filter.showOldVersions')}
+          </label>
 
           {/* Tag multi-select */}
           {tags && tags.length > 0 && (

@@ -178,7 +178,8 @@
       "allCategories": "All categories",
       "allTypes": "All types",
       "allLocales": "All locales",
-      "locale": "Filter by locale"
+      "locale": "Filter by locale",
+      "showOldVersions": "Show previous versions"
     },
     "column": {
       "stem": "Question",

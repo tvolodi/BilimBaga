@@ -182,3 +182,71 @@ describe('QuestionBankPage bulk export (Bearer download)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/download failed/i)
   })
 })
+
+describe('QuestionBankPage language and version filters (ISS-134)', () => {
+  function captureUrls() {
+    const urls: URL[] = []
+    server.use(
+      http.get('/api/v1/questions', ({ request }) => {
+        urls.push(new URL(request.url))
+        return HttpResponse.json({
+          data: { items: [sampleQuestion], meta: { page: 1, per_page: 20, total: 1 } },
+          error: null,
+        })
+      }),
+    )
+    return urls
+  }
+
+  it('sends locale (not locale_missing) when the language filter is chosen', async () => {
+    const urls = captureUrls()
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <QuestionBankPage />
+      </Wrapper>,
+    )
+    await waitFor(() => screen.getByText('What is H2O?'))
+    expect(urls[0].searchParams.has('locale')).toBe(false)
+    expect(urls[0].searchParams.has('include_versions')).toBe(false)
+
+    await userEvent.selectOptions(screen.getByLabelText('Filter by locale'), 'kk')
+    await waitFor(() => {
+      const last = urls[urls.length - 1]
+      expect(last.searchParams.get('locale')).toBe('kk')
+      expect(last.searchParams.has('locale_missing')).toBe(false)
+    })
+  })
+
+  it('sends locale_missing from the separate missing-translation filter', async () => {
+    const urls = captureUrls()
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <QuestionBankPage />
+      </Wrapper>,
+    )
+    await waitFor(() => screen.getByText('What is H2O?'))
+    await userEvent.selectOptions(screen.getByLabelText('Missing translation'), 'ru')
+    await waitFor(() => {
+      const last = urls[urls.length - 1]
+      expect(last.searchParams.get('locale_missing')).toBe('ru')
+      expect(last.searchParams.has('locale')).toBe(false)
+    })
+  })
+
+  it('hides old versions by default and requests them via the toggle', async () => {
+    const urls = captureUrls()
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <QuestionBankPage />
+      </Wrapper>,
+    )
+    await waitFor(() => screen.getByText('What is H2O?'))
+    await userEvent.click(screen.getByLabelText('Show previous versions'))
+    await waitFor(() => {
+      expect(urls[urls.length - 1].searchParams.get('include_versions')).toBe('true')
+    })
+  })
+})

@@ -24,10 +24,14 @@ type mockRepository struct {
 	categoryNameErr error
 
 	// Insight cache fields.
-	insightCache    *InsightResult
+	insightCache    *InsightResult // scope key "all"
 	insightCacheErr error
 	upsertCalled    bool
 	upsertErr       error
+	// scopedRows stands in for ai_insight_cache rows of department-scoped callers,
+	// keyed examID+"|"+scopeKey; upsertScopes records every scope key written.
+	scopedRows   map[string]*InsightResult
+	upsertScopes []string
 	examInsightData *ExamInsightData
 	examInsightErr  error
 	scopeIDs        map[string][]string // department id -> subtree ids
@@ -69,14 +73,30 @@ func (m *mockRepository) GetCategoryName(_ context.Context, _ string) (string, e
 	return m.categoryName, m.categoryNameErr
 }
 
-func (m *mockRepository) GetInsightCache(_ context.Context, _ string) (*InsightResult, error) {
-	return m.insightCache, m.insightCacheErr
+func (m *mockRepository) GetInsightCache(_ context.Context, examID, scopeKey string) (*InsightResult, error) {
+	if scopeKey == deptscope.ScopeKeyAll {
+		return m.insightCache, m.insightCacheErr
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	row := m.scopedRows[examID+"|"+scopeKey]
+	if row == nil {
+		return nil, m.insightCacheErr
+	}
+	return &InsightResult{Insights: append([]string(nil), row.Insights...), GeneratedAt: row.GeneratedAt, Cached: true}, m.insightCacheErr
 }
 
-func (m *mockRepository) UpsertInsightCache(_ context.Context, _, _ string, _ []string) error {
+func (m *mockRepository) UpsertInsightCache(_ context.Context, examID, scopeKey, _ string, insights []string) error {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.upsertCalled = true
-	m.mu.Unlock()
+	m.upsertScopes = append(m.upsertScopes, scopeKey)
+	if scopeKey != deptscope.ScopeKeyAll {
+		if m.scopedRows == nil {
+			m.scopedRows = map[string]*InsightResult{}
+		}
+		m.scopedRows[examID+"|"+scopeKey] = &InsightResult{Insights: append([]string(nil), insights...), GeneratedAt: time.Now().UTC()}
+	}
 	return m.upsertErr
 }
 

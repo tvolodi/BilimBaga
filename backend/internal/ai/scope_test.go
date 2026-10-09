@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
+	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 )
 
 const scopeDept = "11111111-1111-1111-1111-111111111111"
@@ -37,8 +38,10 @@ func TestGetInsights_DepartmentAdmin_BypassesSharedCache(t *testing.T) {
 	if res.Cached || len(res.Insights) == 0 || res.Insights[0] == "All-department insight." {
 		t.Errorf("department_admin must get freshly generated scoped insights, got %+v", res)
 	}
-	if repo.upsertCalled {
-		t.Error("department-scoped insights must not be written to the shared cache")
+	for _, sk := range repo.upsertScopes {
+		if sk == deptscope.ScopeKeyAll {
+			t.Error("department-scoped insights must not be written to the shared 'all' cache row")
+		}
 	}
 	if !repo.logCalled {
 		t.Error("usage must still be logged")
@@ -109,8 +112,10 @@ func TestGetInsights_AllNonSuperAdminRoles_BypassSharedCache(t *testing.T) {
 		if res.Cached || (len(res.Insights) > 0 && res.Insights[0] == "All-department insight.") {
 			t.Errorf("%q must get freshly generated scoped insights, got %+v", role, res)
 		}
-		if repo.upsertCalled {
-			t.Errorf("%q: scoped insights must not be written to the shared cache", role)
+		for _, sk := range repo.upsertScopes {
+			if sk == deptscope.ScopeKeyAll {
+				t.Errorf("%q: scoped insights must not be written to the shared 'all' cache row", role)
+			}
 		}
 	}
 }

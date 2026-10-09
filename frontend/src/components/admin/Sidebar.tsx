@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useTenantConfig } from '@/api/useTenantConfig'
 import {
   LayoutDashboard,
@@ -16,9 +15,17 @@ import {
   ChevronRight,
   ClipboardCheck,
   ScrollText,
+  ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { AUDIT_READ_ROLES, REPORTS_READ_ROLES, jwtRole } from '@/lib/routeRoles'
+import { useMyPermissions } from '@/hooks/useMyPermissions'
+import {
+  AUDIT_READ_ROLES,
+  REPORTS_READ_ROLES,
+  ROLES_MANAGE_ROLES,
+  ROUTE_PERMISSIONS as PERM,
+  can,
+} from '@/lib/routeRoles'
 
 interface SidebarProps {
   collapsed: boolean
@@ -33,28 +40,36 @@ interface NavItem {
   end: boolean
   /** When set, the link is shown only to these roles (mirrors the route guards). */
   roles?: string[]
+  /** Permission a custom (non-built-in) role needs to see the link (FR-BB117 AC-16). */
+  permission: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard', icon: LayoutDashboard, path: '/admin', labelKey: 'nav.dashboard', end: true },
-  { key: 'users', icon: Users, path: '/admin/users', labelKey: 'nav.users', end: false },
-  { key: 'departments', icon: Building2, path: '/admin/departments', labelKey: 'nav.departments', end: false },
-  { key: 'questions', icon: FileQuestion, path: '/admin/questions', labelKey: 'nav.questions', end: false },
-  { key: 'categories', icon: FolderTree, path: '/admin/categories', labelKey: 'nav.categories', end: false },
-  { key: 'tags', icon: Hash, path: '/admin/tags', labelKey: 'nav.tags', end: false },
-  { key: 'exams', icon: ClipboardList, path: '/admin/exams', labelKey: 'nav.exams', end: false },
-  { key: 'grading', icon: ClipboardCheck, path: '/admin/grading', labelKey: 'grading.nav', end: false },
-  { key: 'reports', icon: BarChart2, path: '/admin/reports', labelKey: 'nav.reports', end: false, roles: REPORTS_READ_ROLES },
-  { key: 'audit', icon: ScrollText, path: '/admin/audit', labelKey: 'nav.audit', end: false, roles: AUDIT_READ_ROLES },
-  { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false },
+  { key: 'dashboard', icon: LayoutDashboard, path: '/admin', labelKey: 'nav.dashboard', end: true, permission: PERM.dashboard },
+  { key: 'users', icon: Users, path: '/admin/users', labelKey: 'nav.users', end: false, permission: PERM.users },
+  { key: 'roles', icon: ShieldCheck, path: '/admin/roles', labelKey: 'nav.roles', end: false, roles: ROLES_MANAGE_ROLES, permission: PERM.roles },
+  { key: 'departments', icon: Building2, path: '/admin/departments', labelKey: 'nav.departments', end: false, permission: PERM.departments },
+  { key: 'questions', icon: FileQuestion, path: '/admin/questions', labelKey: 'nav.questions', end: false, permission: PERM.questions },
+  { key: 'categories', icon: FolderTree, path: '/admin/categories', labelKey: 'nav.categories', end: false, permission: PERM.categories },
+  { key: 'tags', icon: Hash, path: '/admin/tags', labelKey: 'nav.tags', end: false, permission: PERM.tags },
+  { key: 'exams', icon: ClipboardList, path: '/admin/exams', labelKey: 'nav.exams', end: false, permission: PERM.exams },
+  { key: 'grading', icon: ClipboardCheck, path: '/admin/grading', labelKey: 'grading.nav', end: false, permission: PERM.grading },
+  { key: 'reports', icon: BarChart2, path: '/admin/reports', labelKey: 'nav.reports', end: false, roles: REPORTS_READ_ROLES, permission: PERM.reports },
+  { key: 'audit', icon: ScrollText, path: '/admin/audit', labelKey: 'nav.audit', end: false, roles: AUDIT_READ_ROLES, permission: PERM.audit },
+  { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false, permission: PERM.settings },
 ]
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { t } = useTranslation()
   const { data: tenantConfig } = useTenantConfig()
-  const qc = useQueryClient()
-  const role = jwtRole(qc.getQueryData<string | null>(['auth', 'accessToken']))
-  const visibleItems = NAV_ITEMS.filter((item) => !item.roles || (role !== undefined && item.roles.includes(role)))
+  const { role, isCustom, permissions } = useMyPermissions()
+  // Built-in roles: unchanged role-list logic. Custom roles: only links whose permission they hold
+  // (hidden while permissions are unknown). The API stays authoritative.
+  const visibleItems = NAV_ITEMS.filter((item) =>
+    isCustom
+      ? can(permissions, item.permission)
+      : !item.roles || (role !== undefined && item.roles.includes(role)),
+  )
 
   return (
     <aside

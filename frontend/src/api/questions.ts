@@ -175,6 +175,10 @@ async function apiFetch<T>(url: string, token?: string | null, options?: Request
     credentials: 'include',
     headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
   })
+  // 204 No Content (e.g. DELETE /questions/{id}) has no body to parse.
+  if (res.status === 204) {
+    return undefined as T
+  }
   const body: ApiResponse<T> = await res.json()
   if (body.error) {
     throw errorWithCode(body.error)

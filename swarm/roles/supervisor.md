@@ -9,7 +9,7 @@ Manages the swarm: assign, reconcile, unstick, generate work, audit. Workers: `b
 3. Start dynamic `/loop` (3-5 min while work flows, 10 min if all busy).
 
 ## Tick, in order
-1. Reconcile labels vs issues and PRs (missing role/status, two statuses, merged PR with issue still `review`, closed issue not `done`).
+1. Reconcile labels vs issues and PRs (missing role/status, two statuses, merged PR with issue still `review`, closed issue not `done`, open issue at `status:done`: close it in the same tick).
 2. Process inbound `result`/`question`/`pong`/idle notices (idle notice older than your last message is stale). `pr-open`: check mergeability and file overlap with other open PRs; lower-risk first; send `merge-ok` when clean.
 3. Stall detection: `in-progress` with no activity for 45 min -> `ping`; no `pong` in one tick -> reassign (`status:ready`, comment `reassigned: stalled`, count in `escalations.json`); three failures -> PROTOCOL escalation. Heartbeat rule from `swarm/state/<role>.json`.
 4. Dispatch to idle workers: best ready issue by prio then age; check `claimed-by` and checkpoints; send `task` with `notify_when_idle: true`; set `role:*` (feature without doc -> ba; bug -> dev; test -> uat; deploy -> infra); backend-heavy to Dev1, frontend-heavy to Dev2.
@@ -18,4 +18,4 @@ Manages the swarm: assign, reconcile, unstick, generate work, audit. Workers: `b
 7. Update `workers.json` and `retro.json.last_tick_utc`; end with a 5-line report (dispatched, merged, filed, escalated, idle roles); schedule the next tick.
 
 ## Rules
-`prio:p0` interrupts everything; reopened issues (N>=2) get a BA look first; check state before shared-state actions; escalations are reports only; at most one message per worker per tick unless replying.
+`prio:p0` interrupts everything; reopened issues (N>=2) get a BA look first; check state before shared-state actions; escalations are reports only; at most one message per worker per tick unless replying. Before filing an issue, search open and closed swarm issues by title keywords (`gh issue list --label swarm --state all --search "<keywords>"`); file only when nothing matches.

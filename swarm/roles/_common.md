@@ -15,3 +15,4 @@ Read at every startup and after every compaction, together with `PROTOCOL.md`.
 11. Startup handshake: send `bb-supervisor` `{"type":"pong","status":"idle","role":"<role>"}` with first line "<role> online and ready".
 12. Run `/compact` when context grows large.
 13. Checkpoint each step change and each tick (PROTOCOL, checkpoints).
+14. Never run a script or tool that sends requests to a host other than the local stack or a target the issue names (lighthouse, k6, curl, npx of an unknown package). Guard tests stub the tool on PATH and never call the real one.

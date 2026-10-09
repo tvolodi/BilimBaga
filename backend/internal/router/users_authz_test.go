@@ -456,3 +456,13 @@ func TestRouterUsersAuthz_RoleChangeRevokesOldTokenImmediately(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	assert.Equal(t, "TOKEN_REVOKED", errCode(t, rec))
 }
+
+// FR-BB510 overdue reminders (unused in the authz tests).
+func (r *authzRepo) ExamExists(context.Context, string) (bool, error) { return false, nil }
+func (r *authzRepo) IsOverdueTarget(context.Context, string, string) (bool, error) {
+	return false, nil
+}
+func (r *authzRepo) LastReminderAt(context.Context, string, string) (*time.Time, error) {
+	return nil, nil
+}
+func (r *authzRepo) InsertReminder(context.Context, string, string, string) error { return nil }

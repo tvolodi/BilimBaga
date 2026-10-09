@@ -3,6 +3,7 @@ package audit_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -130,4 +131,71 @@ func TestHandler_Export_MissingTenant_Returns401(t *testing.T) {
 	h.Export(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestHandler_List_ParsesFiltersAndPaging(t *testing.T) {
+	var got audit.AuditFilters
+	var gotPage, gotPer int
+	svc := &mockService{
+		listFn: func(_ context.Context, _ string, f audit.AuditFilters, page, perPage int) ([]audit.AuditEntry, int, error) {
+			got, gotPage, gotPer = f, page, perPage
+			return nil, 0, nil
+		},
+	}
+	h := audit.NewHandler(svc, nil)
+	url := "/api/v1/audit?actor_id=u1&actor=ann&action=a.b&entity_type=exam" +
+		"&from=2026-01-02T03:04:05Z&to=not-a-date&page=3&per_page=abc"
+	req := httptest.NewRequest(http.MethodGet, url, nil).WithContext(ctxWithTenant("public"))
+	w := httptest.NewRecorder()
+
+	h.List(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NotNil(t, got.ActorID)
+	assert.Equal(t, "u1", *got.ActorID)
+	assert.Equal(t, "ann", *got.Actor)
+	assert.Equal(t, "a.b", *got.Action)
+	assert.Equal(t, "exam", *got.EntityType)
+	require.NotNil(t, got.From)
+	assert.Equal(t, 2026, got.From.Year())
+	assert.Nil(t, got.To, "unparseable date is ignored")
+	assert.Equal(t, 3, gotPage)
+	assert.Equal(t, 50, gotPer, "invalid per_page falls back to default")
+}
+
+func TestHandler_List_NonPositivePage_UsesDefault(t *testing.T) {
+	var gotPage int
+	svc := &mockService{
+		listFn: func(_ context.Context, _ string, _ audit.AuditFilters, page, _ int) ([]audit.AuditEntry, int, error) {
+			gotPage = page
+			return nil, 0, nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit?page=-2", nil).WithContext(ctxWithTenant("public"))
+	audit.NewHandler(svc, nil).List(httptest.NewRecorder(), req)
+	assert.Equal(t, 1, gotPage)
+}
+
+func TestHandler_List_ServiceError_Returns500(t *testing.T) {
+	svc := &mockService{
+		listFn: func(context.Context, string, audit.AuditFilters, int, int) ([]audit.AuditEntry, int, error) {
+			return nil, 0, errors.New("db")
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit", nil).WithContext(ctxWithTenant("public"))
+	w := httptest.NewRecorder()
+	audit.NewHandler(svc, nil).List(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestHandler_Export_ServiceError_Returns500(t *testing.T) {
+	svc := &mockService{
+		exportFn: func(context.Context, string, audit.AuditFilters) ([]audit.AuditEntry, error) {
+			return nil, errors.New("db")
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/export?action=x", nil).WithContext(ctxWithTenant("public"))
+	w := httptest.NewRecorder()
+	audit.NewHandler(svc, nil).Export(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

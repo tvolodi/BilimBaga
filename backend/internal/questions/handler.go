@@ -415,6 +415,20 @@ func (h *Handler) TransitionStatus(w http.ResponseWriter, r *http.Request) {
 					"message": err.Error(),
 				},
 			})
+		case errors.Is(err, ErrInvalidOptionText):
+			var optErr *OptionValidationError
+			var fields []fieldError
+			if errors.As(err, &optErr) {
+				fields = optErr.Fields
+			}
+			api.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{
+				"data": nil,
+				"error": map[string]any{
+					"code":    "ERR_VALIDATION",
+					"message": "cannot activate question: one or more answer options have blank text for the default locale",
+					"fields":  fields,
+				},
+			})
 		case errors.Is(err, ErrStemRequired):
 			api.WriteError(w, http.StatusBadRequest, "ERR_STEM_REQUIRED", "default locale stem is required before transitioning to this status")
 		default:

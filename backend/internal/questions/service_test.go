@@ -19,6 +19,7 @@ type mockRepository struct {
 	tagExistsFn        func(ctx context.Context, tagID string) (bool, error)
 	GetTranslationFn   func(ctx context.Context, questionID, locale string) (*QuestionTranslation, error)
 	findSimilarStemsFn func(ctx context.Context, stems []string, locale string) (map[string]StemSimilarityResult, error)
+	detailOptions      map[string][]AnswerOptionDetail // questionID -> options returned by GetWithDetails
 }
 
 func newMockRepo() *mockRepository {
@@ -164,7 +165,7 @@ func (m *mockRepository) GetWithDetails(_ context.Context, id string) (*Question
 		Version:       q.Version,
 		ParentID:      q.ParentID,
 		Translations:  map[string]TranslationDetail{},
-		AnswerOptions: []AnswerOptionDetail{},
+		AnswerOptions: append([]AnswerOptionDetail{}, m.detailOptions[id]...),
 		TagIDs:        []string{},
 	}, nil
 }

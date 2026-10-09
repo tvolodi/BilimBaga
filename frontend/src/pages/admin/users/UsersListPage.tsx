@@ -13,6 +13,7 @@ import { UserCreateDrawer } from './UserCreateDrawer'
 import { UserEditDrawer } from './UserEditDrawer'
 import { ImportModal } from './ImportModal'
 import { DeactivateConfirmDialog } from '@/pages/users/DeactivateConfirmDialog'
+import { ReactivateConfirmDialog } from '@/pages/users/ReactivateConfirmDialog'
 import { PasswordResetModal } from '@/pages/users/PasswordResetModal'
 import type { CreateUserResponse } from '@/api/users'
 import { userErrorKey } from '@/lib/assignableRoles'
@@ -35,6 +36,7 @@ export function UsersListPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [deactivateUser, setDeactivateUser] = useState<User | null>(null)
+  const [reactivateUser, setReactivateUser] = useState<User | null>(null)
   const [importOpen, setImportOpen] = useState(false)
 
   const [resetUserId, setResetUserId] = useState<string | null>(null)
@@ -272,6 +274,15 @@ export function UsersListPage() {
                         {t('users.actions.deactivate')}
                       </Button>
                     )}
+                    {user.status === 'inactive' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setReactivateUser(user)}
+                      >
+                        {t('users.actions.reactivate')}
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -313,6 +324,7 @@ export function UsersListPage() {
       />
       <UserEditDrawer user={editUser} onClose={() => setEditUser(null)} />
       <DeactivateConfirmDialog user={deactivateUser} onClose={() => setDeactivateUser(null)} />
+      <ReactivateConfirmDialog user={reactivateUser} onClose={() => setReactivateUser(null)} />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
 
       <PasswordResetModal

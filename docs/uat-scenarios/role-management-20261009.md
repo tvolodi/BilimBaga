@@ -101,6 +101,8 @@ Setup: a second custom role `dept_manager` with `users:read`, `users:manage` (as
 | 8 | Dept admin A1 | Same four calls against a `super_admin` user and against an `examiner` and an `employee` in department A | `super_admin` target: 403 on all four. `examiner` and `employee` targets: allowed (200), because they are of strictly lower rank | |
 | 9 | Dept admin A1 | Same calls against an `employee` in department B | 403 or 404 (outside own department; no data leaked) | |
 | 10 | Custom2 user | Reset password of a peer user holding a custom role whose permissions are NOT a subset of Custom2's | 403; a role with a subset of Custom2's permissions is allowed | |
+| 11 | Dept admin A1 | `PUT /api/v1/users/{employee_in_A}` with `role_id` = `department_admin`; then with `role_id` = `super_admin`; then `POST /api/v1/users` creating a user with role `department_admin` | 403 `FORBIDDEN` each (department_admin may assign `examiner` or `employee` only; FR-BB18 AC-4/AC-6, PR #222) | |
+| 12 | Dept admin A1 | `PUT /api/v1/users/{employee_in_A}` with `role_id` = `examiner`; then back to `employee` | 200 each | |
 
 ## Scenario S6: Localization and accessibility
 

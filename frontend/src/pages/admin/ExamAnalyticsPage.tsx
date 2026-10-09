@@ -250,8 +250,9 @@ export function ExamAnalyticsPage() {
 
   if (!examId) return null
 
+  // department_admin is admitted: the analytics API scopes these queries to its department subtree (deptscope).
   return (
-    <RequireRole roles={['examiner', 'hr_admin', 'super_admin']}>
+    <RequireRole roles={['examiner', 'hr_admin', 'super_admin', 'department_admin']}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">

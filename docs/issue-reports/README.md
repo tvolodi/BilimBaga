@@ -48,3 +48,4 @@
 | [ISS-053](ISS-053-users-list-department-tree-filter.md) | Users List department filter is a flat select that ignores the department tree | low | frontend | users | resolved | 2026-10-09 |
 | [ISS-054](ISS-054-auditlogtable-react-key-warning.md) | AuditLogTable logs React "unique key" warning (bare fragment in map) | low | frontend | audit | resolved | 2026-10-09 |
 | [ISS-055](ISS-055-export-buttons-bypass-download-helper.md) | CSV export buttons bypass shared download helper (no 401 refresh / error display) | medium | frontend | reports | resolved | 2026-10-09 |
+| [ISS-060](ISS-060-frontend-tests-grading-results-employee-step4.md) | No frontend tests for grading UI, result components, employee record, Step 4 eligible counts | low | frontend | exams | resolved | 2026-10-09 |

@@ -1,9 +1,11 @@
 package reports
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
@@ -766,4 +768,39 @@ func TestDashboardExportPDF_500_ServiceError(t *testing.T) {
 	h.DashboardExportPDF(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// ISS-75: a BuildDashboardReport error must be logged (never swallowed) and map to 500.
+func TestDashboardExportPDF_500_ErrorIsLogged(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(prev)
+
+	svc := &mockSvc{
+		buildDashboardReportFn: func(_ context.Context, _ string, _, _ time.Time, _, _ string) (*DashboardReportData, error) {
+			return nil, errors.New("pq: column \"tenant_id\" does not exist")
+		},
+	}
+	h := NewHandler(svc, &mockTenantCfg{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard/export", nil)
+	w := httptest.NewRecorder()
+	h.DashboardExportPDF(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, buf.String(), "level=ERROR")
+	assert.Contains(t, buf.String(), "does not exist")
+}
+
+// ISS-75: happy path returns 200, application/pdf and a real PDF body.
+func TestDashboardExportPDF_200_PDFBody(t *testing.T) {
+	h := NewHandler(&mockSvc{}, &mockTenantCfg{})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/dashboard/export", nil)
+	w := httptest.NewRecorder()
+	h.DashboardExportPDF(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/pdf", w.Header().Get("Content-Type"))
+	assert.True(t, bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF")))
 }

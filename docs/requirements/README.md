@@ -93,6 +93,14 @@ Decision records (not FR-BB requirements).
 |----|------|-------|--------|
 | DEC-001 | DEC-001.Environments-production-class-demo-and-qa.md | Environments: Production-Class Demo and Separate QA | Accepted |
 
+## Reference / Conventions
+
+Cross-cutting reference documents (not FR-BB requirements).
+
+| ID | File | Title | Status |
+|----|------|-------|--------|
+| REF-API | api-conventions.md | API Conventions (as implemented): envelope, error codes, UUID rule, auth, pagination, uploads, audit | Accepted |
+
 ## Status Values
 
 | Status | Meaning |

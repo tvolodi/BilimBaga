@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { useCategories, flattenCategories } from '@/api/categories'
 import { useTags } from '@/api/questions'
+import { describeExamError } from '@/api/examErrors'
 import {
   useAddRule,
   useUpdateRule,
@@ -346,7 +347,7 @@ export function Step2QuestionRules({
       try {
         await deleteRule.mutateAsync(rule.id)
       } catch (err) {
-        setApiError((err as ExamApiError).message)
+        setApiError(describeExamError(err as ExamApiError, t))
         return
       }
     }
@@ -399,18 +400,18 @@ export function Step2QuestionRules({
       }
       onNext()
     } catch (err) {
-      setApiError((err as ExamApiError).message)
+      setApiError(describeExamError(err as ExamApiError, t))
     } finally {
       setIsSaving(false)
     }
-  }, [rules, addRule, updateRule, onNext])
+  }, [rules, addRule, updateRule, onNext, t])
 
   const pickerRule = pickerRuleIndex !== null ? rules[pickerRuleIndex] : null
 
   return (
     <div className="space-y-4">
       {apiError && (
-        <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
           {apiError}
         </div>
       )}

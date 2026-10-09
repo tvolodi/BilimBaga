@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test'
+import { currentAdminPassword } from './fixtures/admin-pass'
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@bilimbaga.local'
-const ADMIN_PASS = process.env.E2E_ADMIN_PASS ?? 'Admin1234!'
+const ADMIN_PASS = currentAdminPassword()
 
 test.describe('Auth — login flow', () => {
   test('redirects to /login when unauthenticated', async ({ browser }) => {

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { errorWithCode } from '@/api/errors'
 
 export interface TenantConfig {
   app_name: string
@@ -20,7 +21,7 @@ async function fetchTenantConfig(): Promise<TenantConfig> {
   }
   const body: ApiResponse<TenantConfig> = await res.json()
   if (body.error) {
-    throw new Error(body.error.message)
+    throw errorWithCode(body.error)
   }
   return body.data
 }

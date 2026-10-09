@@ -8,14 +8,43 @@ interface DialogProps {
 }
 
 function Dialog({ open, onOpenChange, children }: DialogProps) {
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  // Latest callback in a ref so re-renders do not re-run the effect (which would steal focus).
+  const onOpenChangeRef = React.useRef(onOpenChange)
+  onOpenChangeRef.current = onOpenChange
+
   React.useEffect(() => {
     if (!open) return
+    // Remember the trigger so focus returns to it on close (a11y).
+    const previouslyFocused = document.activeElement as HTMLElement | null
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onOpenChange(false)
+      if (e.key === 'Escape') {
+        onOpenChangeRef.current(false)
+        return
+      }
+      if (e.key !== 'Tab') return
+      // Focus trap: keep Tab / Shift+Tab inside the dialog.
+      const focusable = containerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || !containerRef.current?.contains(active))) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && (active === last || !containerRef.current?.contains(active))) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, onOpenChange])
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previouslyFocused?.focus?.()
+    }
+  }, [open])
 
   if (!open) return null
   return (
@@ -25,7 +54,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
-      <div className="relative z-50">{children}</div>
+      <div ref={containerRef} className="relative z-50">{children}</div>
     </div>
   )
 }

@@ -6,7 +6,7 @@
 | ID | FR-BB117 |
 | Phase | 1 — Foundation (gap closure; extends FR-BB16 "static roles in Phase 1" to admin-managed roles; GitHub issue #135) |
 | Priority | 2 |
-| Status | Validated |
+| Status | Implemented (backend #137, frontend #138; live UAT pending) |
 | Depends On | FR-BB16, FR-BB18, FR-BB19, FR-BB111, FR-BB62 |
 
 ## Description

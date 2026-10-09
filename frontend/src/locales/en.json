@@ -39,7 +39,8 @@
     "reports": "Reports",
     "audit": "Audit Log",
     "settings": "Settings",
-    "tags": "Tags"
+    "tags": "Tags",
+    "roles": "Roles"
   },
   "users": {
     "title": "Users",
@@ -1075,5 +1076,131 @@
   "download": {
     "failed": "Download failed. Please try again.",
     "session_expired": "Your session has expired. Please sign in again."
+  },
+  "roles": {
+    "title": "Roles",
+    "create": "Create role",
+    "dismiss": "Dismiss",
+    "empty": "No roles found.",
+    "columns": {
+      "name": "Name",
+      "description": "Description",
+      "type": "Type",
+      "users": "Users",
+      "permissions": "Permissions",
+      "actions": "Actions"
+    },
+    "type": {
+      "system": "System",
+      "custom": "Custom"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "delete": "Delete",
+      "viewRole": "View role {{name}}",
+      "editRole": "Edit role {{name}}",
+      "deleteRole": "Delete role {{name}}"
+    },
+    "form": {
+      "createTitle": "Create role",
+      "editTitle": "Edit role",
+      "viewTitle": "View role",
+      "name": "Name",
+      "nameHint": "Lowercase letters, digits and underscores; 3 to 32 characters; must start with a letter.",
+      "description": "Description",
+      "permissions": "Permissions",
+      "systemReadOnly": "System roles are read-only.",
+      "close": "Close",
+      "saving": "Saving…"
+    },
+    "matrix": {
+      "notAssignable": "Cannot be granted to a custom role"
+    },
+    "delete": {
+      "title": "Delete role",
+      "description": "Delete the role \"{{name}}\"? This cannot be undone.",
+      "deleting": "Deleting…"
+    },
+    "toast": {
+      "created": "Role \"{{name}}\" created.",
+      "updated": "Role \"{{name}}\" updated.",
+      "deleted": "Role \"{{name}}\" deleted."
+    },
+    "errors": {
+      "ROLE_NAME_TAKEN": "A role with this name already exists.",
+      "ROLE_SYSTEM_IMMUTABLE": "System roles cannot be changed or deleted.",
+      "ROLE_IN_USE": "This role is still assigned to users (count: {{count}}). Reassign them before deleting.",
+      "VALIDATION_ERROR": "The role data is invalid. Check the name and the selected permissions.",
+      "NOT_FOUND": "This role no longer exists.",
+      "FORBIDDEN": "You do not have permission to do this.",
+      "nameInvalid": "Use 3 to 32 lowercase letters, digits or underscores, starting with a letter.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "noAccess": {
+      "title": "No pages available",
+      "body": "Your role has no permissions for any admin page yet. Contact an administrator."
+    },
+    "resources": {
+      "users": "Users",
+      "questions": "Questions",
+      "exams": "Exams",
+      "reports": "Reports",
+      "portal": "Employee portal",
+      "tenant": "Tenant",
+      "audit": "Audit log",
+      "departments": "Departments",
+      "categories": "Categories",
+      "tags": "Tags",
+      "grading": "Grading",
+      "roles": "Roles"
+    },
+    "permissions": {
+      "users": {
+        "read": "Users: View",
+        "manage": "Users: Manage"
+      },
+      "questions": {
+        "read": "Questions: View",
+        "write": "Questions: Create and edit"
+      },
+      "exams": {
+        "read": "Exams: View",
+        "write": "Exams: Create and edit",
+        "assign": "Exams: Assign"
+      },
+      "reports": {
+        "read": "Reports: View"
+      },
+      "portal": {
+        "read": "Employee portal: View",
+        "submit": "Employee portal: Submit"
+      },
+      "tenant": {
+        "manage": "Tenant: Manage"
+      },
+      "audit": {
+        "read": "Audit log: View"
+      },
+      "departments": {
+        "read": "Departments: View",
+        "manage": "Departments: Manage"
+      },
+      "categories": {
+        "manage": "Categories: Manage"
+      },
+      "tags": {
+        "read": "Tags: View",
+        "manage": "Tags: Manage"
+      },
+      "grading": {
+        "read": "Grading: View",
+        "write": "Grading: Create and edit"
+      },
+      "roles": {
+        "read": "Roles: View",
+        "manage": "Roles: Manage"
+      }
+    }
   }
 }

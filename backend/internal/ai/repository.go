@@ -34,7 +34,7 @@ type Repository interface {
 
 	// GetExamInsightData gathers all anonymised aggregate statistics needed to
 	// build the AI prompt.  Returns ErrExamNotFound when the exam does not exist
-	// or does not belong to the given tenant.
+	// (tenantID is unused: exams has no tenant_id column; single-tenant, ISS-82).
 	GetExamInsightData(ctx context.Context, examID, tenantID string) (*ExamInsightData, error)
 
 	// ── FR-BB75: Loyalty Profile Narrative ───────────────────────────────────
@@ -152,7 +152,6 @@ DO UPDATE SET insights      = EXCLUDED.insights,
 type examInsightRow struct {
 	Title           string `db:"title"`
 	PassingScorePct int    `db:"passing_score_pct"`
-	TenantID        string `db:"tenant_id"`
 }
 
 // insightSummaryRow is the scan target for the session aggregate query.
@@ -171,20 +170,23 @@ type insightQuestionRow struct {
 	AvgTimeSecs *float64 `db:"avg_time_secs"`
 }
 
-func (r *postgresRepository) GetExamInsightData(ctx context.Context, examID, tenantID string) (*ExamInsightData, error) {
-	// Verify exam exists and belongs to the tenant.
+// GetExamInsightData gathers the aggregate statistics for an exam.
+//
+// tenantID is accepted to keep the Repository interface stable but is unused:
+// the exams table has no tenant_id column (the deployment is single-tenant and
+// the tenant middleware injects the constant "public"), so there is nothing to
+// compare it against (ISS-82; same root cause as ISS-75).
+func (r *postgresRepository) GetExamInsightData(ctx context.Context, examID, _ string) (*ExamInsightData, error) {
+	// Verify the exam exists.
 	var header examInsightRow
 	err := r.db.QueryRowxContext(ctx,
-		`SELECT title, passing_score_pct, tenant_id FROM exams WHERE id = $1`, examID,
+		`SELECT title, passing_score_pct FROM exams WHERE id = $1`, examID,
 	).StructScan(&header)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrExamNotFound
 		}
 		return nil, fmt.Errorf("ai: GetExamInsightData: fetch exam: %w", err)
-	}
-	if header.TenantID != tenantID {
-		return nil, ErrExamNotFound
 	}
 
 	// Aggregate session statistics.
@@ -207,10 +209,10 @@ WHERE exam_id = $1
 		return nil, fmt.Errorf("ai: GetExamInsightData: aggregate sessions: %w", err)
 	}
 
-	// Per-question stats — use order_num from session_questions to preserve display order.
+	// Per-question stats — use sort_order from session_questions to preserve display order.
 	rows, err := r.db.QueryxContext(ctx, `
 SELECT
-  MIN(sq.order_num)                                                               AS order_num,
+  MIN(sq.sort_order)                                                              AS order_num,
   LEFT(qt.stem, 100)                                                              AS stem,
   ROUND(
     COUNT(sqs.question_id) FILTER (WHERE sqs.score = sqs.max_score)::DECIMAL
@@ -293,10 +295,16 @@ func (r *postgresRepository) GetSessionCategoryTrack(ctx context.Context, sessio
 		EmployeeUserID string         `db:"user_id"`
 	}
 	scanErr := r.db.QueryRowxContext(ctx, `
-SELECT c.track, es.user_id
+SELECT t.track, es.user_id
 FROM exam_sessions es
-JOIN exams e ON e.id = es.exam_id
-LEFT JOIN categories c ON c.id = e.category_id
+LEFT JOIN LATERAL (
+  SELECT c.track
+  FROM exam_question_rules r
+  JOIN categories c ON c.id = r.category_id
+  WHERE r.exam_id = es.exam_id AND c.track IS NOT NULL
+  ORDER BY r.sort_order
+  LIMIT 1
+) t ON TRUE
 WHERE es.id = $1`, sessionID).StructScan(&row)
 	if scanErr != nil {
 		if errors.Is(scanErr, sql.ErrNoRows) {

@@ -86,7 +86,7 @@ func (e *selfChangeEnv) change(current string) (*ChangePasswordResponse, *http.C
 }
 
 func TestSelfChange_OldTokenRevoked_NewTokenWorksImmediately(t *testing.T) {
-	now := time.Date(2026, 10, 9, 12, 0, 0, 500_000_000, time.UTC)
+	now := testClock(0, 500_000_000)
 	e := newSelfChangeEnv(t, now, false)
 	old := e.tokenAt(now.Add(-10 * time.Minute))
 	require.Equal(t, http.StatusOK, e.get(old).Code, "sanity: valid before the change")
@@ -110,7 +110,7 @@ func TestSelfChange_OldTokenRevoked_NewTokenWorksImmediately(t *testing.T) {
 func TestSelfChange_BoundarySameSecond(t *testing.T) {
 	// The clock sits 700ms into the second: the stamp is truncated to the second and the new
 	// token's iat is that same second, so iat == floor(stamp) and the new token passes.
-	now := time.Date(2026, 10, 9, 12, 0, 0, 700_000_000, time.UTC)
+	now := testClock(0, 700_000_000)
 	e := newSelfChangeEnv(t, now, false)
 	resp, _, err := e.change("OldPass123")
 	require.NoError(t, err)
@@ -130,7 +130,7 @@ func TestSelfChange_BoundarySameSecond(t *testing.T) {
 
 func TestSelfChange_Boundary_FractionalSecondStamp(t *testing.T) {
 	// If a stamp carried a fraction (e.g. a database now()), floor semantics still hold.
-	changedAt := time.Date(2026, 10, 9, 12, 0, 5, 900_000_000, time.UTC)
+	changedAt := testClock(5, 900_000_000)
 	assert.False(t, tokenPredatesPasswordChange(changedAt.Unix(), changedAt))
 	assert.True(t, tokenPredatesPasswordChange(changedAt.Unix()-1, changedAt))
 	assert.False(t, tokenPredatesPasswordChange(changedAt.Unix()+1, changedAt))
@@ -138,7 +138,7 @@ func TestSelfChange_Boundary_FractionalSecondStamp(t *testing.T) {
 }
 
 func TestSelfChange_RefreshTokensRevokedThenCallerGetsNewOne(t *testing.T) {
-	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	now := testClock(0, 0)
 	e := newSelfChangeEnv(t, now, false)
 	_, cookie, err := e.change("OldPass123")
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestSelfChange_RefreshTokensRevokedThenCallerGetsNewOne(t *testing.T) {
 }
 
 func TestSelfChange_ForcedChangeFlowStillWorksWithReturnedToken(t *testing.T) {
-	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	now := testClock(0, 0)
 	e := newSelfChangeEnv(t, now, true)
 	old := e.tokenAt(now.Add(-time.Minute))
 	assert.Equal(t, http.StatusForbidden, e.get(old).Code, "blocked before the change")
@@ -167,7 +167,7 @@ func TestSelfChange_ForcedChangeFlowStillWorksWithReturnedToken(t *testing.T) {
 }
 
 func TestSelfChange_WrongCurrentPasswordDoesNotStamp(t *testing.T) {
-	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	now := testClock(0, 0)
 	e := newSelfChangeEnv(t, now, false)
 	old := e.tokenAt(now.Add(-time.Minute))
 
@@ -182,7 +182,7 @@ func TestSelfChange_WrongCurrentPasswordDoesNotStamp(t *testing.T) {
 }
 
 func TestSelfChange_WeakPasswordDoesNotStamp(t *testing.T) {
-	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	now := testClock(0, 0)
 	e := newSelfChangeEnv(t, now, false)
 	_, _, err := e.svc.ChangePassword(context.Background(), "u1", &ChangePasswordRequest{CurrentPassword: "OldPass123", NewPassword: "weak"}, "")
 	require.Error(t, err)
@@ -191,7 +191,7 @@ func TestSelfChange_WeakPasswordDoesNotStamp(t *testing.T) {
 
 // Through the HTTP handler: the body carries the token, the cookie is set, the hook runs.
 func TestSelfChange_HandlerReturnsSessionAndCookie(t *testing.T) {
-	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	now := testClock(0, 0)
 	e := newSelfChangeEnv(t, now, false)
 	h := NewHandler(e.svc, nil)
 	var hooked string
@@ -219,3 +219,10 @@ func TestSelfChange_HandlerReturnsSessionAndCookie(t *testing.T) {
 type nopAudit struct{}
 
 func (nopAudit) Write(context.Context, *http.Request, string, string, *string, any) {}
+
+// testClock returns a deterministic sub-minute offset from the start of the current UTC
+// minute. The JWT library validates exp against the real clock, so fixed calendar dates
+// make these tests rot once the date passes.
+func testClock(sec, nsec int) time.Time {
+	return time.Now().UTC().Truncate(time.Minute).Add(time.Duration(sec)*time.Second + time.Duration(nsec))
+}

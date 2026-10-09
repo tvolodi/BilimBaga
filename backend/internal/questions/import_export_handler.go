@@ -32,6 +32,11 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	file, fh, err := r.FormFile("file")
 	if err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, "ERR_FILE_TOO_LARGE", "import file must not exceed 10 MB")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, "ERR_INVALID_BODY", "field 'file' is required")
 		return
 	}

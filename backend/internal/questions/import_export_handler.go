@@ -217,9 +217,11 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 
 // ── CSV parsing ───────────────────────────────────────────────────────────────
 
-// CSV column order: type, difficulty, category_path, default_locale, stem, explanation,
-//   option_1…option_N, correct, tags
-// Multi-locale columns not supported on import (only single-locale stem/explanation per row).
+// Accepted CSV layouts (see normaliseCSVHeader, ISS-199):
+//   legacy : type, difficulty, category_path, default_locale, stem, explanation,
+//            option_1…option_N, correct, tags
+//   export : the same, with stem_<loc>, explanation_<loc>, option_N_<loc> per locale
+//            (exactly what GET /questions/export writes).
 
 func parseCSVImport(r io.Reader) ([]ImportRow, error) {
 	cr := csv.NewReader(r)
@@ -230,16 +232,9 @@ func parseCSVImport(r io.Reader) ([]ImportRow, error) {
 	if err != nil {
 		return nil, fmt.Errorf("CSV: failed to read header: %w", err)
 	}
-	colIdx := make(map[string]int, len(header))
-	for i, h := range header {
-		colIdx[strings.TrimSpace(h)] = i
-	}
-
-	required := []string{"type", "difficulty", "category_path", "default_locale", "stem"}
-	for _, col := range required {
-		if _, ok := colIdx[col]; !ok {
-			return nil, fmt.Errorf("CSV: missing required column %q", col)
-		}
+	layout, err := normaliseCSVHeader(header)
+	if err != nil {
+		return nil, err
 	}
 
 	var rows []ImportRow
@@ -254,70 +249,15 @@ func parseCSVImport(r io.Reader) ([]ImportRow, error) {
 		}
 		rowNum++
 
-		get := func(col string) string {
-			idx, ok := colIdx[col]
-			if !ok || idx >= len(record) {
+		get := func(pos int) string {
+			if pos >= len(record) {
 				return ""
 			}
 			// ISS-191: undo the export-side formula guard so exports re-import cleanly.
-			return api.CSVUnsafe(strings.TrimSpace(record[idx]))
+			// ISS-199: applies to every text column, legacy or <name>_<locale>.
+			return api.CSVUnsafe(strings.TrimSpace(record[pos]))
 		}
-
-		locale := get("default_locale")
-		stem := get("stem")
-		expl := get("explanation")
-
-		translations := map[string]TranslationInput{}
-		if locale != "" && stem != "" {
-			ti := TranslationInput{Stem: stem}
-			if expl != "" {
-				ti.Explanation = &expl
-			}
-			translations[locale] = ti
-		}
-
-		// Parse options: option_1, option_2, … up to whatever columns exist.
-		var options []AnswerOptionInput
-		correctRaw := get("correct")
-		correctIdxs := parseCorrectIndices(correctRaw)
-
-		for n := 1; ; n++ {
-			colName := fmt.Sprintf("option_%d", n)
-			text := get(colName)
-			if text == "" {
-				break
-			}
-			isCorrect := correctIdxs[n]
-			options = append(options, AnswerOptionInput{
-				SortOrder: n,
-				IsCorrect: isCorrect,
-				Translations: map[string]AnswerTranslationInput{
-					locale: {Text: text},
-				},
-			})
-		}
-
-		// Tags: semicolon-separated in the tags column.
-		var tags []string
-		if raw := get("tags"); raw != "" {
-			for _, t := range strings.Split(raw, ";") {
-				t = strings.TrimSpace(t)
-				if t != "" {
-					tags = append(tags, t)
-				}
-			}
-		}
-
-		rows = append(rows, ImportRow{
-			RowNumber:     rowNum,
-			Type:          get("type"),
-			Difficulty:    get("difficulty"),
-			CategoryPath:  get("category_path"),
-			DefaultLocale: locale,
-			Translations:  translations,
-			AnswerOptions: options,
-			Tags:          tags,
-		})
+		rows = append(rows, layout.buildRow(rowNum, get))
 	}
 	return rows, nil
 }

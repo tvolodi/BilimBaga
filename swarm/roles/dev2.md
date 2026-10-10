@@ -12,7 +12,7 @@ Identity in claims: `bb-dev2`; worktree `.claude/worktrees/dev2`. Prefers fronte
 ## Per issue
 1. `git fetch origin && git switch -C swarm/<issue>-<slug> origin/main`.
 2. `gh issue edit <n> --add-label status:in-progress --remove-label status:ready`; comment `claimed-by: bb-dev2`.
-3. Implement; migrations via the migration lock; prefer unit tests over running the stack. For a bug where bad input gives a 500 or a wrong status, the handler test covers malformed, unknown and empty values of that input, not only the value named in the issue.
+3. Implement; for any frontend change first read `docs/design-system/README.md` (one-page UI checklist, order of authority); migrations via the migration lock; prefer unit tests over running the stack. For a bug where bad input gives a 500 or a wrong status, the handler test covers malformed, unknown and empty values of that input, not only the value named in the issue.
 4. Commit, push, `gh pr create` with `Refs #n` (closing happens after UAT).
 5. `status:review`, send Supervisor `result pr-open`. On `merge-ok`: merge origin/main into the branch, re-run tests, push, `gh pr merge <n> --squash --match-head-commit <merge-ok SHA>`, delete the branch only after MERGED, labels to `status:uat role:uat` (or the test-only close in PROTOCOL), send `result done`.
 6. Fix unrelated blockers (Unblock-Everything directive).

@@ -70,12 +70,19 @@ test.describe('User Management — Edit User', () => {
     await waitForContent(page)
     await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 })
 
-    // Find row with our test user's email
+    // Find the row with our test user's email. The list is paginated (20 per page) and the seed
+    // accumulates users, so page forward until the row appears or there is no next page (#407).
     const row = page.locator('table tbody tr').filter({ hasText: user.email })
-    if (!(await row.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    const nextPage = page.getByRole('button', { name: /^(Next|Вперёд|Келесі)$/ })
+    let found = await row.isVisible({ timeout: 3_000 }).catch(() => false)
+    while (!found && (await nextPage.isEnabled().catch(() => false))) {
+      await nextPage.click()
+      await waitForContent(page)
+      found = await row.isVisible({ timeout: 3_000 }).catch(() => false)
+    }
+    if (!found) {
       await deleteTestUser(adminToken, user.id)
-      test.info().annotations.push({ type: 'note', description: 'Test user row not visible on page — may be paginated' })
-      return
+      throw new Error(`edit test: user ${user.email} not found on any page of the users list`)
     }
     const editBtn = row.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit\$/i })
     await editBtn.click()

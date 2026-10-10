@@ -187,7 +187,7 @@ describe('EmployeeRecordPage (FR-BB58)', () => {
     expect(screen.getAllByText('Values Profile')).toHaveLength(1) // loyalty session only
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
     expect(await screen.findByText('Values team work.')).toBeInTheDocument()
-    expect(fetchLoyaltyNarrative).toHaveBeenCalledWith('sess-1')
+    expect(fetchLoyaltyNarrative).toHaveBeenCalledWith(expect.anything(), 'sess-1')
     expect(screen.getByRole('button', { name: 'Regenerate' })).toBeInTheDocument()
   })
 

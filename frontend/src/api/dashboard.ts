@@ -1,5 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { errorWithCode } from '@/api/errors'
+import type { QueryClient } from '@tanstack/react-query'
+import { apiFetch } from './apiFetch'
+
+function apiPost<T>(qc: QueryClient, url: string, payload: unknown): Promise<T> {
+  return apiFetch<T>(qc, url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
 
 // ---- Types ------------------------------------------------------------------
 
@@ -41,50 +50,13 @@ export interface DashboardMetrics {
 
 // ---- API helpers ------------------------------------------------------------
 
-interface ApiResponse<T> {
-  data: T
-  error: null | { code: string; message: string }
-}
-
-async function apiFetch<T>(url: string, token?: string | null): Promise<T> {
-  const res = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'include',
-  })
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) throw errorWithCode(body.error)
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-  return body.data
-}
-
-async function apiPost<T>(
-  url: string,
-  payload: unknown,
-  token?: string | null,
-): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(payload),
-    credentials: 'include',
-  })
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) throw errorWithCode(body.error)
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-  return body.data
-}
-
 // ---- Hooks ------------------------------------------------------------------
 
 export function useDashboard() {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<DashboardMetrics, Error>({
     queryKey: ['dashboard'],
-    queryFn: () => apiFetch<DashboardMetrics>('/api/v1/admin/dashboard', token),
+    queryFn: () => apiFetch<DashboardMetrics>(qc, '/api/v1/admin/dashboard'),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
@@ -95,10 +67,9 @@ export function useRemindEmployee(
   onError?: (err: Error) => void,
 ) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useMutation<unknown, Error, { userId: string; examId: string }>({
     mutationFn: ({ userId, examId }) =>
-      apiPost<{ sent_at: string }>(`/api/v1/admin/users/${userId}/remind`, { exam_id: examId }, token),
+      apiPost<{ sent_at: string }>(qc, `/api/v1/admin/users/${userId}/remind`, { exam_id: examId }),
     onSuccess,
     onError,
   })

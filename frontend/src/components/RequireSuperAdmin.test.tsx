@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { RequireSuperAdmin } from './RequireSuperAdmin'
@@ -114,6 +114,34 @@ describe('RequireSuperAdmin', () => {
   it('treats a token whose payload has no role claim as not super_admin', () => {
     renderGuard(makeToken({ sub: 'uid-4', exp: 9999999999 }))
     expect(screen.getByText('Admin Home')).toBeInTheDocument()
+    expect(screen.queryByText('Super Admin Content')).not.toBeInTheDocument()
+  })
+
+  it('redirects to /login when the token is cleared after mount (ISS-249)', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    qc.setQueryData(['auth', 'accessToken'], makeToken({ sub: 'uid-1', role: 'super_admin', exp: 9999999999 }))
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/super']}>
+          <Routes>
+            <Route
+              path="/super"
+              element={
+                <RequireSuperAdmin>
+                  <div>Super Admin Content</div>
+                </RequireSuperAdmin>
+              }
+            />
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(screen.getByText('Super Admin Content')).toBeInTheDocument()
+
+    act(() => qc.setQueryData(['auth', 'accessToken'], null))
+
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
     expect(screen.queryByText('Super Admin Content')).not.toBeInTheDocument()
   })
 })

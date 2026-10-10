@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
 import { useMe } from '@/api/users'
+import { useAccessToken } from '@/hooks/useAccessToken'
 import { applyLocale, isSupportedLocale } from '@/lib/locale'
 
 /**
@@ -12,11 +12,7 @@ import { applyLocale, isSupportedLocale } from '@/lib/locale'
 export function PreferredLocaleSync() {
   const { i18n } = useTranslation()
   // Read-only observer of the token that useRefreshToken / useLogin own; it is never fetched here.
-  const { data: token } = useQuery<string | null>({
-    queryKey: ['auth', 'accessToken'],
-    queryFn: () => null,
-    enabled: false,
-  })
+  const { token } = useAccessToken()
   const me = useMe({ enabled: !!token })
   const preferred = me.data?.preferred_locale ?? null
 

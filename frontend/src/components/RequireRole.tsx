@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { Navigate, useLocation } from 'react-router-dom'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
+import { useAccessToken } from '@/hooks/useAccessToken'
 import { useMyPermissions } from '@/hooks/useMyPermissions'
 import { can, jwtRole } from '@/lib/routeRoles'
 
@@ -26,10 +26,12 @@ export function RequireRole({
   permission,
   allowCustomRole,
 }: RequireRoleProps) {
-  const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
+  // Subscribed (ISS-249): a token cleared after mount redirects to /login instead of a blank page.
+  const { token } = useAccessToken()
+  const location = useLocation()
   const { isCustom, permissions, isLoading } = useMyPermissions()
-  if (!token) return <Navigate to="/login" replace />
+  // `from` lets LoginPage send the user back here after signing in again (AC-11).
+  if (!token) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   const role = jwtRole(token)
   if (role && roles.includes(role)) return <>{children}</>
 

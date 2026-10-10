@@ -834,7 +834,12 @@
     "col_status": "Status",
     "col_actions": "Actions",
     "minutes_format": "{{minutes}} min",
-    "manage_assignments": "Assign"
+    "manage_assignments": "Assign",
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "archived": "Archived"
+    }
   },
   "grading": {
     "queue_title": "Manual Grading Queue",

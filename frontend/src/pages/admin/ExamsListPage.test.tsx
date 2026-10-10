@@ -189,3 +189,39 @@ describe('ExamsListPage — Assign button for active exams', () => {
     expect(assignLink).toHaveAttribute('href', '/admin/exams/exam-1/edit?step=3')
   })
 })
+
+// #471: the status badge shows the translated label, not the raw lowercase value.
+describe('ExamsListPage status badges (#471)', () => {
+  const archivedExam = { ...draftExam, id: 'exam-3', title: 'Old Exam', status: 'archived' }
+
+  it.each([
+    ['en', 'Archived'],
+    ['kk', 'Мұрағатталған'],
+    ['ru', 'В архиве'],
+  ])('shows the archived status as "%s" in %s', async (lng, label) => {
+    const { default: i18n } = await import('@/i18n')
+    await i18n.changeLanguage(lng)
+    server.use(
+      http.get('/api/v1/exams', () =>
+        HttpResponse.json({
+          data: { items: [archivedExam], meta: { page: 1, per_page: 20, total: 1 } },
+          error: null,
+        }),
+      ),
+    )
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <ExamsListPage />
+      </Wrapper>,
+    )
+    await waitFor(() => {
+      expect(screen.getByText('Old Exam')).toBeInTheDocument()
+    })
+
+    const badge = screen.getAllByText(label).find((el) => el.tagName === 'SPAN')
+    expect(badge).toBeDefined()
+    expect(screen.queryByText('archived')).not.toBeInTheDocument()
+    await i18n.changeLanguage('en')
+  })
+})

@@ -834,7 +834,12 @@
     "col_status": "Күй",
     "col_actions": "Әрекеттер",
     "minutes_format": "{{minutes}} мин",
-    "manage_assignments": "Тағайындау"
+    "manage_assignments": "Тағайындау",
+    "status": {
+      "draft": "Жоба",
+      "active": "Белсенді",
+      "archived": "Мұрағатталған"
+    }
   },
   "grading": {
     "queue_title": "Қолмен бағалау кезегі",

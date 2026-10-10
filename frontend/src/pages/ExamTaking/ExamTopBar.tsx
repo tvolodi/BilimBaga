@@ -54,7 +54,7 @@ export function ExamTopBar({
           <Button
             variant="outline"
             size="sm"
-            className="md:hidden"
+            className="md:hidden min-h-11"
             onClick={onOpenNavigator}
             aria-label={t('exam.taking.navigator.title')}
           >

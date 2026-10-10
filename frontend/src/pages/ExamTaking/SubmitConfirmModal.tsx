@@ -25,10 +25,10 @@ export function SubmitConfirmModal({
         </DialogHeader>
         <p className="text-sm text-muted-foreground">{t('exam.taking.submit.confirm.message')}</p>
         <div className="flex justify-end gap-3 mt-4">
-          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          <Button variant="outline" className="min-h-11" onClick={onCancel} disabled={isSubmitting}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={onConfirm} disabled={isSubmitting}>
+          <Button className="min-h-11" onClick={onConfirm} disabled={isSubmitting}>
             {isSubmitting ? t('common.loading') : t('exam.taking.submit.confirm.submit')}
           </Button>
         </div>

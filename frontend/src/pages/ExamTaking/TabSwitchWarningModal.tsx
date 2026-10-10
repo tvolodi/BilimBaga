@@ -42,11 +42,11 @@ export function TabSwitchWarningModal({
         )}
         <div className="flex flex-wrap justify-end gap-2 mt-4">
           {canReturnFullscreen && (
-            <Button variant="outline" onClick={handleReturnFullscreen}>
+            <Button variant="outline" className="min-h-11" onClick={handleReturnFullscreen}>
               {t('exam.taking.tabswitch.returnFullscreen')}
             </Button>
           )}
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button className="min-h-11" onClick={onClose}>{t('common.cancel')}</Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -10,7 +10,7 @@
     snapshot (swarm-snapshot.txt: roster + open issue counts and titles, tokens scrubbed) to branch swarm-state of
     THAT remote, through a throwaway temp repo, so the working checkout is never switched. A failed push only warns.
  -MinIntervalMin N: do nothing if the newest dated folder is younger than N minutes (used by ensure-up).
- Usage: powershell -File swarm\backup-state.ps1 [-WhatIf] [-BackupRoot dir] [-Keep 20] [-PushRemote url (tests only)]
+ Usage: powershell -File swarm\backup-state.ps1 [-WhatIf] [-BackupRoot dir] [-Keep 20] [-PushRemote existing local bare repo dir (tests only)]
         [-QueueJsonFile stub.json] [-MinIntervalMin 60] [-NowUtc <datetime>]
 #>
 [CmdletBinding(SupportsShouldProcess)]
@@ -24,6 +24,12 @@ param(
   [datetime]$NowUtc = ([datetime]::UtcNow)
 )
 $ErrorActionPreference = 'Stop'
+# #464: -PushRemote is for tests and must be an existing local directory (a local bare repo). A URL, a remote name,
+# a UNC share, a relative path or a missing directory is refused here, before any copy or push.
+if ($PushRemote -and ($PushRemote -notmatch '^[A-Za-z]:[\\/]' -or -not (Test-Path -LiteralPath $PushRemote -PathType Container))) {
+  Write-Host "refused: -PushRemote must be an existing local directory (a local bare repo for tests), got '$PushRemote'"
+  exit 2
+}
 $env:GIT_TERMINAL_PROMPT = '0'   # never wait for a credential prompt
 $env:GCM_INTERACTIVE = 'never'
 Remove-Item Env:GIT_ASKPASS, Env:SSH_ASKPASS -WhatIf:$false -ErrorAction SilentlyContinue

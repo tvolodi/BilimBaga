@@ -275,6 +275,11 @@ func (s *service) ChangePassword(ctx context.Context, userID string, req *Change
 
 	// Stamp and the new token's iat share one instant (truncated to seconds by the JWT lib).
 	changedAt := s.now().Truncate(time.Second)
+	// A token issued after the account's last stamp can carry an iat one second ahead of the clock (a
+	// sign-in in the reset's own second, #439). The new stamp must pass it, or that token survives.
+	if prev := user.PasswordChangedAt; prev != nil && !prev.Before(changedAt) {
+		changedAt = prev.Truncate(time.Second).Add(time.Second)
+	}
 	if err := s.repo.UpdatePassword(ctx, userID, string(newHash), changedAt); err != nil {
 		return nil, nil, fmt.Errorf("auth.service.ChangePassword: update password: %w", err)
 	}
@@ -316,7 +321,17 @@ func (s *service) ParseAccessToken(tokenString string) (*Claims, error) {
 
 // issueAccessToken generates a signed JWT for the given user.
 func (s *service) issueAccessToken(user *User) (string, error) {
-	return s.issueAccessTokenAt(user, time.Now().UTC())
+	return s.issueAccessTokenAt(user, issueTime(s.now().UTC(), user.PasswordChangedAt))
+}
+
+// issueTime is the iat of a token issued at now. It is never before the account's password stamp, so a
+// sign-in or refresh in the second a reset stamped (the next second) is not revoked from birth (#439).
+// A stamp at or before now leaves the clock's own second, which the epoch check accepts.
+func issueTime(now time.Time, changedAt *time.Time) time.Time {
+	if changedAt != nil && changedAt.After(now) {
+		return *changedAt
+	}
+	return now
 }
 
 // issueAccessTokenAt is issueAccessToken with an explicit issue time (ISS-171).

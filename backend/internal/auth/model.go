@@ -22,6 +22,8 @@ type User struct {
 	LockedUntil         *time.Time `db:"locked_until"`
 	CreatedAt           time.Time  `db:"created_at"`
 	UpdatedAt           time.Time  `db:"updated_at"`
+	// PasswordChangedAt is users.password_changed_at (nil when the password was never reset or changed).
+	PasswordChangedAt *time.Time `db:"password_changed_at"`
 }
 
 // RefreshToken represents a persisted refresh token record.

@@ -80,12 +80,13 @@ func (r *pgRepository) PurgeExpiredResetTokens(ctx context.Context, cutoff time.
 }
 
 // completeResetSetPasswordSQL stamps password_changed_at so access tokens issued before
-// the reset are rejected by Authenticate (ISS-105).
+// the reset are rejected by Authenticate (ISS-105). The stamp is the start of the next second, so
+// a token issued in the reset's own second is rejected too (#439).
 const completeResetSetPasswordSQL = `
 		UPDATE users
 		SET    password_hash = $1, force_password_change = false,
 		       failed_attempts = 0, locked_until = NULL, updated_at = now(),
-		       password_changed_at = now()
+		       password_changed_at = date_trunc('second', now()) + interval '1 second'
 		WHERE  id = $2 AND status = 'active'`
 
 // CompleteReset runs the whole password reset in one transaction so a token can be used once.

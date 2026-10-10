@@ -47,7 +47,7 @@ func (r *pgRepository) GetUserByEmail(ctx context.Context, email string) (*User,
 		SELECT u.id, u.email, u.password_hash, u.full_name,
 		       u.department_id, u.role_id, ro.name AS role_name,
 		       u.status, u.force_password_change, u.failed_attempts,
-		       u.locked_until, u.created_at, u.updated_at
+		       u.locked_until, u.created_at, u.updated_at, u.password_changed_at
 		FROM   users u
 		JOIN   roles ro ON ro.id = u.role_id
 		WHERE  lower(u.email) = $1`
@@ -67,7 +67,7 @@ func (r *pgRepository) GetUserByID(ctx context.Context, userID string) (*User, e
 		SELECT u.id, u.email, u.password_hash, u.full_name,
 		       u.department_id, u.role_id, ro.name AS role_name,
 		       u.status, u.force_password_change, u.failed_attempts,
-		       u.locked_until, u.created_at, u.updated_at
+		       u.locked_until, u.created_at, u.updated_at, u.password_changed_at
 		FROM   users u
 		JOIN   roles ro ON ro.id = u.role_id
 		WHERE  u.id = $1`

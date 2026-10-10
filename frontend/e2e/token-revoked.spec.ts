@@ -143,6 +143,36 @@ test.describe('TOKEN_REVOKED ends the session in a real browser', () => {
     }
   })
 
+  // A migrated module (#249 attempt 4): the admin dashboard queries through the shared apiFetch, which
+  // before that change was a local copy with no revocation handling.
+  test('(a) admin dashboard: password changed elsewhere ends the session from a migrated module', async ({ browser }) => {
+    const admin = await createAccount('super_admin', 'e2e-revoke-dash')
+    const ctxA = await isolatedContext(browser)
+    const page = await ctxA.newPage()
+    const hits = trackApi(page)
+    try {
+      await signIn(page, admin)
+      await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 })
+      await page.goto('/admin/users')
+      await expect(sidebar(page)).toBeVisible({ timeout: 20_000 })
+
+      await settle()
+      await changePasswordInContextB(browser, admin, PASS_SECOND)
+
+      // Probe: the sidebar's dashboard link redirects to /admin/dashboard, which queries with the revoked token.
+      await sidebarLink(page, '/admin').click()
+
+      await assertSessionEnded(page, hits)
+      await page.getByRole('alert').getByRole('button', { name: DISMISS_NAME }).click()
+      await expect(page.getByRole('alert')).toHaveCount(0)
+
+      await submitLogin(page, admin.email, admin.password)
+      await expect(page).toHaveURL(/\/admin\/dashboard$/, { timeout: 20_000 })
+    } finally {
+      await ctxA.close()
+    }
+  })
+
   test('(b) admin: department changed elsewhere refreshes once and the user stays signed in', async ({ browser }) => {
     const admin = await createAccount('super_admin', 'e2e-revoke-claims')
     const department = await createDepartment()

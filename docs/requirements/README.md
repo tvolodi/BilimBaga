@@ -95,6 +95,7 @@ Decision records (not FR-BB requirements).
 | ID | File | Title | Status |
 |----|------|-------|--------|
 | DEC-001 | DEC-001.Environments-production-class-demo-and-qa.md | Environments: Production-Class Demo and Separate QA | Accepted |
+| DEC-002 | DEC-002.Colour-contrast-over-imported-design-system.md | Colour Contrast Values Rank Above the Imported Design System | Accepted |
 
 ## Reference / Conventions
 

@@ -21,7 +21,7 @@ Claiming: Supervisor assigns and posts `supervisor: assigned to bb-devN` on the 
 - Lock dir and `swarm/state/` live in the main checkout (absolute paths from worktrees).
 
 ## Architect
-`bb-architect` (Opus, event-driven, no `/loop`) reviews judgment calls: architecture, decisions, the way the team works, retro analysis, the big picture. Advisory with a written reason; it merges and dispatches nothing; the owner overrides.
+`bb-architect` (Opus, event-driven, no `/loop`) reviews judgment calls: architecture, decisions, the way the team works, retro analysis, the big picture. Advisory with a written reason; it merges and dispatches nothing; the owner overrides. Its decisions rank above decisions in external documents (`CLAUDE.md`, Architect authority).
 
 **Routing.** The Supervisor routes mechanically each tick; any role may also add the `needs-architect` label (a request). The Supervisor sends one `task` (action `architect-review`, issue or PR, trigger id, one-sentence question) per issue, never more than one task in flight, at most 3 per day unless `prio:p0`. Triggers, any one is enough:
 - T1: label `needs-architect` on an open issue or PR.

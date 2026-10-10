@@ -35,6 +35,14 @@ export function writeE2eToken(token: string): void {
   }
 }
 
+/**
+ * Clear a token left by an older build, once at startup, when the seed is off (#415).
+ * With the seed on, the e2e build keeps its token for the spec run.
+ */
+export function clearStaleE2eToken(): void {
+  if (!E2E_TOKEN_SEED_ENABLED) clearE2eToken()
+}
+
 /** Remove any stored token, in every build (logout and revoked sessions). */
 export function clearE2eToken(): void {
   try {

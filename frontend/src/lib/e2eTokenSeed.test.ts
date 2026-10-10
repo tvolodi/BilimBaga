@@ -48,3 +48,37 @@ describe('e2e token seed, e2e build (#415)', () => {
     expect(seed.readE2eToken()).toBe('seeded-token')
   })
 })
+
+describe('startup clears a stale token in the default build (#415)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('removes a token left by an older build', async () => {
+    const seed = await import('./e2eTokenSeed')
+    localStorage.setItem(KEY, 'stale-token')
+    seed.clearStaleE2eToken()
+    expect(localStorage.getItem(KEY)).toBeNull()
+  })
+})
+
+describe('the E2E flag stays out of deploy files and workflows (#415)', () => {
+  it('appears in no deploy file or workflow', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const repo = path.resolve(process.cwd(), '..')
+    const walk = (dir: string): string[] => {
+      if (!fs.existsSync(dir)) return []
+      return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const p = path.join(dir, e.name)
+        return e.isDirectory() ? walk(p) : [p]
+      })
+    }
+    const scanned = [...walk(path.join(repo, 'deploy')), ...walk(path.join(repo, '.github', 'workflows'))]
+    expect(scanned.length).toBeGreaterThan(0)
+    const hits = scanned.filter((f) => fs.readFileSync(f, 'utf8').includes('VITE_E2E_TOKEN_SEED'))
+    expect(hits).toEqual([])
+  })
+})

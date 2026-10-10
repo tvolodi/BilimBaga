@@ -2,7 +2,6 @@ import { useParams, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useSessionResult } from '@/api/sessions'
 import { usePortalExam } from '@/api/portal'
-import { useTenantConfig } from '@/api/useTenantConfig'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { ScoreDial } from '@/components/results/ScoreDial'
 import { PassFailBanner } from '@/components/results/PassFailBanner'
@@ -14,7 +13,6 @@ import { ResultActions } from '@/components/results/ResultActions'
 export function ResultPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const { t } = useTranslation()
-  const { data: tenantConfig } = useTenantConfig()
 
   const {
     data: result,
@@ -41,7 +39,6 @@ export function ResultPage() {
     )
   }
 
-  const primaryColor = tenantConfig?.primary_color ?? '#6366f1'
   const isPending = result.score_pct === null || result.status === 'grading_pending'
   const canRetake =
     !!exam &&
@@ -73,7 +70,7 @@ export function ResultPage() {
               <p className="text-center text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
                 {t('result.score_label')}
               </p>
-              <ScoreDial scorePct={result.score_pct!} primaryColor={primaryColor} />
+              <ScoreDial scorePct={result.score_pct!} />
             </div>
             <PassFailBanner passed={result.passed} />
           </div>

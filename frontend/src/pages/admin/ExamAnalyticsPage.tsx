@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useExamAnalytics } from '@/api/analytics'
 import { useAIInsights } from '@/api/ai'
-import { useTenantConfig } from '@/api/useTenantConfig'
 import { RequireRole } from '@/components/RequireRole'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -149,8 +148,6 @@ function PageSkeleton() {
 function ExamAnalyticsContent({ examId }: { examId: string }) {
   const { t } = useTranslation()
   const { data, isLoading, isError } = useExamAnalytics(examId)
-  const { data: tenantConfig } = useTenantConfig()
-  const primaryColor = tenantConfig?.primary_color ?? '#6366f1'
 
   const [sortCol, setSortCol] = useState<SortCol>('correct_rate')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -203,7 +200,6 @@ function ExamAnalyticsContent({ examId }: { examId: string }) {
           <CardContent>
             <ScoreDistributionChart
               distribution={data.score_distribution}
-              primaryColor={primaryColor}
             />
           </CardContent>
         </Card>
@@ -213,7 +209,7 @@ function ExamAnalyticsContent({ examId }: { examId: string }) {
             <h2 className="text-base font-semibold">{t('exam_analytics.pass_rate')}</h2>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <PassRateChart passRate={data.pass_rate} primaryColor={primaryColor} />
+            <PassRateChart passRate={data.pass_rate} />
           </CardContent>
         </Card>
       </div>

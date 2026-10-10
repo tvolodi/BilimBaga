@@ -33,8 +33,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Swarm runtime
+# Swarm runtime (#284: state, locks and backups never enter the public repo)
 .claude/worktrees/
-swarm/state/*.json
+swarm/state/*
 !swarm/state/*.example.json
 swarm/locks/
+swarm/backups/
+swarm-snapshot.txt

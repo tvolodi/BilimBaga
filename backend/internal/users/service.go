@@ -391,7 +391,7 @@ func (s *service) ResetPassword(ctx context.Context, id, callerRole, callerDeptI
 		return nil, fmt.Errorf("users.ResetPassword: hash password: %w", err)
 	}
 
-	if err := s.repo.UpdatePassword(ctx, id, string(hash)); err != nil {
+	if err := s.repo.UpdatePassword(ctx, id, string(hash), s.clock()); err != nil {
 		return nil, fmt.Errorf("users.ResetPassword: %w", err)
 	}
 

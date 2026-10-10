@@ -56,6 +56,7 @@ func newSimAccount(t *testing.T, start time.Time) *simAccount {
 	repo := &mockRepository{
 		getUserByEmailFn: func(context.Context, string) (*User, error) { return a.user(), nil },
 		getUserByIDFn:    func(context.Context, string) (*User, error) { return a.user(), nil },
+		passwordStamp: func() *time.Time { return a.stamp },
 		updatePasswordFn: func(_ context.Context, _ string, hash string, at time.Time) error {
 			a.passwordHash = hash
 			a.stamp = &at
@@ -81,9 +82,9 @@ func (a *simAccount) user() *User {
 	}
 }
 
-// modelResetStamp is the stamp an admin or recovery reset writes on origin/main: the start of the next
-// second after the application clock, whatever the previous stamp was.
-func modelResetStamp(now time.Time) time.Time { return now.Truncate(time.Second).Add(time.Second) }
+// modelResetStamp is the stamp an admin or recovery reset writes: NextPasswordStamp over the
+// application clock and the account's previous stamp, as the repositories compute it under their lock.
+func modelResetStamp(now time.Time, previous *time.Time) time.Time { return NextPasswordStamp(now, previous) }
 
 func (a *simAccount) signIn() string {
 	resp, _, err := a.svc.Login(context.Background(), &LoginRequest{Email: simAccountEmail, Password: a.password}, "127.0.0.1")
@@ -106,7 +107,7 @@ func (a *simAccount) change() string {
 func (a *simAccount) reset() {
 	a.password = simTempPassword
 	a.passwordHash = simHash(a.t, simTempPassword)
-	stamp := modelResetStamp(a.clock)
+	stamp := modelResetStamp(a.clock, a.stamp)
 	a.stamp = &stamp
 }
 

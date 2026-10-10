@@ -4,9 +4,39 @@
  * Requires: make dev running, employee storage state from global-setup.ts (seeded with
  * localStorage i18n-lang = 'ru'). Runs in the chromium-live-employee project.
  * The login-screen selector test uses a fresh unauthenticated context.
+ *
+ * The employee's saved preferred_locale (FR-BB116) overrides the localStorage value on load, so each
+ * test in the portal block sets it to 'ru' through the API first and puts back the value it found (#438).
  */
 import { test, expect, type Page } from '@playwright/test'
-import { EMPLOYEE_STORAGE_STATE } from './fixtures/seed'
+import { requireTarget } from '../../scripts/lib/target-guard'
+import { EMPLOYEE_STORAGE_STATE, getEmployeeApiToken } from './fixtures/seed'
+
+const API = requireTarget(
+  'E2E_API_URL',
+  process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`,
+  process.env,
+)
+
+/** The employee's saved preferred_locale, or null when none is saved. */
+async function savedPreferredLocale(): Promise<string | null> {
+  const res = await fetch(`${API}/api/v1/users/me`, {
+    headers: { Authorization: `Bearer ${await getEmployeeApiToken()}` },
+  })
+  const body = (await res.json()) as { data: { preferred_locale?: string | null } | null }
+  if (!res.ok || !body.data) throw new Error(`GET /users/me failed: ${res.status}`)
+  return body.data.preferred_locale ?? null
+}
+
+/** Save the employee's preferred_locale; null clears it. */
+async function setSavedPreferredLocale(locale: string | null): Promise<void> {
+  const res = await fetch(`${API}/api/v1/users/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await getEmployeeApiToken()}` },
+    body: JSON.stringify({ preferred_locale: locale }),
+  })
+  if (!res.ok) throw new Error(`PATCH /users/me preferred_locale failed: ${res.status}`)
+}
 
 // Native <select> rendered by LocaleSwitcher (options kk / ru / en).
 function localeSelect(page: Page) {
@@ -25,6 +55,17 @@ function portalNav(page: Page) {
 
 test.describe('Portal locale switcher (FR-BB316)', () => {
   test.use({ storageState: EMPLOYEE_STORAGE_STATE })
+
+  // Each test starts from the saved locale 'ru' that the seeded storage state assumes, and afterwards
+  // puts back whatever the employee had saved (possibly none), so the seed state is not changed.
+  let savedLocale: string | null = null
+  test.beforeEach(async () => {
+    savedLocale = await savedPreferredLocale()
+    await setSavedPreferredLocale('ru')
+  })
+  test.afterEach(async () => {
+    await setSavedPreferredLocale(savedLocale)
+  })
 
   test('AC1: switcher is visible in the portal header and offers kk/ru/en', async ({ page }) => {
     await page.goto('/portal')

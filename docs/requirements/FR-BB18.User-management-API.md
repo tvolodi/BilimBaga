@@ -17,7 +17,7 @@ Exposes the full lifecycle of user accounts to admin roles: paginated listing wi
 - [x] AC-2: The list endpoint supports query filters: `department_id`, `role_id`, and `status` (`active` | `inactive`); multiple filters are ANDed.
 - [x] AC-3: `department_admin` can only list users whose `department_id` matches their own; super admin sees all users.
 - [x] AC-4: `POST /api/v1/users` creates a user with `force_password_change = true`; the response includes the generated temporary password in plain text exactly once (never stored or returned again). A `department_admin` may only create users whose `department_id` matches their own; supplying any other `department_id` returns `403`. A `department_admin` may create users only with role `examiner` or `employee` (any other `role_id` returns `403 FORBIDDEN`; FR-BB117 D-1).
-- [x] AC-5: `GET /api/v1/users/:id` is accessible to `super_admin`, `department_admin`, or the user themselves (`id` matches JWT `sub`); any other user receives `403`. A `department_admin` may access any user whose `department_id` matches their own OR whose `id` matches the calling user's own JWT `sub`.
+- [x] AC-5: `GET /api/v1/users/:id` is accessible to `super_admin`, `department_admin` (and any role holding `users:read`), or the user themselves (`id` matches JWT `sub`). Amended 2026-10-10 (issue #405, FR-BB117 D-4c / D-5): a caller that may read users but asks for a user OUTSIDE its own department receives `404 NOT_FOUND`, identical to an unknown id, so existence cannot be probed; `403 FORBIDDEN` is only for a caller without any read permission on users (for example an employee asking for another user). Remaining original rule: A `department_admin` may access any user whose `department_id` matches their own OR whose `id` matches the calling user's own JWT `sub`.
 - [x] AC-6: `PUT /api/v1/users/:id` allows updating `full_name`, `department_id`, and `role_id`; `department_admin` may set `role_id` only to `examiner` or `employee` (never `department_admin` or `super_admin`; amended 2026-10-09, issue #217, strict rank hierarchy of FR-BB117 D-1, a violation returns `403 FORBIDDEN`) and may act only on users of strictly lower rank; only `super_admin` may assign or remove the `super_admin` role. A `department_admin` may only perform this operation on users whose `department_id` matches their own; any other user ID returns `403`.
 - [x] AC-7: `POST /api/v1/users/:id/deactivate` sets `status = 'inactive'`; the user can no longer log in; all existing records (exam results, certificates) are preserved. A `department_admin` may only perform this operation on users whose `department_id` matches their own; any other user ID returns `403`.
 - [x] AC-8: `POST /api/v1/users/:id/reset-password` generates a secure random temporary password, hashes it with bcrypt cost 12, stores the hash, sets `force_password_change = true`, and returns the plaintext temporary password in the response exactly once. A `department_admin` may only perform this operation on users whose `department_id` matches their own; any other user ID returns `403`.
@@ -151,7 +151,7 @@ The `examiner` role is excluded from all user management endpoints.
 ```
 
 ```json
-// GET /api/v1/users/:id — 403 Forbidden
+// GET /api/v1/users/:id — 403 Forbidden (caller without read permission on users; an out-of-department read by a department_admin is 404, see AC-5)
 {
   "data": null,
   "error": { "code": "FORBIDDEN", "message": "insufficient permissions" }

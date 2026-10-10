@@ -15,9 +15,12 @@ const RAW_FETCH_ALLOWED: Record<string, string> = {
   'recovery.ts': 'public account recovery (no token)',
 }
 
-/** True when module text calls fetch directly (a bare call, not apiFetch, refetch or another object's fetch). */
+/**
+ * True when module text reaches fetch directly: a bare call, or fetch through window, globalThis or self (#448).
+ * Not flagged: apiFetch, refetch, or a method named fetch on another object (client.fetch).
+ */
 function rawFetchIn(text: string): boolean {
-  return /(?<![\w$.])fetch\(/.test(text)
+  return /(?<![\w$.])fetch\(/.test(text) || /(?<![\w$])(?:window|globalThis|self)\s*\.\s*fetch\b/.test(text)
 }
 
 async function apiModules(): Promise<Array<{ name: string; text: string }>> {

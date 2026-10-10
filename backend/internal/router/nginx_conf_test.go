@@ -82,3 +82,25 @@ func TestNginxConf_Oversize413ReturnsJSONEnvelopeWithEndpointCode(t *testing.T) 
 		}
 	}
 }
+
+// FR-BB321 AC-4: theme-init.js sets the theme before first paint. The browser must revalidate it on
+// every load (Cache-Control no-cache), and, like /reset-password, its own location must repeat the
+// security headers because add_header is not inherited.
+func TestNginxConf_ThemeInitLocationRevalidatesAndKeepsSecurityHeaders(t *testing.T) {
+	raw, err := os.ReadFile("../../../deploy/nginx.conf")
+	if err != nil {
+		t.Fatalf("read nginx.conf: %v", err)
+	}
+	block := regexp.MustCompile(`(?s)location\s*=\s*/theme-init\.js\s*\{(.*?)\n\s*\}`).FindSubmatch(raw)
+	if block == nil {
+		t.Fatal("no `location = /theme-init.js` block in deploy/nginx.conf")
+	}
+	if !regexp.MustCompile(`add_header\s+Cache-Control\s+"no-cache"\s+always;`).Match(block[1]) {
+		t.Errorf("theme-init.js location lacks Cache-Control no-cache:\n%s", block[1])
+	}
+	for _, header := range []string{"Content-Security-Policy", "X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy", "Strict-Transport-Security"} {
+		if !regexp.MustCompile(`add_header\s+` + header + `\s+`).Match(block[1]) {
+			t.Errorf("theme-init.js location does not repeat %s", header)
+		}
+	}
+}

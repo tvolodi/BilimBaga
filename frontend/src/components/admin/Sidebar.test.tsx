@@ -56,6 +56,13 @@ describe('Sidebar', () => {
     expect(onToggle).toHaveBeenCalledOnce()
   })
 
+  it('uses the navy tokens for the surface and no default-palette grey (FR-BB320 AC-2)', () => {
+    renderSidebar(false)
+    const aside = document.querySelector('aside')
+    expect(aside).toHaveClass('bg-bg-navy', 'text-text-on-navy')
+    expect(aside?.innerHTML).not.toMatch(/gray-\d/)
+  })
+
   it('renders in collapsed state without crashing', () => {
     renderSidebar(true)
     // Sidebar still renders

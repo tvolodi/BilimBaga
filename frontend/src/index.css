@@ -31,7 +31,7 @@
 
   --color-text-primary: #1A1F2E;
   --color-text-secondary: #4A5568;
-  --color-text-muted: #8A94A6;
+  --color-text-muted: #5f6b7d;
   --color-text-on-navy: #FFFFFF;
   --color-text-on-blue: #FFFFFF;
   --color-text-link: #2E6DB4;
@@ -139,7 +139,7 @@
 
   --color-text-primary: #E8ECF4;
   --color-text-secondary: #9AAABB;
-  --color-text-muted: #5A6A7E;
+  --color-text-muted: #8fa0b4;
   --color-text-on-navy: #E8ECF4;
   --color-text-link: #5AA0E0;
 
@@ -165,7 +165,7 @@
   --color-accent: #C8A84B;
   --color-accent-foreground: #0F1623;
   --color-destructive: #E06050;
-  --color-destructive-foreground: #FFFFFF;
+  --color-destructive-foreground: #0f1623;
   --color-background: #0F1623;
   --color-foreground: #E8ECF4;
   --color-card: #1A2133;

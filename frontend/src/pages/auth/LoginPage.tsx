@@ -22,10 +22,7 @@ interface LoginPayload {
  */
 function returnPath(state: unknown): string | null {
   const from = (state as { from?: unknown } | null)?.from
-  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//') || from.startsWith('/login')) {
-    return null
-  }
-  return from
+  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : null
 }
 
 export function LoginPage() {

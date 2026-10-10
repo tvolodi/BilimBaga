@@ -17,10 +17,7 @@ const E2E_TOKEN_KEY = '__e2e_access_token__'
 export function endRevokedSession(qc: QueryClient): void {
   try { localStorage.removeItem(E2E_TOKEN_KEY) } catch { /* ignore */ }
   // Prefix match: also drops ['users', 'me'], ['users', 'roles'] and ['roles', 'permissions'].
-  qc.removeQueries({ queryKey: ['users'] })
-  qc.removeQueries({ queryKey: ['roles'] })
-  qc.removeQueries({ queryKey: ['portal'] })
-  qc.removeQueries({ queryKey: ['my-results'] })
+  for (const key of ['users', 'roles', 'portal', 'my-results']) qc.removeQueries({ queryKey: [key] })
   qc.setQueryData(SESSION_REVOKED_KEY, true)
   qc.setQueryData(['auth', 'accessToken'], null)
   qc.setQueryData(['auth', 'currentUser'], null)

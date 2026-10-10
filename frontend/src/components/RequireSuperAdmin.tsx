@@ -1,16 +1,7 @@
 import { type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAccessToken } from '@/hooks/useAccessToken'
-
-/** Decode the `role` claim from a JWT without signature verification. */
-function jwtRole(token: string): string | undefined {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return payload?.role as string | undefined
-  } catch {
-    return undefined
-  }
-}
+import { jwtRole } from '@/lib/routeRoles'
 
 interface RequireSuperAdminProps {
   children: ReactNode

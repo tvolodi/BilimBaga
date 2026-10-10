@@ -48,7 +48,7 @@ describe('DepartmentRenameModal', () => {
         <DepartmentRenameModal open department={dept} onClose={() => {}} />
       </Wrapper>,
     )
-    const input = screen.getByLabelText(/name/i) as HTMLInputElement
+    const input = screen.getByLabelText(/^name$/i) as HTMLInputElement
     expect(input.value).toBe('Engineering')
   })
 
@@ -69,7 +69,7 @@ describe('DepartmentRenameModal', () => {
         <DepartmentRenameModal open department={dept} onClose={() => {}} />
       </Wrapper>,
     )
-    const input = screen.getByLabelText(/name/i)
+    const input = screen.getByLabelText(/^name$/i)
     await userEvent.clear(input)
     expect(screen.getByRole('button', { name: /save/i })).toBeDisabled()
   })
@@ -81,8 +81,8 @@ describe('DepartmentRenameModal', () => {
         <DepartmentRenameModal open department={dept} onClose={() => {}} />
       </Wrapper>,
     )
-    await userEvent.clear(screen.getByLabelText(/name/i))
-    await userEvent.type(screen.getByLabelText(/name/i), '   ')
+    await userEvent.clear(screen.getByLabelText(/^name$/i))
+    await userEvent.type(screen.getByLabelText(/^name$/i), '   ')
     expect(screen.getByRole('button', { name: /save/i })).toBeDisabled()
   })
 
@@ -121,7 +121,7 @@ describe('DepartmentRenameModal', () => {
         <DepartmentRenameModal open department={dept} onClose={onClose} />
       </Wrapper>,
     )
-    const input = screen.getByLabelText(/name/i)
+    const input = screen.getByLabelText(/^name$/i)
     await userEvent.clear(input)
     await userEvent.type(input, '  Platform  ')
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
@@ -182,7 +182,7 @@ describe('DepartmentRenameModal', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
     await waitFor(() => expect(screen.getByText(/already exists/i)).toBeInTheDocument())
-    await userEvent.type(screen.getByLabelText(/name/i), 'x')
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'x')
     expect(screen.queryByText(/already exists/i)).not.toBeInTheDocument()
   })
 
@@ -225,7 +225,7 @@ describe('DepartmentRenameModal', () => {
         <DepartmentRenameModal open department={null} onClose={() => {}} />
       </Wrapper>,
     )
-    expect((screen.getByLabelText(/name/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/^name$/i) as HTMLInputElement).value).toBe('')
     expect(screen.getByRole('button', { name: /save/i })).toBeDisabled()
   })
 
@@ -244,7 +244,7 @@ describe('DepartmentRenameModal', () => {
         <DepartmentRenameModal open department={null} onClose={onClose} />
       </Wrapper>,
     )
-    await userEvent.type(screen.getByLabelText(/name/i), 'Orphan')
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'Orphan')
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
     expect(putCalled).toBe(false)
     expect(onClose).not.toHaveBeenCalled()
@@ -263,6 +263,6 @@ describe('DepartmentRenameModal', () => {
         <DepartmentRenameModal open department={other} onClose={() => {}} />
       </Wrapper>,
     )
-    expect((screen.getByLabelText(/name/i) as HTMLInputElement).value).toBe('Sales')
+    expect((screen.getByLabelText(/^name$/i) as HTMLInputElement).value).toBe('Sales')
   })
 })

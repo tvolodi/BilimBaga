@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { changeLocale } from '@/i18n'
 
 interface LanguageSelectorProps {
   availableLocales: string[]
@@ -15,7 +16,9 @@ export function LanguageSelector({ availableLocales }: LanguageSelectorProps) {
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const lang = e.target.value
-    i18n.changeLanguage(lang)
+    void changeLocale(lang).catch((err: unknown) => {
+      console.error(`Could not load the ${lang} translations`, err)
+    })
     localStorage.setItem('i18n-lang', lang)
   }
 

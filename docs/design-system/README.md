@@ -3,6 +3,7 @@
 Read this page before any frontend work (pages, components, forms, layouts, locale strings in the UI). It is the project rule for how BilimBaga looks and behaves; `docs/requirements/FR-BB320.Design-system-conformance.md` makes it enforceable.
 
 ## Order of authority
+An architect decision (`architect-decision:` comment or `docs/requirements/DEC-NNN`) ranks above this list where they conflict, and the owner's direct order ranks above both (`CLAUDE.md`, Architect authority).
 1. `foundations.md` and `tokens.json` (the owner's design system, synced 2026-10-09): colour, type, spacing, radii, motion, exam mode, accessibility, screen recipes, status mapping.
 2. `bilimbaga_design_system.md`: component details, Tailwind config summary, folder structure, i18n conventions. Where it conflicts with `foundations.md`, `foundations.md` wins (known case: icons are `lucide-react`, stroke 1.5, 20px, not Tabler).
 3. `frontend/src/index.css` and `components/ui/*` are the implementation. If they disagree with 1, the code is wrong (see FR-BB320 for the known differences).
@@ -30,4 +31,4 @@ The owner also keeps the design system as a Claude artifact with live component 
 - The owner: the design system itself (the artifact, and approval of new tokens and components).
 - BA: this folder, `FR-BB320`, frontend sections of requirements, review of UI requirements against this page.
 - Developers: follow the checklist; fix differences between code and the design system.
-- Architect (when running): decisions on trade-offs between the design system and implementation.
+- Architect (event-driven, no loop): decisions on trade-offs between the design system and implementation.

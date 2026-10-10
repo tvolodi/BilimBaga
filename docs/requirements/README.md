@@ -84,6 +84,7 @@
 | FR-BB318 | exam-unpublish | Unpublish Exam | Implemented |
 | FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Implemented |
 | FR-BB319 | Anti-cheat-event-hygiene | Anti-Cheat Event Hygiene: Single Report per Incident, Auto-Submit Only on Tab Switch, Fullscreen Exit | Validated |
+| FR-BB321 | Dark-mode | Dark Mode: Theme Switch with Light, Dark and System | Validated (revision 5, tenant colours per DEC-002) |
 | FR-BB320 | Design-system-conformance | Design System Conformance and Enforcement | Validated |
 | FR-BB510 | Overdue-reminder-action | Overdue Employee Reminder: Real "Send Reminder" Action | Validated |
 
@@ -94,6 +95,7 @@ Decision records (not FR-BB requirements).
 | ID | File | Title | Status |
 |----|------|-------|--------|
 | DEC-001 | DEC-001.Environments-production-class-demo-and-qa.md | Environments: Production-Class Demo and Separate QA | Accepted |
+| DEC-002 | DEC-002.Colour-contrast-over-imported-design-system.md | Colour Contrast Values Rank Above the Imported Design System | Accepted |
 
 ## Reference / Conventions
 

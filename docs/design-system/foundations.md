@@ -14,7 +14,7 @@ BilimBaga is a corporate exam and learning platform with two faces: a dense admi
 ## Visual foundations
 
 - **Colour.** `color-navy` for sidebar, auth panel and dark surfaces; `color-blue` (alias `color-primary`) for buttons, links, active nav and focus; `color-gold` only for certificates and achievement badges, never for an action; the logo carries its own colours and does not use the palette tokens. Status colours come in pairs: text `color-success` on `color-bg-success`, likewise warning, danger and info. Never invert a pair.
-- **Surfaces.** Page `color-bg-page`, cards `color-bg-surface` with a 1px `color-border-default` and `shadow-card`, hover and alternate rows `color-bg-subtle`. Dark theme swaps the same names; switch with `class="dark"` on `<html>` (the code's mechanism; the original design system text said `data-theme="dark"`). No theme switch exists in the app yet, so dark mode is defined but not reachable.
+- **Surfaces.** Page `color-bg-page`, cards `color-bg-surface` with a 1px `color-border-default` and `shadow-card`, hover and alternate rows `color-bg-subtle`. Dark theme swaps the same names; switch with `class="dark"` on `<html>` (the code's mechanism; the original design system text said `data-theme="dark"`). The theme switch is specified in FR-BB321 (light, dark, system; stored in `localStorage` key `bb-theme`).
 - **Type.** Inter (`font-sans`, loaded from Google Fonts, 300 to 700), JetBrains Mono for codes and IDs. Page title `text-h1`, section `text-h2`, card title `text-h3`, body `text-body`, tables `text-body-sm`, labels `text-label`, helper text `text-caption`.
 - **Spacing.** 4px base: `space-6` (24px) card padding, `space-8` between sections in a page, `space-12` between major areas. Admin content is `container-admin` wide with `space-8` padding; the portal is `container-content`; an exam question column is `container-question`.
 - **Radii.** `radius-md` buttons and inputs, `radius-lg` cards, `radius-xl` dialogs, `radius-pill` badges and progress bars.
@@ -53,7 +53,7 @@ Rules that apply to every screen: all text goes through `t()`; sorting and pagin
 
 ## Accessibility
 
-Body text meets 4.5:1 in both themes. `color-text-muted` (about 3:1 light, 2.9:1 dark) and `color-gold` on white (2.3:1) do not; use them only for non-essential text or alongside a label. The dark destructive button (white on `color-destructive`) is about 3.5:1. These are known failures of the source values, to be corrected by FR-BB320 AC-1 (muted text `#5f6b7d` light and `#8fa0b4` dark, dark destructive foreground `#0f1623`, gold never as text).
+Body text meets 4.5:1 in both themes. The source values of `color-text-muted` (3.06:1 on white light, 2.90:1 on surface dark) and `color-gold` on white (2.3:1) failed; FR-BB320 AC-1 corrected them: muted text is `#5f6b7d` light and `#8fa0b4` dark (4.81 to 5.40:1 and 5.16 to 6.78:1 on every ground), the dark destructive foreground is `#0f1623` (5.14:1 on the dark destructive fill, white gave 3.52:1). `color-gold` is never used as text; gold badge text is `#7a5e1a` on `color-gold-light` (4.79:1).
 
 ## Not synced
 

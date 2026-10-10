@@ -74,19 +74,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'flex flex-col h-screen bg-gray-900 text-gray-100 transition-all duration-200',
+        'flex flex-col h-screen bg-bg-navy text-text-on-navy transition-all duration-200',
         collapsed ? 'w-16' : 'w-56',
       )}
     >
       {/* Logo / Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-text-on-navy/15">
         {!collapsed && (
           <span className="text-lg font-bold tracking-tight truncate">{tenantConfig?.app_name ?? 'BilimBaga'}</span>
         )}
         <button
           onClick={onToggle}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors ml-auto"
+          className="p-1 rounded hover:bg-text-on-navy/15 text-text-on-navy/80 hover:text-text-on-navy transition-colors ml-auto"
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
@@ -104,8 +104,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               cn(
                 'flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white',
+                  ? 'bg-text-on-navy/15 text-text-on-navy'
+                  : 'text-text-on-navy/80 hover:bg-text-on-navy/10 hover:text-text-on-navy',
                 collapsed && 'justify-center px-0',
               )
             }

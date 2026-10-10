@@ -420,5 +420,41 @@ describe('EmployeePortal', () => {
         Reflect.deleteProperty(document.documentElement, 'requestFullscreen')
       }
     })
+
+    // #417: a start the backend refuses must not leave the candidate in fullscreen on the portal page.
+    it('leaves fullscreen when the session cannot be created (#417)', async () => {
+      let fullscreenEl: Element | null = null
+      const enter = vi.fn(() => {
+        fullscreenEl = document.documentElement
+        return Promise.resolve()
+      })
+      const exit = vi.fn(() => {
+        fullscreenEl = null
+        return Promise.resolve()
+      })
+      Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: enter })
+      Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit })
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fullscreenEl })
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () =>
+          HttpResponse.json(
+            { data: null, error: { code: 'ATTEMPTS_EXHAUSTED', message: 'x' } },
+            { status: 422 },
+          ),
+        ),
+      )
+      try {
+        const user = await openStartModal()
+        await user.click(screen.getByRole('button', { name: /begin exam/i }))
+        expect(await screen.findByRole('alert')).toBeInTheDocument()
+        await waitFor(() => expect(exit).toHaveBeenCalledTimes(1))
+        expect(enter).toHaveBeenCalledTimes(1)
+        expect(fullscreenEl).toBeNull()
+      } finally {
+        Reflect.deleteProperty(document.documentElement, 'requestFullscreen')
+        Reflect.deleteProperty(document, 'exitFullscreen')
+        Reflect.deleteProperty(document, 'fullscreenElement')
+      }
+    })
   })
 })

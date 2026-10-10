@@ -83,6 +83,7 @@
 | FR-BB317 | department-treeview | Department Treeview Selector | Implemented (Users List filter shipped, #40) |
 | FR-BB318 | exam-unpublish | Unpublish Exam | Implemented |
 | FR-BB59 | Reports-hub-page | Frontend: Reports Hub Page | Implemented |
+| FR-BB319 | Anti-cheat-event-hygiene | Anti-Cheat Event Hygiene: Single Report per Incident, Auto-Submit Only on Tab Switch, Fullscreen Exit | Validated |
 | FR-BB510 | Overdue-reminder-action | Overdue Employee Reminder: Real "Send Reminder" Action | Validated |
 
 ## Decisions

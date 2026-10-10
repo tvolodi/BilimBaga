@@ -176,7 +176,28 @@ describe('BrandingSettingsPage', () => {
     await waitFor(() => {
       expect(lastPutBody).not.toBeNull()
     })
-    expect(lastPutBody).toEqual({ primary_color: '#2e6db4' })
+    // #498: the saved colour is the canonical uppercase form, the same as the seeded default.
+    expect(lastPutBody).toEqual({ primary_color: '#2E6DB4' })
+  })
+
+  // #498: however the colour is typed, the saved value is the same string as the default, #2E6DB4.
+  it.each(['2E6DB4', '#2E6DB4'])('saves a hand-typed %s as #2E6DB4', async (typed) => {
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <BrandingSettingsPage />
+      </Wrapper>,
+    )
+    const hex = (await screen.findByLabelText('Primary Colour hex')) as HTMLInputElement
+    await userEvent.clear(hex)
+    await userEvent.type(hex, typed)
+
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(lastPutBody).not.toBeNull()
+    })
+    expect(lastPutBody).toEqual({ primary_color: '#2E6DB4' })
   })
 
   it('does not block other fields when the stored primary colour already fails', async () => {

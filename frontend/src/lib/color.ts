@@ -14,3 +14,13 @@ export function normaliseHex(input: string): string | null {
       : trimmed
   return `#${expanded.toLowerCase()}`
 }
+
+/**
+ * The saved form of a hex colour: #RRGGBB in uppercase, the case the seeded default uses (#498). The
+ * colour field works in lowercase, because the native colour input needs it; only the saved value is
+ * uppercased. Validation stays case-insensitive, through normaliseHex.
+ */
+export function canonicalHex(input: string): string | null {
+  const normalised = normaliseHex(input)
+  return normalised === null ? null : normalised.toUpperCase()
+}

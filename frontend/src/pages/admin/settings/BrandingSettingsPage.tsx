@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LogoUploader } from '@/components/settings/LogoUploader'
+import { canonicalHex } from '@/lib/color'
 import { ColorPickerField } from '@/components/settings/ColorPickerField'
 import { LocaleSelector } from '@/components/settings/LocaleSelector'
 import { BrandingPreview } from '@/components/settings/BrandingPreview'
@@ -18,6 +19,14 @@ const DEFAULT_PRIMARY = '#2E6DB4'
 const DEFAULT_ACCENT = '#C8A84B'
 
 type PrimaryIssue = { kind: 'invalid' } | { kind: 'contrast'; ratio: string } | null
+
+// #498: the colours are saved in one case, uppercase like the seeded default, however they were typed.
+function canonicalColours(update: TenantConfigUpdate): TenantConfigUpdate {
+  const next = { ...update }
+  if (next.primary_color !== undefined) next.primary_color = canonicalHex(next.primary_color) ?? next.primary_color
+  if (next.accent_color !== undefined) next.accent_color = canonicalHex(next.accent_color) ?? next.accent_color
+  return next
+}
 
 // FR-BB320 AC-1: the server rule, applied to the draft value before save.
 function primaryIssueFor(draftValue: string | undefined): PrimaryIssue {
@@ -60,7 +69,7 @@ export function BrandingSettingsPage() {
   async function handleSave() {
     if (!canSave) return
     try {
-      await updateConfig.mutateAsync(draft)
+      await updateConfig.mutateAsync(canonicalColours(draft))
       setDraft({})
       setFeedback({ kind: 'success', message: t('settings.branding.saveSuccess') })
     } catch (err) {

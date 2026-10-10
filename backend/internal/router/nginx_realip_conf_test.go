@@ -95,3 +95,45 @@ func TestNginxEdgeVhosts_TrustCloudflareAndReadTheConnectingIP(t *testing.T) {
 		}
 	}
 }
+
+// #475 (architect review): nginx passes a client-sent True-Client-IP through by default, and chi RealIP reads
+// it before X-Real-IP, so every proxy in front of the API must clear it. Each location that proxies to the API
+// clears it with an empty proxy_set_header.
+func TestNginxConf_ClearsClientSentTrueClientIP(t *testing.T) {
+	cases := []struct{ path, location string }{
+		{"../../../deploy/nginx.conf", `location\s+/api/\s*\{`},
+		{"../../../deploy/nginx/bilimbaga.conf", `location\s+/\s*\{`},
+		{"../../../deploy/nginx/bilimbaga-qa.conf", `location\s+/\s*\{`},
+	}
+	for _, c := range cases {
+		raw, err := os.ReadFile(c.path)
+		if err != nil {
+			t.Fatalf("read %s: %v", c.path, err)
+		}
+		block := regexp.MustCompile(`(?s)` + c.location + `(.*?)\n\s*\}`).FindSubmatch(raw)
+		if block == nil {
+			t.Errorf("%s: no proxying location block matching %s", c.path, c.location)
+			continue
+		}
+		if !regexp.MustCompile(`(?m)^\s*proxy_set_header\s+True-Client-IP\s+"";`).Match(block[1]) {
+			t.Errorf("%s: the proxying location does not clear True-Client-IP (`proxy_set_header True-Client-IP \"\";`)", c.path)
+		}
+	}
+}
+
+// #475 (architect review): the Cloudflare range list needs a periodic comparison with the published lists; the
+// comment above it must say so, so the list is not treated as permanent.
+func TestNginxEdgeVhosts_CloudflareListNoteAsksForPeriodicComparison(t *testing.T) {
+	for _, path := range []string{
+		"../../../deploy/nginx/bilimbaga.conf",
+		"../../../deploy/nginx/bilimbaga-qa.conf",
+	} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if !regexp.MustCompile(`(?i)#[^\n]*periodic comparison`).Match(raw) {
+			t.Errorf("%s: no comment above the Cloudflare range list asking for a periodic comparison", path)
+		}
+	}
+}

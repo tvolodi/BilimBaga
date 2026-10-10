@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -48,5 +49,28 @@ func TestRealIP_DifferentClientsGetSeparateAuthBuckets(t *testing.T) {
 	}
 	if got := limitedCall(h, http.MethodPost, "/api/v1/auth/login", second); got == http.StatusTooManyRequests {
 		t.Fatalf("client %s was limited by client %s's bucket", second, first)
+	}
+}
+
+// TestRealIP_ClientSuppliedForwardingHeadersDoNotChooseTheBucket: the API takes the client from X-Real-IP
+// only. chi RealIP also trusts True-Client-IP and X-Forwarded-For, which a client sends freely, so a new
+// value per request would pick a new bucket and escape the sign-in limiter (#475 review). The TCP peer is the
+// same for every request here, so the limiter must still count them as one client.
+func TestRealIP_ClientSuppliedForwardingHeadersDoNotChooseTheBucket(t *testing.T) {
+	for _, header := range []string{"True-Client-IP", "X-Forwarded-For"} {
+		t.Run(header, func(t *testing.T) {
+			h := newRouter()
+			last := 0
+			for i := 0; i < 11; i++ {
+				req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+				req.Header.Set(header, fmt.Sprintf("198.51.100.%d", 30+i))
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+				last = rec.Code
+			}
+			if last != http.StatusTooManyRequests {
+				t.Fatalf("11th login with a new %s each time = %d; want 429 (one client, one bucket)", header, last)
+			}
+		})
 	}
 }

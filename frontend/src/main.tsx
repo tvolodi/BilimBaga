@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './i18n'
 import './index.css'
+import { clearStaleE2eToken } from './lib/e2eTokenSeed'
+
+clearStaleE2eToken()
 
 if (import.meta.env.MODE !== 'production') {
   import('@axe-core/react').then(({ default: axe }) => {

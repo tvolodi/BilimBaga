@@ -109,6 +109,7 @@ test.describe('Accessibility — colour contrast, both themes (FR-BB320 AC-5, FR
   let resultExamId = ''
   let takingSessionId = ''
   let resultSessionId = ''
+  let wizardExamId = ''
 
   test.beforeAll(async () => {
     const seed = await getSeedData()
@@ -124,6 +125,8 @@ test.describe('Accessibility — colour contrast, both themes (FR-BB320 AC-5, FR
     resultExamId = result.id
     takingSessionId = await startEmployeeSession(takingExamId)
     resultSessionId = await createPassedEmployeeSession(resultExamId)
+    // #450: a draft exam for the wizard; step 2 shows the completed-step tint that step 1 does not.
+    wizardExamId = (await createTestExam(seed.adminToken, 'Contrast run exam (wizard)')).id
   })
 
   test.afterAll(async () => {
@@ -131,6 +134,7 @@ test.describe('Accessibility — colour contrast, both themes (FR-BB320 AC-5, FR
     for (const examId of [takingExamId, resultExamId]) {
       if (examId) await deleteTestExam(seed.adminToken, examId).catch(() => {})
     }
+    if (wizardExamId) await deleteTestExam(seed.adminToken, wizardExamId).catch(() => {})
     if (questionId) await deleteTestQuestion(seed.adminToken, questionId).catch(() => {})
   })
 
@@ -157,6 +161,17 @@ test.describe('Accessibility — colour contrast, both themes (FR-BB320 AC-5, FR
 
       test('question bank list has zero color-contrast violations', async ({ page }) => {
         await openInTheme(page, theme, '/admin/questions')
+        expect(await colorContrastViolations(page)).toEqual([])
+      })
+
+      // #450: the exam wizard, step 1 and a later step with the completed-step tint.
+      test('exam wizard, step 1 has zero color-contrast violations', async ({ page }) => {
+        await openInTheme(page, theme, '/admin/exams/new')
+        expect(await colorContrastViolations(page)).toEqual([])
+      })
+
+      test('exam wizard, step 2 has zero color-contrast violations', async ({ page }) => {
+        await openInTheme(page, theme, `/admin/exams/${wizardExamId}/edit?step=2`)
         expect(await colorContrastViolations(page)).toEqual([])
       })
 

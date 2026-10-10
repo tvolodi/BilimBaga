@@ -137,8 +137,8 @@ export function UsersListPage() {
           role={notice.type === 'error' ? 'alert' : 'status'}
           className={`rounded-md border px-4 py-3 text-sm ${
             notice.type === 'error'
-              ? 'border-red-200 bg-red-50 text-red-800'
-              : 'border-green-200 bg-green-50 text-green-800'
+              ? 'border-danger bg-bg-danger text-danger'
+              : 'border-success bg-bg-success text-success'
           }`}
         >
           {notice.text}
@@ -184,7 +184,7 @@ export function UsersListPage() {
 
       {/* Table */}
       {isLoading && <p className="text-muted-foreground">…</p>}
-      {isError && <p className="text-red-600">{t('users.messages.error_generic')}</p>}
+      {isError && <p className="text-danger">{t('users.messages.error_generic')}</p>}
       {data && (
         <Table>
           <TableHeader>
@@ -234,7 +234,7 @@ export function UsersListPage() {
                 <TableCell>
                   <StatusBadge status={user.status} />
                   {user.is_locked && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                    <span className="ml-2 inline-flex items-center rounded-full bg-bg-warning px-2.5 py-0.5 text-xs font-semibold text-warning">
                       {t('users.status.locked')}
                     </span>
                   )}

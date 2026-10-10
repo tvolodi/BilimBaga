@@ -36,9 +36,9 @@ describe('QuestionNavigator', () => {
         onNavigate={() => {}}
       />,
     )
-    expect(screen.getByRole('button', { name: '1' }).className).toContain('bg-blue-500')
-    expect(screen.getByRole('button', { name: '2' }).className).toContain('bg-yellow-300')
-    expect(screen.getByRole('button', { name: '3' }).className).not.toMatch(/bg-blue-500|bg-yellow-300/)
+    expect(screen.getByRole('button', { name: '1' }).className).toContain('bg-info')
+    expect(screen.getByRole('button', { name: '2' }).className).toContain('bg-bg-warning')
+    expect(screen.getByRole('button', { name: '3' }).className).not.toMatch(/bg-info|bg-bg-warning/)
   })
 
   it('renders the legend', () => {

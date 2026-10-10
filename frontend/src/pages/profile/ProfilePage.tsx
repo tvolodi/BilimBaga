@@ -121,7 +121,7 @@ export function ProfilePage() {
           {notice && (
             <p
               role={notice.kind === 'error' ? 'alert' : 'status'}
-              className={cn('text-sm', notice.kind === 'error' ? 'text-destructive' : 'text-emerald-700')}
+              className={cn('text-sm', notice.kind === 'error' ? 'text-destructive' : 'text-success')}
             >
               {notice.text}
             </p>

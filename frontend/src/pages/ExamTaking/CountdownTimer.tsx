@@ -55,9 +55,9 @@ export function CountdownTimer({ remainingSeconds, totalSeconds, onExpire }: Cou
         className={cn(
           'font-mono text-sm font-semibold px-2 py-1 rounded',
           isCritical
-            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+            ? 'bg-bg-danger text-danger'
             : isWarning
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+              ? 'bg-bg-warning text-warning'
               : 'bg-muted text-foreground',
         )}
         title={

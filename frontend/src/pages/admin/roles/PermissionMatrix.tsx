@@ -56,7 +56,7 @@ export function PermissionMatrix({ catalogue, selected, onChange, readOnly = fal
                   <input
                     id={inputId}
                     type="checkbox"
-                    className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 disabled:opacity-50"
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-border disabled:opacity-50"
                     checked={selected.has(p.id)}
                     disabled={disabled}
                     onChange={(e) => toggle(p.id, e.target.checked)}

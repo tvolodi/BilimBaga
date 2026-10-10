@@ -96,7 +96,7 @@ export function UserEditDrawer({ user, onClose }: UserEditDrawerProps) {
               <p className="text-xs text-muted-foreground">{t('users.messages.role_locked')}</p>
             )}
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <SheetFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               {t('users.deactivate_dialog.cancel')}

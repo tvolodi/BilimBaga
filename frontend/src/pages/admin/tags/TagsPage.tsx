@@ -33,7 +33,7 @@ function NotificationBanner({ notification, onDismiss }: { notification: Notific
     >
       <AlertCircle size={16} className="flex-shrink-0" />
       <span className="flex-1">{notification.message}</span>
-      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-black/10">
+      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-foreground/10">
         <X size={14} />
       </button>
     </div>

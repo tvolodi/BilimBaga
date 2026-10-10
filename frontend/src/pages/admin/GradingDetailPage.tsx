@@ -116,8 +116,8 @@ export function GradingDetailPage() {
         <div
           className={`px-4 py-3 rounded-md text-sm ${
             toast.message.type === 'error'
-              ? 'bg-red-50 border border-red-200 text-red-800'
-              : 'bg-green-50 border border-green-200 text-green-800'
+              ? 'bg-bg-danger border border-danger text-danger'
+              : 'bg-bg-success border border-success text-success'
           }`}
         >
           {toast.message.text}

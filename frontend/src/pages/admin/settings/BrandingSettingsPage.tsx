@@ -135,7 +135,7 @@ export function BrandingSettingsPage() {
                 role="status"
                 className={
                   feedback.kind === 'success'
-                    ? 'text-sm text-green-700'
+                    ? 'text-sm text-success'
                     : 'text-sm text-destructive'
                 }
               >

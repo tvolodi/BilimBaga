@@ -327,7 +327,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
             </DialogHeader>
             <p className="text-sm text-muted-foreground">{t('exam.taking.timesUp.message')}</p>
             {submitSession.isError && (
-              <p className="text-sm text-amber-600">{t('exam.taking.timesUp.retrying')}</p>
+              <p className="text-sm text-warning">{t('exam.taking.timesUp.retrying')}</p>
             )}
           </DialogContent>
         </Dialog>
@@ -430,7 +430,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{t('exam.taking.timesUp.message')}</p>
           {submitSession.isError && (
-            <p className="text-sm text-amber-600">{t('exam.taking.timesUp.retrying')}</p>
+            <p className="text-sm text-warning">{t('exam.taking.timesUp.retrying')}</p>
           )}
         </DialogContent>
       </Dialog>

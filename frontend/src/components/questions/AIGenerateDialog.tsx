@@ -84,7 +84,7 @@ function DraftRow({ question, index, selected, onToggle, expanded, onExpand }: D
             {question.options.map((opt, i) => (
               <li
                 key={i}
-                className={opt.is_correct ? 'text-green-700 font-medium' : ''}
+                className={opt.is_correct ? 'text-success font-medium' : ''}
               >
                 {opt.is_correct ? '✓ ' : '○ '}{opt.text}
               </li>
@@ -325,7 +325,7 @@ export function AIGenerateDialog({ open, onClose, onSuccess }: AIGenerateDialogP
 
           {/* Error */}
           {errorMsg && (
-            <p className="text-sm text-red-600">{errorMsg}</p>
+            <p className="text-sm text-danger">{errorMsg}</p>
           )}
 
           {/* Loading */}

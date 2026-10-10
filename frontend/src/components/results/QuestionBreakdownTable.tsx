@@ -77,11 +77,11 @@ export function QuestionBreakdownTable({ breakdown }: QuestionBreakdownTableProp
                 <TableRow key={item.question_id}>
                   <TableCell className="align-top text-sm">{stem}</TableCell>
                   <TableCell
-                    className={`align-top text-sm ${isWrong && !isCorrect ? 'bg-red-50' : ''}`}
+                    className={`align-top text-sm ${isWrong && !isCorrect ? 'bg-bg-danger' : ''}`}
                   >
                     {item.employee_answer.join(', ') || '—'}
                   </TableCell>
-                  <TableCell className="align-top text-sm bg-green-50 font-semibold">
+                  <TableCell className="align-top text-sm bg-bg-success font-semibold">
                     {item.correct_answer.join(', ') || '—'}
                   </TableCell>
                   <TableCell className="align-top text-sm text-right whitespace-nowrap">
@@ -92,7 +92,7 @@ export function QuestionBreakdownTable({ breakdown }: QuestionBreakdownTableProp
                   </TableCell>
                   <TableCell className="align-top text-sm max-w-[240px]">
                     {item.manual_feedback
-                      ? <span className="text-blue-700">{item.manual_feedback}</span>
+                      ? <span className="text-info">{item.manual_feedback}</span>
                       : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                 </TableRow>

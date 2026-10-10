@@ -335,7 +335,7 @@ describe('DepartmentsPage', () => {
     await waitFor(() => expect(screen.queryByText('Frontend')).not.toBeInTheDocument())
     expect(screen.getByText('Engineering')).toBeInTheDocument()
     // The banner must show the success message, not the Delete button label (#326).
-    const banner = document.querySelector('.bg-green-50')
+    const banner = document.querySelector('.bg-bg-success')
     expect(banner).not.toBeNull()
     expect(banner?.textContent?.trim()).toBe('Department deleted')
   })

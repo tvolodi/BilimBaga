@@ -16,7 +16,7 @@ export function AdminHome() {
   if (isLoading) return <FullPageSpinner />
   if (permissions === undefined) {
     return (
-      <p role="alert" className="py-8 text-sm text-red-600">
+      <p role="alert" className="py-8 text-sm text-danger">
         {t('common.loadError')}
       </p>
     )

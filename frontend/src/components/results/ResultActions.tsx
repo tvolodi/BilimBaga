@@ -41,7 +41,7 @@ export function ResultActions({
   return (
     <div className="flex flex-col gap-2 w-full sm:flex-row sm:justify-center">
       {downloadError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {t(downloadError)}
         </p>
       )}

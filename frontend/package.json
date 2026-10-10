@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:e2e": "tsc && vite build --mode e2e",
     "preview": "vite preview",
     "test": "vitest run && npm run check:i18n",
     "test:e2e": "playwright test",

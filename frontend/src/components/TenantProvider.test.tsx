@@ -112,3 +112,30 @@ describe('TenantProvider in the dark theme (FR-BB321 AC-8)', () => {
     expect(seen).toBeGreaterThan(0)
   })
 })
+
+describe('TenantProvider accent foreground (FR-BB321 AC-8)', () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute('style')
+  })
+
+  it('sets the foreground of an overridden accent in the light theme', () => {
+    mockConfig('#123456', '#c8a84b')
+    render(<TenantProvider><span /></TenantProvider>)
+
+    expect(document.documentElement.style.getPropertyValue('--color-accent-foreground')).toBe('#0f1623')
+  })
+
+  it('removes the accent and its foreground when the accent is not set', () => {
+    mockConfig('#123456', '#c8a84b')
+    const view = render(<TenantProvider><span /></TenantProvider>)
+    expect(document.documentElement.style.getPropertyValue('--color-accent-foreground')).toBe('#0f1623')
+
+    vi.mocked(useTenantConfig).mockReturnValue({
+      data: { app_name: 'Acme', primary_color: '#123456', accent_color: '', default_locale: 'en', available_locales: ['en'] },
+    } as unknown as ReturnType<typeof useTenantConfig>)
+    view.rerender(<TenantProvider><span /></TenantProvider>)
+
+    expect(document.documentElement.style.getPropertyValue('--color-accent')).toBe('')
+    expect(document.documentElement.style.getPropertyValue('--color-accent-foreground')).toBe('')
+  })
+})

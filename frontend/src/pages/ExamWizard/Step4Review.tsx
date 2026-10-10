@@ -118,7 +118,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
 
       {/* Success */}
       {successBanner && (
-        <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+        <div className="flex items-center gap-2 rounded-md bg-bg-success border border-success px-4 py-3 text-sm text-success">
           <CheckCircle2 size={16} />
           {t('exam.publishSuccess')}
         </div>
@@ -126,7 +126,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
 
       {/* 422 validation error */}
       {unsatisfiedRules && unsatisfiedRules.length > 0 && (
-        <div role="alert" className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 space-y-2">
+        <div role="alert" className="rounded-md bg-bg-warning border border-warning px-4 py-3 text-sm text-warning space-y-2">
           <div className="flex items-center gap-2 font-medium">
             <AlertTriangle size={16} />
             {t('exam.wizard.validationWarning')}
@@ -143,7 +143,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           )}
           <button
             type="button"
-            className="text-xs underline mt-1 text-amber-700 hover:text-amber-900"
+            className="text-xs underline mt-1 text-warning hover:text-warning"
             onClick={() => setUnsatisfiedRules(null)}
           >
             {t('exam.wizard.retryPublish')}
@@ -212,10 +212,10 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
               } else if (eligible !== undefined) {
                 const badgeClass =
                   eligible >= r.count
-                    ? 'bg-green-100 text-green-800'
+                    ? 'bg-bg-success text-success'
                     : eligible > 0
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-red-100 text-red-800'
+                      ? 'bg-bg-warning text-warning'
+                      : 'bg-bg-danger text-danger'
                 badge = (
                   <Badge className={`ml-2 text-xs ${badgeClass}`}>
                     {eligible} {t('exam.wizard.step4.eligibleCount')}
@@ -255,7 +255,7 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
         )}
         {isPublished && (
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 text-sm text-green-700">
+            <div className="flex items-center gap-2 text-sm text-success">
               <CheckCircle2 size={16} />
               {t('exam.wizard.step4.published')}
             </div>

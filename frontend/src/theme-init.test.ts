@@ -13,10 +13,10 @@ function stubPrefersDark(prefersDark: boolean) {
   )
 }
 
-const SWITCH_LINE = 'var THEME_SWITCH_ENABLED = false;'
+const SWITCH_LINE = 'var THEME_SWITCH_ENABLED = true;'
 
-// The shipped file has the switch off. The enabled-state tests flip the constant in the text
-// they run; the off-state tests run the file as shipped.
+// The shipped file has the switch on. The off-state tests flip the constant in the text they run;
+// the enabled-state tests run the file as shipped.
 function scriptWithSwitch(enabled: boolean): string {
   if (!scriptText.includes(SWITCH_LINE)) throw new Error('switch line not found in theme-init.js')
   return scriptText.replace(SWITCH_LINE, `var THEME_SWITCH_ENABLED = ${enabled};`)
@@ -31,7 +31,7 @@ function htmlIsDark() {
 }
 
 describe('theme-init.js while the switch is off (FR-BB321 part 1)', () => {
-  it('ships with the switch off, matching ThemeProvider', () => {
+  it('ships with the switch on, matching ThemeProvider', () => {
     expect(scriptText).toContain(SWITCH_LINE)
   })
 

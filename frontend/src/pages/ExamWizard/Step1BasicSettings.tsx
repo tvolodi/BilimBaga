@@ -229,7 +229,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {isReadOnly && (
-        <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-md bg-bg-warning border border-warning px-4 py-3 text-sm text-warning">
           {t('exam.wizard.activeReadOnlyNotice')}
         </div>
       )}

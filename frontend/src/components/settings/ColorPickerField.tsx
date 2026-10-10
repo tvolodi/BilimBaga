@@ -67,7 +67,7 @@ export function ColorPickerField({
       {!passes && (
         <div
           role="alert"
-          className="rounded-md border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800"
+          className="rounded-md border border-warning bg-bg-warning px-3 py-2 text-xs text-warning"
         >
           {t('settings.branding.contrastWarning', { ratio: ratio.toFixed(2) })}
         </div>

@@ -84,7 +84,7 @@ export function DepartmentCreateModal({ open, defaultParentId, departments, onCl
               autoFocus
             />
             {inlineError && (
-              <p className="text-sm text-red-600">{inlineError}</p>
+              <p className="text-sm text-danger">{inlineError}</p>
             )}
           </div>
           <div className="space-y-1.5">

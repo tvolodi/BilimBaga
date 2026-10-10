@@ -75,8 +75,8 @@ export function OverdueTable({ employees }: OverdueTableProps) {
         <div
           className={`rounded-md px-4 py-2 text-sm ${
             toast.type === 'success'
-              ? 'bg-green-50 text-green-800'
-              : 'bg-red-50 text-red-800'
+              ? 'bg-bg-success text-success'
+              : 'bg-bg-danger text-danger'
           }`}
         >
           {toast.message}

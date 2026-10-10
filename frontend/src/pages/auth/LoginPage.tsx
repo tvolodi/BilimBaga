@@ -77,7 +77,7 @@ export function LoginPage() {
           {resetNotice && (
             <p
               role="status"
-              className="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+              className="mt-4 rounded-md border border-success bg-bg-success px-3 py-2 text-sm text-success"
             >
               {t('auth.recovery.resetSuccess')}
             </p>
@@ -85,7 +85,7 @@ export function LoginPage() {
           {sessionRevoked && (
             <div
               role="alert"
-              className="mt-4 flex items-start justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              className="mt-4 flex items-start justify-between gap-3 rounded-md border border-warning bg-bg-warning px-3 py-2 text-sm text-warning"
             >
               <p>{t('auth.login.sessionRevoked')}</p>
               <button

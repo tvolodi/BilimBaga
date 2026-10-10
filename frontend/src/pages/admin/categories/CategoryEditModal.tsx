@@ -173,7 +173,7 @@ export function CategoryEditModal({
               maxLength={100}
               disabled={isPending}
             />
-            {errors.name && <p className="text-xs text-red-600">{errors.name}</p>}
+            {errors.name && <p className="text-xs text-danger">{errors.name}</p>}
           </div>
 
           {/* Parent */}
@@ -192,7 +192,7 @@ export function CategoryEditModal({
                 </option>
               ))}
             </Select>
-            {errors.parent_id && <p className="text-xs text-red-600">{errors.parent_id}</p>}
+            {errors.parent_id && <p className="text-xs text-danger">{errors.parent_id}</p>}
           </div>
 
           {/* Track */}
@@ -218,10 +218,10 @@ export function CategoryEditModal({
               onChange={(e) => setForm((p) => ({ ...p, sort_order: e.target.value }))}
               disabled={isPending}
             />
-            {errors.sort_order && <p className="text-xs text-red-600">{errors.sort_order}</p>}
+            {errors.sort_order && <p className="text-xs text-danger">{errors.sort_order}</p>}
           </div>
 
-          {apiError && <p className="text-sm text-red-600">{apiError}</p>}
+          {apiError && <p className="text-sm text-danger">{apiError}</p>}
         </form>
 
         <DialogFooter>

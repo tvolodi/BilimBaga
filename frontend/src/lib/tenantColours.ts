@@ -19,9 +19,11 @@ export interface TenantOverrides {
   primary: string | null
   primaryForeground: string | null
   accent: string | null
+  /** Text on the accent fill: readableForeground(accent) whenever the accent is overridden (FR-BB321 AC-8). */
+  accentForeground: string | null
 }
 
-const NO_OVERRIDES: TenantOverrides = { primary: null, primaryForeground: null, accent: null }
+const NO_OVERRIDES: TenantOverrides = { primary: null, primaryForeground: null, accent: null, accentForeground: null }
 
 /**
  * The overrides a tenant palette gives in one theme.
@@ -46,14 +48,17 @@ export function tenantOverrides(palette: TenantPalette | undefined, theme: Theme
       primary,
       primaryForeground: primary ? readableForeground(primary) : null,
       accent,
+      accentForeground: accent ? readableForeground(accent) : null,
     }
   }
 
   const derivedPrimary =
     primary && primary !== DESIGN_DEFAULT_PRIMARY ? deriveDarkColour(primary) : null
+  const derivedAccent = accent && accent !== DESIGN_DEFAULT_ACCENT ? deriveDarkColour(accent) : null
   return {
     primary: derivedPrimary,
     primaryForeground: derivedPrimary ? readableForeground(derivedPrimary) : null,
-    accent: accent && accent !== DESIGN_DEFAULT_ACCENT ? deriveDarkColour(accent) : null,
+    accent: derivedAccent,
+    accentForeground: derivedAccent ? readableForeground(derivedAccent) : null,
   }
 }

@@ -27,13 +27,13 @@ function NotificationBanner({ notification, onDismiss }: { notification: Notific
     <div
       className={`flex items-center gap-3 px-4 py-3 rounded-md text-sm mb-4 ${
         notification.type === 'error'
-          ? 'bg-red-50 border border-red-200 text-red-800'
-          : 'bg-green-50 border border-green-200 text-green-800'
+          ? 'bg-bg-danger border border-transparent text-danger'
+          : 'bg-bg-success border border-transparent text-success'
       }`}
     >
       <AlertCircle size={16} className="flex-shrink-0" />
       <span className="flex-1">{notification.message}</span>
-      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-black/10">
+      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-foreground/10">
         <X size={14} />
       </button>
     </div>
@@ -78,15 +78,15 @@ function ActionsMenu({ tag, onRename, onDelete }: ActionsMenuProps) {
         <MoreHorizontal size={15} aria-hidden="true" />
       </Button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-36 rounded-md border bg-white shadow-md text-sm">
+        <div className="absolute right-0 z-50 mt-1 w-36 rounded-md border bg-popover text-popover-foreground shadow-md text-sm">
           <button
-            className="w-full px-3 py-2 text-left hover:bg-gray-50"
+            className="w-full px-3 py-2 text-left hover:bg-muted"
             onClick={() => { setOpen(false); onRename(tag) }}
           >
             {t('tags.actions.rename')}
           </button>
           <button
-            className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50"
+            className="w-full px-3 py-2 text-left text-danger hover:bg-bg-danger"
             onClick={() => { setOpen(false); onDelete(tag) }}
           >
             {t('tags.actions.delete')}
@@ -234,7 +234,7 @@ export function TagsPage() {
         <div className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</div>
       )}
       {isError && (
-        <div className="text-sm text-red-600 py-8 text-center">{t('common.loadError')}</div>
+        <div className="text-sm text-danger py-8 text-center">{t('common.loadError')}</div>
       )}
 
       {/* Table */}

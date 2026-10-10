@@ -36,8 +36,8 @@ function SortIcon({
 
 function getRowClass(correctRate: number | null): string {
   if (correctRate === null) return ''
-  if (correctRate < 0.4) return 'border-l-4 border-l-red-500'
-  if (correctRate > 0.95) return 'border-l-4 border-l-amber-400'
+  if (correctRate < 0.4) return 'border-l-4 border-l-danger'
+  if (correctRate > 0.95) return 'border-l-4 border-l-warning'
   return ''
 }
 

@@ -68,7 +68,7 @@ export function TagCreateModal({ open, onClose }: Props) {
               autoFocus
             />
             {inlineError && (
-              <p className="text-sm text-red-600">{inlineError}</p>
+              <p className="text-sm text-danger">{inlineError}</p>
             )}
             {!inlineError && (
               <p className="text-xs text-muted-foreground">{t('tags.form.nameHelp')}</p>

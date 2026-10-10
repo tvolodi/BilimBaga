@@ -19,12 +19,12 @@ function AIReasoningSection({ reasoning }: { reasoning: string }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="text-xs text-blue-700 hover:underline focus:outline-none"
+        className="text-xs text-info hover:underline focus:outline-none"
       >
         {open ? t('grading.ai_reasoning_hide') : t('grading.ai_reasoning_show')}
       </button>
       {open && (
-        <div className="mt-1 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <div className="mt-1 rounded border border-info bg-bg-info px-3 py-2 text-sm text-info">
           <p className="font-medium mb-1">{t('grading.ai_reasoning_label')}</p>
           <p className="whitespace-pre-wrap">{reasoning}</p>
         </div>
@@ -68,7 +68,7 @@ export function QuestionGrader({ question, score, feedback, onChange }: Question
           </Badge>
         )}
         {question.grading_status === 'ai_graded' && (
-          <Badge variant="secondary" className="mt-1 bg-blue-100 text-blue-800">
+          <Badge variant="secondary" className="mt-1 bg-bg-info text-info">
             {t('grading.ai_graded')}
           </Badge>
         )}

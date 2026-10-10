@@ -16,9 +16,9 @@ import {
 
 function StatusBadge({ status }: { status: 'draft' | 'active' | 'archived' }) {
   const colors = {
-    draft: 'bg-gray-100 text-gray-700',
-    active: 'bg-green-100 text-green-700',
-    archived: 'bg-red-100 text-red-700',
+    draft: 'bg-muted text-muted-foreground',
+    active: 'bg-bg-success text-success',
+    archived: 'bg-muted text-muted-foreground',
   }
   return (
     <span
@@ -101,7 +101,7 @@ export function ExamsListPage() {
 
       {/* Archive feedback */}
       {archiveSuccess && (
-        <p className="text-sm text-green-700">{archiveSuccess}</p>
+        <p className="text-sm text-success">{archiveSuccess}</p>
       )}
       {archiveError && (
         <p className="text-sm text-destructive">{archiveError}</p>

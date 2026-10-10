@@ -14,8 +14,8 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold',
         status === 'active'
-          ? 'bg-green-100 text-green-800'
-          : 'bg-gray-100 text-gray-600',
+          ? 'bg-bg-success text-success'
+          : 'bg-muted text-muted-foreground',
         className,
       )}
     >

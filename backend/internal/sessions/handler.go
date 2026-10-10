@@ -167,7 +167,7 @@ func (h *Handler) SubmitSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "id")
 	userID := auth.UserIDFromCtx(r.Context())
 	tenantID := ctxkeys.TenantIDFromCtx(r.Context())
-	actorIP := r.RemoteAddr
+	actorIP := api.ClientIP(r)
 
 	resp, err := h.svc.SubmitSession(r.Context(), sessionID, userID, tenantID, actorIP)
 	if err != nil {
@@ -362,7 +362,7 @@ func (h *Handler) HandleGradeAnswer(w http.ResponseWriter, r *http.Request) {
 	questionID := chi.URLParam(r, "questionId")
 	graderID := auth.UserIDFromCtx(r.Context())
 	tenantID := ctxkeys.TenantIDFromCtx(r.Context())
-	actorIP := r.RemoteAddr
+	actorIP := api.ClientIP(r)
 
 	var req GradeAnswerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import i18n, { changeLocale, ensureLocale } from '@/i18n'
+import i18n, { changeLocale, ensureLocale, LAZY_LOCALES, switchLocale } from '@/i18n'
 
 afterEach(async () => {
   localStorage.clear()
@@ -50,5 +50,47 @@ describe('i18n lazy locales', () => {
 
     expect(fresh.default.language).toBe('ru')
     expect(fresh.default.t('common.loading')).toBe('Загрузка…')
+  })
+})
+
+describe('overlapping switches', () => {
+  it('applies the last requested locale even when an earlier load resolves last', async () => {
+    const originalKk = LAZY_LOCALES.get('kk')!
+    const originalRu = LAZY_LOCALES.get('ru')!
+    i18n.removeResourceBundle('kk', 'translation')
+    i18n.removeResourceBundle('ru', 'translation')
+
+    // The kk bundle stays pending until the test releases it, so the earlier request finishes last.
+    let releaseKk!: () => void
+    const kkGate = new Promise<void>((resolve) => {
+      releaseKk = resolve
+    })
+    LAZY_LOCALES.set('kk', async () => {
+      await kkGate
+      return originalKk()
+    })
+    const spy = vi.spyOn(i18n, 'changeLanguage')
+
+    try {
+      const earlier = switchLocale(i18n, 'kk') // requested first, waits for its bundle
+      const later = switchLocale(i18n, 'ru') // requested last, its bundle is ready first
+
+      await later
+      expect(i18n.language).toBe('ru')
+
+      releaseKk()
+      await earlier
+
+      // The earlier request must not apply: the language stays ru and kk is never switched to.
+      expect(i18n.language).toBe('ru')
+      expect(i18n.t('common.loading')).toBe('Загрузка…')
+      expect(spy.mock.calls.map(([lng]) => lng)).toEqual(['ru'])
+    } finally {
+      spy.mockRestore()
+      LAZY_LOCALES.set('kk', originalKk)
+      LAZY_LOCALES.set('ru', originalRu)
+      await ensureLocale('kk')
+      await ensureLocale('ru')
+    }
   })
 })

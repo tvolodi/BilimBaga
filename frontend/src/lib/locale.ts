@@ -1,5 +1,5 @@
 import type { i18n as I18n } from 'i18next'
-import { ensureLocale, isLocaleReady } from '@/i18n'
+import { switchLocale } from '@/i18n'
 
 /**
  * Languages the UI ships translations for (FR-BB116). The labels are the languages' own names,
@@ -27,10 +27,7 @@ export function isSupportedLocale(code: unknown): code is SupportedLocale {
  * they are already loaded the switch is synchronous, as before.
  */
 export function applyLocale(i18n: I18n, code: SupportedLocale): void {
-  const switched = isLocaleReady(code)
-    ? i18n.changeLanguage(code)
-    : ensureLocale(code).then(() => i18n.changeLanguage(code))
-  void switched.catch((err: unknown) => {
+  void switchLocale(i18n, code).catch((err: unknown) => {
     console.error(`Could not load the ${code} translations`, err)
   })
   try {

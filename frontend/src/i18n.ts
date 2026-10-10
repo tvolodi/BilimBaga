@@ -1,4 +1,5 @@
 import i18n from 'i18next'
+import type { i18n as I18nInstance } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 
@@ -8,7 +9,8 @@ import en from './locales/en.json'
 // strings are not loaded yet.
 type LocaleModule = { default: Record<string, unknown> }
 
-const LAZY_LOCALES = new Map<string, () => Promise<LocaleModule>>([
+// Exported so tests can replace a loader (for example to make one load slow).
+export const LAZY_LOCALES = new Map<string, () => Promise<LocaleModule>>([
   ['kk', () => import('./locales/kk.json')],
   ['ru', () => import('./locales/ru.json')],
 ])
@@ -44,13 +46,24 @@ export function ensureLocale(lng: string): Promise<void> {
   return pending
 }
 
+// Each switch takes a number. When switches overlap, only the last one requested is applied, even
+// if an earlier bundle finishes loading after it (an earlier request must never win).
+let latestRequest = 0
+
 /**
- * Switches the UI language to `lng`, loading its bundle first when needed. When the bundle is
- * already present the switch happens synchronously, as it always did.
+ * Switches `instance` to `lng` once its bundle is present. When the bundle is already present the
+ * switch happens synchronously, as it always did.
  */
-export async function changeLocale(lng: string): Promise<void> {
+export async function switchLocale(instance: I18nInstance, lng: string): Promise<void> {
+  const request = ++latestRequest
   if (!isLocaleReady(lng)) await ensureLocale(lng)
-  await i18n.changeLanguage(lng)
+  if (request !== latestRequest) return // a later request superseded this one
+  await instance.changeLanguage(lng)
+}
+
+/** Switches the module's i18next instance to `lng`, loading its bundle first when needed. */
+export function changeLocale(lng: string): Promise<void> {
+  return switchLocale(i18n, lng)
 }
 
 function readPersistedLocale(): string | null {

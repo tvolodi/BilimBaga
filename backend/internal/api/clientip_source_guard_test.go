@@ -55,6 +55,24 @@ func TestClientAddressGuard_FixtureRemoteAddrWriteIsAccepted(t *testing.T) {
 	assert.Empty(t, clientAddressViolations("fixture.go", fixture))
 }
 
+// #480: a client sends True-Client-IP freely, and nothing in production may read it.
+func TestClientAddressGuard_FixtureTrueClientIPReadIsFlagged(t *testing.T) {
+	fixture := `ip := r.Header.Get("True-Client-IP")`
+	assert.NotEmpty(t, clientAddressViolations("fixture.go", fixture))
+}
+
+// #480: X-Real-IP is read only by the router's resolution, in router/realip.go.
+func TestClientAddressGuard_FixtureXRealIPReadOutsideRealIPIsFlagged(t *testing.T) {
+	fixture := `ip := r.Header.Get("X-Real-IP")`
+	assert.NotEmpty(t, clientAddressViolations(filepath.Join("audit", "writer.go"), fixture))
+}
+
+// #480: the router's own read of X-Real-IP, in router/realip.go, is allowed.
+func TestClientAddressGuard_FixtureXRealIPReadInRealIPIsAccepted(t *testing.T) {
+	fixture := `ip := r.Header.Get("X-Real-IP")`
+	assert.Empty(t, clientAddressViolations(filepath.Join("router", "realip.go"), fixture))
+}
+
 // TestClientAddressGuard_NoProductionReadBypassesTheHelper scans the non-test sources under backend/internal.
 func TestClientAddressGuard_NoProductionReadBypassesTheHelper(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..")) // backend/internal

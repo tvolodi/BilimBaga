@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { clearPasswordChangeRequired, markPasswordChangeRequired } from '@/lib/passwordChangeRequired'
 import { clearE2eToken, readE2eToken, writeE2eToken } from '@/lib/e2eTokenSeed'
+import { clearNonPublicQueries } from '@/lib/queryCache'
 
 export interface ApiError {
   code: string
@@ -86,8 +87,8 @@ export function useLogin() {
       return json.data as LoginResponse
     },
     onSuccess: (data) => {
-      // FR-BB116: drop the previous session's cached profile so its preferred_locale is never applied.
-      qc.removeQueries({ queryKey: ['users'] })
+      // #436: no data from the previous session survives a login (FR-BB116: its profile and locale included).
+      clearNonPublicQueries(qc)
       qc.setQueryData(['auth', 'currentUser'], data.user)
       qc.setQueryData(['auth', 'accessToken'], data.access_token)
       // A seeded e2e build boots from the stored token, so a fresh sign-in must replace the seed (ISS-249).
@@ -138,7 +139,7 @@ export function useLogout() {
       })
     },
     onSettled: () => {
-      qc.removeQueries({ queryKey: ['users'] }) // FR-BB116: no profile (or locale) outlives the session
+      clearNonPublicQueries(qc) // #436, FR-BB116: no profile (or locale) outlives the session
       clearE2eToken() // #415: no stored token outlives the session, in any build
       qc.setQueryData(['auth', 'accessToken'], null)
       qc.setQueryData(['auth', 'currentUser'], null)

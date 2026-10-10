@@ -316,7 +316,17 @@ func (s *service) ParseAccessToken(tokenString string) (*Claims, error) {
 
 // issueAccessToken generates a signed JWT for the given user.
 func (s *service) issueAccessToken(user *User) (string, error) {
-	return s.issueAccessTokenAt(user, s.now().UTC())
+	return s.issueAccessTokenAt(user, issueTime(s.now().UTC(), user.PasswordChangedAt))
+}
+
+// issueTime is the iat of a token issued at now. It is never before the account's password stamp, so a
+// sign-in or refresh in the second a reset stamped (the next second) is not revoked from birth (#439).
+// A stamp at or before now leaves the clock's own second, which the epoch check accepts.
+func issueTime(now time.Time, changedAt *time.Time) time.Time {
+	if changedAt != nil && changedAt.After(now) {
+		return *changedAt
+	}
+	return now
 }
 
 // issueAccessTokenAt is issueAccessToken with an explicit issue time (ISS-171).

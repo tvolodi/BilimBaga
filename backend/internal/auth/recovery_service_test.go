@@ -70,7 +70,9 @@ func (r *recoveryRepo) ResetFailedAttempts(context.Context, string) error       
 func (r *recoveryRepo) CreateRefreshToken(context.Context, *RefreshToken) error         { return nil }
 func (r *recoveryRepo) RevokeRefreshToken(context.Context, string) error                { return nil }
 func (r *recoveryRepo) RevokeAllUserRefreshTokens(context.Context, string) error        { return nil }
-func (r *recoveryRepo) UpdatePassword(context.Context, string, string, time.Time) error { return nil }
+func (r *recoveryRepo) UpdatePassword(_ context.Context, _ string, _ string, appNow time.Time) (time.Time, error) {
+	return NextPasswordStamp(appNow, nil), nil
+}
 func (r *recoveryRepo) GetRefreshTokenByHash(context.Context, string) (*RefreshToken, error) {
 	return nil, ErrNotFound
 }

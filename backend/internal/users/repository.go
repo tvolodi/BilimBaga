@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
+	"github.com/bilimbaga/bilimbaga/internal/auth"
 	"github.com/bilimbaga/bilimbaga/internal/deptscope"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -22,7 +23,8 @@ type Repository interface {
 	Deactivate(ctx context.Context, id string) error
 	Reactivate(ctx context.Context, id string) error
 	RevokeAllTokens(ctx context.Context, userID string) error
-	UpdatePassword(ctx context.Context, id, passwordHash string) error
+	// UpdatePassword stores the hash and stamps password_changed_at for an admin reset at appNow (#455).
+	UpdatePassword(ctx context.Context, id, passwordHash string, appNow time.Time) error
 	Unlock(ctx context.Context, id string) error
 	GetDepartmentIDByName(ctx context.Context, name string) (string, error)
 	GetRoleIDByName(ctx context.Context, name string) (string, error)
@@ -230,19 +232,36 @@ func (r *pgRepository) RevokeAllTokens(ctx context.Context, userID string) error
 	return nil
 }
 
+// lockPasswordStampSQL reads the account's previous stamp under a row lock (#455).
+const lockPasswordStampSQL = `SELECT password_changed_at FROM users WHERE id = $1 FOR UPDATE`
+
 // UpdatePassword stores a new bcrypt hash, forces a password change on next login, stamps
-// password_changed_at at the start of the next second and revokes every refresh token of the user,
-// in one transaction (#439). The next-second stamp makes a token issued in the reset's own second
-// fail the access-token epoch check; no token is returned to the admin, so nothing needs that second.
-func (r *pgRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+// password_changed_at with auth.NextPasswordStamp(appNow, previous) and revokes every refresh token of
+// the user, in one transaction. The previous stamp is read under a row lock, and the stamp comes from
+// the application clock, never the database clock (#439, #455). No token is returned to the admin.
+func (r *pgRepository) UpdatePassword(ctx context.Context, id, passwordHash string, appNow time.Time) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("users.UpdatePassword: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	const q = `UPDATE users SET password_hash = $1, force_password_change = true, updated_at = now(), password_changed_at = date_trunc('second', now()) + interval '1 second' WHERE id = $2`
-	result, err := tx.ExecContext(ctx, q, passwordHash, id)
+	var prev sql.NullTime
+	if err := tx.GetContext(ctx, &prev, lockPasswordStampSQL, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("users.UpdatePassword: lock stamp: %w", err)
+	}
+	var previous *time.Time
+	if prev.Valid {
+		p := prev.Time
+		previous = &p
+	}
+	stamp := auth.NextPasswordStamp(appNow, previous)
+
+	const q = `UPDATE users SET password_hash = $1, force_password_change = true, updated_at = now(), password_changed_at = $3 WHERE id = $2`
+	result, err := tx.ExecContext(ctx, q, passwordHash, id, stamp)
 	if err != nil {
 		return fmt.Errorf("users.UpdatePassword: %w", err)
 	}

@@ -155,7 +155,7 @@ func (m *mockRepo) RevokeAllTokens(_ context.Context, userID string) error {
 	return nil
 }
 
-func (m *mockRepo) UpdatePassword(_ context.Context, id, hash string) error {
+func (m *mockRepo) UpdatePassword(_ context.Context, id, hash string, _ time.Time) error {
 	if _, ok := m.users[id]; !ok {
 		return ErrNotFound
 	}

@@ -43,6 +43,7 @@ func newResetEnv(t *testing.T, clock time.Time, stamp *time.Time) *resetEnv {
 		getRefreshTokenByHashFn: func(context.Context, string) (*RefreshToken, error) {
 			return &RefreshToken{ID: "rt1", UserID: "u1", TokenHash: "h", ExpiresAt: time.Now().Add(24 * time.Hour)}, nil
 		},
+		passwordStamp: func() *time.Time { return e.stamp },
 		updatePasswordFn: func(_ context.Context, _ string, _ string, at time.Time) error {
 			e.stamp = &at // the change stamps the account, as the users row would
 			return nil

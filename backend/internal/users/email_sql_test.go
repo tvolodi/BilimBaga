@@ -58,6 +58,10 @@ func (s recStmt) Query(args []driver.Value) (driver.Rows, error) {
 	defer s.f.mu.Unlock()
 	s.f.queries = append(s.f.queries, s.q)
 	s.f.args = append(s.f.args, append([]driver.Value(nil), args...))
+	if strings.Contains(s.q, "FOR UPDATE") {
+		// The row-locked read of the previous password stamp: a NULL stamp (never reset before).
+		return &recRows{cols: []string{"password_changed_at"}, data: [][]driver.Value{{nil}}}, nil
+	}
 	if s.f.idRows != nil {
 		data := [][]driver.Value{}
 		for _, id := range s.f.idRows {

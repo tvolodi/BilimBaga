@@ -620,6 +620,9 @@ type mockRepository struct {
 	revokeRefreshTokenFn    func(ctx context.Context, tokenID string) error
 	revokeAllUserTokensFn   func(ctx context.Context, userID string) error
 	updatePasswordFn        func(ctx context.Context, userID, passwordHash string, changedAt time.Time) error
+	// passwordStamp reports the account's current password_changed_at (what the repository reads under
+	// its row lock); nil means never changed. Optional: a nil func means the account has no stamp.
+	passwordStamp func() *time.Time
 }
 
 func (m *mockRepository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
@@ -685,9 +688,16 @@ func (m *mockRepository) RevokeAllUserRefreshTokens(ctx context.Context, userID 
 	return nil
 }
 
-func (m *mockRepository) UpdatePassword(ctx context.Context, userID, passwordHash string, changedAt time.Time) error {
-	if m.updatePasswordFn != nil {
-		return m.updatePasswordFn(ctx, userID, passwordHash, changedAt)
+// UpdatePassword stamps the next password_changed_at from the account's current stamp, as the real
+// repository does under its row lock, and reports the stamp it wrote.
+func (m *mockRepository) UpdatePassword(ctx context.Context, userID, passwordHash string, appNow time.Time) (time.Time, error) {
+	var previous *time.Time
+	if m.passwordStamp != nil {
+		previous = m.passwordStamp()
 	}
-	return nil
+	stamp := NextPasswordStamp(appNow, previous)
+	if m.updatePasswordFn != nil {
+		return stamp, m.updatePasswordFn(ctx, userID, passwordHash, stamp)
+	}
+	return stamp, nil
 }

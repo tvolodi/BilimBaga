@@ -3,8 +3,10 @@ package users
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -12,28 +14,39 @@ import (
 )
 
 // #439: an admin password reset must revoke the user's earlier access tokens, including one issued
-// in the same second as the reset, and every refresh token the user holds. The access-token epoch
-// compares iat with floor(password_changed_at), so the reset stamps the start of the next second.
+// in the same second as the reset, and every refresh token the user holds. #455: the stamp is
+// auth.NextPasswordStamp over the application clock and the previous stamp, read under a row lock.
 
-func TestAdminReset_StampsNextSecondAndRevokesRefreshTokensInOneTransaction(t *testing.T) {
+func TestAdminReset_StampsFromTheClockUnderALockAndRevokesRefreshTokens(t *testing.T) {
 	f := &recDB{}
 	db := sqlx.NewDb(sql.OpenDB(recConnector{f}), "postgres")
 	t.Cleanup(func() { _ = db.Close() })
 
-	require.NoError(t, NewRepository(db).UpdatePassword(context.Background(), uuidA, "new-hash"))
+	appNow := time.Now().UTC().Truncate(time.Second).Add(700 * time.Millisecond) // the real clock, as the other tests use
+	require.NoError(t, NewRepository(db).UpdatePassword(context.Background(), uuidA, "new-hash", appNow))
 
-	var userUpdate, refreshRevoke string
-	for _, q := range f.queries {
+	lock, update, refreshRevoke := -1, -1, -1
+	for i, q := range f.queries {
 		switch {
+		case strings.Contains(q, "FOR UPDATE"):
+			lock = i
 		case strings.Contains(q, "UPDATE users"):
-			userUpdate = q
+			update = i
 		case strings.Contains(q, "UPDATE refresh_tokens"):
-			refreshRevoke = q
+			refreshRevoke = i
 		}
 	}
-	assert.Contains(t, userUpdate, "password_changed_at = date_trunc('second', now()) + interval '1 second'",
-		"the stamp must be the start of the next second, so a token issued in the reset's own second is rejected")
-	assert.Contains(t, refreshRevoke, "revoked_at = now()", "every refresh token of the user must be revoked")
-	assert.Contains(t, refreshRevoke, "user_id = $1")
-	assert.Contains(t, refreshRevoke, "revoked_at IS NULL")
+	require.GreaterOrEqual(t, lock, 0, "the previous stamp is read under a row lock")
+	require.GreaterOrEqual(t, update, 0)
+	assert.Less(t, lock, update, "the lock is taken before the stamp is written")
+	assert.Contains(t, f.queries[update], "password_changed_at = $3", "the stamp is a parameter, not the database clock")
+	assert.NotContains(t, f.queries[update], "password_changed_at = now()", "the stamp is not taken from the database clock")
+	assert.NotContains(t, f.queries[update], "date_trunc", "the stamp is not computed in SQL")
+
+	want := appNow.Truncate(time.Second).Add(time.Second) // the start of the next second after appNow
+	assert.Contains(t, f.args[update], driver.Value(want), "the stamp is the next second after the application clock")
+
+	require.GreaterOrEqual(t, refreshRevoke, 0, "every refresh token of the user is revoked")
+	assert.Contains(t, f.queries[refreshRevoke], "user_id = $1")
+	assert.Contains(t, f.queries[refreshRevoke], "revoked_at IS NULL")
 }

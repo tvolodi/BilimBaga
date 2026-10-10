@@ -151,6 +151,9 @@ func (s txStmt) Query([]driver.Value) (driver.Rows, error) {
 	defer s.f.mu.Unlock()
 	s.f.stmts = append(s.f.stmts, s.q)
 	switch {
+	case strings.Contains(s.q, "password_changed_at") && strings.Contains(s.q, "FOR UPDATE"):
+		// The locked read of the previous stamp (#455): a NULL stamp, never reset before.
+		return &txRows{cols: []string{"password_changed_at"}, data: [][]driver.Value{{nil}}}, nil
 	case strings.Contains(s.q, "FOR UPDATE"):
 		r := &txRows{cols: []string{"id"}}
 		for i := 0; i < s.f.lockRows; i++ {

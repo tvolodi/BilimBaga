@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { apiFetch } from './apiFetch'
+import { retryUnlessNotFound } from '@/lib/apiRetry'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -252,5 +253,6 @@ export function useExamHistory(examId: string) {
       ),
     enabled: !!examId,
     staleTime: 30 * 1000,
+    retry: retryUnlessNotFound,
   })
 }

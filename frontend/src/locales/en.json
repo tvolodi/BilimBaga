@@ -9,6 +9,7 @@
     "save": "Save",
     "loading": "Loading…",
     "loadError": "Failed to load. Please try again.",
+    "examNotFound": "Exam not found. It may have been deleted.",
     "skipToMain": "Skip to main content",
     "signOut": "Sign out",
     "remove": "Remove",

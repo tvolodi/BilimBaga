@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { apiFetch } from './apiFetch'
+import { retryUnlessNotFound } from '@/lib/apiRetry'
 
 function apiGet<T>(qc: QueryClient, url: string): Promise<T> {
   return apiFetch<T>(qc, url)
@@ -50,5 +51,6 @@ export function useExamAnalytics(examId: string) {
     queryFn: () => apiGet<ExamAnalytics>(qc, `/api/v1/admin/exams/${examId}/analytics`),
     staleTime: 5 * 60 * 1000,
     enabled: !!examId,
+    retry: retryUnlessNotFound,
   })
 }

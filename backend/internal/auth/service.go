@@ -316,7 +316,7 @@ func (s *service) ParseAccessToken(tokenString string) (*Claims, error) {
 
 // issueAccessToken generates a signed JWT for the given user.
 func (s *service) issueAccessToken(user *User) (string, error) {
-	return s.issueAccessTokenAt(user, time.Now().UTC())
+	return s.issueAccessTokenAt(user, s.now().UTC())
 }
 
 // issueAccessTokenAt is issueAccessToken with an explicit issue time (ISS-171).

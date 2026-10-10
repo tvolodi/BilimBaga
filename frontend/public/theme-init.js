@@ -3,7 +3,7 @@
 // Classic blocking script, same origin, no requests. Keep the two in step.
 (function () {
   // FR-BB321 switch: must equal THEME_SWITCH_ENABLED in ThemeProvider.tsx. While false the page is light.
-  var THEME_SWITCH_ENABLED = false;
+  var THEME_SWITCH_ENABLED = true;
   try {
     var dark = false;
     if (THEME_SWITCH_ENABLED) {

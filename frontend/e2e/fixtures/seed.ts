@@ -24,7 +24,7 @@ export const EMPLOYEE_STORAGE_STATE = path.join(AUTH_DIR, 'employee.json')
 const EMPLOYEE_TOKEN_PATH = path.join(AUTH_DIR, 'employee-token.txt')
 const EMPLOYEE_ID_PATH = path.join(AUTH_DIR, 'employee-id.txt')
 
-const BASE = requireTarget('E2E_API_URL', process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`, process.env)
+export const BASE = requireTarget('E2E_API_URL', process.env.E2E_API_URL || `http://localhost:${process.env.BB_API_PORT || 8080}`, process.env)
 
 // ---------------------------------------------------------------------------
 // Low-level fetch helpers (Node 18+ global fetch)
@@ -669,6 +669,24 @@ export async function createPassedEmployeeSession(examId: string): Promise<strin
   }
   await submitSession(token, sessionId)
   return sessionId
+}
+
+/** The tenant primary colour as the public API reports it (FR-BB321 AC-11). */
+export async function readTenantPrimary(): Promise<string> {
+  const res = await fetch(`${BASE}/api/v1/tenant/config`)
+  const body = (await res.json()) as { data?: { primary_color?: string } }
+  if (!res.ok || !body.data?.primary_color) throw new Error(`readTenantPrimary: HTTP ${res.status}`)
+  return body.data.primary_color
+}
+
+/** Sets the tenant primary through the admin API. PUT /tenant/config is a partial update. */
+export async function writeTenantPrimary(adminToken: string, colour: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/v1/tenant/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+    body: JSON.stringify({ primary_color: colour }),
+  })
+  if (!res.ok) throw new Error(`writeTenantPrimary: HTTP ${res.status}`)
 }
 
 export async function deleteTestExam(adminToken: string, examId: string): Promise<void> {

@@ -44,7 +44,13 @@ function primaryStylesheet(palette: TenantPalette | undefined): string {
   return rules.join('\n')
 }
 
-/** Writes the tenant overrides for the current theme; the accent stays an inline root style. */
+/** Sets or removes one inline root override. The accent pair stays inline, so each theme writes its own. */
+function setRootOverride(name: string, value: string | null) {
+  if (value) document.documentElement.style.setProperty(name, value)
+  else document.documentElement.style.removeProperty(name)
+}
+
+/** Writes the tenant overrides for the current theme. */
 function applyTenantStyles(palette: TenantPalette | undefined, theme: ThemeName) {
   let style = document.getElementById(TENANT_STYLE_ID) as HTMLStyleElement | null
   if (!style) {
@@ -54,12 +60,9 @@ function applyTenantStyles(palette: TenantPalette | undefined, theme: ThemeName)
   }
   style.textContent = primaryStylesheet(palette)
 
-  const { accent } = tenantOverrides(palette, theme)
-  if (accent) {
-    document.documentElement.style.setProperty('--color-accent', accent)
-  } else {
-    document.documentElement.style.removeProperty('--color-accent')
-  }
+  const { accent, accentForeground } = tenantOverrides(palette, theme)
+  setRootOverride('--color-accent', accent)
+  setRootOverride('--color-accent-foreground', accentForeground)
 }
 
 export function TenantProvider({ children }: TenantProviderProps) {

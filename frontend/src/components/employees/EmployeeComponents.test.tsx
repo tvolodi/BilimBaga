@@ -17,22 +17,25 @@ vi.mock('@/api/employees', async (importOriginal) => ({
 }))
 
 describe('ExamStatusChip (FR-BB58 AC-8)', () => {
-  it('uses green styling when passed', () => {
+  it('uses the success pair when passed', () => {
     render(<ExamStatusChip title="Security 1" passed attempts={2} />)
     const chip = screen.getByTitle('Security 1 — 2 attempt(s)')
-    expect(chip.className).toMatch(/green/)
+    expect(chip.className).toMatch(/bg-bg-success/)
+    expect(chip.className).toMatch(/text-success/)
   })
 
-  it('uses red styling when failed', () => {
+  it('uses the danger pair when failed', () => {
     render(<ExamStatusChip title="Security 1" passed={false} attempts={1} />)
-    expect(screen.getByTitle(/Security 1/).className).toMatch(/red/)
+    expect(screen.getByTitle(/Security 1/).className).toMatch(/bg-bg-danger/)
+    expect(screen.getByTitle(/Security 1/).className).toMatch(/text-danger/)
   })
 
-  it('uses neutral grey styling when never attempted (passed = null)', () => {
+  it('uses the neutral token pair when never attempted (passed = null)', () => {
     render(<ExamStatusChip title="Security 1" passed={null} attempts={0} />)
     const chip = screen.getByTitle('Security 1 — 0 attempt(s)')
-    expect(chip.className).toMatch(/gray/)
-    expect(chip.className).not.toMatch(/green|red/)
+    expect(chip.className).toMatch(/bg-muted/)
+    expect(chip.className).toMatch(/text-muted-foreground/)
+    expect(chip.className).not.toMatch(/success|danger/)
   })
 })
 

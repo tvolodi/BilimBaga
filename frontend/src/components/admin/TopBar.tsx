@@ -23,13 +23,13 @@ export function TopBar({ user }: TopBarProps) {
   }
 
   return (
-    <header className="flex items-center justify-between h-14 px-6 border-b bg-white shadow-sm flex-shrink-0">
+    <header className="flex items-center justify-between h-14 px-6 border-b bg-card shadow-sm flex-shrink-0">
       <div />
       <div className="flex items-center gap-3">
         <LocaleSwitcher />
         <ThemeToggle />
         {/* FR-BB116 AC-5: the name opens the caller's profile page. */}
-        <Link to="/admin/profile" className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:underline">
+        <Link to="/admin/profile" className="text-sm font-medium text-foreground hover:underline">
           {user.full_name}
         </Link>
         <RoleBadge role={user.role_name} />
@@ -39,7 +39,7 @@ export function TopBar({ user }: TopBarProps) {
           onClick={handleLogout}
           disabled={logout.isPending}
           aria-label={t('common.signOut')}
-          className="gap-1.5 text-gray-600 hover:text-gray-900"
+          className="gap-1.5 text-muted-foreground hover:text-foreground"
         >
           <LogOut size={16} aria-hidden="true" />
         </Button>

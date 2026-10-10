@@ -386,6 +386,7 @@
     "login": {
       "title": "Вход в {{appName}}",
       "sessionRevoked": "Данные вашей учётной записи изменились или сессия отозвана. Войдите снова.",
+      "dismissNotice": "Закрыть",
       "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Пароль",

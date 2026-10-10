@@ -9,11 +9,18 @@ export const SESSION_REVOKED_KEY = ['auth', 'sessionRevoked'] as const
 const E2E_TOKEN_KEY = '__e2e_access_token__'
 
 /**
- * End the session client-side: drop the token and user (RequireAuth then redirects to /login)
- * and raise the notice LoginPage shows. Idempotent.
+ * End the session client-side (AC-11): drop the token, the user and every per-user cache (profile,
+ * roles, portal and result data) so none of it outlives the session, then raise the notice
+ * LoginPage shows. Guards subscribed to the token redirect to /login and keep the requested path
+ * in location state, so sign-in can restore it. Idempotent.
  */
 export function endRevokedSession(qc: QueryClient): void {
   try { localStorage.removeItem(E2E_TOKEN_KEY) } catch { /* ignore */ }
+  // Prefix match: also drops ['users', 'me'], ['users', 'roles'] and ['roles', 'permissions'].
+  qc.removeQueries({ queryKey: ['users'] })
+  qc.removeQueries({ queryKey: ['roles'] })
+  qc.removeQueries({ queryKey: ['portal'] })
+  qc.removeQueries({ queryKey: ['my-results'] })
   qc.setQueryData(SESSION_REVOKED_KEY, true)
   qc.setQueryData(['auth', 'accessToken'], null)
   qc.setQueryData(['auth', 'currentUser'], null)

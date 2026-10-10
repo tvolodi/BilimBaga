@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -388,6 +388,37 @@ describe('EmployeePortal', () => {
       await user.click(screen.getByRole('button', { name: /cancel/i }))
       await user.click(await screen.findByRole('button', { name: /start exam/i }))
       expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('requests fullscreen synchronously in the confirm click, before the session is created; a rejected request is ignored (FR-BB319 AC-8)', async () => {
+      const order: string[] = []
+      const request = vi.fn(() => {
+        order.push('fullscreen')
+        return Promise.reject(new Error('denied'))
+      })
+      Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: request })
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () => {
+          order.push('create')
+          return HttpResponse.json(
+            { data: { session_id: 'sess-42', exam_id: 'exam-1', questions: [] }, error: null },
+            { status: 201 },
+          )
+        }),
+      )
+      try {
+        const user = await openStartModal()
+        await user.click(screen.getByRole('button', { name: /begin exam/i }))
+        expect(await screen.findByText('SESSION PAGE')).toBeInTheDocument()
+        expect(request).toHaveBeenCalledTimes(1)
+        expect(order).toEqual(['fullscreen', 'create'])
+        expect(screen.queryByRole('alert')).toBeNull()
+        expect(errorSpy).not.toHaveBeenCalled()
+      } finally {
+        errorSpy.mockRestore()
+        Reflect.deleteProperty(document.documentElement, 'requestFullscreen')
+      }
     })
   })
 })

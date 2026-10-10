@@ -557,8 +557,17 @@ func (s *service) ReportEvent(ctx context.Context, sessionID, userID string, inp
 		return nil, fmt.Errorf("sessions: ReportEvent: get exam config: %w", err)
 	}
 
-	// AC-10: action_taken is derived from the exam config, not the request body.
-	if err := s.repo.InsertTabSwitchEvent(ctx, sessionID, input.Type, cfg.OnTabSwitch); err != nil {
+	// FR-BB319 D-2: only tab_switch may auto-submit. For blur and fullscreen_exit
+	// the effective policy is capped at warn (log stays log, warn stays warn).
+	// The cap is server-side; the client never decides.
+	effective := cfg.OnTabSwitch
+	if input.Type != "tab_switch" && effective == "submit" {
+		effective = "warn"
+	}
+
+	// AC-10 (amended by FR-BB319 AC-3): action_taken is the effective policy,
+	// derived from the exam config, not the request body.
+	if err := s.repo.InsertTabSwitchEvent(ctx, sessionID, input.Type, effective); err != nil {
 		return nil, fmt.Errorf("sessions: ReportEvent: insert event: %w", err)
 	}
 
@@ -567,7 +576,7 @@ func (s *service) ReportEvent(ctx context.Context, sessionID, userID string, inp
 		return nil, fmt.Errorf("sessions: ReportEvent: count events: %w", err)
 	}
 
-	switch cfg.OnTabSwitch {
+	switch effective {
 	case "submit":
 		result, err := s.repo.AutoSubmitSession(ctx, sessionID)
 		if err != nil {

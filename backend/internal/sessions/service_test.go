@@ -1190,7 +1190,7 @@ func TestReportEvent_PolicyWarn(t *testing.T) {
 	assert.Equal(t, 2, resp.EventCount)
 }
 
-// AC-2: on_tab_switch='submit' → auto_submitted response.
+// AC-2: on_tab_switch='submit' → auto_submitted response (tab_switch only; FR-BB319 AC-1).
 func TestReportEvent_PolicySubmit(t *testing.T) {
 	fixNow(t, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
 	score := 80.0
@@ -1215,7 +1215,7 @@ func TestReportEvent_PolicySubmit(t *testing.T) {
 		},
 	}
 	svc := NewService(repo)
-	resp, err := svc.ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: "fullscreen_exit"})
+	resp, err := svc.ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: "tab_switch"})
 	require.NoError(t, err)
 	assert.False(t, resp.Warn)
 	require.NotNil(t, resp.Status)
@@ -1269,6 +1269,129 @@ func TestReportEvent_EachCallInsertsEvent(t *testing.T) {
 		require.NoError(t, err)
 	}
 	assert.Equal(t, 3, insertCount)
+}
+
+// FR-BB319 AC-1 / AC-11: under policy 'submit' only tab_switch auto-submits. blur and
+// fullscreen_exit are capped at warn: no submit, no session fields, one row with action_taken='warn'.
+func TestReportEvent_SubmitPolicy_OnlyTabSwitchSubmits(t *testing.T) {
+	fixNow(t, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+	for _, typ := range []string{"blur", "fullscreen_exit"} {
+		t.Run(typ, func(t *testing.T) {
+			var storedAction string
+			inserted := 0
+			autoSubmitted := false
+			repo := &mockRepo{
+				getSessionForUserFn: func(_ context.Context, _, userID string) (*sessionStateRow, error) {
+					return activeSession(userID), nil
+				},
+				getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
+					cfg := defaultConfig()
+					cfg.OnTabSwitch = "submit"
+					return cfg, nil
+				},
+				insertTabSwitchEventFn: func(_ context.Context, _, _, actionTaken string) error {
+					storedAction = actionTaken
+					inserted++
+					return nil
+				},
+				countTabSwitchEventsFn: func(_ context.Context, _ string) (int, error) {
+					return 1, nil
+				},
+				autoSubmitSessionFn: func(_ context.Context, _ string) (*autoSubmitResult, error) {
+					autoSubmitted = true
+					return &autoSubmitResult{SessionID: "sess-1", Status: "auto_submitted"}, nil
+				},
+			}
+			svc := NewService(repo)
+			resp, err := svc.ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: typ})
+			require.NoError(t, err)
+			assert.True(t, resp.Warn)
+			assert.Equal(t, 1, resp.EventCount)
+			assert.Nil(t, resp.SessionID)
+			assert.Nil(t, resp.Status)
+			assert.False(t, autoSubmitted, "%s must not auto-submit", typ)
+			assert.Equal(t, 1, inserted)
+			assert.Equal(t, "warn", storedAction)
+		})
+	}
+}
+
+// FR-BB319 AC-1 / AC-3: tab_switch under policy 'submit' still auto-submits and the stored
+// action_taken is the effective policy 'submit'.
+func TestReportEvent_SubmitPolicy_TabSwitchStillSubmits(t *testing.T) {
+	fixNow(t, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+	var storedAction string
+	autoSubmitted := false
+	repo := &mockRepo{
+		getSessionForUserFn: func(_ context.Context, _, userID string) (*sessionStateRow, error) {
+			return activeSession(userID), nil
+		},
+		getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
+			cfg := defaultConfig()
+			cfg.OnTabSwitch = "submit"
+			return cfg, nil
+		},
+		insertTabSwitchEventFn: func(_ context.Context, _, _, actionTaken string) error {
+			storedAction = actionTaken
+			return nil
+		},
+		autoSubmitSessionFn: func(_ context.Context, sessionID string) (*autoSubmitResult, error) {
+			autoSubmitted = true
+			return &autoSubmitResult{SessionID: sessionID, Status: "auto_submitted"}, nil
+		},
+	}
+	svc := NewService(repo)
+	resp, err := svc.ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: "tab_switch"})
+	require.NoError(t, err)
+	assert.True(t, autoSubmitted)
+	assert.False(t, resp.Warn)
+	require.NotNil(t, resp.Status)
+	assert.Equal(t, "auto_submitted", *resp.Status)
+	assert.Equal(t, "submit", storedAction)
+}
+
+// FR-BB319 AC-2 / AC-11: under policy 'warn' or 'log' every event type keeps its behaviour and
+// action_taken equals the exam policy.
+func TestReportEvent_WarnAndLogPolicy_UnchangedForAllTypes(t *testing.T) {
+	fixNow(t, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+	for _, policy := range []string{"warn", "log"} {
+		for _, typ := range []string{"tab_switch", "blur", "fullscreen_exit"} {
+			t.Run(policy+"/"+typ, func(t *testing.T) {
+				var storedAction string
+				autoSubmitted := false
+				repo := &mockRepo{
+					getSessionForUserFn: func(_ context.Context, _, userID string) (*sessionStateRow, error) {
+						return activeSession(userID), nil
+					},
+					getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
+						cfg := defaultConfig()
+						cfg.OnTabSwitch = policy
+						return cfg, nil
+					},
+					insertTabSwitchEventFn: func(_ context.Context, _, _, actionTaken string) error {
+						storedAction = actionTaken
+						return nil
+					},
+					countTabSwitchEventsFn: func(_ context.Context, _ string) (int, error) {
+						return 4, nil
+					},
+					autoSubmitSessionFn: func(_ context.Context, _ string) (*autoSubmitResult, error) {
+						autoSubmitted = true
+						return &autoSubmitResult{SessionID: "sess-1", Status: "auto_submitted"}, nil
+					},
+				}
+				svc := NewService(repo)
+				resp, err := svc.ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: typ})
+				require.NoError(t, err)
+				assert.False(t, autoSubmitted)
+				assert.Equal(t, policy, storedAction)
+				assert.Equal(t, policy == "warn", resp.Warn)
+				assert.Equal(t, 4, resp.EventCount)
+				assert.Nil(t, resp.SessionID)
+				assert.Nil(t, resp.Status)
+			})
+		}
+	}
 }
 
 // ── FR-BB39: SubmitSession ────────────────────────────────────────────────────

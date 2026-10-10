@@ -45,6 +45,9 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        # Local stack only: the E2E token seed (#415). Never set in deploy/.
+        VITE_E2E_TOKEN_SEED: "true"
     volumes:
       - frontend_dist:/app/dist
     healthcheck:

@@ -557,6 +557,8 @@ Every list and table must define an empty state:
 
 ## 6. Icons
 
+> **Superseded (2026-10-10, FR-BB320 AC-5):** the app uses `lucide-react` (outline, stroke 1.5, 20px for UI icons), not Tabler. The Tabler instructions and imports below are historical; see `foundations.md` in this folder.
+
 Use [Tabler Icons](https://tabler.io/icons) throughout — outline style only.
 
 ```tsx

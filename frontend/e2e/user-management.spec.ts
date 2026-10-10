@@ -30,7 +30,7 @@ test.describe('User Management — Edit User', () => {
     await waitForContent(page)
     await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 })
 
-    const editBtn = page.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit\$/i }).first()
+    const editBtn = page.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit$|^\u04e8\u04a3\u0434\u0435\u0443$/i }).first()
     if (!(await editBtn.isVisible({ timeout: 5_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No edit button visible — no users in list' })
       return
@@ -50,7 +50,7 @@ test.describe('User Management — Edit User', () => {
     await waitForContent(page)
     await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 })
 
-    const editBtn = page.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit\$/i }).first()
+    const editBtn = page.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit$|^\u04e8\u04a3\u0434\u0435\u0443$/i }).first()
     if (!(await editBtn.isVisible({ timeout: 5_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No edit button visible' })
       return
@@ -84,7 +84,7 @@ test.describe('User Management — Edit User', () => {
       await deleteTestUser(adminToken, user.id)
       throw new Error(`edit test: user ${user.email} not found on any page of the users list`)
     }
-    const editBtn = row.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit\$/i })
+    const editBtn = row.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit$|^\u04e8\u04a3\u0434\u0435\u0443$/i })
     await editBtn.click()
     await expect(page.getByRole('heading', { name: /\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f|edit user/i })).toBeVisible({ timeout: 5_000 })
 
@@ -106,7 +106,7 @@ test.describe('User Management — Edit User', () => {
     await waitForContent(page)
     await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 })
 
-    const editBtn = page.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit\$/i }).first()
+    const editBtn = page.getByRole('button', { name: /^\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c$|^edit$|^\u04e8\u04a3\u0434\u0435\u0443$/i }).first()
     if (!(await editBtn.isVisible({ timeout: 5_000 }).catch(() => false))) {
       test.info().annotations.push({ type: 'note', description: 'No edit button visible' })
       return

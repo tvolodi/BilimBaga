@@ -10,6 +10,7 @@ import { LanguageSelector } from '@/components/auth/LanguageSelector'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { Card } from '@/components/ui/card'
 import { SESSION_REVOKED_KEY } from '@/lib/sessionRevoked'
+import { AuthShell } from '@/components/auth/AuthShell'
 
 interface LoginPayload {
   email: string
@@ -66,42 +67,44 @@ export function LoginPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
-      <Card className="w-full max-w-md p-8">
-        <TenantLogo appName={config?.app_name} />
-        <h1 className="mt-4 text-xl font-semibold text-center">
-          {t('auth.login.title', { appName: config?.app_name ?? 'BilimBaga' })}
-        </h1>
-        {resetNotice && (
-          <p
-            role="status"
-            className="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
-          >
-            {t('auth.recovery.resetSuccess')}
-          </p>
-        )}
-        {sessionRevoked && (
-          <div
-            role="alert"
-            className="mt-4 flex items-start justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
-          >
-            <p>{t('auth.login.sessionRevoked')}</p>
-            <button
-              type="button"
-              onClick={dismissNotice}
-              className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
+    <AuthShell>
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
+        <Card className="w-full max-w-md p-8">
+          <TenantLogo appName={config?.app_name} />
+          <h1 className="mt-4 text-xl font-semibold text-center">
+            {t('auth.login.title', { appName: config?.app_name ?? 'BilimBaga' })}
+          </h1>
+          {resetNotice && (
+            <p
+              role="status"
+              className="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
             >
-              {t('auth.login.dismissNotice')}
-            </button>
-          </div>
-        )}
-        <LoginForm
-          onSubmit={handleSubmit}
-          isPending={login.isPending}
-          error={login.error as ApiError | null}
-        />
-        <LanguageSelector availableLocales={config?.available_locales ?? ['kk', 'ru', 'en']} />
-      </Card>
-    </main>
+              {t('auth.recovery.resetSuccess')}
+            </p>
+          )}
+          {sessionRevoked && (
+            <div
+              role="alert"
+              className="mt-4 flex items-start justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            >
+              <p>{t('auth.login.sessionRevoked')}</p>
+              <button
+                type="button"
+                onClick={dismissNotice}
+                className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
+              >
+                {t('auth.login.dismissNotice')}
+              </button>
+            </div>
+          )}
+          <LoginForm
+            onSubmit={handleSubmit}
+            isPending={login.isPending}
+            error={login.error as ApiError | null}
+          />
+          <LanguageSelector availableLocales={config?.available_locales ?? ['kk', 'ru', 'en']} />
+        </Card>
+      </main>
+    </AuthShell>
   )
 }

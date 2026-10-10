@@ -6,6 +6,7 @@ import { useVerifyCertificate } from '@/api/verify'
 import { useTenantConfig } from '@/api/useTenantConfig'
 import { TenantLogo } from '@/components/TenantLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -40,9 +41,12 @@ export function VerifyCertificatePage() {
       tabIndex={-1}
       className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-6 px-4 py-8 outline-none"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <TenantLogo appName={tenant?.app_name} />
-        <LocaleSwitcher />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <LocaleSwitcher />
+        </div>
       </div>
       {tenant?.app_name && <p className="text-center text-sm font-semibold">{tenant.app_name}</p>}
 

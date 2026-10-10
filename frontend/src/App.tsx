@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { TenantProvider } from '@/components/TenantProvider'
+import { ThemeProvider } from '@/components/ThemeProvider'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
 import { RequireAuth } from '@/components/RequireAuth'
 import { RequireRole } from '@/components/RequireRole'
@@ -419,11 +420,13 @@ function AppRoot() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TenantProvider>
-        <BrowserRouter>
-          <AppRoot />
-        </BrowserRouter>
-      </TenantProvider>
+      <ThemeProvider>
+        <TenantProvider>
+          <BrowserRouter>
+            <AppRoot />
+          </BrowserRouter>
+        </TenantProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

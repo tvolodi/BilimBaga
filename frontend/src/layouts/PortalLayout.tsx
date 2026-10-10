@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/api/auth'
 
@@ -42,6 +43,7 @@ export function PortalLayout() {
           </div>
           <div className="flex items-center gap-1 sm:gap-3 ml-auto shrink-0">
             <LocaleSwitcher />
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="sm"

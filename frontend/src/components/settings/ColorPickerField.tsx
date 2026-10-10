@@ -45,7 +45,7 @@ export function ColorPickerField({
     setDraft(null)
   }
 
-  const safeValue = normaliseHex(value) ?? '#000000'
+  const safeValue = normaliseHex(value) ?? '#000000' // design-ok: the native colour input needs a #rrggbb value, so black stands in for one that does not parse
   const ratio = contrastRatio(safeValue, contrastAgainst)
   const passes = ratio >= MIN_TEXT_CONTRAST
 

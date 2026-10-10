@@ -63,7 +63,7 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 	r.Use(appmw.RequestID)
 	r.Use(appmw.Recovery(log))
 	r.Use(appmw.RequestLogger(log))
-	r.Use(chimw.RealIP)
+	r.Use(clientFromXRealIP)
 	r.Use(chimw.Heartbeat("/ping"))
 
 	// Global middleware — injects tenant_id for every request (public and protected alike).

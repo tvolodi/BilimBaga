@@ -27,6 +27,15 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      # #473: the image is FROM scratch (no shell, wget or curl), so the binary answers the check itself:
+      # /app/api healthcheck GETs its own /api/v1/health on loopback (API_PORT, default 8080), exit 0 only on 200.
+      # nginx keeps the short depends_on form on purpose: no service_healthy gate on the api.
+      test: ["CMD", "/app/api", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   nginx:
     image: bilimbaga-qa:latest

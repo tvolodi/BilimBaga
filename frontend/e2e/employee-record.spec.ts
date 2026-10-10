@@ -157,7 +157,8 @@ test.describe('Employee record (FR-BB58)', () => {
     expect(download.suggestedFilename()).toBe(`certificate-${certId}.pdf`)
   })
 
-  test('certificate download failure shows an error alert (AC-4)', async ({ page }) => {
+  // Stubs the record (one row with a certificate) and the certificate endpoint with a failure.
+  async function stubCertificateFailure(page: Page, status: number, error: { code: string; message: string }) {
     await page.route(RECORD_API, (route) =>
       route.fulfill({
         status: 200,
@@ -187,13 +188,26 @@ test.describe('Employee record (FR-BB58)', () => {
     )
     await page.route(CERT_API, (route) =>
       route.fulfill({
-        status: 422,
+        status,
         contentType: 'application/json',
-        body: JSON.stringify({ data: null, error: { code: 'EXAM_NOT_CERTIFIABLE', message: 'not certifiable' } }),
+        body: JSON.stringify({ data: null, error }),
       }),
     )
+  }
+
+  test('certificate download failure shows the exam-not-certifiable message (AC-4)', async ({ page }) => {
+    await stubCertificateFailure(page, 422, { code: 'EXAM_NOT_CERTIFIABLE', message: 'not certifiable' })
     await openRecord(page)
     await page.getByRole('button', { name: /скачать|download/i }).click()
-    await expect(page.getByRole('alert').filter({ hasText: /не удалось скачать|download failed/i })).toBeVisible()
+    await expect(
+      page.getByRole('alert').filter({ hasText: /does not issue certificates|сертификаты не выдаются|сертификат берілмейді/i }),
+    ).toBeVisible()
+  })
+
+  test('certificate download failure with an unmapped error shows the generic message (AC-4)', async ({ page }) => {
+    await stubCertificateFailure(page, 500, { code: 'INTERNAL_ERROR', message: 'boom' })
+    await openRecord(page)
+    await page.getByRole('button', { name: /скачать|download/i }).click()
+    await expect(page.getByRole('alert').filter({ hasText: /download failed|не удалось скачать/i })).toBeVisible()
   })
 })

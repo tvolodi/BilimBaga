@@ -40,7 +40,10 @@ func setRealIPFromRanges(t *testing.T, path string) map[string]bool {
 	return ranges
 }
 
-func TestNginxConf_ContainerTrustsPrivateRangesAndReadsTheForwardedChain(t *testing.T) {
+// #481: the container takes the client from X-Real-IP only. A recursive walk of X-Forwarded-For lets a client
+// that reaches the container from a private address (intranet, host network, local stack) choose the address by
+// rotating the forwarded entries; the edge always sets X-Real-IP to the address it saw, so X-Real-IP is enough.
+func TestNginxConf_ContainerTakesTheClientFromXRealIPOnly(t *testing.T) {
 	const path = "../../../deploy/nginx.conf"
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -61,11 +64,14 @@ func TestNginxConf_ContainerTrustsPrivateRangesAndReadsTheForwardedChain(t *test
 			t.Errorf("%s: trusts %s, which is not a private range (a public peer could set the client address)", path, r)
 		}
 	}
-	if !regexp.MustCompile(`(?m)^\s*real_ip_header\s+X-Forwarded-For;`).Match(raw) {
-		t.Errorf("%s: missing `real_ip_header X-Forwarded-For;`", path)
+	if !regexp.MustCompile(`(?m)^\s*real_ip_header\s+X-Real-IP;`).Match(raw) {
+		t.Errorf("%s: missing `real_ip_header X-Real-IP;`", path)
 	}
-	if !regexp.MustCompile(`(?m)^\s*real_ip_recursive\s+on;`).Match(raw) {
-		t.Errorf("%s: missing `real_ip_recursive on;` (the client is the rightmost untrusted address)", path)
+	if regexp.MustCompile(`(?m)^\s*real_ip_recursive\b`).Match(raw) {
+		t.Errorf("%s: `real_ip_recursive` must be dropped: it lets a private-address client rotate X-Forwarded-For (#481)", path)
+	}
+	if regexp.MustCompile(`(?m)^\s*real_ip_header\s+X-Forwarded-For\b`).Match(raw) {
+		t.Errorf("%s: `real_ip_header X-Forwarded-For` must not be used: the client controls that header (#481)", path)
 	}
 	if !regexp.MustCompile(`proxy_set_header\s+X-Real-IP\s+\$remote_addr;`).Match(raw) {
 		t.Errorf("%s: the API must still receive X-Real-IP $remote_addr (the resolved client)", path)

@@ -7,15 +7,15 @@ interface RoleBadgeProps {
 }
 
 const roleStyles: Record<string, string> = {
-  super_admin: 'bg-purple-100 text-purple-800',
-  department_admin: 'bg-blue-100 text-blue-800',
-  examiner: 'bg-teal-100 text-teal-800',
-  employee: 'bg-gray-100 text-gray-700',
+  super_admin: 'bg-primary text-primary-foreground',
+  department_admin: 'bg-primary/10 text-foreground',
+  examiner: 'bg-bg-info text-info',
+  employee: 'bg-muted text-muted-foreground',
 }
 
 export function RoleBadge({ role, className }: RoleBadgeProps) {
   const { t } = useTranslation()
-  const style = roleStyles[role] ?? 'bg-gray-100 text-gray-700'
+  const style = roleStyles[role] ?? 'bg-muted text-muted-foreground'
   const label = t(`users.roles.${role}`, { defaultValue: role })
 
   return (

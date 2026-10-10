@@ -15,6 +15,14 @@ const RAW_FETCH_ALLOWED: Record<string, string> = {
   'recovery.ts': 'public account recovery (no token)',
 }
 
+/**
+ * True when module text reaches fetch directly: a bare call, or fetch through window, globalThis or self (#448).
+ * Not flagged: apiFetch, refetch, or a method named fetch on another object (client.fetch).
+ */
+function rawFetchIn(text: string): boolean {
+  return /(?<![\w$.])fetch\(/.test(text) || /(?<![\w$])(?:window|globalThis|self)\s*\.\s*fetch\b/.test(text)
+}
+
 async function apiModules(): Promise<Array<{ name: string; text: string }>> {
   const fs = await import('node:fs')
   const path = await import('node:path')
@@ -35,9 +43,23 @@ describe('API modules use the shared apiFetch (#249)', () => {
 
   it('no module calls fetch directly outside the allow-list', async () => {
     const offenders = (await apiModules())
-      .filter((m) => !(m.name in RAW_FETCH_ALLOWED) && /(?<![\w.])fetch\(/.test(m.text))
+      .filter((m) => !(m.name in RAW_FETCH_ALLOWED) && rawFetchIn(m.text))
       .map((m) => m.name)
     expect(offenders).toEqual([])
+  })
+
+  // #448: fetch reached through window, globalThis or self is a raw fetch too.
+  it('flags window.fetch and globalThis.fetch in an API module (#448)', () => {
+    expect(rawFetchIn("const r = await window.fetch('/api/v1/exams')")).toBe(true)
+    expect(rawFetchIn("const r = await globalThis.fetch('/api/v1/exams')")).toBe(true)
+    expect(rawFetchIn('const send = globalThis.fetch')).toBe(true)
+    expect(rawFetchIn("self.fetch('/api/v1/exams')")).toBe(true)
+  })
+
+  it('does not flag the shared apiFetch, a method named fetch on another object, or refetch (#448)', () => {
+    expect(rawFetchIn('return apiFetch<T>(qc, url)')).toBe(false)
+    expect(rawFetchIn('await client.fetch(url)')).toBe(false)
+    expect(rawFetchIn('void refetch()')).toBe(false)
   })
 
   it('every allow-listed file exists, so the list cannot go stale', async () => {

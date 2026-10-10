@@ -17,16 +17,16 @@ export function ExamStatusChip({ title, passed, attempts }: ExamStatusChipProps)
     passed === true
       ? {
           icon: CheckCircle,
-          className: 'bg-green-50 text-green-700 border-green-200',
+          className: 'bg-bg-success text-success border-transparent',
         }
       : passed === false
         ? {
             icon: XCircle,
-            className: 'bg-red-50 text-red-700 border-red-200',
+            className: 'bg-bg-danger text-danger border-transparent',
           }
         : {
             icon: Minus,
-            className: 'bg-gray-50 text-gray-500 border-gray-200',
+            className: 'bg-muted text-muted-foreground border-border',
           }
 
   const { icon: Icon, className } = config

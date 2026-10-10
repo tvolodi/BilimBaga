@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { apiFetch, type ApiError } from './apiFetch'
+import { retryUnlessNotFound } from '@/lib/apiRetry'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -196,6 +197,7 @@ export function useExam(id: string | null | undefined) {
     },
     enabled: !!id,
     staleTime: 30_000,
+    retry: retryUnlessNotFound,
   })
 }
 

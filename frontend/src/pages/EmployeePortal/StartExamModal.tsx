@@ -42,7 +42,7 @@ export function StartExamModal({
           )}
           <p>{t('portal.modal.passingScore', { pct: exam.passing_score_pct })}</p>
           <p>{t('portal.modal.maxAttempts', { remaining })}</p>
-          <p className="text-amber-600 font-medium">{t('portal.modal.warning')}</p>
+          <p className="text-warning font-medium">{t('portal.modal.warning')}</p>
           {errorMessage && (
             <p role="alert" className="text-destructive font-medium">
               {errorMessage}

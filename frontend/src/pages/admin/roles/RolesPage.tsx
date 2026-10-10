@@ -74,12 +74,12 @@ export function RolesPage() {
       {notice && (
         <div
           role="status"
-          className="flex items-center justify-between gap-3 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+          className="flex items-center justify-between gap-3 rounded-md border border-success bg-bg-success px-4 py-3 text-sm text-success"
         >
           <span>{notice}</span>
           <button
             type="button"
-            className="rounded px-2 py-0.5 hover:bg-black/10"
+            className="rounded px-2 py-0.5 hover:bg-foreground/10"
             onClick={() => setNotice(null)}
             aria-label={t('roles.dismiss')}
           >
@@ -90,7 +90,7 @@ export function RolesPage() {
 
       {isLoading && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
       {isError && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {t('common.loadError')}
         </p>
       )}
@@ -140,7 +140,7 @@ export function RolesPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-red-600"
+                        className="text-danger"
                         onClick={() => openDelete(role)}
                         aria-label={t('roles.actions.deleteRole', { name: role.name })}
                       >
@@ -171,7 +171,7 @@ export function RolesPage() {
             </DialogDescription>
           </DialogHeader>
           {deleteError && (
-            <p role="alert" className="mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <p role="alert" className="mb-2 rounded-md border border-danger bg-bg-danger px-3 py-2 text-sm text-danger">
               {deleteError}
             </p>
           )}

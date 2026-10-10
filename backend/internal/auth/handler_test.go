@@ -418,10 +418,12 @@ func TestHashToken_DifferentInputsDifferentHashes(t *testing.T) {
 	assert.NotEqual(t, h1, h2)
 }
 
-func TestClientIP_XForwardedFor(t *testing.T) {
+// #478: X-Forwarded-For is client-controlled, so the audit IP is the RemoteAddr the router resolved, never the header.
+func TestClientIP_XForwardedForIsIgnored(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "192.0.2.1:4567"
 	req.Header.Set("X-Forwarded-For", "203.0.113.5, 198.51.100.1")
-	assert.Equal(t, "203.0.113.5", clientIP(req))
+	assert.Equal(t, "192.0.2.1", clientIP(req))
 }
 
 func TestClientIP_RemoteAddr(t *testing.T) {

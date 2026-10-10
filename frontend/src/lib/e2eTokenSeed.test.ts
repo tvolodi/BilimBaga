@@ -64,21 +64,43 @@ describe('startup clears a stale token in the default build (#415)', () => {
   })
 })
 
-describe('the E2E flag stays out of deploy files and workflows (#415)', () => {
+// #422: the flag may appear only in the local stack's build (docker-compose and frontend/Dockerfile).
+// The scan covers deploy/ and the workflows; a planted file proves the scan can fail.
+async function scanDeployFiles(repo: string) {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const walk = (dir: string): string[] => {
+    if (!fs.existsSync(dir)) return []
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const p = path.join(dir, e.name)
+      return e.isDirectory() ? walk(p) : [p]
+    })
+  }
+  const scanned = [...walk(path.join(repo, 'deploy')), ...walk(path.join(repo, '.github', 'workflows'))]
+  const hits = scanned.filter((f) => fs.readFileSync(f, 'utf8').includes('VITE_E2E_TOKEN_SEED'))
+  return { scanned, hits }
+}
+
+describe('the E2E flag stays out of deploy files and workflows (#415, #422)', () => {
   it('appears in no deploy file or workflow', async () => {
-    const fs = await import('node:fs')
     const path = await import('node:path')
-    const repo = path.resolve(process.cwd(), '..')
-    const walk = (dir: string): string[] => {
-      if (!fs.existsSync(dir)) return []
-      return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-        const p = path.join(dir, e.name)
-        return e.isDirectory() ? walk(p) : [p]
-      })
-    }
-    const scanned = [...walk(path.join(repo, 'deploy')), ...walk(path.join(repo, '.github', 'workflows'))]
+    const { scanned, hits } = await scanDeployFiles(path.resolve(process.cwd(), '..'))
     expect(scanned.length).toBeGreaterThan(0)
-    const hits = scanned.filter((f) => fs.readFileSync(f, 'utf8').includes('VITE_E2E_TOKEN_SEED'))
     expect(hits).toEqual([])
+  })
+
+  it('fails the scan when the flag leaks into a deploy file', async () => {
+    const fs = await import('node:fs')
+    const os = await import('node:os')
+    const path = await import('node:path')
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-flag-guard-'))
+    try {
+      fs.mkdirSync(path.join(repo, 'deploy'))
+      fs.writeFileSync(path.join(repo, 'deploy', 'Dockerfile'), 'ARG VITE_E2E_TOKEN_SEED=true\n')
+      const { hits } = await scanDeployFiles(repo)
+      expect(hits).toHaveLength(1)
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true })
+    }
   })
 })

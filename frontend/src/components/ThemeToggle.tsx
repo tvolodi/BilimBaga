@@ -57,6 +57,7 @@ export function ThemeToggle() {
   return (
     <div
       role="radiogroup"
+      data-testid="theme-toggle"
       aria-label={t('theme.label')}
       className="inline-flex items-center gap-0.5 rounded-md border border-border p-0.5"
     >

@@ -60,7 +60,7 @@ export function ResultPage() {
 
         {isPending ? (
           /* Pending manual review notice */
-          <div className="rounded-lg border border-yellow-400 bg-yellow-50 px-4 py-4 text-center text-sm text-yellow-800">
+          <div className="rounded-lg border border-warning bg-bg-warning px-4 py-4 text-center text-sm text-warning">
             {t('result.pending_grading')}
           </div>
         ) : (

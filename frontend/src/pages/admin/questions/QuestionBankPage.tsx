@@ -112,13 +112,13 @@ function NotificationBanner({ type, message, onDismiss }: NotificationBannerProp
     <div
       className={`flex items-center gap-3 px-4 py-3 rounded-md text-sm ${
         type === 'error'
-          ? 'bg-red-50 border border-red-200 text-red-800'
-          : 'bg-green-50 border border-green-200 text-green-800'
+          ? 'bg-bg-danger border border-danger text-danger'
+          : 'bg-bg-success border border-success text-success'
       }`}
     >
       <AlertCircle size={16} className="flex-shrink-0" />
       <span className="flex-1">{message}</span>
-      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-black/10">
+      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-foreground/10">
         <X size={14} />
       </button>
     </div>
@@ -179,14 +179,14 @@ function LocaleCoverageIcons({ coverage, allLocales = ['en', 'kk', 'ru'] }: Loca
           <CheckCircle2
             key={locale}
             size={14}
-            className="text-green-600"
+            className="text-success"
             aria-label={t('questionBank.localeCoverage.present', { locale: locale.toUpperCase() })}
           />
         ) : (
           <XCircle
             key={locale}
             size={14}
-            className="text-red-400"
+            className="text-danger"
             aria-label={t('questionBank.localeCoverage.missing', { locale: locale.toUpperCase() })}
           />
         )
@@ -260,7 +260,7 @@ function RowActionsMenu({ question, onEdit, onArchive, onViewVersions, onDelete 
           {canDelete && (
             <button
               onClick={() => { setOpen(false); onDelete() }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-muted text-red-600"
+              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-muted text-danger"
             >
               <Trash2 size={14} />
               {t('questionBank.actions.delete')}
@@ -580,7 +580,7 @@ function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
 
           {/* Error from mutation */}
           {importMutation.isError && (
-            <p className="text-sm text-red-600">{importMutation.error?.message}</p>
+            <p className="text-sm text-danger">{importMutation.error?.message}</p>
           )}
 
           {/* Dry run results */}
@@ -592,14 +592,14 @@ function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
 
               {hasErrors && (
                 <div>
-                  <p className="text-sm font-medium text-red-700 mb-1">
+                  <p className="text-sm font-medium text-danger mb-1">
                     {t('questionBank.import.errors')}
                   </p>
                   <div className="max-h-36 overflow-y-auto space-y-1">
                     {dryRunResult.error_rows.map((row) => (
                       <div
                         key={row.row}
-                        className="text-xs bg-red-50 border border-red-200 rounded px-2 py-1.5"
+                        className="text-xs bg-bg-danger border border-danger rounded px-2 py-1.5"
                       >
                         <span className="font-medium">{t('questionBank.import.row', { row: row.row })}</span>{' '}
                         {row.errors.join(', ')}
@@ -611,14 +611,14 @@ function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
 
               {hasWarnings && (
                 <div>
-                  <p className="text-sm font-medium text-yellow-700 mb-1">
+                  <p className="text-sm font-medium text-warning mb-1">
                     {t('questionBank.import.warnings')}
                   </p>
                   <div className="max-h-36 overflow-y-auto space-y-1">
                     {dryRunResult.warning_rows.map((row) => (
                       <div
                         key={row.row}
-                        className="text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5"
+                        className="text-xs bg-bg-warning border border-warning rounded px-2 py-1.5"
                       >
                         <span className="font-medium">{t('questionBank.import.row', { row: row.row })}</span>{' '}
                         {t('questionBank.import.similarTo', {
@@ -796,7 +796,7 @@ function BulkActionBar({
           {t('questionBank.bulk.selected', { count })}
         </span>
         {exportError && (
-          <span role="alert" className="text-xs text-red-700">
+          <span role="alert" className="text-xs text-danger">
             {t(exportError)}
           </span>
         )}
@@ -1241,7 +1241,7 @@ export function QuestionBankPage() {
       {/* Table */}
       {isLoading && <LoadingSkeleton />}
       {isError && (
-        <p className="text-red-600 text-sm">{t('questionBank.error.loadFailed')}</p>
+        <p className="text-danger text-sm">{t('questionBank.error.loadFailed')}</p>
       )}
       {!isLoading && !isError && data && (
         <>

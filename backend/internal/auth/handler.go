@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -75,20 +74,9 @@ func handleServiceError(w http.ResponseWriter, err error) {
 	})
 }
 
-// clientIP extracts the caller's IP address, preferring X-Forwarded-For.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For may be a comma-separated list; take the first entry.
-		if ip := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); ip != "" {
-			return ip
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
+// clientIP is the caller's address for audit rows: the one helper, api.ClientIP (#478). It never reads
+// X-Forwarded-For, which a client sends freely.
+func clientIP(r *http.Request) string { return api.ClientIP(r) }
 
 // Login handles POST /api/v1/auth/login.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {

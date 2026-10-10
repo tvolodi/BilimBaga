@@ -3,7 +3,8 @@
  * localStorage (FR-BB110 AC-3: the token lives in the React Query cache only, and a reload goes
  * through POST /auth/refresh with the httpOnly cookie).
  *
- * The local E2E stack builds with VITE_E2E_TOKEN_SEED=true (mode "e2e", see .env.e2e). Specs
+ * The local E2E stack builds with VITE_E2E_TOKEN_SEED=true (the frontend Dockerfile build argument, set by
+ * docker-compose.yml; #422 removed the separate e2e build mode). Specs
  * share one admin session and refresh tokens rotate, so the seed keeps working there. Every
  * other build has the seed off: nothing is read or written.
  *

@@ -50,7 +50,7 @@ export function ResultsTable({ sessions, sortCol, sortDir, onSort }: ResultsTabl
   return (
     <div className="space-y-2">
       {downloadError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {t(downloadError)}
         </p>
       )}

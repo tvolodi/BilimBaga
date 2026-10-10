@@ -82,7 +82,7 @@ describe('Step4Review eligible counts (FR-BB315)', () => {
       isError: false,
     })
     renderStep4()
-    const badge = ruleItem(1).querySelector('[class*="bg-green"]')
+    const badge = ruleItem(1).querySelector('[class*="bg-bg-success"]')
     expect(badge).toHaveTextContent('8 eligible')
   })
 
@@ -94,7 +94,7 @@ describe('Step4Review eligible counts (FR-BB315)', () => {
       isError: false,
     })
     renderStep4()
-    expect(ruleItem(1).querySelector('[class*="bg-green"]')).toHaveTextContent('5 eligible')
+    expect(ruleItem(1).querySelector('[class*="bg-bg-success"]')).toHaveTextContent('5 eligible')
   })
 
   it('shows amber when some but not enough questions are eligible, and red when none', () => {
@@ -113,8 +113,8 @@ describe('Step4Review eligible counts (FR-BB315)', () => {
       isError: false,
     })
     renderStep4()
-    expect(ruleItem(1).querySelector('[class*="bg-amber"]')).toHaveTextContent('2 eligible')
-    expect(ruleItem(2).querySelector('[class*="bg-red"]')).toHaveTextContent('0 eligible')
+    expect(ruleItem(1).querySelector('[class*="bg-bg-warning"]')).toHaveTextContent('2 eligible')
+    expect(ruleItem(2).querySelector('[class*="bg-bg-danger"]')).toHaveTextContent('0 eligible')
   })
 
   it('matches counts to rules by rule_id, not by position', () => {

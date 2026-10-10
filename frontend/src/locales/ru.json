@@ -9,6 +9,7 @@
     "save": "Сохранить",
     "loading": "Загрузка…",
     "loadError": "Не удалось загрузить. Попробуйте ещё раз.",
+    "examNotFound": "Экзамен не найден. Возможно, его удалили.",
     "skipToMain": "Перейти к основному содержимому",
     "signOut": "Выйти",
     "remove": "Удалить",
@@ -834,7 +835,12 @@
     "col_status": "Статус",
     "col_actions": "Действия",
     "minutes_format": "{{minutes}} мин",
-    "manage_assignments": "Назначить"
+    "manage_assignments": "Назначить",
+    "status": {
+      "draft": "Черновик",
+      "active": "Активен",
+      "archived": "В архиве"
+    }
   },
   "grading": {
     "queue_title": "Очередь ручного оценивания",

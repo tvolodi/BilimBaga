@@ -22,13 +22,13 @@ function NotificationBanner({ notification, onDismiss }: { notification: Notific
     <div
       className={`flex items-center gap-3 px-4 py-3 rounded-md text-sm mb-4 ${
         notification.type === 'error'
-          ? 'bg-red-50 border border-red-200 text-red-800'
-          : 'bg-green-50 border border-green-200 text-green-800'
+          ? 'bg-bg-danger border border-danger text-danger'
+          : 'bg-bg-success border border-success text-success'
       }`}
     >
       <AlertCircle size={16} className="flex-shrink-0" />
       <span className="flex-1">{notification.message}</span>
-      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-black/10">
+      <button onClick={onDismiss} className="p-0.5 rounded hover:bg-foreground/10">
         <X size={14} />
       </button>
     </div>
@@ -148,7 +148,7 @@ export function CategoriesPage() {
       )}
 
       {isError && (
-        <div className="text-sm text-red-600 py-8 text-center">
+        <div className="text-sm text-danger py-8 text-center">
           {t('common.loadError')}
         </div>
       )}

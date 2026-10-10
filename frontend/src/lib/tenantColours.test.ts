@@ -8,6 +8,7 @@ describe('tenantOverrides in the light theme', () => {
       primary: '#123456',
       primaryForeground: '#ffffff',
       accent: '#c8a84b',
+      accentForeground: '#0f1623',
     })
   })
 
@@ -24,11 +25,12 @@ describe('tenantOverrides in the light theme', () => {
   })
 
   it('removes every override when there is no primary', () => {
-    expect(tenantOverrides(undefined, 'light')).toEqual({ primary: null, primaryForeground: null, accent: null })
+    expect(tenantOverrides(undefined, 'light')).toEqual({ primary: null, primaryForeground: null, accent: null, accentForeground: null })
     expect(tenantOverrides({ primary_color: '', accent_color: '#c8a84b' }, 'light')).toEqual({
       primary: null,
       primaryForeground: null,
       accent: null,
+      accentForeground: null,
     })
   })
 
@@ -57,6 +59,10 @@ describe('tenantOverrides in the dark theme', () => {
     expect(overrides.primary).toBeNull()
   })
 
+  it('sets the accent foreground from the derived accent', () => {
+    expect(tenantOverrides({ primary_color: '#1b3a6b', accent_color: '#B91C1C' }, 'dark').accentForeground).toBe('#0f1623')
+  })
+
   it('derives the accent, and leaves the token for the design default accent', () => {
     expect(tenantOverrides({ primary_color: '#1b3a6b', accent_color: '#B91C1C' }, 'dark').accent).toBe('#e96d6d')
     expect(tenantOverrides({ primary_color: '#1b3a6b', accent_color: '#c8a84b' }, 'dark').accent).toBeNull()
@@ -67,6 +73,7 @@ describe('tenantOverrides in the dark theme', () => {
       primary: null,
       primaryForeground: null,
       accent: null,
+      accentForeground: null,
     })
   })
 })

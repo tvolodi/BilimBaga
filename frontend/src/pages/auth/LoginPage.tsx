@@ -8,6 +8,7 @@ import { TenantLogo } from '@/components/TenantLogo'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { LanguageSelector } from '@/components/auth/LanguageSelector'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { SESSION_REVOKED_KEY } from '@/lib/sessionRevoked'
 import { AuthShell } from '@/components/auth/AuthShell'
@@ -77,7 +78,7 @@ export function LoginPage() {
           {resetNotice && (
             <p
               role="status"
-              className="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+              className="mt-4 rounded-md border border-success bg-bg-success px-3 py-2 text-sm text-success"
             >
               {t('auth.recovery.resetSuccess')}
             </p>
@@ -85,16 +86,18 @@ export function LoginPage() {
           {sessionRevoked && (
             <div
               role="alert"
-              className="mt-4 flex items-start justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              className="mt-4 flex items-start justify-between gap-3 rounded-md border border-warning bg-bg-warning px-3 py-2 text-sm text-warning"
             >
               <p>{t('auth.login.sessionRevoked')}</p>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={dismissNotice}
-                className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
+                className="h-auto shrink-0 px-0 font-medium text-warning underline underline-offset-2 hover:bg-transparent hover:text-warning hover:no-underline"
               >
                 {t('auth.login.dismissNotice')}
-              </button>
+              </Button>
             </div>
           )}
           <LoginForm

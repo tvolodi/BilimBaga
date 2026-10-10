@@ -76,6 +76,15 @@ describe('LoginPage session-revoked notice (ISS-249)', () => {
     expect(screen.queryByRole('alert')).toBeNull()
     expect(qc.getQueryData(SESSION_REVOKED_KEY)).toBe(false)
   })
+  // #437: the dismiss control is the components/ui Button in the warning colour, not a raw button.
+  it('dismisses with the ui Button in the warning colour (#437)', async () => {
+    await i18n.changeLanguage('en')
+    renderLogin(true)
+    const dismiss = screen.getByRole('alert').querySelector('button') as HTMLButtonElement
+    expect(dismiss.className).toMatch(/focus-visible:ring-2/)
+    expect(dismiss.className).toMatch(/text-warning/)
+    expect(dismiss.className).not.toMatch(/#/)
+  })
 })
 
 describe('LoginPage return path after a revoked session (AC-11)', () => {

@@ -79,7 +79,7 @@ describe('QuestionDifficultyTable', () => {
     const rows = container.querySelectorAll('tbody tr')
     // Third question has correct_rate 0.25 — should have red border
     const redRow = rows[2]
-    expect(redRow.className).toMatch(/border-l-red-500/)
+    expect(redRow.className).toMatch(/border-l-danger/)
   })
 
   it('applies amber border class for high correct_rate (> 0.95)', () => {
@@ -94,7 +94,7 @@ describe('QuestionDifficultyTable', () => {
     const rows = container.querySelectorAll('tbody tr')
     // Second question has correct_rate 0.98 — should have amber border
     const amberRow = rows[1]
-    expect(amberRow.className).toMatch(/border-l-amber-400/)
+    expect(amberRow.className).toMatch(/border-l-warning/)
   })
 
   it('does not apply border for normal correct_rate', () => {
@@ -109,8 +109,8 @@ describe('QuestionDifficultyTable', () => {
     const rows = container.querySelectorAll('tbody tr')
     // First question has correct_rate 0.85 — no coloured border
     const normalRow = rows[0]
-    expect(normalRow.className).not.toMatch(/border-l-red-500/)
-    expect(normalRow.className).not.toMatch(/border-l-amber-400/)
+    expect(normalRow.className).not.toMatch(/border-l-danger/)
+    expect(normalRow.className).not.toMatch(/border-l-warning/)
   })
 
   it('shows "Consider Revising" badge for low correct_rate', () => {

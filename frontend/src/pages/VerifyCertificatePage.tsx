@@ -69,7 +69,7 @@ export function VerifyCertificatePage() {
 
           {isError && (
             <div className="space-y-3">
-              <p className="flex items-center gap-2 font-medium text-amber-600">
+              <p className="flex items-center gap-2 font-medium text-warning">
                 <AlertTriangle aria-hidden="true" className="h-5 w-5" />
                 {t('verify.unavailable')}
               </p>
@@ -83,7 +83,7 @@ export function VerifyCertificatePage() {
             <div className="space-y-4">
               <p
                 role="status"
-                className="flex items-center gap-2 text-lg font-semibold text-green-600"
+                className="flex items-center gap-2 text-lg font-semibold text-success"
               >
                 <CheckCircle2 aria-hidden="true" className="h-6 w-6" />
                 {t('verify.valid')}
@@ -110,7 +110,7 @@ export function VerifyCertificatePage() {
           )}
 
           {data && !data.valid && (
-            <p role="alert" className="flex items-center gap-2 text-lg font-semibold text-red-600">
+            <p role="alert" className="flex items-center gap-2 text-lg font-semibold text-danger">
               <XCircle aria-hidden="true" className="h-6 w-6" />
               {t('verify.invalid')}
             </p>

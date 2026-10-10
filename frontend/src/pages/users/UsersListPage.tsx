@@ -104,8 +104,8 @@ export function UsersListPage() {
 
       {/* Table */}
       {isLoading && <p className="text-muted-foreground">Loading...</p>}
-      {resetError && <p role="alert" className="text-red-600">{resetError}</p>}
-      {isError && <p className="text-red-600">{t('users.messages.error_generic')}</p>}
+      {resetError && <p role="alert" className="text-danger">{resetError}</p>}
+      {isError && <p className="text-danger">{t('users.messages.error_generic')}</p>}
       {data && (
         <Table>
           <TableHeader>

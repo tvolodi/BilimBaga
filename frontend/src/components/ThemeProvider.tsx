@@ -17,11 +17,11 @@ export const THEME_STORAGE_KEY = 'bb-theme'
 const DARK_QUERY = '(prefers-color-scheme: dark)'
 
 /**
- * FR-BB321 switch. Stays false until the nginx change (AC-4) is on main and every page is migrated
- * (part 3). While false the resolved theme is always light and the toggle is hidden.
+ * FR-BB321 switch. On: the three-way theme choice is live (part 3, after the nginx change of AC-4 and
+ * the class migration of AC-13). While false the resolved theme is always light and the toggle is hidden.
  * Keep `public/theme-init.js` in step with this value.
  */
-export const THEME_SWITCH_ENABLED = false
+export const THEME_SWITCH_ENABLED = true
 
 interface ThemeContextValue {
   preference: ThemePreference

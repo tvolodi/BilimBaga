@@ -2,10 +2,10 @@ package middleware
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 )
@@ -91,26 +91,6 @@ func LoggerFromContext(ctx context.Context) zerolog.Logger {
 	return zerolog.Ctx(ctx).With().Logger()
 }
 
-// realIP returns the best-guess client IP address.  It prefers X-Forwarded-For
-// (set by the Nginx reverse proxy) over RemoteAddr.
-func realIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For may be a comma-separated list; the first entry is the client.
-		if i := len(xff); i > 0 {
-			for j := 0; j < i; j++ {
-				if xff[j] == ',' {
-					return xff[:j]
-				}
-			}
-			return xff
-		}
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
+// realIP is the client address the request log records: the one helper, api.ClientIP (#478), which reads the
+// RemoteAddr that the router resolved from X-Real-IP. It never reads X-Forwarded-For, which a client sends freely.
+func realIP(r *http.Request) string { return api.ClientIP(r) }

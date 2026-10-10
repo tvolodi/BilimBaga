@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
 	"github.com/jmoiron/sqlx"
 )
@@ -47,7 +48,7 @@ func (w *Writer) Write(ctx context.Context, r *http.Request, action, entityType 
 		actorNull = &actorIDStr
 	}
 
-	ip := r.RemoteAddr // RealIP middleware has already normalised this
+	ip := api.ClientIP(r) // the resolved client (#475), never a forged X-Forwarded-For (#478)
 
 	var meta []byte
 	if metadata != nil {

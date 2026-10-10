@@ -58,12 +58,14 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 	// Structured middleware chain (FR-BB66):
 	//   1. RequestID  — assign UUID correlation ID
 	//   2. Recovery   — recover panics and return 500 (wraps everything below)
-	//   3. RequestLogger — structured JSON log after response written
-	//   4. RealIP / Heartbeat — chi built-ins
+	//   3. clientFromXRealIP — the client address from X-Real-IP (#475)
+	//   4. RequestLogger — structured JSON log after response written; runs after the client is resolved, so
+	//      its ip field is the real client (#478)
+	//   5. Heartbeat — chi built-in
 	r.Use(appmw.RequestID)
 	r.Use(appmw.Recovery(log))
-	r.Use(appmw.RequestLogger(log))
 	r.Use(clientFromXRealIP)
+	r.Use(appmw.RequestLogger(log))
 	r.Use(chimw.Heartbeat("/ping"))
 
 	// Global middleware — injects tenant_id for every request (public and protected alike).

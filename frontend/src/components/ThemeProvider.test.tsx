@@ -176,8 +176,8 @@ describe('ThemeProvider defaults and storage', () => {
 })
 
 describe('ThemeProvider while the switch is off (FR-BB321 part 1)', () => {
-  it('ships with the switch off', () => {
-    expect(THEME_SWITCH_ENABLED).toBe(false)
+  it('ships with the switch on (FR-BB321 part 3)', () => {
+    expect(THEME_SWITCH_ENABLED).toBe(true)
   })
 
   it('resolves light for a stored dark value and never adds the dark class', () => {

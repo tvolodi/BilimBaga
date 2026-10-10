@@ -86,7 +86,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
             </p>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
 
           {preview && (
             <div className="space-y-3">
@@ -114,11 +114,11 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                     </TableHeader>
                     <TableBody>
                       {preview.errors.map((row) => (
-                        <TableRow key={row.row_num} className="bg-red-50">
+                        <TableRow key={row.row_num} className="bg-bg-danger">
                           <TableCell>{row.row_num}</TableCell>
                           <TableCell>{row.email}</TableCell>
                           <TableCell>{row.full_name}</TableCell>
-                          <TableCell className="text-red-600 text-xs">{row.error}</TableCell>
+                          <TableCell className="text-danger text-xs">{row.error}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

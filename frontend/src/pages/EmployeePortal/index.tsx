@@ -8,7 +8,7 @@ import { ExamCard } from './ExamCard'
 import { ExamCardSkeleton } from './ExamCardSkeleton'
 import { StartExamModal } from './StartExamModal'
 import { EmptyPortal } from './EmptyPortal'
-import { requestDocumentFullscreen } from '@/lib/fullscreen'
+import { requestDocumentFullscreen, exitDocumentFullscreen } from '@/lib/fullscreen'
 
 export function EmployeePortal() {
   const { t } = useTranslation()
@@ -26,13 +26,15 @@ export function EmployeePortal() {
 
   function handleConfirm() {
     // FR-BB319 AC-8: first statement, inside the user's click, so the browser allows fullscreen.
-    requestDocumentFullscreen()
+    const entering = requestDocumentFullscreen()
     createSession.mutate(undefined, {
       onSuccess: (data) => {
         setSelectedExam(null)
         navigate(`/portal/sessions/${data.session_id}`)
       },
       onError: () => {
+        // #417: the exam did not start, so leave the fullscreen requested above (after that request settles).
+        void entering.then(exitDocumentFullscreen)
         // The exam list may be stale (e.g. a session is already open): refresh it so the card reflects reality.
         void queryClient.invalidateQueries({ queryKey: ['portal', 'exams'] })
       },

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"io"
 	"strings"
 	"sync"
@@ -38,7 +37,13 @@ type recRows struct {
 
 func (c recConn) Prepare(q string) (driver.Stmt, error) { return recStmt{c.f, q}, nil }
 func (c recConn) Close() error                          { return nil }
-func (c recConn) Begin() (driver.Tx, error)             { return nil, errors.New("no tx") }
+func (c recConn) Begin() (driver.Tx, error)             { return recTx{}, nil }
+
+// recTx is a no-op transaction, so repository methods that run inside one can be recorded.
+type recTx struct{}
+
+func (recTx) Commit() error   { return nil }
+func (recTx) Rollback() error { return nil }
 func (s recStmt) Close() error                          { return nil }
 func (s recStmt) NumInput() int                         { return -1 }
 func (s recStmt) Exec(args []driver.Value) (driver.Result, error) {

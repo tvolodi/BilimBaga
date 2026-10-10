@@ -30,4 +30,4 @@ The owner also keeps the design system as a Claude artifact with live component 
 - The owner: the design system itself (the artifact, and approval of new tokens and components).
 - BA: this folder, `FR-BB320`, frontend sections of requirements, review of UI requirements against this page.
 - Developers: follow the checklist; fix differences between code and the design system.
-- Architect (when running): decisions on trade-offs between the design system and implementation.
+- Architect (event-driven, no loop): decisions on trade-offs between the design system and implementation.

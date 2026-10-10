@@ -230,16 +230,32 @@ func (r *pgRepository) RevokeAllTokens(ctx context.Context, userID string) error
 	return nil
 }
 
-// UpdatePassword stores a new bcrypt hash and forces a password change on next login.
+// UpdatePassword stores a new bcrypt hash, forces a password change on next login, stamps
+// password_changed_at at the start of the next second and revokes every refresh token of the user,
+// in one transaction (#439). The next-second stamp makes a token issued in the reset's own second
+// fail the access-token epoch check; no token is returned to the admin, so nothing needs that second.
 func (r *pgRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
-	const q = `UPDATE users SET password_hash = $1, force_password_change = true, updated_at = now(), password_changed_at = now() WHERE id = $2`
-	result, err := r.db.ExecContext(ctx, q, passwordHash, id)
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("users.UpdatePassword: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const q = `UPDATE users SET password_hash = $1, force_password_change = true, updated_at = now(), password_changed_at = date_trunc('second', now()) + interval '1 second' WHERE id = $2`
+	result, err := tx.ExecContext(ctx, q, passwordHash, id)
 	if err != nil {
 		return fmt.Errorf("users.UpdatePassword: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
 		return ErrNotFound
+	}
+	const revokeRefresh = `UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`
+	if _, err := tx.ExecContext(ctx, revokeRefresh, id); err != nil {
+		return fmt.Errorf("users.UpdatePassword: revoke refresh tokens: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("users.UpdatePassword: commit: %w", err)
 	}
 	return nil
 }

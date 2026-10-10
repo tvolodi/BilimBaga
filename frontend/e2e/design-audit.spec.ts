@@ -32,21 +32,28 @@ async function waitForContent(page: Page) {
 }
 
 /** Every visible interactive element, measured as the learner taps it. */
-async function visibleTargets(page: Page): Promise<Target[]> {
-  return page.evaluate((selector) => {
+async function visibleTargets(page: Page, includeVisuallyHidden = false): Promise<Target[]> {
+  return page.evaluate(([selector, includeHidden]) => {
     return Array.from(document.querySelectorAll<HTMLElement>(selector))
       .map((el) => {
         const isNativeChoice = el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox')
         const target = isNativeChoice ? el.closest('label') ?? el : el
         const rect = target.getBoundingClientRect()
         const style = getComputedStyle(target)
-        const visible = rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
+        // A box of 1 px or less is visually hidden (sr-only), such as the skip link until it has focus.
+        const hiddenBox = rect.width <= 1 || rect.height <= 1
+        const visible =
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.visibility !== 'hidden' &&
+          style.display !== 'none' &&
+          (includeHidden || !hiddenBox)
         const label = (target.textContent ?? '').trim().slice(0, 40) || target.getAttribute('aria-label') || target.tagName
         return { label, width: rect.width, height: rect.height, visible }
       })
       .filter((t) => t.visible)
       .map(({ label, width, height }) => ({ label, width, height }))
-  }, INTERACTIVE)
+  }, [INTERACTIVE, includeVisuallyHidden] as const)
 }
 
 test.describe('Exam-mode audit (FR-BB320 AC-10)', () => {
@@ -77,6 +84,11 @@ test.describe('Exam-mode audit (FR-BB320 AC-10)', () => {
     await page.goto(`/portal/sessions/${sessionId}`)
     await waitForContent(page)
 
+    // The skip link is visually hidden until it has focus. Focus it, then measure it as the learner sees it.
+    const skipLink = page.locator('a[href="#main-content"]')
+    await expect(skipLink).toHaveCount(1)
+    await skipLink.focus()
+
     const targets = await visibleTargets(page)
     expect(targets.length).toBeGreaterThan(0)
     const small = targets.filter((t) => t.width < MIN_TARGET_PX || t.height < MIN_TARGET_PX)
@@ -87,7 +99,8 @@ test.describe('Exam-mode audit (FR-BB320 AC-10)', () => {
     await page.goto(`/portal/sessions/${sessionId}`)
     await waitForContent(page)
 
-    const targets = await visibleTargets(page)
+    // Every Tab stop counts, the skip link included (it is the first one), so the hidden box is not excluded here.
+    const targets = await visibleTargets(page, true)
     const missing: string[] = []
     for (let step = 0; step < targets.length; step++) {
       await page.keyboard.press('Tab')

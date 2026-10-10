@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
+import { clearE2eToken, readE2eToken, writeE2eToken } from '@/lib/e2eTokenSeed'
 
 /** Backend 401 code: the role/department/status (or password) behind the JWT changed (ISS-240). */
 export const TOKEN_REVOKED = 'TOKEN_REVOKED'
@@ -6,14 +7,12 @@ export const TOKEN_REVOKED = 'TOKEN_REVOKED'
 /** Query key holding the "session ended because the token was revoked" notice for the login page. */
 export const SESSION_REVOKED_KEY = ['auth', 'sessionRevoked'] as const
 
-const E2E_TOKEN_KEY = '__e2e_access_token__'
-
 /**
  * End the session client-side: drop the token and user (RequireAuth then redirects to /login)
  * and raise the notice LoginPage shows. Idempotent.
  */
 export function endRevokedSession(qc: QueryClient): void {
-  try { localStorage.removeItem(E2E_TOKEN_KEY) } catch { /* ignore */ }
+  clearE2eToken()
   qc.setQueryData(SESSION_REVOKED_KEY, true)
   qc.setQueryData(['auth', 'accessToken'], null)
   qc.setQueryData(['auth', 'currentUser'], null)
@@ -34,7 +33,7 @@ export function refreshAccessTokenOnce(qc: QueryClient): Promise<string | null> 
       const json = (await res.json()) as { data?: { access_token?: string } | null; error?: unknown }
       const token = json.data?.access_token
       if (json.error || !token) return null
-      try { if (localStorage.getItem(E2E_TOKEN_KEY)) localStorage.setItem(E2E_TOKEN_KEY, token) } catch { /* ignore */ }
+      if (readE2eToken()) writeE2eToken(token)
       qc.setQueryData(['auth', 'accessToken'], token)
       return token
     } catch {

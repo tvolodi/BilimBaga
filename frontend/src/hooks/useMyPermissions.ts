@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useAccessToken } from '@/hooks/useAccessToken'
 import { useMe } from '@/api/users'
 import { isCustomRole, jwtRole } from '@/lib/routeRoles'
 
@@ -18,8 +18,9 @@ export interface MyPermissions {
  * entry from a previous session can never grant access.
  */
 export function useMyPermissions(): MyPermissions {
-  const qc = useQueryClient()
-  const role = jwtRole(qc.getQueryData<string | null>(['auth', 'accessToken']))
+  // Subscribed (ISS-249): the guard that calls this must re-render when the token is cleared.
+  const { token } = useAccessToken()
+  const role = jwtRole(token)
   const isCustom = isCustomRole(role)
   const { data, isLoading, isFetching } = useMe({ enabled: isCustom })
   const matches = isCustom && !!data && data.role_name === role

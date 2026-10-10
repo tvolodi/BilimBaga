@@ -43,6 +43,10 @@ func newResetEnv(t *testing.T, clock time.Time, stamp *time.Time) *resetEnv {
 		getRefreshTokenByHashFn: func(context.Context, string) (*RefreshToken, error) {
 			return &RefreshToken{ID: "rt1", UserID: "u1", TokenHash: "h", ExpiresAt: time.Now().Add(24 * time.Hour)}, nil
 		},
+		updatePasswordFn: func(_ context.Context, _ string, _ string, at time.Time) error {
+			e.stamp = &at // the change stamps the account, as the users row would
+			return nil
+		},
 	}
 	e.svc = NewService(ServiceConfig{JWTSecret: selfChangeSecret, JWTAccessTTLMin: 15, JWTRefreshTTLDays: 7, BcryptCost: 4}, repo).(*service)
 	e.svc.now = func() time.Time { return e.clock }
@@ -123,6 +127,25 @@ func TestSignIn_AfterTheStamp_UsesTheClock(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, later.Unix(), claims.IssuedAt.Unix(), "after the stamp the token carries the clock's second")
 	assert.Equal(t, http.StatusOK, e.get(resp.AccessToken).Code)
+}
+
+// A sign-in in the reset's own second followed at once by a password change: the change must revoke
+// the sign-in's token, because that token's iat can be the next second (#439).
+func TestChangePassword_RightAfterSignInInTheResetsSecond_RevokesThatToken(t *testing.T) {
+	reset := testNow(700_000_000)
+	stamp := resetStamp(reset)
+	e := newResetEnv(t, reset, &stamp)
+
+	signIn, _, err := e.svc.Login(context.Background(), &LoginRequest{Email: "a@example.com", Password: "OldPass123"}, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, e.get(signIn.AccessToken).Code, "sanity: the sign-in token works before the change")
+
+	changed, _, err := e.svc.ChangePassword(context.Background(), "u1", &ChangePasswordRequest{CurrentPassword: "OldPass123", NewPassword: "NewPass456"}, "127.0.0.1")
+	require.NoError(t, err)
+	rec := e.get(signIn.AccessToken)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code, "the sign-in token issued before the change must be revoked")
+	assert.Contains(t, rec.Body.String(), "TOKEN_REVOKED")
+	assert.Equal(t, http.StatusOK, e.get(changed.AccessToken).Code, "the token from the change works at once")
 }
 
 func TestSignIn_BeforeAnyReset_IsUnaffected(t *testing.T) {

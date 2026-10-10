@@ -12,7 +12,7 @@ import (
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
 )
 
-const usage = "usage: api [migrate]\n  (no args)  start the API server (applies pending migrations at startup)\n  migrate    apply pending database migrations and exit\n"
+const usage = "usage: api [migrate|healthcheck]\n  (no args)    start the API server (applies pending migrations at startup)\n  migrate      apply pending database migrations and exit\n  healthcheck  exit 0 if the API answers its health route, 1 otherwise (the container probe, #473)\n"
 
 // migrator applies pending database migrations.
 type migrator interface {
@@ -23,6 +23,7 @@ type migrator interface {
 type deps struct {
 	serve    func()
 	migrator migrator
+	probe    func() error // the healthcheck subcommand: nil means the API is healthy (#473)
 	stdout   io.Writer
 	stderr   io.Writer
 }
@@ -39,6 +40,12 @@ func run(args []string, d deps) int {
 			return 1
 		}
 		fmt.Fprintln(d.stdout, "migrations applied")
+		return 0
+	case args[0] == "healthcheck" && len(args) == 1:
+		if err := d.probe(); err != nil {
+			fmt.Fprintf(d.stderr, "healthcheck: %v\n", err)
+			return 1
+		}
 		return 0
 	default:
 		fmt.Fprint(d.stderr, usage)
@@ -87,5 +94,11 @@ func (dbMigrator) Migrate() error {
 }
 
 func main() {
-	os.Exit(run(os.Args[1:], deps{serve: serve, migrator: dbMigrator{}, stdout: os.Stdout, stderr: os.Stderr}))
+	os.Exit(run(os.Args[1:], deps{
+		serve:    serve,
+		migrator: dbMigrator{},
+		probe:    func() error { return probeHealth(healthURL()) },
+		stdout:   os.Stdout,
+		stderr:   os.Stderr,
+	}))
 }

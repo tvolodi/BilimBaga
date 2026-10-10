@@ -1459,3 +1459,43 @@ func TestUnpublishExam_ActiveSessionsExist_ReturnsErrActiveSessionsExist(t *test
 	_, err := svc.UnpublishExam(context.Background(), "exam-1")
 	assert.ErrorIs(t, err, ErrActiveSessionsExist)
 }
+
+// ── UpdateRule (sweep 3, #392) ───────────────────────────────────────────────
+
+func TestUpdateRule_UpdatesExistingRule(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "random", Count: 1}
+	svc := NewService(repo)
+
+	rule, err := svc.UpdateRule(context.Background(), "exam-1", "rule-1", QuestionRuleInput{Mode: "random", Count: 3})
+
+	require.NoError(t, err)
+	assert.Equal(t, 3, rule.Count)
+}
+
+func TestUpdateRule_ExamNotFound(t *testing.T) {
+	svc := NewService(newMockRepo())
+	_, err := svc.UpdateRule(context.Background(), "missing", "rule-1", QuestionRuleInput{Mode: "random", Count: 1})
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestUpdateRule_RuleNotFound(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	svc := NewService(repo)
+	_, err := svc.UpdateRule(context.Background(), "exam-1", "rule-missing", QuestionRuleInput{Mode: "random", Count: 1})
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestUpdateRule_InvalidTagIDRejectedBeforeWrite(t *testing.T) {
+	repo := newMockRepo()
+	seedExam(repo, "exam-1", "draft")
+	repo.rules["rule-1"] = &ExamQuestionRule{ID: "rule-1", ExamID: "exam-1", Mode: "random", Count: 1}
+	svc := NewService(repo)
+
+	_, err := svc.UpdateRule(context.Background(), "exam-1", "rule-1", QuestionRuleInput{Mode: "random", Count: 2, TagIDs: []string{"not-a-uuid"}})
+
+	assert.ErrorIs(t, err, ErrInvalidInput)
+	assert.Equal(t, 1, repo.rules["rule-1"].Count, "a rejected update must not change the rule")
+}

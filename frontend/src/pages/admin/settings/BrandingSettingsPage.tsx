@@ -1,3 +1,4 @@
+/* design-ok-file: tenant colour editor */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTenantConfig } from '@/api/useTenantConfig'

@@ -79,6 +79,8 @@ jobs:
         run: npm run lint
       - name: i18n key check
         run: npm run check:i18n
+      - name: Design-system check (FR-BB320 AC-6, AC-7)
+        run: npm run check:design
       - name: Unit tests
         run: npx vitest run
       - name: Build

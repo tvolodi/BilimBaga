@@ -1,7 +1,7 @@
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { downloadFile } from '@/api/download'
-import { errorWithCode } from '@/api/errors'
+import { apiFetch, apiFetchPaginated } from './apiFetch'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -56,61 +56,26 @@ export interface RequiredExam {
 
 // ---- API helpers ------------------------------------------------------------
 
-interface ApiPaginatedResponse<T> {
-  data: T
-  meta: PaginationMeta
-  error: null | { code: string; message: string }
-}
-
-interface ApiResponse<T> {
-  data: T
-  error: null | { code: string; message: string }
-}
-
-async function fetchPaginated<T>(url: string, token?: string | null): Promise<PaginatedResult<T>> {
-  const res = await fetch(url, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  const body: ApiPaginatedResponse<T> = await res.json()
-  if (body.error) throw errorWithCode(body.error)
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-  return { data: body.data, meta: body.meta }
-}
-
-async function apiFetch<T>(url: string, token?: string | null): Promise<T> {
-  const res = await fetch(url, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) throw errorWithCode(body.error)
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-  return body.data
+function fetchPaginated<T>(qc: QueryClient, url: string): Promise<PaginatedResult<T>> {
+  return apiFetchPaginated<T, PaginationMeta>(qc, url)
 }
 
 // ---- Hooks ------------------------------------------------------------------
 
 export function useEmployeeRecord(userId: string, page: number) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery({
     queryKey: ['employee-record', userId, page],
-    queryFn: () =>
-      fetchPaginated<EmployeeRecordData>(
-        `/api/v1/admin/users/${userId}/record?page=${page}&per_page=20`,
-        token,
-      ),
+    queryFn: () => fetchPaginated<EmployeeRecordData>(qc, `/api/v1/admin/users/${userId}/record?page=${page}&per_page=20`),
     placeholderData: keepPreviousData,
   })
 }
 
 export function useEmployeeProgress(userId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery({
     queryKey: ['employee-progress', userId],
-    queryFn: () => apiFetch<EmployeeProgress>(`/api/v1/admin/users/${userId}/progress`, token),
+    queryFn: () => apiFetch<EmployeeProgress>(qc, `/api/v1/admin/users/${userId}/progress`),
     staleTime: 5 * 60 * 1000,
   })
 }

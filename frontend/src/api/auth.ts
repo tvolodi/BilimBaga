@@ -90,6 +90,8 @@ export function useLogin() {
       qc.removeQueries({ queryKey: ['users'] })
       qc.setQueryData(['auth', 'currentUser'], data.user)
       qc.setQueryData(['auth', 'accessToken'], data.access_token)
+      // A seeded e2e build boots from the stored token, so a fresh sign-in must replace the seed (ISS-249).
+      if (readE2eToken()) writeE2eToken(data.access_token)
       clearPasswordChangeRequired(qc) // the login response carries the authoritative flag
     },
   })

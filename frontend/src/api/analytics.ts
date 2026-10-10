@@ -1,5 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { errorWithCode } from '@/api/errors'
+import type { QueryClient } from '@tanstack/react-query'
+import { apiFetch } from './apiFetch'
+
+function apiGet<T>(qc: QueryClient, url: string): Promise<T> {
+  return apiFetch<T>(qc, url)
+}
 
 // ---- Types ------------------------------------------------------------------
 
@@ -36,30 +41,13 @@ export interface AnswerDistributionItem {
 
 // ---- API helpers ------------------------------------------------------------
 
-interface ApiResponse<T> {
-  data: T
-  error: null | { code: string; message: string }
-}
-
-async function apiGet<T>(url: string, token?: string | null): Promise<T> {
-  const res = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'include',
-  })
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) throw errorWithCode(body.error)
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-  return body.data
-}
-
 // ---- Hooks ------------------------------------------------------------------
 
 export function useExamAnalytics(examId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<ExamAnalytics, Error>({
     queryKey: ['exam-analytics', examId],
-    queryFn: () => apiGet<ExamAnalytics>(`/api/v1/admin/exams/${examId}/analytics`, token),
+    queryFn: () => apiGet<ExamAnalytics>(qc, `/api/v1/admin/exams/${examId}/analytics`),
     staleTime: 5 * 60 * 1000,
     enabled: !!examId,
   })

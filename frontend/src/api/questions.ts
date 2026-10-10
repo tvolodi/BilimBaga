@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { errorWithCode } from '@/api/errors'
+import { apiFetch } from './apiFetch'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -163,32 +163,6 @@ export interface ImportWarningRow {
 
 // ---- API helpers ------------------------------------------------------------
 
-interface ApiResponse<T> {
-  data: T
-  error: null | { code: string; message: string }
-}
-
-async function apiFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
-  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-  const res = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
-  })
-  // 204 No Content (e.g. DELETE /questions/{id}) has no body to parse.
-  if (res.status === 204) {
-    return undefined as T
-  }
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) {
-    throw errorWithCode(body.error)
-  }
-  if (!res.ok) {
-    throw new Error(`Request failed: ${res.status}`)
-  }
-  return body.data
-}
-
 function buildQuestionsQuery(filters: QuestionFilters): string {
   const params = new URLSearchParams()
   if (filters.page) params.set('page', String(filters.page))
@@ -212,11 +186,10 @@ function buildQuestionsQuery(filters: QuestionFilters): string {
 
 export function useQuestions(filters: QuestionFilters = {}) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<QuestionListResponse, Error>({
     queryKey: ['questions', filters],
     queryFn: () =>
-      apiFetch<QuestionListResponse>(`/api/v1/questions${buildQuestionsQuery(filters)}`, token),
+      apiFetch<QuestionListResponse>(qc, `/api/v1/questions${buildQuestionsQuery(filters)}`),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   })
@@ -224,31 +197,28 @@ export function useQuestions(filters: QuestionFilters = {}) {
 
 export function useCategories() {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<Category[], Error>({
     queryKey: ['categories'],
-    queryFn: () => apiFetch<Category[]>('/api/v1/categories', token),
+    queryFn: () => apiFetch<Category[]>(qc, '/api/v1/categories'),
     staleTime: 300_000,
   })
 }
 
 export function useTags() {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<Tag[], Error>({
     queryKey: ['tags'],
-    queryFn: () => apiFetch<Tag[]>('/api/v1/tags', token),
+    queryFn: () => apiFetch<Tag[]>(qc, '/api/v1/tags'),
     staleTime: 300_000,
   })
 }
 
 export function useQuestionVersions(id: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<QuestionVersion[], Error>({
     queryKey: ['questions', id, 'versions'],
     queryFn: () =>
-      apiFetch<QuestionVersion[]>(`/api/v1/questions/${id}/versions`, token),
+      apiFetch<QuestionVersion[]>(qc, `/api/v1/questions/${id}/versions`),
     staleTime: 0,
     enabled: !!id,
   })
@@ -263,8 +233,7 @@ export function useTransitionStatus() {
     { previousQueries: [readonly unknown[], unknown][] }
   >({
     mutationFn: ({ id, target_status }) => {
-      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
-      return apiFetch<void>(`/api/v1/questions/${id}/status`, token, {
+      return apiFetch<void>(queryClient, `/api/v1/questions/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: target_status }),
@@ -308,8 +277,7 @@ export function useDeleteQuestion() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: (id) => {
-      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
-      return apiFetch<void>(`/api/v1/questions/${id}`, token, { method: 'DELETE' })
+      return apiFetch<void>(queryClient, `/api/v1/questions/${id}`, { method: 'DELETE' })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] })
@@ -321,12 +289,11 @@ export function useImportQuestions() {
   const qc = useQueryClient()
   return useMutation<ImportDryRunResult, Error, { file: File; dryRun: boolean }>({
     mutationFn: ({ file, dryRun }) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       const formData = new FormData()
       formData.append('file', file)
       return apiFetch<ImportDryRunResult>(
+        qc,
         `/api/v1/questions/import${dryRun ? '?dry_run=true' : ''}`,
-        token,
         { method: 'POST', body: formData },
       )
     },
@@ -335,10 +302,9 @@ export function useImportQuestions() {
 
 export function useQuestion(id: string | null) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<QuestionDetail, Error>({
     queryKey: ['questions', id],
-    queryFn: () => apiFetch<QuestionDetail>(`/api/v1/questions/${id}`, token),
+    queryFn: () => apiFetch<QuestionDetail>(qc, `/api/v1/questions/${id}`),
     enabled: id !== null && id !== undefined && id !== '',
     staleTime: 0,
   })
@@ -348,8 +314,7 @@ export function useCreateQuestion() {
   const queryClient = useQueryClient()
   return useMutation<QuestionDetail, Error, QuestionCreatePayload>({
     mutationFn: (payload) => {
-      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
-      return apiFetch<QuestionDetail>('/api/v1/questions', token, {
+      return apiFetch<QuestionDetail>(queryClient, '/api/v1/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -365,8 +330,7 @@ export function useUpdateQuestion() {
   const queryClient = useQueryClient()
   return useMutation<QuestionDetail, Error, { id: string; payload: QuestionUpdatePayload }>({
     mutationFn: ({ id, payload }) => {
-      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
-      return apiFetch<QuestionDetail>(`/api/v1/questions/${id}`, token, {
+      return apiFetch<QuestionDetail>(queryClient, `/api/v1/questions/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -393,8 +357,7 @@ export function useUpdateQuestionStatus() {
     { previousDetail: QuestionDetail | undefined }
   >({
     mutationFn: ({ id, target_status }) => {
-      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
-      return apiFetch<void>(`/api/v1/questions/${id}/status`, token, {
+      return apiFetch<void>(queryClient, `/api/v1/questions/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: target_status }),
@@ -425,8 +388,7 @@ export function useCreateTag() {
   const queryClient = useQueryClient()
   return useMutation<Tag, Error, { name: string }>({
     mutationFn: (payload) => {
-      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
-      return apiFetch<Tag>('/api/v1/tags', token, {
+      return apiFetch<Tag>(queryClient, '/api/v1/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

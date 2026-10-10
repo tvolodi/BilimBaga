@@ -369,6 +369,7 @@
     "login": {
       "title": "Sign in to {{appName}}",
       "sessionRevoked": "Your account was changed or your session was revoked. Please sign in again.",
+      "dismissNotice": "Dismiss",
       "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Password",

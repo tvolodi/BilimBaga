@@ -369,6 +369,7 @@
     "login": {
       "title": "{{appName}} жүйесіне кіру",
       "sessionRevoked": "Тіркелгі деректері өзгерді немесе сессия тоқтатылды. Қайта кіріңіз.",
+      "dismissNotice": "Жабу",
       "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Құпия сөз",

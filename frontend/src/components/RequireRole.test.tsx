@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { RequireRole } from './RequireRole'
+import { endRevokedSession } from '@/lib/sessionRevoked'
 
 // A minimal valid JWT with role=super_admin and exp far in the future.
 // Header: {"alg":"HS256","typ":"JWT"}
@@ -86,5 +87,34 @@ describe('RequireRole', () => {
     renderWithToken('not.a.jwt', ['super_admin'])
     expect(screen.getByText('Admin Home')).toBeInTheDocument()
     expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
+  })
+
+  it('redirects to /login when the token is cleared after mount (ISS-249)', async () => {
+    // The guard subscribes to the token, so endRevokedSession on TOKEN_REVOKED re-renders it.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    qc.setQueryData(['auth', 'accessToken'], SUPER_ADMIN_TOKEN)
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/protected']}>
+          <Routes>
+            <Route
+              path="/protected"
+              element={
+                <RequireRole roles={['super_admin']}>
+                  <div>Protected Content</div>
+                </RequireRole>
+              }
+            />
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(screen.getByText('Protected Content')).toBeInTheDocument()
+
+    act(() => endRevokedSession(qc))
+
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { downloadFile, downloadErrorKey } from './download'
+import { SESSION_REVOKED_KEY } from '@/lib/sessionRevoked'
 import { downloadAdminCertificate, exportEmployeeRecord } from './employees'
 import { exportAuditLog } from './audit'
 import { downloadDashboardPdf, downloadExamCsv } from './reports'
@@ -97,6 +98,29 @@ describe('downloadFile', () => {
     })
     expect(fetchMock).toHaveBeenCalledTimes(3)
     expect(clicked).toHaveLength(0)
+  })
+
+  it('ends the session when a revoked download cannot refresh (ISS-249)', async () => {
+    const qc = makeQc('old')
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: null, error: { code: 'TOKEN_REVOKED' } }, 401))
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+    await expect(downloadFile(qc, '/api/v1/x', 'f.pdf')).rejects.toMatchObject({ code: 'ERR_UNAUTHORIZED' })
+    expect(qc.getQueryData(['auth', 'accessToken'])).toBeNull()
+    expect(qc.getQueryData(SESSION_REVOKED_KEY)).toBe(true)
+    expect(clicked).toHaveLength(0)
+  })
+
+  it('ends the session when the retry after a refresh is revoked again (ISS-249)', async () => {
+    const qc = makeQc('old')
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: null, error: { code: 'TOKEN_REVOKED' } }, 401))
+      .mockResolvedValueOnce(jsonResponse({ data: { access_token: 'new' }, error: null }, 200))
+      .mockResolvedValueOnce(jsonResponse({ data: null, error: { code: 'TOKEN_REVOKED' } }, 401))
+    await expect(downloadFile(qc, '/api/v1/x', 'f.pdf')).rejects.toMatchObject({ code: 'ERR_UNAUTHORIZED' })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(qc.getQueryData(['auth', 'accessToken'])).toBeNull()
+    expect(qc.getQueryData(SESSION_REVOKED_KEY)).toBe(true)
   })
 
   it('throws the server error code on non-OK responses', async () => {

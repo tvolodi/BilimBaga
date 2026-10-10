@@ -1,3 +1,4 @@
+/* design-ok-file: tenant colour editor */
 import { useTranslation } from 'react-i18next'
 import { TenantLogo } from '@/components/TenantLogo'
 import type { TenantConfig } from '@/api/useTenantConfig'

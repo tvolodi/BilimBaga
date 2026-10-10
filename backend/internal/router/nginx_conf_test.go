@@ -31,6 +31,8 @@ func TestNginxConf_Oversize413ReturnsJSONEnvelopeWithEndpointCode(t *testing.T) 
 	cases := []struct{ path, prefix string }{
 		{"../../../deploy/nginx.conf", "too_large"},
 		{"../../../deploy/nginx/bilimbaga-qa.conf", "bb_qa_413"},
+		{"../../../deploy/nginx/bilimbaga.conf", "bb_prod_413"},
+		{"../../../deploy/nginx/bilimbaga-test.conf", "bb_test_413"},
 	}
 	// $uri has no query string, so the users import (?commit=true) still matches its entry.
 	wantCodes := map[string]string{

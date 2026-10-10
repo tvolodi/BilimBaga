@@ -11,8 +11,8 @@ import (
 // trusts only Cloudflare and takes the client from CF-Connecting-IP. Ranges are Cloudflare's published lists
 // (https://www.cloudflare.com/ips-v4/ and /ips-v6/); re-check them when they change.
 //
-// deploy/nginx/bilimbaga-test.conf is NOT covered here: its header makes it an owner-only protected target
-// (customer demo), so it changes only with the owner's decision (#475).
+// deploy/nginx/bilimbaga-test.conf (customer demo, owner-only protected target) is covered from #477 on: the
+// owner ordered the same block there (2026-10-10), added through a PR with an architect decision.
 
 var (
 	privateRanges = []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
@@ -76,6 +76,7 @@ func TestNginxEdgeVhosts_TrustCloudflareAndReadTheConnectingIP(t *testing.T) {
 	for _, path := range []string{
 		"../../../deploy/nginx/bilimbaga.conf",
 		"../../../deploy/nginx/bilimbaga-qa.conf",
+		"../../../deploy/nginx/bilimbaga-test.conf",
 	} {
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -104,6 +105,7 @@ func TestNginxConf_ClearsClientSentTrueClientIP(t *testing.T) {
 		{"../../../deploy/nginx.conf", `location\s+/api/\s*\{`},
 		{"../../../deploy/nginx/bilimbaga.conf", `location\s+/\s*\{`},
 		{"../../../deploy/nginx/bilimbaga-qa.conf", `location\s+/\s*\{`},
+		{"../../../deploy/nginx/bilimbaga-test.conf", `location\s+/\s*\{`},
 	}
 	for _, c := range cases {
 		raw, err := os.ReadFile(c.path)
@@ -127,6 +129,7 @@ func TestNginxEdgeVhosts_CloudflareListNoteAsksForPeriodicComparison(t *testing.
 	for _, path := range []string{
 		"../../../deploy/nginx/bilimbaga.conf",
 		"../../../deploy/nginx/bilimbaga-qa.conf",
+		"../../../deploy/nginx/bilimbaga-test.conf",
 	} {
 		raw, err := os.ReadFile(path)
 		if err != nil {

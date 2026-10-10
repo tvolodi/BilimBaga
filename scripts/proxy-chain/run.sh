@@ -5,6 +5,8 @@
 # host or prod, and it tears the project down on exit.
 #   usage: bash scripts/proxy-chain/run.sh
 #   env:   PROXY_CHAIN_PORT  (edge host port, default 18090, bound to 127.0.0.1)
+# UAT: for any PR that touches deploy/nginx.conf or deploy/nginx/*.conf, UAT runs this script and quotes the two PASS
+# lines before merge-ok. It is not wired into CI (it builds an image and pulls from Docker Hub).
 # Needs Docker with Compose v2.
 # Exit:  0 all checks pass; 1 a check failed; 2 the chain did not come up.
 set -u

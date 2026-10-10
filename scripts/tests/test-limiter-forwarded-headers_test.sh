@@ -42,7 +42,11 @@ for base in \
   "http://192.168.1.10:8080" \
   "http://10.0.0.5" \
   "localhost:3111" \
-  "http://"; do
+  "http://" \
+  "http://localhost:80@evil.example.com" \
+  "http://user@localhost" \
+  "http://localhost/path@evil.example.com" \
+  "http://localhost/?next=a@b"; do
   run_case refused "$base"
   if [ "$code" = 3 ] && [ "$calls" = 0 ] && [[ "$out" == *refused* ]]; then
     pass "refuses $base before any request (exit 3)"

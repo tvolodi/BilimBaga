@@ -109,7 +109,7 @@ test.describe('Theme switch — exam screen (FR-BB321 D-5, AC-12)', () => {
     await waitForContent(page)
 
     await expect(page.locator('html')).toHaveClass(/\bdark\b/)
-    await expect(page.getByRole('radiogroup', { name: 'Theme' })).toHaveCount(0)
+    await expect(page.getByTestId('theme-toggle')).toHaveCount(0)
   })
 })
 
@@ -140,7 +140,7 @@ test.describe('Admin layout at 375 px (FR-BB321 AC-6, AC-13, #472)', () => {
       })
       expect(overflow.page).toBeLessThanOrEqual(0)
       expect(overflow.header).toBeLessThanOrEqual(0)
-      await expect(page.locator('header').getByRole('radiogroup', { name: 'Theme' })).toBeInViewport()
+      await expect(page.locator('header').getByTestId('theme-toggle')).toBeInViewport()
     })
   }
 

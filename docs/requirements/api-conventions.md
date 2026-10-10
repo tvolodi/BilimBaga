@@ -182,6 +182,8 @@ Create (`POST /questions`), update (`PUT /questions/{id}`) and bulk import of a 
 
 File type is always detected from magic bytes (`upload/validate.go`, `DetectMIME`).
 
+**Size rule (decision of issue #176, reopened twice, 2026-10-10):** whenever the size cap is the cause of a failed upload the answer is 413 with the size code (`ERR_FILE_TOO_LARGE` for questions import, `FILE_TOO_LARGE` for users import, `LOGO_TOO_LARGE` for the logo), never 400. This holds for every size above the cap, including a body between the 10 MiB content cap and the 11 MiB body cap, a body above the 11 MiB cap, and any case where the multipart parser reports a generic parse error after the cap was hit. 400 `ERR_INVALID_BODY` is reserved for bodies that are not multipart at all or lack the `file` field. Boundaries: a file of exactly 10 MiB is accepted; 10 MiB + 1 byte is 413. The reverse proxy limit (`client_max_body_size 11m`) equals the API body cap, so a body above 11 MiB sent through nginx is rejected by nginx before the API; that response must also be the JSON envelope with `ERR_FILE_TOO_LARGE` (follow-up for infrastructure). No new table row is needed: the rows for `FILE_TOO_LARGE` and `ERR_FILE_TOO_LARGE` already exist.
+
 ## 9. File downloads
 
 All download endpoints are ordinary GETs inside the protected group, so **Bearer is required**; a plain `<a href>` navigation cannot send it. The frontend must use `downloadFile` (fetch with Authorization, blob, object URL; `frontend/src/api/download.ts:46-75`). Responses set `Content-Disposition: attachment; filename="..."`:

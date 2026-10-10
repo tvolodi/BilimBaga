@@ -5,20 +5,20 @@
  2. Prunes: only direct children of BackupRoot whose name matches ^\d{8}-\d{6}$ (real directories, not links),
     keeping the newest -Keep (20). Anything else in BackupRoot is never touched. Pruning runs only after a
     successful copy.
- 3. Pushes a text snapshot (swarm-snapshot.txt: roster + open issue counts and titles, tokens scrubbed; no
-    session ids, no settings, no state files) to branch swarm-state of THIS repo's remote, using a throwaway temp
-    repo (git init + fetch + commit + plain push), so the working checkout is never switched. A failed push only
-    warns; it never fails the backup. -NoPush disables it.
+ 3. Publishing is OFF by default (#284: the repo is public, so nothing swarm-related is pushed anywhere).
+    Only an explicit -PushRemote (tests: a local bare repo) reaches the snapshot code, which pushes a text
+    snapshot (swarm-snapshot.txt: roster + open issue counts and titles, tokens scrubbed) to branch swarm-state of
+    THAT remote, through a throwaway temp repo, so the working checkout is never switched. A failed push only warns.
  -MinIntervalMin N: do nothing if the newest dated folder is younger than N minutes (used by ensure-up).
- Usage: powershell -File swarm\backup-state.ps1 [-WhatIf] [-BackupRoot dir] [-Keep 20] [-NoPush] [-PushRemote url]
+ Usage: powershell -File swarm\backup-state.ps1 [-WhatIf] [-BackupRoot dir] [-Keep 20] [-PushRemote url (tests only)]
         [-QueueJsonFile stub.json] [-MinIntervalMin 60] [-NowUtc <datetime>]
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
   [string]$BackupRoot = (Join-Path $env:USERPROFILE '.swarm-backups\bilimbaga'),
   [int]$Keep = 20,
-  [switch]$NoPush,
-  [string]$PushRemote,              # default: this repo's origin URL (tests: a local bare repo)
+  [switch]$NoPush,                  # accepted for compatibility; publishing is already off by default (#284)
+  [string]$PushRemote,              # tests only: a local bare repo. Never defaults to origin (#284).
   [string]$QueueJsonFile,           # test stub replacing `gh issue list`
   [int]$MinIntervalMin = 0,
   [datetime]$NowUtc = ([datetime]::UtcNow)
@@ -78,8 +78,11 @@ foreach ($d in $excess) {
   if ($copied -and $PSCmdlet.ShouldProcess($d.FullName, 'remove old dated backup')) { Remove-Item -LiteralPath $d.FullName -Recurse -Force }
 }
 
-# 3. snapshot to branch swarm-state
-if ($NoPush) { exit 0 }
+# 3. snapshot to branch swarm-state of an explicit remote only (#284). The default is no publishing at all.
+if ($NoPush -or -not $PushRemote) {
+  Write-Host 'snapshot publishing is off (#284): local backup only; -PushRemote is for tests'
+  exit 0
+}
 function New-Snapshot {
   $b = New-Object System.Text.StringBuilder
   [void]$b.AppendLine("BilimBaga swarm snapshot $($NowUtc.ToString('yyyy-MM-ddTHH:mm:ssZ'))")
@@ -100,7 +103,6 @@ function New-Snapshot {
 }
 try {
   $remote = $PushRemote
-  if (-not $remote) { $remote = (& git -C $PSScriptRoot remote get-url origin 2>$null); if ($LASTEXITCODE -ne 0 -or -not $remote) { throw 'no origin remote' } }
   $snap = New-Snapshot
   if ($WhatIfPreference) { Write-Host "What if: would push swarm-snapshot.txt to branch swarm-state of $remote"; Write-Host $snap; exit 0 }
   $tmp = Join-Path ([IO.Path]::GetTempPath()) ("swarm-snap-" + [guid]::NewGuid())

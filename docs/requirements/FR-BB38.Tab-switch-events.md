@@ -22,7 +22,7 @@ Implements the anti-cheat event-reporting endpoint that the exam-taking frontend
 - [ ] AC-7: Returns HTTP 403 if the session does not belong to the calling user.
 - [ ] AC-8: The `type` field in the request body accepts only `'tab_switch'`, `'blur'`, or `'fullscreen_exit'`; any other value returns HTTP 400.
 - [ ] AC-9: The endpoint is idempotent from an audit perspective — each call always records a new event row; it does not deduplicate rapid successive events.
-- [ ] AC-10: `action_taken` stored in `tab_switch_events` matches the policy in effect at event time (derived from the exam config, not from the request body).
+- [ ] AC-10: `action_taken` stored in `tab_switch_events` matches the policy in effect at event time (derived from the exam config, not from the request body). Amended by FR-BB319 (draft): the stored value is the EFFECTIVE policy, and `blur` / `fullscreen_exit` are capped at `warn` (only `tab_switch` can auto-submit).
 
 ## Technical Specification
 
@@ -136,6 +136,6 @@ func handleSessionEvent(w http.ResponseWriter, r *http.Request) {
 
 ## Notes
 - The auto-submit triggered by `on_tab_switch = 'submit'` should call the same internal `submitSession()` function used by FR-BB39 to avoid logic duplication.
-- Rapid successive tab-switch events (e.g. user switches in and out quickly) will each trigger a separate event row; the frontend should implement a debounce of at least 500 ms before calling this endpoint.
+- Rapid successive tab-switch events (e.g. user switches in and out quickly) will each trigger a separate event row; the frontend should implement a debounce of at least 500 ms before calling this endpoint (superseded by the 300 ms blur rule of FR-BB319, draft).
 - The `event_count` in the warn response gives the frontend enough context to show escalating warning messages (e.g. "Warning 1 of 3 — further violations will auto-submit").
 - If the exam `on_tab_switch = 'submit'` but grading encounters short-text questions, the session status transitions to `grading_pending` (same as manual submission with short-text answers) rather than directly to `submitted`.

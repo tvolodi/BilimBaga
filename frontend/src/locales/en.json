@@ -660,7 +660,9 @@
       },
       "tabswitch": {
         "title": "Warning",
-        "warning": "You left the exam window. Further violations may result in automatic submission."
+        "warning": "You left the exam window. Further violations may result in automatic submission.",
+        "count": "Violations recorded: {{count}}",
+        "returnFullscreen": "Return to full screen"
       },
       "timer": {
         "warning": "Less than 20% of your time remaining.",

@@ -14,6 +14,8 @@ import { PassRateChart } from '@/components/analytics/PassRateChart'
 import { StatsSummaryRow } from '@/components/analytics/StatsSummaryRow'
 import { QuestionDifficultyTable } from '@/components/analytics/QuestionDifficultyTable'
 import { ExportCSVButton } from '@/components/analytics/ExportCSVButton'
+import { ExamNotFoundState } from '@/components/ExamNotFoundState'
+import { isNotFoundError } from '@/lib/apiRetry'
 import type { QuestionStat } from '@/api/analytics'
 
 type SortCol = 'correct_rate' | 'avg_time_seconds'
@@ -147,7 +149,7 @@ function PageSkeleton() {
 
 function ExamAnalyticsContent({ examId }: { examId: string }) {
   const { t } = useTranslation()
-  const { data, isLoading, isError } = useExamAnalytics(examId)
+  const { data, error, isLoading, isError } = useExamAnalytics(examId)
 
   const [sortCol, setSortCol] = useState<SortCol>('correct_rate')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -162,6 +164,9 @@ function ExamAnalyticsContent({ examId }: { examId: string }) {
   }
 
   if (isLoading) return <PageSkeleton />
+
+  // #470: an unknown exam gets its own message and a way back, not the generic load error.
+  if (isError && isNotFoundError(error)) return <ExamNotFoundState />
 
   if (isError || !data) {
     return (

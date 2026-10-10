@@ -3,6 +3,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { useExam } from '@/api/exams'
+import { ExamNotFoundState } from '@/components/ExamNotFoundState'
+import { isNotFoundError } from '@/lib/apiRetry'
 import { Step1BasicSettings } from './Step1BasicSettings'
 import { Step2QuestionRules } from './Step2QuestionRules'
 import { Step3Assignments } from './Step3Assignments'
@@ -75,7 +77,7 @@ export function ExamWizard({ examId: examIdProp }: ExamWizardProps) {
   const [resolvedSectionId, setResolvedSectionId] = useState<string | null>(null)
 
   // In edit mode, pre-load the exam to populate forms
-  const { data: exam, isLoading: examLoading } = useExam(resolvedExamId)
+  const { data: exam, isLoading: examLoading, error: examError } = useExam(resolvedExamId)
 
   const isEditMode = !!examIdProp
 
@@ -98,6 +100,9 @@ export function ExamWizard({ examId: examIdProp }: ExamWizardProps) {
     currentUser?.role === 'admin' ||
     currentUser?.role === 'super_admin' ||
     currentUser?.role === 'department_admin'
+
+  // #470: an unknown exam id in edit mode gets the not-found state, not a wizard with no data.
+  if (isEditMode && examError && isNotFoundError(examError)) return <ExamNotFoundState />
 
   if (examLoading && isEditMode) {
     return (

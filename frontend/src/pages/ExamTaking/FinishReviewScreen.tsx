@@ -49,14 +49,14 @@ export function FinishReviewScreen({
 
         {flagged.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-amber-600 mb-2">
+            <h2 className="text-sm font-semibold text-warning mb-2">
               {t('exam.taking.review.flagged')} ({flagged.length})
             </h2>
             <div className="flex flex-wrap gap-2">
               {flagged.map((q) => (
                 <span
                   key={q.id}
-                  className="inline-flex items-center justify-center w-8 h-8 rounded bg-yellow-200 border border-yellow-400 text-sm font-medium"
+                  className="inline-flex items-center justify-center w-8 h-8 rounded bg-bg-warning border border-warning text-sm font-medium"
                 >
                   {indexOf(q)}
                 </span>
@@ -70,10 +70,10 @@ export function FinishReviewScreen({
         )}
 
         <div className="flex gap-3 pt-4">
-          <Button variant="outline" onClick={onGoBack}>
+          <Button variant="outline" className="min-h-11" onClick={onGoBack}>
             {t('exam.taking.review.goBack')}
           </Button>
-          <Button onClick={onSubmitAnyway}>
+          <Button className="min-h-11" onClick={onSubmitAnyway}>
             {t('exam.taking.review.submitAnyway')}
           </Button>
         </div>

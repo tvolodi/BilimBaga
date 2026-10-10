@@ -1,6 +1,7 @@
 # BilimBaga — Design System
 
 > Agent-facing reference. Use this file when generating any frontend code for BilimBaga.
+> **Colour values (2026-10-10):** where a value in this file fails the 4.5:1 contrast target it was corrected to the value in `tokens.json` and `foundations.md` (DEC-002, `FR-BB320` AC-1). `tokens.json` is the authority for any colour; if this file and `tokens.json` differ, `tokens.json` wins.
 > Stack: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui
 
 ---
@@ -61,7 +62,7 @@ Define in `tailwind.config.ts` and `globals.css`:
   /* Text */
   --text-primary:       #1A1F2E;
   --text-secondary:     #4A5568;
-  --text-muted:         #8A94A6;
+  --text-muted:         #5F6B7D;  /* DEC-002 / FR-BB320 AC-1: darkened for 4.5:1 on white, page and subtle grounds */
   --text-on-navy:       #FFFFFF;
   --text-on-blue:       #FFFFFF;
   --text-link:          #2E6DB4;
@@ -91,7 +92,7 @@ Define in `tailwind.config.ts` and `globals.css`:
 
   --text-primary:       #E8ECF4;
   --text-secondary:     #9AAABB;
-  --text-muted:         #5A6A7E;
+  --text-muted:         #8FA0B4;  /* DEC-002 / FR-BB320 AC-1: lightened for 4.5:1 on every dark ground */
   --text-on-navy:       #E8ECF4;
   --text-link:          #5AA0E0;
 
@@ -556,6 +557,8 @@ Every list and table must define an empty state:
 ---
 
 ## 6. Icons
+
+> **Superseded (2026-10-10, FR-BB320 AC-5):** the app uses `lucide-react` (outline, stroke 1.5, 20px for UI icons), not Tabler. The Tabler instructions and imports below are historical; see `foundations.md` in this folder.
 
 Use [Tabler Icons](https://tabler.io/icons) throughout — outline style only.
 

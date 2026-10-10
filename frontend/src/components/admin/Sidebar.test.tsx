@@ -56,6 +56,13 @@ describe('Sidebar', () => {
     expect(onToggle).toHaveBeenCalledOnce()
   })
 
+  it('uses the navy tokens for the surface and no default-palette grey (FR-BB320 AC-2)', () => {
+    renderSidebar(false)
+    const aside = document.querySelector('aside')
+    expect(aside).toHaveClass('bg-bg-navy', 'text-text-on-navy')
+    expect(aside?.innerHTML).not.toMatch(/gray-\d/)
+  })
+
   it('renders in collapsed state without crashing', () => {
     renderSidebar(true)
     // Sidebar still renders
@@ -101,5 +108,111 @@ describe('Sidebar', () => {
     expect(hrefs.includes('/admin/audit')).toBe(audit)
     expect(hrefs.includes('/admin/reports')).toBe(reports)
     expect(hrefs).toContain('/admin/users')
+  })
+})
+
+describe('Sidebar overlay and navigation (FR-BB321 AC-6, #472)', () => {
+  beforeEach(() => {
+    vi.mocked(useTenantConfig).mockReturnValue({
+      data: { app_name: 'BilimBaga', primary_color: '#000', accent_color: '#fff', default_locale: 'en', available_locales: ['en'] },
+    } as ReturnType<typeof useTenantConfig>)
+  })
+
+  function renderWith(props: { overlay?: boolean; onClose?: () => void }) {
+    const qc = new QueryClient()
+    qc.setQueryData(['auth', 'accessToken'], tokenFor('super_admin'))
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Sidebar collapsed={false} onToggle={vi.fn()} {...props} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('floats over the page when overlay is set', () => {
+    renderWith({ overlay: true })
+    expect(document.querySelector('aside')).toHaveClass('fixed', 'z-40')
+  })
+
+  it('takes its width in the layout when overlay is not set', () => {
+    renderWith({})
+    expect(document.querySelector('aside')).not.toHaveClass('fixed')
+  })
+
+  it('calls onClose when a link is followed, so an overlay can close', async () => {
+    const onClose = vi.fn()
+    renderWith({ overlay: true, onClose })
+    await userEvent.click(screen.getByRole('link', { name: /users/i }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Sidebar overlay keyboard (FR-BB321 AC-6, #472)', () => {
+  beforeEach(() => {
+    vi.mocked(useTenantConfig).mockReturnValue({
+      data: { app_name: 'BilimBaga', primary_color: '#000', accent_color: '#fff', default_locale: 'en', available_locales: ['en'] },
+    } as ReturnType<typeof useTenantConfig>)
+  })
+
+  function renderOverlay(overlay = true) {
+    const onClose = vi.fn()
+    const qc = new QueryClient()
+    qc.setQueryData(['auth', 'accessToken'], tokenFor('super_admin'))
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Sidebar collapsed={false} onToggle={vi.fn()} overlay={overlay} onClose={onClose} />
+          <button type="button">Outside</button>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    return { onClose }
+  }
+
+  it('Escape closes the overlay and returns focus to the toggle', async () => {
+    const { onClose } = renderOverlay()
+    screen.getByRole('link', { name: /users/i }).focus()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveFocus()
+  })
+
+  it('Escape does nothing when the sidebar is not an overlay', async () => {
+    const { onClose } = renderOverlay(false)
+    screen.getByRole('link', { name: /users/i }).focus()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('closes when focus moves out of the overlay', () => {
+    const { onClose } = renderOverlay()
+    screen.getByRole('link', { name: /users/i }).focus()
+
+    screen.getByRole('button', { name: 'Outside' }).focus()
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays open while focus moves between items inside it', async () => {
+    const { onClose } = renderOverlay()
+    screen.getByRole('link', { name: /users/i }).focus()
+
+    await userEvent.tab()
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('does not close when focus moves out of a sidebar that is not an overlay', () => {
+    const { onClose } = renderOverlay(false)
+    screen.getByRole('link', { name: /users/i }).focus()
+
+    screen.getByRole('button', { name: 'Outside' }).focus()
+
+    expect(onClose).not.toHaveBeenCalled()
   })
 })

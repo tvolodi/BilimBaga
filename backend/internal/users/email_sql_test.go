@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"io"
 	"strings"
 	"sync"
@@ -38,7 +37,13 @@ type recRows struct {
 
 func (c recConn) Prepare(q string) (driver.Stmt, error) { return recStmt{c.f, q}, nil }
 func (c recConn) Close() error                          { return nil }
-func (c recConn) Begin() (driver.Tx, error)             { return nil, errors.New("no tx") }
+func (c recConn) Begin() (driver.Tx, error)             { return recTx{}, nil }
+
+// recTx is a no-op transaction, so repository methods that run inside one can be recorded.
+type recTx struct{}
+
+func (recTx) Commit() error   { return nil }
+func (recTx) Rollback() error { return nil }
 func (s recStmt) Close() error                          { return nil }
 func (s recStmt) NumInput() int                         { return -1 }
 func (s recStmt) Exec(args []driver.Value) (driver.Result, error) {
@@ -53,6 +58,10 @@ func (s recStmt) Query(args []driver.Value) (driver.Rows, error) {
 	defer s.f.mu.Unlock()
 	s.f.queries = append(s.f.queries, s.q)
 	s.f.args = append(s.f.args, append([]driver.Value(nil), args...))
+	if strings.Contains(s.q, "FOR UPDATE") {
+		// The row-locked read of the previous password stamp: a NULL stamp (never reset before).
+		return &recRows{cols: []string{"password_changed_at"}, data: [][]driver.Value{{nil}}}, nil
+	}
 	if s.f.idRows != nil {
 		data := [][]driver.Value{}
 		for _, id := range s.f.idRows {

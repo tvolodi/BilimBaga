@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { TenantProvider } from '@/components/TenantProvider'
+import { ThemeProvider } from '@/components/ThemeProvider'
 import { FullPageSpinner } from '@/components/FullPageSpinner'
+import { DESIGN_GALLERY_ON, DESIGN_GALLERY_PATH } from '@/lib/designGallery'
 import { RequireAuth } from '@/components/RequireAuth'
 import { RequireRole } from '@/components/RequireRole'
 import {
@@ -96,6 +98,10 @@ const ExamWizardCreatePage = lazy(() =>
 const ExamWizardEditPage = lazy(() =>
   import('@/pages/ExamWizard').then((m) => ({ default: m.ExamWizardEditPage })),
 )
+// FR-BB320 AC-9: @__PURE__ lets the build drop this import when DESIGN_GALLERY_ON folds to false.
+const DesignGalleryPage = /* @__PURE__ */ lazy(() =>
+  import('@/pages/DesignGallery').then((m) => ({ default: m.DesignGalleryPage })),
+)
 const GradingQueuePage = lazy(() =>
   import('@/pages/admin/GradingQueuePage').then((m) => ({ default: m.GradingQueuePage })),
 )
@@ -142,6 +148,14 @@ function AppRoutes() {
         <Routes>
           <Route path="/verify/:code" element={<VerifyCertificatePage />} />
         </Routes>
+      </Suspense>
+    )
+  }
+  // FR-BB320 AC-9: the development-only component gallery. Public, so it opens without signing in.
+  if (DESIGN_GALLERY_ON && pathname === DESIGN_GALLERY_PATH) {
+    return (
+      <Suspense fallback={<FullPageSpinner />}>
+        <DesignGalleryPage />
       </Suspense>
     )
   }
@@ -419,11 +433,13 @@ function AppRoot() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TenantProvider>
-        <BrowserRouter>
-          <AppRoot />
-        </BrowserRouter>
-      </TenantProvider>
+      <ThemeProvider>
+        <TenantProvider>
+          <BrowserRouter>
+            <AppRoot />
+          </BrowserRouter>
+        </TenantProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

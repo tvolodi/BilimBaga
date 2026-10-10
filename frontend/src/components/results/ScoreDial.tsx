@@ -1,9 +1,12 @@
+import { useThemeColors } from '@/hooks/useThemeColors'
+
 interface ScoreDialProps {
   scorePct: number
-  primaryColor: string
+  primaryColor?: string
 }
 
 export function ScoreDial({ scorePct, primaryColor }: ScoreDialProps) {
+  const colours = useThemeColors()
   const radius = 54
   const circumference = 2 * Math.PI * radius
   const clampedPct = Math.min(100, Math.max(0, scorePct))
@@ -23,7 +26,7 @@ export function ScoreDial({ scorePct, primaryColor }: ScoreDialProps) {
         cy="70"
         r={radius}
         fill="none"
-        stroke="#e5e7eb"
+        stroke={colours.border}
         strokeWidth="12"
       />
       {/* Progress arc */}
@@ -32,7 +35,7 @@ export function ScoreDial({ scorePct, primaryColor }: ScoreDialProps) {
         cy="70"
         r={radius}
         fill="none"
-        stroke={primaryColor}
+        stroke={primaryColor || colours.primary}
         strokeWidth="12"
         strokeLinecap="round"
         strokeDasharray={circumference}

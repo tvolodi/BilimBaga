@@ -16,7 +16,7 @@ export function SaveIndicator({ status }: SaveIndicatorProps) {
       className={cn(
         'text-xs font-medium transition-opacity',
         status === 'saving' && 'text-muted-foreground',
-        status === 'saved' && 'text-green-600 dark:text-green-400',
+        status === 'saved' && 'text-success',
         status === 'error' && 'text-destructive',
       )}
       aria-live="polite"

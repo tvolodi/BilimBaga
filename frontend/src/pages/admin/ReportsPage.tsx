@@ -100,7 +100,7 @@ function DashboardPdfCard() {
           </Button>
         </div>
         {exportError && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-danger">
             {t(exportError)}
           </p>
         )}
@@ -138,7 +138,7 @@ function ExamReportsCard() {
       </CardHeader>
       <CardContent>
         {exportError && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-danger">
             {t(exportError)}
           </p>
         )}
@@ -165,7 +165,7 @@ function ExamReportsCard() {
                   <tr key={exam.id} className="border-b last:border-0">
                     <td className="py-2 pr-4 font-medium">{exam.title}</td>
                     <td className="py-2 pr-4">
-                      <Badge variant={statusVariant(exam.status)}>{exam.status}</Badge>
+                      <Badge variant={statusVariant(exam.status)}>{t(`exam_list.status.${exam.status}`)}</Badge>
                     </td>
                     <td className="py-2">
                       <div className="flex items-center gap-2">

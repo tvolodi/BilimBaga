@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -388,6 +388,73 @@ describe('EmployeePortal', () => {
       await user.click(screen.getByRole('button', { name: /cancel/i }))
       await user.click(await screen.findByRole('button', { name: /start exam/i }))
       expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('requests fullscreen synchronously in the confirm click, before the session is created; a rejected request is ignored (FR-BB319 AC-8)', async () => {
+      const order: string[] = []
+      const request = vi.fn(() => {
+        order.push('fullscreen')
+        return Promise.reject(new Error('denied'))
+      })
+      Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: request })
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () => {
+          order.push('create')
+          return HttpResponse.json(
+            { data: { session_id: 'sess-42', exam_id: 'exam-1', questions: [] }, error: null },
+            { status: 201 },
+          )
+        }),
+      )
+      try {
+        const user = await openStartModal()
+        await user.click(screen.getByRole('button', { name: /begin exam/i }))
+        expect(await screen.findByText('SESSION PAGE')).toBeInTheDocument()
+        expect(request).toHaveBeenCalledTimes(1)
+        expect(order).toEqual(['fullscreen', 'create'])
+        expect(screen.queryByRole('alert')).toBeNull()
+        expect(errorSpy).not.toHaveBeenCalled()
+      } finally {
+        errorSpy.mockRestore()
+        Reflect.deleteProperty(document.documentElement, 'requestFullscreen')
+      }
+    })
+
+    // #417: a start the backend refuses must not leave the candidate in fullscreen on the portal page.
+    it('leaves fullscreen when the session cannot be created (#417)', async () => {
+      let fullscreenEl: Element | null = null
+      const enter = vi.fn(() => {
+        fullscreenEl = document.documentElement
+        return Promise.resolve()
+      })
+      const exit = vi.fn(() => {
+        fullscreenEl = null
+        return Promise.resolve()
+      })
+      Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: enter })
+      Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit })
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fullscreenEl })
+      server.use(
+        http.post('/api/v1/portal/exams/exam-1/sessions', () =>
+          HttpResponse.json(
+            { data: null, error: { code: 'ATTEMPTS_EXHAUSTED', message: 'x' } },
+            { status: 422 },
+          ),
+        ),
+      )
+      try {
+        const user = await openStartModal()
+        await user.click(screen.getByRole('button', { name: /begin exam/i }))
+        expect(await screen.findByRole('alert')).toBeInTheDocument()
+        await waitFor(() => expect(exit).toHaveBeenCalledTimes(1))
+        expect(enter).toHaveBeenCalledTimes(1)
+        expect(fullscreenEl).toBeNull()
+      } finally {
+        Reflect.deleteProperty(document.documentElement, 'requestFullscreen')
+        Reflect.deleteProperty(document, 'exitFullscreen')
+        Reflect.deleteProperty(document, 'fullscreenElement')
+      }
     })
   })
 })

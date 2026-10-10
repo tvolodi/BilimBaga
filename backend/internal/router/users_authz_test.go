@@ -137,7 +137,7 @@ func (r *authzRepo) Deactivate(_ context.Context, id string) error {
 	return nil
 }
 func (r *authzRepo) RevokeAllTokens(context.Context, string) error { return nil }
-func (r *authzRepo) UpdatePassword(context.Context, string, string) error {
+func (r *authzRepo) UpdatePassword(context.Context, string, string, time.Time) error {
 	r.mu.Lock()
 	r.writes++
 	r.mu.Unlock()

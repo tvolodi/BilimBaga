@@ -9,14 +9,14 @@ export function PassFailBanner({ passed }: PassFailBannerProps) {
 
   if (passed) {
     return (
-      <div data-testid="pass-fail-banner" className="w-full rounded-lg border border-green-500 bg-green-50 px-4 py-3 text-center text-lg font-semibold text-green-800">
+      <div data-testid="pass-fail-banner" className="w-full rounded-lg border border-success bg-bg-success px-4 py-3 text-center text-lg font-semibold text-success">
         {t('result.passed')}
       </div>
     )
   }
 
   return (
-    <div data-testid="pass-fail-banner" className="w-full rounded-lg border border-red-500 bg-red-50 px-4 py-3 text-center text-lg font-semibold text-red-800">
+    <div data-testid="pass-fail-banner" className="w-full rounded-lg border border-danger bg-bg-danger px-4 py-3 text-center text-lg font-semibold text-danger">
       {t('result.failed')}
     </div>
   )

@@ -38,7 +38,7 @@ export function DeactivateConfirmDialog({ user, onClose }: DeactivateConfirmDial
             {t('users.deactivate_dialog.message', { name: user?.full_name ?? '' })}
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+        {error && <p className="text-sm text-danger mb-2">{error}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={deactivate.isPending}>
             {t('users.deactivate_dialog.cancel')}

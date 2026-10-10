@@ -169,8 +169,8 @@ function AutoSaveStatus({ status }: { status: 'idle' | 'saving' | 'saved' | 'err
   if (status === 'saving')
     return <span className="text-xs text-muted-foreground">{t('questionEditor.autosave.saving')}</span>
   if (status === 'saved')
-    return <span className="text-xs text-green-600">{t('questionEditor.autosave.saved')}</span>
-  return <span className="text-xs text-red-500">{t('questionEditor.error.saveFailed')}</span>
+    return <span className="text-xs text-success">{t('questionEditor.autosave.saved')}</span>
+  return <span className="text-xs text-danger">{t('questionEditor.error.saveFailed')}</span>
 }
 
 interface StatusBadgeProps {
@@ -214,7 +214,7 @@ function CoverageTabs({ activeLocale, onLocaleChange, translations }: CoverageTa
           >
             <span>{loc.toUpperCase()}</span>
             {hasContent ? (
-              <span title={t('questionEditor.locale.coverage.complete')}><Check size={12} className="text-green-500" /></span>
+              <span title={t('questionEditor.locale.coverage.complete')}><Check size={12} className="text-success" /></span>
             ) : (
               <span className="text-xs text-muted-foreground" title={t('questionEditor.locale.coverage.missing')}>{MISSING_MARK}</span>
             )}
@@ -521,7 +521,7 @@ function QuestionPreview({ form, activeLocale }: QuestionPreviewProps) {
               <li
                 key={opt.tempId}
                 className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded border ${
-                  opt.is_correct ? 'border-green-400 bg-green-50' : 'border-border'
+                  opt.is_correct ? 'border-success bg-bg-success' : 'border-border'
                 }`}
               >
                 {(form.type === 'single' || form.type === 'truefalse') && (
@@ -875,12 +875,12 @@ export function QuestionEditorPage() {
         <div
           className={`flex items-center gap-3 px-4 py-3 text-sm border-b ${
             notification.type === 'error'
-              ? 'bg-red-50 border-red-200 text-red-800'
-              : 'bg-green-50 border-green-200 text-green-800'
+              ? 'bg-bg-danger border-danger text-danger'
+              : 'bg-bg-success border-success text-success'
           }`}
         >
           <span className="flex-1">{notification.message}</span>
-          <button onClick={() => setNotification(null)} className="p-0.5 rounded hover:bg-black/10">
+          <button onClick={() => setNotification(null)} className="p-0.5 rounded hover:bg-foreground/10">
             <X size={14} />
           </button>
         </div>

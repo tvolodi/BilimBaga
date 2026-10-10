@@ -1,0 +1,48 @@
+# #484: the real three-container chain for the sign-in limiter's client address: edge nginx -> container nginx ->
+# API. Run it with scripts/proxy-chain/run.sh, which gives this project its own name and throwaway secrets. It never
+# touches the dev stack, the test host or prod. Nothing here is deployed.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bilimbaga
+      POSTGRES_USER: bilimbaga
+      POSTGRES_PASSWORD: ${PROXY_CHAIN_DB_PASSWORD:?set by run.sh}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bilimbaga"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ../../backend
+    environment:
+      API_PORT: "8080"
+      DB_HOST: db
+      DB_NAME: bilimbaga
+      DB_USER: bilimbaga
+      DB_PASSWORD: ${PROXY_CHAIN_DB_PASSWORD:?set by run.sh}
+      JWT_SECRET: ${PROXY_CHAIN_JWT_SECRET:?set by run.sh}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # The production container config, unchanged: the same real_ip rules that trust X-Real-IP from private ranges.
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ../../deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_started
+
+  # The edge of the chain: see edge.conf.
+  edge:
+    image: nginx:alpine
+    ports:
+      - "127.0.0.1:${PROXY_CHAIN_PORT:-18090}:80"
+    volumes:
+      - ./edge.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      nginx:
+        condition: service_started

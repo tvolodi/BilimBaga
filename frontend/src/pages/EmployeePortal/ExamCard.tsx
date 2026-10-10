@@ -107,7 +107,7 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
             : t('portal.card.noDeadline')}
         </div>
         {windowBlock && (
-          <p id={`start-reason-${exam.id}`} role="status" className="text-xs text-amber-800 dark:text-amber-400 mb-2">
+          <p id={`start-reason-${exam.id}`} role="status" className="text-xs text-warning mb-2">
             {windowBlock === 'notOpen'
               ? t('portal.card.windowNotOpen', {
                   date: new Date(exam.available_from as string).toLocaleString(i18n.language),

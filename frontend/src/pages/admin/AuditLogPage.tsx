@@ -116,7 +116,7 @@ export function AuditLogPage() {
       </div>
 
       {exportError && (
-        <div role="alert" className="px-4 py-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800">
+        <div role="alert" className="px-4 py-3 rounded-md text-sm bg-bg-danger border border-danger text-danger">
           {t(exportError)}
         </div>
       )}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
@@ -203,10 +204,21 @@ func generatePassword() (string, error) {
 	return string(out), nil
 }
 
-type pgBootstrapStore struct{ db *sqlx.DB }
+type pgBootstrapStore struct {
+	db  *sqlx.DB
+	now func() time.Time // the application clock (#457); nil means the process clock
+}
 
 // NewBootstrapStore creates the PostgreSQL-backed BootstrapStore.
 func NewBootstrapStore(db *sqlx.DB) BootstrapStore { return &pgBootstrapStore{db: db} }
+
+// clock is the application clock the stamp is taken from, never the database clock (#455, #457).
+func (s *pgBootstrapStore) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now().UTC()
+}
 
 func (s *pgBootstrapStore) GetAdminCredentials(ctx context.Context, email string) (string, string, error) {
 	const q = `SELECT id, password_hash FROM users WHERE lower(email) = lower($1)`
@@ -223,16 +235,30 @@ func (s *pgBootstrapStore) GetAdminCredentials(ctx context.Context, email string
 	return row.ID, row.PasswordHash, nil
 }
 
-func (s *pgBootstrapStore) SetAdminPassword(ctx context.Context, id, oldHash, newHash string, forceChange bool) (bool, error) {
-	// password_changed_at is stamped so access tokens issued under the default password
-	// are rejected by the password-epoch check (ISS-105).
-	const q = `
+// bootstrapSetPasswordSQL stores the new hash only while the stored hash is still oldHash. The stamp is
+// a parameter from NextPasswordStamp, so the access-token epoch (ISS-105) follows the application
+// clock and the previous stamp, like every other writer (#455, #457).
+const bootstrapSetPasswordSQL = `
 		UPDATE users
 		SET    password_hash = $1, force_password_change = $4,
 		       failed_attempts = 0, locked_until = NULL,
-		       password_changed_at = now(), updated_at = now()
+		       password_changed_at = $5, updated_at = now()
 		WHERE  id = $2 AND password_hash = $3`
-	res, err := s.db.ExecContext(ctx, q, newHash, id, oldHash, forceChange)
+
+func (s *pgBootstrapStore) SetAdminPassword(ctx context.Context, id, oldHash, newHash string, forceChange bool) (bool, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("auth.SetAdminPassword: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	stamp, err := lockAndStamp(ctx, tx, id, s.clock())
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("auth.SetAdminPassword: %w", err)
+	}
+	res, err := tx.ExecContext(ctx, bootstrapSetPasswordSQL, newHash, id, oldHash, forceChange, stamp)
 	if err != nil {
 		return false, fmt.Errorf("auth.SetAdminPassword: %w", err)
 	}
@@ -240,15 +266,36 @@ func (s *pgBootstrapStore) SetAdminPassword(ctx context.Context, id, oldHash, ne
 	if err != nil {
 		return false, fmt.Errorf("auth.SetAdminPassword: rows affected: %w", err)
 	}
-	return n > 0, nil
+	if n == 0 {
+		return false, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("auth.SetAdminPassword: commit: %w", err)
+	}
+	return true, nil
 }
 
-func (s *pgBootstrapStore) RequireAdminPasswordChange(ctx context.Context, id, hash string) (bool, error) {
-	const q = `
+// bootstrapRequireChangeSQL forces a password change only while the stored hash is still hash. It stamps
+// password_changed_at too, so access tokens issued before the forced change are rejected (#466).
+const bootstrapRequireChangeSQL = `
 		UPDATE users
-		SET    force_password_change = true, updated_at = now()
+		SET    force_password_change = true, password_changed_at = $3, updated_at = now()
 		WHERE  id = $1 AND password_hash = $2`
-	res, err := s.db.ExecContext(ctx, q, id, hash)
+
+func (s *pgBootstrapStore) RequireAdminPasswordChange(ctx context.Context, id, hash string) (bool, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("auth.RequireAdminPasswordChange: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	stamp, err := lockAndStamp(ctx, tx, id, s.clock())
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("auth.RequireAdminPasswordChange: %w", err)
+	}
+	res, err := tx.ExecContext(ctx, bootstrapRequireChangeSQL, id, hash, stamp)
 	if err != nil {
 		return false, fmt.Errorf("auth.RequireAdminPasswordChange: %w", err)
 	}
@@ -256,5 +303,11 @@ func (s *pgBootstrapStore) RequireAdminPasswordChange(ctx context.Context, id, h
 	if err != nil {
 		return false, fmt.Errorf("auth.RequireAdminPasswordChange: rows affected: %w", err)
 	}
-	return n > 0, nil
+	if n == 0 {
+		return false, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("auth.RequireAdminPasswordChange: commit: %w", err)
+	}
+	return true, nil
 }

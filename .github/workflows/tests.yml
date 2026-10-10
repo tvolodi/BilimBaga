@@ -53,6 +53,8 @@ jobs:
       - name: go test
         if: ${{ !cancelled() }}
         run: go test -p 2 ./...
+      - name: Sign-in limiter script refuses a non-local base (#484)
+        run: bash ../scripts/tests/test-limiter-forwarded-headers_test.sh
 
   frontend-tests:
     runs-on: ubuntu-latest
@@ -77,9 +79,41 @@ jobs:
         run: npm run lint
       - name: i18n key check
         run: npm run check:i18n
+      - name: Design-system check (FR-BB320 AC-6, AC-7)
+        run: npm run check:design
       - name: Unit tests
         run: npx vitest run
       - name: Build
         run: npm run build
       - name: Bundle budget (FR-BB65, #200)
         run: bash ../scripts/perf/bundle-check.sh
+
+  swarm-tests:
+    # #423: the swarm shell tests run on every PR and on main, so a broken swarm script cannot merge unnoticed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swarm shell tests
+        run: |
+          fail=0
+          for t in swarm/tests/*.sh; do
+            echo "::group::$t"
+            bash "$t" || { echo "::error::$t failed"; fail=1; }
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  swarm-tests-windows:
+    # #423: the PowerShell swarm tests need Windows PowerShell and Scheduled Tasks, so they run on a Windows runner.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swarm PowerShell tests
+        shell: pwsh
+        run: |
+          foreach ($t in Get-ChildItem swarm/tests/*.ps1) {
+            powershell -NoProfile -ExecutionPolicy Bypass -File $t.FullName
+            if ($LASTEXITCODE -ne 0) { throw "$($t.Name) failed" }
+          }

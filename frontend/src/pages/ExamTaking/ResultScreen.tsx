@@ -32,7 +32,7 @@ export function ResultScreen({ result, examTitle, certificateEnabled: _certifica
         {isPassed && (
           <div className="space-y-2">
             <div className="text-4xl">✅</div>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <p className="text-2xl font-bold text-success">
               {t('exam.taking.result.passed')}
             </p>
             {result.score_pct !== null && (

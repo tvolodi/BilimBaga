@@ -125,7 +125,7 @@ export function CategoryTreeNode({
                     {t('categories.actions.edit')}
                   </button>
                   <button
-                    className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-muted"
+                    className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-muted"
                     onClick={() => { setMenuOpen(false); onDelete(node) }}
                   >
                     {t('categories.actions.delete')}

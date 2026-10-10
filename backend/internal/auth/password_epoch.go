@@ -131,3 +131,40 @@ func tokenPredatesPasswordChange(iat int64, changedAt time.Time) bool {
 	}
 	return iat < changedAt.Unix()
 }
+
+// lockPasswordStampSQL reads the account's previous stamp under a row lock, so two writers on one
+// account cannot both stamp from the same previous value (#455).
+const lockPasswordStampSQL = `SELECT password_changed_at FROM users WHERE id = $1 FOR UPDATE`
+
+// lockAndStamp reads the account's previous stamp under a row lock and returns the stamp for a change
+// at appNow. It must run inside the transaction that writes the stamp.
+func lockAndStamp(ctx context.Context, tx *sqlx.Tx, userID string, appNow time.Time) (time.Time, error) {
+	var prev sql.NullTime
+	if err := tx.GetContext(ctx, &prev, lockPasswordStampSQL, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, ErrNotFound
+		}
+		return time.Time{}, fmt.Errorf("lock password stamp: %w", err)
+	}
+	var previous *time.Time
+	if prev.Valid {
+		p := prev.Time
+		previous = &p
+	}
+	return NextPasswordStamp(appNow, previous), nil
+}
+
+// NextPasswordStamp is the password_changed_at written by a reset or a change made at appNow, given
+// the account's previous stamp (nil when none). It is the start of the next second after both appNow
+// and the previous stamp, so every token issued at or before either second has iat < stamp and is
+// revoked, and the stamp never moves backwards (#455). It is a pure function of the application clock
+// and the previous stamp: the database clock is never used.
+func NextPasswordStamp(appNow time.Time, previous *time.Time) time.Time {
+	next := appNow.UTC().Truncate(time.Second).Add(time.Second)
+	if previous != nil {
+		if p := previous.UTC().Truncate(time.Second).Add(time.Second); p.After(next) {
+			next = p
+		}
+	}
+	return next
+}

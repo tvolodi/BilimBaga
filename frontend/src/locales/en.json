@@ -9,8 +9,8 @@
     "save": "Save",
     "loading": "Loading…",
     "loadError": "Failed to load. Please try again.",
+    "examNotFound": "Exam not found. It may have been deleted.",
     "skipToMain": "Skip to main content",
-    "deleteQuestion": "Delete question",
     "signOut": "Sign out",
     "remove": "Remove",
     "dragHandle": "Drag to reorder",
@@ -50,7 +50,6 @@
       "department": "Department",
       "role": "Role",
       "status": "Status",
-      "created_at": "Created",
       "actions": "Actions",
       "error": "Error"
     },
@@ -87,9 +86,7 @@
     },
     "create_drawer": {
       "title": "Create User",
-      "submit": "Create",
-      "temp_password_label": "Temporary Password",
-      "temp_password_note": "Save this password — it will not be shown again."
+      "submit": "Create"
     },
     "edit_drawer": {
       "title": "Edit User",
@@ -133,13 +130,8 @@
       "all": "All"
     },
     "messages": {
-      "create_success": "User created successfully.",
-      "update_success": "User updated successfully.",
-      "deactivate_success": "User deactivated.",
-      "reset_success": "Password reset.",
       "unlock_success": "Account unlocked.",
       "unlock_error": "Could not unlock the account. Please try again.",
-      "import_success": "Import completed.",
       "error_generic": "An error occurred. Please try again.",
       "forbidden": "You are not allowed to assign this role or act on this user.",
       "role_locked": "This user's current role cannot be changed by you."
@@ -163,6 +155,8 @@
       "primaryColor": "Primary Colour",
       "accentColor": "Accent Colour",
       "contrastWarning": "Low contrast — text may be hard to read (ratio: {{ratio}}:1)",
+      "primaryContrastBlocked": "Save is blocked until the primary colour reaches 4.5:1 contrast against white (current: {{ratio}}:1).",
+      "primaryInvalid": "Enter a valid hex colour, for example #2E6DB4. Save is blocked until it is valid.",
       "locales": "Available Languages",
       "defaultLocale": "Default Language",
       "localeError": "Default language must be in the available languages list.",
@@ -179,10 +173,8 @@
     "newQuestion": "New Question",
     "importButton": "Import",
     "filter": {
-      "category": "Category",
       "tag": "Tag",
       "difficulty": "Difficulty",
-      "type": "Type",
       "status": "Status",
       "localeMissing": "Missing translation",
       "search": "Search questions…",
@@ -209,7 +201,6 @@
       "exportJson": "Export JSON",
       "archive": "Archive",
       "archivePartialResult": "{{success}} archived, {{failed}} failed",
-      "exportProgress": "Exporting {{n}} questions",
       "exportLimit": "More than 100 selected — exporting with current filters"
     },
     "empty": {
@@ -245,10 +236,6 @@
       "pageOf": "Page {{page}} of {{total}}",
       "pageSize": "Rows per page"
     },
-    "sort": {
-      "asc": "Ascending",
-      "desc": "Descending"
-    },
     "status": {
       "draft": "Draft",
       "review": "Review",
@@ -270,8 +257,7 @@
     "error": {
       "loadFailed": "Load failed",
       "statusTransitionFailed": "Status transition failed",
-      "deleteFailed": "Delete failed",
-      "exportFailed": "Export failed"
+      "deleteFailed": "Delete failed"
     },
     "skeleton": {
       "loading": "Loading..."
@@ -386,6 +372,7 @@
     "login": {
       "title": "Sign in to {{appName}}",
       "sessionRevoked": "Your account was changed or your session was revoked. Please sign in again.",
+      "dismissNotice": "Dismiss",
       "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Password",
@@ -532,11 +519,7 @@
         "title": "Review & Publish",
         "publishConfirm": "Publishing this exam will make it available to assigned users. This cannot be undone. Are you sure?",
         "eligibleCount": "eligible",
-        "eligibleCountLoading": "Checking availability…",
         "eligibleCountError": "Could not load counts",
-        "ruleStatusOk": "Sufficient",
-        "ruleStatusInsufficient": "Insufficient",
-        "ruleStatusNone": "No matching questions",
         "ruleUnsatisfied": "Rule {{id}}…: needs {{required}}, only {{available}} available",
         "ruleSummary": "Rule {{n}}: {{mode}}, {{count}} questions",
         "published": "Published",
@@ -598,13 +581,10 @@
       "empty": "No assignments yet."
     },
     "publishSuccess": "Exam published successfully",
-    "saveSuccess": "Exam saved",
     "unpublish": {
       "button": "Unpublish",
       "confirm": "Revert to Draft?",
-      "confirmDetail": "This will revert the exam to Draft status. Employees will no longer see it until you publish it again. Completed results will not be affected.",
-      "success": "Exam reverted to draft.",
-      "errorActiveSessions": "Cannot unpublish: there are active exam sessions in progress."
+      "confirmDetail": "This will revert the exam to Draft status. Employees will no longer see it until you publish it again. Completed results will not be affected."
     },
     "archive": {
       "button": "Archive",
@@ -660,7 +640,9 @@
       },
       "tabswitch": {
         "title": "Warning",
-        "warning": "You left the exam window. Further violations may result in automatic submission."
+        "warning": "You left the exam window. Further violations may result in automatic submission.",
+        "count": "Violations recorded: {{count}}",
+        "returnFullscreen": "Return to full screen"
       },
       "timer": {
         "warning": "Less than 20% of your time remaining.",
@@ -763,8 +745,7 @@
     "show_more": "Show more",
     "show_less": "Show less",
     "download_certificate": "Download Certificate",
-    "retake_exam": "Retake Exam",
-    "back_to_portal": "Back to Portal"
+    "retake_exam": "Retake Exam"
   },
   "history": {
     "title": "My Results",
@@ -797,8 +778,6 @@
     "col_entity_type": "Entity Type",
     "col_entity_id": "Entity ID",
     "col_ip": "IP Address",
-    "expand": "Show metadata",
-    "collapse": "Hide metadata",
     "export_csv": "Export to CSV",
     "exporting": "Exporting...",
     "pagination_info": "Showing {{from}}–{{to}} of {{total}} entries"
@@ -856,7 +835,12 @@
     "col_status": "Status",
     "col_actions": "Actions",
     "minutes_format": "{{minutes}} min",
-    "manage_assignments": "Assign"
+    "manage_assignments": "Assign",
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "archived": "Archived"
+    }
   },
   "grading": {
     "queue_title": "Manual Grading Queue",
@@ -912,9 +896,6 @@
     "last_activity": "Last Activity",
     "never": "Never",
     "required_exams": "Required Exams",
-    "exam_passed": "Passed",
-    "exam_failed": "Not Passed",
-    "exam_not_attempted": "Not Attempted",
     "attempts": "{{count}} attempt(s)",
     "status_passed": "Passed",
     "status_failed": "Failed",
@@ -985,7 +966,6 @@
     "aiRateLimited": "You have reached the AI generation limit. Please try again in an hour."
   },
   "question": {
-    "originalLanguageBadge": "Original language",
     "aiGenerate": "AI Generate",
     "aiGenerating": "Generating...",
     "aiGenerateTitle": "Generate Questions with AI",
@@ -1004,44 +984,6 @@
     "timerOneMinute": "1 minute remaining",
     "timerExpired": "Time is up",
     "questionsAnswered": "Questions answered: {{count}}"
-  },
-  "status": {
-    "active": {
-      "label": "Active",
-      "short": "Active"
-    },
-    "inactive": {
-      "label": "Inactive",
-      "short": "Inactive"
-    },
-    "pending": {
-      "label": "Pending",
-      "short": "Pending"
-    },
-    "completed": {
-      "label": "Completed",
-      "short": "Completed"
-    },
-    "passed": {
-      "label": "Passed",
-      "short": "Passed"
-    },
-    "failed": {
-      "label": "Failed",
-      "short": "Failed"
-    },
-    "draft": {
-      "label": "Draft",
-      "short": "Draft"
-    },
-    "published": {
-      "label": "Published",
-      "short": "Published"
-    },
-    "archived": {
-      "label": "Archived",
-      "short": "Archived"
-    }
   },
   "departments": {
     "title": "Departments",
@@ -1095,8 +1037,7 @@
     "view_analytics": "Analytics",
     "export_csv": "Export CSV",
     "exporting_csv": "Exporting...",
-    "no_exams": "No exams found.",
-    "loading": "Loading..."
+    "no_exams": "No exams found."
   },
   "verify": {
     "title": "Certificate verification",
@@ -1242,5 +1183,11 @@
         "manage": "Roles: Manage"
       }
     }
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "system": "System",
+    "dark": "Dark"
   }
 }

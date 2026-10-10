@@ -7,6 +7,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+# E2E token seed (#415): off unless the local stack passes VITE_E2E_TOKEN_SEED=true as a build arg.
+ARG VITE_E2E_TOKEN_SEED=false
+ENV VITE_E2E_TOKEN_SEED=$VITE_E2E_TOKEN_SEED
 RUN npm run build
 
 # ── Stage 2: refresh dist volume on every container start ─────────────────────

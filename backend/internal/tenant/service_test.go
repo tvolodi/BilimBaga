@@ -35,13 +35,13 @@ func (m *mockRepository) Upsert(_ context.Context, key string, value json.RawMes
 	return nil
 }
 
-// defaultSeedData returns a seed map matching the migration defaults.
+// defaultSeedData returns a seed map matching the defaults after migration 038.
 func defaultSeedData() map[string]json.RawMessage {
 	return map[string]json.RawMessage{
 		"app_name":          json.RawMessage(`"BilimBaga"`),
 		"logo":              json.RawMessage(`null`),
-		"primary_color":     json.RawMessage(`"#0ea5e9"`),
-		"accent_color":      json.RawMessage(`"#f59e0b"`),
+		"primary_color":     json.RawMessage(`"#2E6DB4"`),
+		"accent_color":      json.RawMessage(`"#C8A84B"`),
 		"default_locale":    json.RawMessage(`"kk"`),
 		"available_locales": json.RawMessage(`["kk","ru","en"]`),
 	}
@@ -168,4 +168,63 @@ func TestInvalidateAndRefresh(t *testing.T) {
 
 	cfg := svc.GetPublicConfig()
 	assert.Equal(t, json.RawMessage(`"Updated Name"`), cfg["app_name"])
+}
+
+// TestUpdateConfig_PrimaryContrast verifies FR-BB320 AC-1: a primary colour must reach
+// 4.5:1 against white, and anything else is rejected with VALIDATION_ERROR.
+func TestUpdateConfig_PrimaryContrast(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		wantCode string
+	}{
+		{name: "design-system primary passes", value: `"#2E6DB4"`},
+		{name: "shorthand passing colour", value: `"#003"`},
+		{name: "AA boundary passes", value: `"#767676"`},
+		{name: "just below boundary rejected", value: `"#777777"`, wantCode: "VALIDATION_ERROR"},
+		{name: "old sky-blue default rejected", value: `"#0ea5e9"`, wantCode: "VALIDATION_ERROR"},
+		{name: "white rejected", value: `"#ffffff"`, wantCode: "VALIDATION_ERROR"},
+		{name: "missing hash rejected", value: `"2E6DB4"`, wantCode: "VALIDATION_ERROR"},
+		{name: "non-hex rejected", value: `"#zzzzzz"`, wantCode: "VALIDATION_ERROR"},
+		{name: "null rejected", value: `null`, wantCode: "VALIDATION_ERROR"},
+		{name: "non-string rejected", value: `42`, wantCode: "VALIDATION_ERROR"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newMockRepository(defaultSeedData())
+			svc := NewService(repo)
+			require.NoError(t, svc.LoadCache(context.Background()))
+
+			_, err := svc.UpdateConfig(context.Background(), map[string]json.RawMessage{
+				"primary_color": json.RawMessage(tc.value),
+			})
+			if tc.wantCode == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			var valErr *ValidationError
+			require.ErrorAs(t, err, &valErr)
+			assert.Equal(t, tc.wantCode, valErr.Code)
+			// A rejected value must not reach the repository.
+			assert.Equal(t, json.RawMessage(`"#2E6DB4"`), repo.(*mockRepository).data["primary_color"])
+		})
+	}
+}
+
+// TestUpdateConfig_PrimaryContrastDoesNotBlockOtherKeys verifies that the contrast rule only
+// applies when primary_color is part of the update.
+func TestUpdateConfig_PrimaryContrastDoesNotBlockOtherKeys(t *testing.T) {
+	repo := newMockRepository(map[string]json.RawMessage{
+		"primary_color": json.RawMessage(`"#0ea5e9"`),
+		"app_name":      json.RawMessage(`"BilimBaga"`),
+	})
+	svc := NewService(repo)
+	require.NoError(t, svc.LoadCache(context.Background()))
+
+	_, err := svc.UpdateConfig(context.Background(), map[string]json.RawMessage{
+		"app_name": json.RawMessage(`"Acme"`),
+	})
+	require.NoError(t, err)
 }

@@ -1068,3 +1068,98 @@ func TestSetManualQuestions_MalformedQuestionID_Returns422(t *testing.T) {
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 	assert.Equal(t, "ERR_VALIDATION", decode(t, w).Error.Code)
 }
+
+// ── UpdateSection / UpdateRule (sweep 3, #392) ───────────────────────────────
+
+func TestUpdateSection_Success_Returns200(t *testing.T) {
+	h := newHandler(&mockSvc{})
+	body := `{"title":"Safety","sort_order":2}`
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/sections/sec-1", strings.NewReader(body)), "id", "exam-1", "sectionId", "sec-1")
+	h.UpdateSection(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestUpdateSection_InvalidBody_Returns400(t *testing.T) {
+	h := newHandler(&mockSvc{})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/sections/sec-1", strings.NewReader("{")), "id", "exam-1", "sectionId", "sec-1")
+	h.UpdateSection(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "ERR_INVALID_BODY", decode(t, w).Error.Code)
+}
+
+func TestUpdateSection_NotFoundAndServiceError(t *testing.T) {
+	h := newHandler(&mockSvc{
+		updateSectionFn: func(_ context.Context, _, _ string, _ SectionInput) (*ExamSection, error) {
+			return nil, ErrNotFound
+		},
+	})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/sections/sec-9", strings.NewReader(`{"title":"x"}`)), "id", "exam-1", "sectionId", "sec-9")
+	h.UpdateSection(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "ERR_NOT_FOUND", decode(t, w).Error.Code)
+
+	h2 := newHandler(&mockSvc{
+		updateSectionFn: func(_ context.Context, _, _ string, _ SectionInput) (*ExamSection, error) {
+			return nil, errors.New("boom")
+		},
+	})
+	w2 := httptest.NewRecorder()
+	req2 := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/sections/sec-1", strings.NewReader(`{"title":"x"}`)), "id", "exam-1", "sectionId", "sec-1")
+	h2.UpdateSection(w2, req2)
+	assert.Equal(t, http.StatusInternalServerError, w2.Code)
+	assert.Equal(t, "ERR_INTERNAL", decode(t, w2).Error.Code)
+}
+
+func TestUpdateRule_Success_Returns200(t *testing.T) {
+	h := newHandler(&mockSvc{})
+	body := `{"mode":"random","count":4,"sort_order":0}`
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/rules/rule-1", strings.NewReader(body)), "id", "exam-1", "ruleId", "rule-1")
+	h.UpdateRule(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestUpdateRule_InvalidBodyAndInvalidMode_Return400And422(t *testing.T) {
+	h := newHandler(&mockSvc{})
+	w := httptest.NewRecorder()
+	req := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/rules/rule-1", strings.NewReader("{")), "id", "exam-1", "ruleId", "rule-1")
+	h.UpdateRule(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "ERR_INVALID_BODY", decode(t, w).Error.Code)
+
+	w2 := httptest.NewRecorder()
+	req2 := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/rules/rule-1", strings.NewReader(`{"mode":"bogus","count":2}`)), "id", "exam-1", "ruleId", "rule-1")
+	h.UpdateRule(w2, req2)
+	assert.Equal(t, http.StatusUnprocessableEntity, w2.Code)
+	assert.Equal(t, "ERR_VALIDATION", decode(t, w2).Error.Code)
+}
+
+func TestUpdateRule_ServiceErrorsMapped(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		status int
+		code   string
+	}{
+		{"not found", ErrNotFound, http.StatusNotFound, "ERR_NOT_FOUND"},
+		{"invalid tag id", ErrInvalidInput, http.StatusUnprocessableEntity, "ERR_VALIDATION"},
+		{"unexpected", errors.New("boom"), http.StatusInternalServerError, "ERR_INTERNAL"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHandler(&mockSvc{
+				updateRuleFn: func(_ context.Context, _, _ string, _ QuestionRuleInput) (*ExamQuestionRule, error) {
+					return nil, tc.err
+				},
+			})
+			w := httptest.NewRecorder()
+			req := withChiParam(httptest.NewRequest(http.MethodPut, "/api/v1/exams/exam-1/rules/rule-1", strings.NewReader(`{"mode":"random","count":2}`)), "id", "exam-1", "ruleId", "rule-1")
+			h.UpdateRule(w, req)
+			assert.Equal(t, tc.status, w.Code)
+			assert.Equal(t, tc.code, decode(t, w).Error.Code)
+		})
+	}
+}

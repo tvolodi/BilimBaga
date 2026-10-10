@@ -66,7 +66,7 @@ export function GradingQueuePage() {
       {showSuccess && (
         <div
           role="status"
-          className="flex items-center justify-between gap-4 px-4 py-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-800"
+          className="flex items-center justify-between gap-4 px-4 py-3 rounded-md text-sm bg-bg-success border border-success text-success"
         >
           <span>{t('grading.success_toast')}</span>
           <button

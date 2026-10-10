@@ -1,4 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
+import { apiFetch, type ApiError } from './apiFetch'
+import { retryUnlessNotFound } from '@/lib/apiRetry'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -144,45 +147,25 @@ export class ExamApiError extends Error {
 
 // ---- API helper -------------------------------------------------------------
 
-interface ApiErrorBody {
-  code: string
-  message: string
-  fields?: Array<{ field: string; message: string }>
-  details?: unknown
-}
-
-interface ApiResponse<T> {
-  data: T
-  error: ApiErrorBody | null
-}
-
-async function examsFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
-  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-  const res = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: { ...authHeader, ...options?.headers },
-  })
-  // 204 No Content responses have no body — skip JSON parsing
-  if (res.status === 204) {
-    if (!res.ok) throw new ExamApiError('Request failed', 'ERR_UNKNOWN', res.status)
-    return undefined as unknown as T
-  }
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) {
+/**
+ * Exam calls go through the shared apiFetch (auth, TOKEN_REVOKED handling). This maps its error onto
+ * ExamApiError, which the exam pages read for httpStatus, fields and unsatisfied publish rules.
+ */
+async function examsFetch<T>(qc: QueryClient, url: string, options?: RequestInit): Promise<T> {
+  try {
+    return await apiFetch<T>(qc, url, options)
+  } catch (err) {
+    const e = err as ApiError
+    if (!e.code) throw err
     throw new ExamApiError(
-      body.error.message,
-      body.error.code,
-      res.status,
-      body.error.fields,
-      Array.isArray(body.error.details) ? (body.error.details as PublishValidationDetail[]) : undefined,
-      body.error.details,
+      e.message,
+      e.code,
+      e.status ?? 0,
+      e.fields,
+      Array.isArray(e.details) ? (e.details as PublishValidationDetail[]) : undefined,
+      e.details,
     )
   }
-  if (!res.ok) {
-    throw new ExamApiError(`Request failed: ${res.status}`, 'ERR_UNKNOWN', res.status)
-  }
-  return body.data
 }
 
 // ---- Exam list & detail hooks -----------------------------------------------
@@ -199,8 +182,7 @@ export function useExams(filters: { page?: number; per_page?: number; status?: s
   return useQuery<ExamListResponse, ExamApiError>({
     queryKey: ['exams', filters],
     queryFn: () => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<ExamListResponse>(`/api/v1/exams${qs ? `?${qs}` : ''}`, token)
+      return examsFetch<ExamListResponse>(qc, `/api/v1/exams${qs ? `?${qs}` : ''}`)
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -211,11 +193,11 @@ export function useExam(id: string | null | undefined) {
   return useQuery<ExamDetail, ExamApiError>({
     queryKey: ['exams', id],
     queryFn: () => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<ExamDetail>(`/api/v1/exams/${id}`, token)
+      return examsFetch<ExamDetail>(qc, `/api/v1/exams/${id}`)
     },
     enabled: !!id,
     staleTime: 30_000,
+    retry: retryUnlessNotFound,
   })
 }
 
@@ -225,8 +207,7 @@ export function useCreateExam() {
   const qc = useQueryClient()
   return useMutation<ExamDetail, ExamApiError, CreateExamPayload>({
     mutationFn: (body) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<ExamDetail>('/api/v1/exams', token, {
+      return examsFetch<ExamDetail>(qc, '/api/v1/exams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -240,8 +221,7 @@ export function useUpdateExam(id: string) {
   const qc = useQueryClient()
   return useMutation<ExamDetail, ExamApiError, CreateExamPayload>({
     mutationFn: (body) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<ExamDetail>(`/api/v1/exams/${id}`, token, {
+      return examsFetch<ExamDetail>(qc, `/api/v1/exams/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -258,8 +238,7 @@ export function usePublishExam(id: string) {
   const qc = useQueryClient()
   return useMutation<ExamDetail, ExamApiError, void>({
     mutationFn: () => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<ExamDetail>(`/api/v1/exams/${id}/publish`, token, { method: 'POST' })
+      return examsFetch<ExamDetail>(qc, `/api/v1/exams/${id}/publish`, { method: 'POST' })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exams'] })
@@ -272,10 +251,9 @@ export function useUnpublishExam() {
   const qc = useQueryClient()
   return useMutation<{ id: string; status: string }, ExamApiError, string>({
     mutationFn: (examId) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       return examsFetch<{ id: string; status: string }>(
+        qc,
         `/api/v1/exams/${examId}/unpublish`,
-        token,
         { method: 'POST' },
       )
     },
@@ -290,10 +268,9 @@ export function useArchiveExam() {
   const qc = useQueryClient()
   return useMutation<{ id: string; status: string }, ExamApiError, string>({
     mutationFn: (examId) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       return examsFetch<{ id: string; status: string }>(
+        qc,
         `/api/v1/exams/${examId}/archive`,
-        token,
         { method: 'POST' },
       )
     },
@@ -310,8 +287,7 @@ export function useAddSection() {
   const qc = useQueryClient()
   return useMutation<SectionDetail, ExamApiError, { examId: string; title?: string; sort_order: number }>({
     mutationFn: ({ examId, ...body }) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<SectionDetail>(`/api/v1/exams/${examId}/sections`, token, {
+      return examsFetch<SectionDetail>(qc, `/api/v1/exams/${examId}/sections`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -327,8 +303,7 @@ export function useAddRule(examId: string) {
   const qc = useQueryClient()
   return useMutation<QuestionRuleDetail, ExamApiError, QuestionRulePayload>({
     mutationFn: (body) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<QuestionRuleDetail>(`/api/v1/exams/${examId}/rules`, token, {
+      return examsFetch<QuestionRuleDetail>(qc, `/api/v1/exams/${examId}/rules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -342,8 +317,7 @@ export function useUpdateRule(examId: string) {
   const qc = useQueryClient()
   return useMutation<QuestionRuleDetail, ExamApiError, { ruleId: string; body: QuestionRulePayload }>({
     mutationFn: ({ ruleId, body }) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<QuestionRuleDetail>(`/api/v1/exams/${examId}/rules/${ruleId}`, token, {
+      return examsFetch<QuestionRuleDetail>(qc, `/api/v1/exams/${examId}/rules/${ruleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -357,8 +331,7 @@ export function useDeleteRule(examId: string) {
   const qc = useQueryClient()
   return useMutation<void, ExamApiError, string>({
     mutationFn: (ruleId) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<void>(`/api/v1/exams/${examId}/rules/${ruleId}`, token, { method: 'DELETE' })
+      return examsFetch<void>(qc, `/api/v1/exams/${examId}/rules/${ruleId}`, { method: 'DELETE' })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId] }),
   })
@@ -372,8 +345,7 @@ export function useSetRuleQuestions(examId: string) {
     { ruleId: string; questions: Array<{ question_id: string; sort_order: number }> }
   >({
     mutationFn: ({ ruleId, questions }) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<void>(`/api/v1/exams/${examId}/rules/${ruleId}/questions`, token, {
+      return examsFetch<void>(qc, `/api/v1/exams/${examId}/rules/${ruleId}/questions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questions }),
@@ -390,8 +362,7 @@ export function useExamAssignments(examId: string | null | undefined) {
   return useQuery<ExamAssignment[], ExamApiError>({
     queryKey: ['exams', examId, 'assignments'],
     queryFn: () => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<ExamAssignment[]>(`/api/v1/exams/${examId}/assignments`, token)
+      return examsFetch<ExamAssignment[]>(qc, `/api/v1/exams/${examId}/assignments`)
     },
     enabled: !!examId,
     staleTime: 30_000,
@@ -402,8 +373,7 @@ export function useAddAssignment(examId: string) {
   const qc = useQueryClient()
   return useMutation<ExamAssignment, ExamApiError, AddAssignmentPayload>({
     mutationFn: (body) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<ExamAssignment>(`/api/v1/exams/${examId}/assign`, token, {
+      return examsFetch<ExamAssignment>(qc, `/api/v1/exams/${examId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -417,8 +387,7 @@ export function useDeleteAssignment(examId: string) {
   const qc = useQueryClient()
   return useMutation<void, ExamApiError, string>({
     mutationFn: (assignmentId) => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
-      return examsFetch<void>(`/api/v1/exams/${examId}/assign/${assignmentId}`, token, { method: 'DELETE' })
+      return examsFetch<void>(qc, `/api/v1/exams/${examId}/assign/${assignmentId}`, { method: 'DELETE' })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams', examId, 'assignments'] }),
   })
@@ -436,10 +405,9 @@ export function useEligibleCounts(examId: string) {
   return useQuery<{ counts: RuleEligibleCount[] }, ExamApiError>({
     queryKey: ['exams', examId, 'eligibleCounts'],
     queryFn: () => {
-      const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
       return examsFetch<{ counts: RuleEligibleCount[] }>(
+        qc,
         `/api/v1/exams/${examId}/rules/eligible-counts`,
-        token,
       )
     },
     enabled: !!examId,

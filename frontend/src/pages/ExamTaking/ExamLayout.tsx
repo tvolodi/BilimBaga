@@ -109,8 +109,13 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
     doAutoSubmitRef.current?.(0)
   }, [])
 
-  // Tab switch detection
-  const handleTabWarn = useCallback(() => setShowTabWarning(true), [])
+  // Tab switch detection (FR-BB319). The count is the server event_count from the last warn response.
+  const [tabWarnCount, setTabWarnCount] = useState(0)
+  const handleTabWarn = useCallback((eventCount: number) => {
+    setTabWarnCount(eventCount)
+    setShowTabWarning(true)
+  }, [])
+  const closeTabWarning = useCallback(() => setShowTabWarning(false), [])
   const handleTabAutoSubmit = useCallback(() => {
     // The session was auto-submitted server-side due to tab switch policy
     // Re-fetch session or go to result with pending state
@@ -125,7 +130,13 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
     onSubmitSuccess(pending)
   }, [session.session_id, onSubmitSuccess])
 
-  useTabSwitchDetection(session.session_id, handleTabWarn, handleTabAutoSubmit)
+  const { enteredFullscreen, isFullscreen } = useTabSwitchDetection(
+    session.session_id,
+    handleTabWarn,
+    handleTabAutoSubmit,
+    session.status === 'in_progress',
+  )
+  const canReturnFullscreen = enteredFullscreen && !isFullscreen
 
   // Reset save status auto-dismiss helper
   function scheduleSaveStatusReset(ms: number) {
@@ -301,7 +312,13 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
           )}
         </main>
         {/* Tab switch warning */}
-        <TabSwitchWarningModal open={showTabWarning} onClose={() => setShowTabWarning(false)} />
+        <TabSwitchWarningModal
+          open={showTabWarning}
+          onClose={closeTabWarning}
+          count={tabWarnCount}
+          canReturnFullscreen={canReturnFullscreen}
+          onReturnFullscreen={closeTabWarning}
+        />
         {/* Time's up modal */}
         <Dialog open={showTimesUp} onOpenChange={() => {}}>
           <DialogContent>
@@ -310,7 +327,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
             </DialogHeader>
             <p className="text-sm text-muted-foreground">{t('exam.taking.timesUp.message')}</p>
             {submitSession.isError && (
-              <p className="text-sm text-amber-600">{t('exam.taking.timesUp.retrying')}</p>
+              <p className="text-sm text-warning">{t('exam.taking.timesUp.retrying')}</p>
             )}
           </DialogContent>
         </Dialog>
@@ -397,7 +414,13 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
       )}
 
       {/* Tab switch warning */}
-      <TabSwitchWarningModal open={showTabWarning} onClose={() => setShowTabWarning(false)} />
+      <TabSwitchWarningModal
+          open={showTabWarning}
+          onClose={closeTabWarning}
+          count={tabWarnCount}
+          canReturnFullscreen={canReturnFullscreen}
+          onReturnFullscreen={closeTabWarning}
+        />
 
       {/* Time's up modal */}
       <Dialog open={showTimesUp} onOpenChange={() => {}}>
@@ -407,7 +430,7 @@ export function ExamLayout({ session, onSubmitSuccess }: ExamLayoutProps) {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{t('exam.taking.timesUp.message')}</p>
           {submitSession.isError && (
-            <p className="text-sm text-amber-600">{t('exam.taking.timesUp.retrying')}</p>
+            <p className="text-sm text-warning">{t('exam.taking.timesUp.retrying')}</p>
           )}
         </DialogContent>
       </Dialog>

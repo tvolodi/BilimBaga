@@ -5,6 +5,7 @@ import { useChangePassword, type ApiError, type CurrentUser } from '@/api/auth'
 import { ChangePasswordForm } from '@/components/auth/ChangePasswordForm'
 import { Card } from '@/components/ui/card'
 import { clearPasswordChangeRequired, PASSWORD_CHANGE_FLAG_KEY } from '@/lib/passwordChangeRequired'
+import { AuthShell } from '@/components/auth/AuthShell'
 
 interface ChangePasswordPayload {
   current_password: string
@@ -55,22 +56,24 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
-      <Card className="w-full max-w-md p-8">
-        <h1 className="text-xl font-semibold text-center">
-          {t('auth.changePassword.title')}
-        </h1>
-        {required && (
-          <p role="status" className="mt-4 text-center text-sm text-muted-foreground">
-            {t('auth.changePassword.required')}
-          </p>
-        )}
-        <ChangePasswordForm
-          onSubmit={handleSubmit}
-          isPending={changePassword.isPending}
-          error={changePassword.error as ApiError | null}
-        />
-      </Card>
-    </main>
+    <AuthShell>
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-muted outline-none">
+        <Card className="w-full max-w-md p-8">
+          <h1 className="text-xl font-semibold text-center">
+            {t('auth.changePassword.title')}
+          </h1>
+          {required && (
+            <p role="status" className="mt-4 text-center text-sm text-muted-foreground">
+              {t('auth.changePassword.required')}
+            </p>
+          )}
+          <ChangePasswordForm
+            onSubmit={handleSubmit}
+            isPending={changePassword.isPending}
+            error={changePassword.error as ApiError | null}
+          />
+        </Card>
+      </main>
+    </AuthShell>
   )
 }

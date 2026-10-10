@@ -51,7 +51,7 @@ func TestRun_MigrateErrorNonZero(t *testing.T) {
 }
 
 func TestRun_BadArgsUsage(t *testing.T) {
-	for _, args := range [][]string{{"bogus"}, {"migrate", "extra"}, {"--help"}} {
+	for _, args := range [][]string{{"bogus"}, {"migrate", "extra"}, {"healthcheck", "extra"}, {"--help"}} {
 		m := &fakeMigrator{}
 		code, served, _, errOut := runWith(args, m)
 		if code != 2 || served != 0 || m.calls != 0 || !strings.Contains(errOut, "usage:") {

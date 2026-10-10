@@ -191,7 +191,7 @@ describe('useExams', () => {
     })
   })
 
-  it('falls back to ERR_UNKNOWN when a failing response has no error envelope', async () => {
+  it('reports ERR_HTTP when a failing response has no error envelope', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ data: null, error: null }) }),
@@ -200,7 +200,7 @@ describe('useExams', () => {
     const { result } = renderHook(() => useExams(), { wrapper })
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(result.current.error).toMatchObject({
-      code: 'ERR_UNKNOWN',
+      code: 'ERR_HTTP',
       message: 'Request failed: 500',
       httpStatus: 500,
     })
@@ -596,15 +596,11 @@ describe('useDeleteRule', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['exams', 'exam-1'] })
   })
 
-  it('throws ERR_UNKNOWN when a 204 response is flagged as not ok', async () => {
-    vi.stubGlobal('fetch', noContentFetch(false, 204))
+  it('resolves without a body on 204 No Content', async () => {
+    vi.stubGlobal('fetch', noContentFetch(true, 204))
     const { wrapper } = makeWrapper()
     const { result } = renderHook(() => useDeleteRule('exam-1'), { wrapper })
-    await expect(result.current.mutateAsync('rule-9')).rejects.toMatchObject({
-      code: 'ERR_UNKNOWN',
-      message: 'Request failed',
-      httpStatus: 204,
-    })
+    await expect(result.current.mutateAsync('rule-9')).resolves.toBeUndefined()
   })
 
   it('rejects with the API error envelope on a 404', async () => {

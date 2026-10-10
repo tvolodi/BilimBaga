@@ -28,8 +28,9 @@ function ValuesProfileSection({
   const [narrative, setNarrative] = useState<string | null>(null)
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
 
+  const qc = useQueryClient()
   const { mutate, isPending, isError } = useMutation({
-    mutationFn: () => fetchLoyaltyNarrative(sessionId),
+    mutationFn: () => fetchLoyaltyNarrative(qc, sessionId),
     onSuccess: (data) => {
       setNarrative(data.narrative)
       setGeneratedAt(data.generated_at)
@@ -183,7 +184,7 @@ export function EmployeeRecordPage() {
           </Button>
         </div>
         {exportError && (
-          <div role="alert" className="px-4 py-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800">
+          <div role="alert" className="px-4 py-3 rounded-md text-sm bg-bg-danger border border-danger text-danger">
             {t(exportError)}
           </div>
         )}

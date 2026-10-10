@@ -122,7 +122,7 @@ export function RoleFormDialog({ open, role, onClose, onSaved }: RoleFormDialogP
               </p>
             )}
             {nameError && (
-              <p id="role-name-error" role="alert" className="text-sm text-red-600">
+              <p id="role-name-error" role="alert" className="text-sm text-danger">
                 {nameError}
               </p>
             )}
@@ -141,7 +141,7 @@ export function RoleFormDialog({ open, role, onClose, onSaved }: RoleFormDialogP
             {readOnly && <p className="text-xs text-muted-foreground">{t('roles.form.systemReadOnly')}</p>}
             {catalogueLoading && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
             {catalogueError && (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="text-sm text-danger">
                 {t('common.loadError')}
               </p>
             )}
@@ -155,7 +155,7 @@ export function RoleFormDialog({ open, role, onClose, onSaved }: RoleFormDialogP
             )}
           </div>
           {formError && (
-            <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <p role="alert" className="rounded-md border border-danger bg-bg-danger px-3 py-2 text-sm text-danger">
               {formError}
             </p>
           )}

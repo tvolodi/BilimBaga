@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router-dom'
 import { useTenantConfig } from '@/api/useTenantConfig'
@@ -30,6 +31,10 @@ import {
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  /** Below sm the expanded sidebar floats over the page instead of taking width from it (#472). */
+  overlay?: boolean
+  /** Closes the overlay: a followed link, Escape, or focus leaving it (#472). */
+  onClose?: () => void
 }
 
 interface NavItem {
@@ -59,8 +64,10 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false, permission: PERM.settings },
 ]
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, overlay = false, onClose }: SidebarProps) {
   const { t } = useTranslation()
+  const asideRef = useRef<HTMLElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
   const { data: tenantConfig } = useTenantConfig()
   const { role, isCustom, permissions } = useMyPermissions()
   // Built-in roles: unchanged role-list logic. Custom roles: only links whose permission they hold
@@ -71,22 +78,53 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       : !item.roles || (role !== undefined && item.roles.includes(role)),
   )
 
+  // An overlay closes on Escape (focus goes back to the toggle) and when focus leaves it, for example by
+  // Tab past the last link. Focus moving between items inside it keeps it open. The listeners are native:
+  // the aside is not interactive, so React handlers on it fail the jsx-a11y lint rule.
+  useEffect(() => {
+    const aside = asideRef.current
+    if (!aside || !overlay) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      toggleRef.current?.focus()
+      onClose?.()
+    }
+
+    function handleFocusOut(event: FocusEvent) {
+      const next = event.relatedTarget as Node | null
+      if (next && aside?.contains(next)) return
+      onClose?.()
+    }
+
+    aside.addEventListener('keydown', handleKeyDown)
+    aside.addEventListener('focusout', handleFocusOut)
+    return () => {
+      aside.removeEventListener('keydown', handleKeyDown)
+      aside.removeEventListener('focusout', handleFocusOut)
+    }
+  }, [overlay, onClose])
+
   return (
     <aside
+      ref={asideRef}
       className={cn(
-        'flex flex-col h-screen bg-gray-900 text-gray-100 transition-all duration-200',
+        'flex flex-col h-screen bg-bg-navy text-text-on-navy transition-all duration-200',
+        overlay && 'fixed inset-y-0 start-0 z-40 shadow-xl',
         collapsed ? 'w-16' : 'w-56',
       )}
     >
       {/* Logo / Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-text-on-navy/15">
         {!collapsed && (
           <span className="text-lg font-bold tracking-tight truncate">{tenantConfig?.app_name ?? 'BilimBaga'}</span>
         )}
         <button
+          ref={toggleRef}
           onClick={onToggle}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors ml-auto"
+          aria-expanded={!collapsed}
+          className="inline-flex items-center justify-center p-1 max-sm:min-h-11 max-sm:min-w-11 rounded hover:bg-text-on-navy/15 text-text-on-navy/80 hover:text-text-on-navy transition-colors ml-auto"
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
@@ -102,14 +140,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             aria-label={collapsed ? t(labelKey) : undefined}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors',
+                'flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors max-sm:min-h-11',
                 isActive
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white',
+                  ? 'bg-text-on-navy/15 text-text-on-navy'
+                  : 'text-text-on-navy/80 hover:bg-text-on-navy/10 hover:text-text-on-navy',
                 collapsed && 'justify-center px-0',
               )
             }
             title={collapsed ? t(labelKey) : undefined}
+            onClick={() => onClose?.()}
           >
             <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
             {!collapsed && <span className="truncate">{t(labelKey)}</span>}

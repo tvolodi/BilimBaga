@@ -10,10 +10,12 @@ import {
   Legend,
 } from 'recharts'
 import type { ExamCompletionRate } from '@/api/dashboard'
+import { useThemeColors } from '@/hooks/useThemeColors'
 
 interface CompletionBarChartProps {
   data: ExamCompletionRate[]
-  primaryColor: string
+  /** Overrides the resolved primary when given (FR-BB321 AC-10). */
+  primaryColor?: string
 }
 
 interface TooltipPayloadEntry {
@@ -46,6 +48,8 @@ function CustomTooltip({ active, payload, label, fullTitles }: CustomTooltipProp
 
 export function CompletionBarChart({ data, primaryColor }: CompletionBarChartProps) {
   const { t } = useTranslation()
+  const colours = useThemeColors()
+  const primary = primaryColor || colours.primary
 
   const chartData = data.map((e) => {
     const completionPct =
@@ -77,17 +81,17 @@ export function CompletionBarChart({ data, primaryColor }: CompletionBarChartPro
     <div role="img" aria-label={t('dashboard.chart_title')}>
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={colours.border} vertical={false} />
         <XAxis
           dataKey="name"
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 12, fill: colours.textSecondary }}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
           domain={[0, 100]}
           tickFormatter={(v: number) => `${v}%`}
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 12, fill: colours.textSecondary }}
           tickLine={false}
           axisLine={false}
         />
@@ -97,8 +101,8 @@ export function CompletionBarChart({ data, primaryColor }: CompletionBarChartPro
           }
         />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey={assignedKey} fill="#e5e7eb" radius={[4, 4, 0, 0]} />
-        <Bar dataKey={completedKey} fill={primaryColor || '#6366f1'} radius={[4, 4, 0, 0]} />
+        <Bar dataKey={assignedKey} fill={colours.border} radius={[4, 4, 0, 0]} />
+        <Bar dataKey={completedKey} fill={primary} radius={[4, 4, 0, 0]} />
       </BarChart>
       </ResponsiveContainer>
     </div>

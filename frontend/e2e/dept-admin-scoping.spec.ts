@@ -155,9 +155,16 @@ test.describe('department_admin scoping (ISS-165)', () => {
       expect(unknown.status).toBe(404)
       expect(denied.text).toBe(unknown.text)
     }
-    // GET /users/{id} is unchanged (403 for another department).
+    // GET /users/{id} for another department is 404 NOT_FOUND, the same body as an unknown id (FR-BB117 D-4c / D-5).
     const viaUsers = await call('GET', `/api/v1/users/${empB.id}`, deptAdmin.token)
-    expect(viaUsers.status).toBe(403)
+    expect(viaUsers.status).toBe(404)
+    expect(viaUsers.error?.code).toBe('NOT_FOUND')
+    const unknownUser = await call('GET', '/api/v1/users/00000000-0000-4000-8000-000000000000', deptAdmin.token)
+    expect(viaUsers.text).toBe(unknownUser.text)
+
+    // An employee reading another user is refused: a caller without users:read gets 403.
+    const employeeViaUsers = await call('GET', `/api/v1/users/${empB.id}`, empA.token)
+    expect(employeeViaUsers.status).toBe(403)
 
     // super_admin unchanged.
     const sa = await call('GET', `/api/v1/admin/users/${empB.id}/record`, adminToken)

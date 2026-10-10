@@ -46,4 +46,15 @@ describe('applyLocale', () => {
     expect(i18n.language).toBe('kk')
     expect(document.documentElement.lang).toBe('kk')
   })
+
+  it('switches only once an unloaded locale has its translations', async () => {
+    i18n.removeResourceBundle('kk', 'translation')
+
+    applyLocale(i18n, 'kk')
+
+    expect(i18n.language).toBe('en')
+    expect(localStorage.getItem('i18n-lang')).toBe('kk')
+    await vi.waitFor(() => expect(i18n.language).toBe('kk'))
+    expect(i18n.t('common.loading')).toBe('Жүктелуде…')
+  })
 })

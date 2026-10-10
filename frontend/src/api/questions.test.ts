@@ -205,7 +205,7 @@ describe('useQuestions', () => {
     expect(result.current.error).toMatchObject({ message: 'boom', code: 'ERR_UNKNOWN' })
   })
 
-  it('throws a plain request-failed error when a failing response has no envelope', async () => {
+  it('reports ERR_HTTP when a failing response has no envelope', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({ data: null, error: null }) }),
@@ -213,8 +213,7 @@ describe('useQuestions', () => {
     const { wrapper } = makeClient()
     const { result } = renderHook(() => useQuestions(), { wrapper })
     await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(result.current.error).toMatchObject({ message: 'Request failed: 502' })
-    expect((result.current.error as Error & { code?: string }).code).toBeUndefined()
+    expect(result.current.error).toMatchObject({ message: 'Request failed: 502', code: 'ERR_HTTP' })
   })
 })
 

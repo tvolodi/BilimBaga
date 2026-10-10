@@ -24,7 +24,8 @@ type Repository interface {
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (*RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, tokenID string) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
-	UpdatePassword(ctx context.Context, userID, passwordHash string, changedAt time.Time) error
+	// UpdatePassword stamps the next password_changed_at for appNow (see NextPasswordStamp) and returns it.
+	UpdatePassword(ctx context.Context, userID, passwordHash string, appNow time.Time) (time.Time, error)
 
 	// Password recovery (FR-BB115) — see recovery_repository.go.
 	RecoveryRepository
@@ -47,7 +48,7 @@ func (r *pgRepository) GetUserByEmail(ctx context.Context, email string) (*User,
 		SELECT u.id, u.email, u.password_hash, u.full_name,
 		       u.department_id, u.role_id, ro.name AS role_name,
 		       u.status, u.force_password_change, u.failed_attempts,
-		       u.locked_until, u.created_at, u.updated_at
+		       u.locked_until, u.created_at, u.updated_at, u.password_changed_at
 		FROM   users u
 		JOIN   roles ro ON ro.id = u.role_id
 		WHERE  lower(u.email) = $1`
@@ -67,7 +68,7 @@ func (r *pgRepository) GetUserByID(ctx context.Context, userID string) (*User, e
 		SELECT u.id, u.email, u.password_hash, u.full_name,
 		       u.department_id, u.role_id, ro.name AS role_name,
 		       u.status, u.force_password_change, u.failed_attempts,
-		       u.locked_until, u.created_at, u.updated_at
+		       u.locked_until, u.created_at, u.updated_at, u.password_changed_at
 		FROM   users u
 		JOIN   roles ro ON ro.id = u.role_id
 		WHERE  u.id = $1`
@@ -162,25 +163,30 @@ const updatePasswordSQL = `
 		WHERE  id = $2`
 
 // UpdatePassword replaces a user's password hash, clears force_password_change, stamps
-// password_changed_at = changedAt and revokes all of the user's refresh tokens in one
-// transaction. The caller issues a fresh session afterwards (ISS-171).
-func (r *pgRepository) UpdatePassword(ctx context.Context, userID, passwordHash string, changedAt time.Time) error {
+// password_changed_at with NextPasswordStamp(appNow, previous) and revokes all of the user's refresh
+// tokens in one transaction. The previous stamp is read under a row lock (#455). It returns the stamp
+// the caller issues the fresh session at (ISS-171).
+func (r *pgRepository) UpdatePassword(ctx context.Context, userID, passwordHash string, appNow time.Time) (time.Time, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("auth.UpdatePassword: begin: %w", err)
+		return time.Time{}, fmt.Errorf("auth.UpdatePassword: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, updatePasswordSQL, passwordHash, userID, changedAt); err != nil {
-		return fmt.Errorf("auth.UpdatePassword: %w", err)
+	stamp, err := lockAndStamp(ctx, tx, userID, appNow)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("auth.UpdatePassword: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, updatePasswordSQL, passwordHash, userID, stamp); err != nil {
+		return time.Time{}, fmt.Errorf("auth.UpdatePassword: %w", err)
 	}
 	const revokeRefresh = `UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`
 	if _, err := tx.ExecContext(ctx, revokeRefresh, userID); err != nil {
-		return fmt.Errorf("auth.UpdatePassword: revoke refresh tokens: %w", err)
+		return time.Time{}, fmt.Errorf("auth.UpdatePassword: revoke refresh tokens: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("auth.UpdatePassword: commit: %w", err)
+		return time.Time{}, fmt.Errorf("auth.UpdatePassword: commit: %w", err)
 	}
-	return nil
+	return stamp, nil
 }
 
 

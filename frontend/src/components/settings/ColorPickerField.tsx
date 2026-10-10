@@ -1,56 +1,17 @@
-import { useId, type ChangeEvent } from 'react'
+import { useId, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { contrastRatio, MIN_TEXT_CONTRAST, normaliseHex } from '@/lib/color'
+
+// Re-exported for existing callers and tests.
+export { contrastRatio }
 
 interface ColorPickerFieldProps {
   label: string
   value: string
   onChange: (color: string) => void
   contrastAgainst: string
-}
-
-function normaliseHex(input: string): string | null {
-  const trimmed = input.trim().replace(/^#/, '')
-  if (!/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed)) return null
-  const expanded =
-    trimmed.length === 3
-      ? trimmed
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : trimmed
-  return `#${expanded.toLowerCase()}`
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace(/^#/, '')
-  const full =
-    h.length === 3
-      ? h
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : h
-  const num = parseInt(full, 16)
-  return [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff]
-}
-
-function relativeLuminance(hex: string): number {
-  const rgb = hexToRgb(hex)
-  return rgb
-    .map((c) => {
-      const s = c / 255
-      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
-    })
-    .reduce((acc, c, i) => acc + c * [0.2126, 0.7152, 0.0722][i], 0)
-}
-
-export function contrastRatio(hex1: string, hex2: string): number {
-  const l1 = relativeLuminance(hex1)
-  const l2 = relativeLuminance(hex2)
-  const [lighter, darker] = l1 > l2 ? [l1, l2] : [l2, l1]
-  return (lighter + 0.05) / (darker + 0.05)
 }
 
 export function ColorPickerField({
@@ -67,19 +28,26 @@ export function ColorPickerField({
     onChange(e.target.value)
   }
 
+  // The text being typed is shown as typed. Expanding a shorthand or re-rendering the stored value on every
+  // keystroke rewrote the field mid-entry (typing 2E6DB4 ended as #22EE66), so the stored value is shown
+  // again only once the field is left.
+  const [draft, setDraft] = useState<string | null>(null)
+  const hexText = draft ?? value
+
   function handleHexChange(e: ChangeEvent<HTMLInputElement>) {
     const next = e.target.value
-    const normalised = normaliseHex(next)
-    if (normalised) {
-      onChange(normalised)
-    } else {
-      onChange(next)
-    }
+    setDraft(next)
+    // A complete value goes to the parent normalised, with its leading #. An incomplete one goes as typed.
+    onChange(normaliseHex(next) ?? next)
   }
 
-  const safeValue = normaliseHex(value) ?? '#000000'
+  function handleHexBlur() {
+    setDraft(null)
+  }
+
+  const safeValue = normaliseHex(value) ?? '#000000' // design-ok: the native colour input needs a #rrggbb value, so black stands in for one that does not parse
   const ratio = contrastRatio(safeValue, contrastAgainst)
-  const passes = ratio >= 4.5
+  const passes = ratio >= MIN_TEXT_CONTRAST
 
   return (
     <div className="space-y-2">
@@ -96,8 +64,9 @@ export function ColorPickerField({
         <Input
           id={hexInputId}
           type="text"
-          value={value}
+          value={hexText}
           onChange={handleHexChange}
+          onBlur={handleHexBlur}
           aria-label={`${label} hex`}
           className="font-mono uppercase"
           maxLength={7}
@@ -106,7 +75,7 @@ export function ColorPickerField({
       {!passes && (
         <div
           role="alert"
-          className="rounded-md border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800"
+          className="rounded-md border border-warning bg-bg-warning px-3 py-2 text-xs text-warning"
         >
           {t('settings.branding.contrastWarning', { ratio: ratio.toFixed(2) })}
         </div>

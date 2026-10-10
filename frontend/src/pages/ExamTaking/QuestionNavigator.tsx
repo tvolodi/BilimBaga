@@ -32,11 +32,11 @@ export function QuestionNavigator({
               key={q.id}
               onClick={() => onNavigate(q.id)}
               className={cn(
-                'w-8 h-8 rounded text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'h-11 w-11 rounded text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 isFlagged
-                  ? 'bg-yellow-300 border-yellow-400 text-yellow-900 hover:bg-yellow-400'
+                  ? 'bg-bg-warning border-warning text-warning hover:bg-warning/20'
                   : isAnswered
-                    ? 'bg-blue-500 border-blue-600 text-white hover:bg-blue-600'
+                    ? 'bg-info border-info text-primary-foreground hover:bg-info/90'
                     : 'bg-background border-border text-foreground hover:bg-muted',
               )}
               title={`${t('exam.taking.navigator.title')} ${idx + 1}`}
@@ -50,8 +50,8 @@ export function QuestionNavigator({
       {/* Legend */}
       <div className="mt-4 space-y-1.5">
         <LegendItem color="bg-background border border-border" label={t('exam.taking.navigator.unanswered')} />
-        <LegendItem color="bg-blue-500" label={t('exam.taking.navigator.answered')} />
-        <LegendItem color="bg-yellow-300" label={t('exam.taking.navigator.flagged')} />
+        <LegendItem color="bg-info" label={t('exam.taking.navigator.answered')} />
+        <LegendItem color="bg-warning" label={t('exam.taking.navigator.flagged')} />
       </div>
     </div>
   )

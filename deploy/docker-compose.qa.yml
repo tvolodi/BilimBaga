@@ -35,6 +35,14 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    healthcheck:
+      # #396: probes the API through the proxy, so it covers nginx and the /api/ path end to end.
+      # The api image is FROM scratch (no shell, no health subcommand) and has no healthcheck of its own.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "http://127.0.0.1/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   bilimbaga_qa_pgdata:

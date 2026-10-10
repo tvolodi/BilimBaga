@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { clearPasswordChangeRequired, markPasswordChangeRequired } from '@/lib/passwordChangeRequired'
+import { clearE2eToken, readE2eToken, writeE2eToken } from '@/lib/e2eTokenSeed'
+import { clearNonPublicQueries } from '@/lib/queryCache'
 
 export interface ApiError {
   code: string
@@ -15,7 +17,6 @@ export interface CurrentUser {
   force_password_change: boolean
 }
 
-const E2E_TOKEN_KEY = '__e2e_access_token__'
 
 interface LoginPayload {
   email: string
@@ -86,10 +87,12 @@ export function useLogin() {
       return json.data as LoginResponse
     },
     onSuccess: (data) => {
-      // FR-BB116: drop the previous session's cached profile so its preferred_locale is never applied.
-      qc.removeQueries({ queryKey: ['users'] })
+      // #436: no data from the previous session survives a login (FR-BB116: its profile and locale included).
+      clearNonPublicQueries(qc)
       qc.setQueryData(['auth', 'currentUser'], data.user)
       qc.setQueryData(['auth', 'accessToken'], data.access_token)
+      // A seeded e2e build boots from the stored token, so a fresh sign-in must replace the seed (ISS-249).
+      if (readE2eToken()) writeE2eToken(data.access_token)
       clearPasswordChangeRequired(qc) // the login response carries the authoritative flag
     },
   })
@@ -119,7 +122,7 @@ export function useChangePassword() {
         qc.setQueryData(['auth', 'accessToken'], data.access_token)
         // E2E-seeded token (global-setup) would otherwise be re-served by useRefreshToken.
         try {
-          if (localStorage.getItem(E2E_TOKEN_KEY)) localStorage.setItem(E2E_TOKEN_KEY, data.access_token)
+          if (readE2eToken()) writeE2eToken(data.access_token)
         } catch { /* ignore */ }
       }
     },
@@ -136,7 +139,8 @@ export function useLogout() {
       })
     },
     onSettled: () => {
-      qc.removeQueries({ queryKey: ['users'] }) // FR-BB116: no profile (or locale) outlives the session
+      clearNonPublicQueries(qc) // #436, FR-BB116: no profile (or locale) outlives the session
+      clearE2eToken() // #415: no stored token outlives the session, in any build
       qc.setQueryData(['auth', 'accessToken'], null)
       qc.setQueryData(['auth', 'currentUser'], null)
       clearPasswordChangeRequired(qc)
@@ -152,7 +156,7 @@ export function useRefreshToken() {
       // E2E: if a token was seeded into localStorage by global-setup, use it directly.
       // The token stays in localStorage so subsequent page navigations within the same
       // test run can reuse it without hitting the auth rate limit on /auth/refresh.
-      const seeded = localStorage.getItem(E2E_TOKEN_KEY)
+      const seeded = readE2eToken()
       if (seeded) {
         const claims = decodeJwtPayload(seeded)
         // Use the cached token only when it has more than 65 seconds of lifetime left.
@@ -173,7 +177,7 @@ export function useRefreshToken() {
           return seeded
         }
         // Token expired — remove and fall through to refresh.
-        localStorage.removeItem(E2E_TOKEN_KEY)
+        clearE2eToken()
       }
 
       try {
@@ -194,7 +198,7 @@ export function useRefreshToken() {
         const accessToken = json.data.access_token as string
         // Persist the new token so subsequent page navigations (fresh JS contexts)
         // can use it directly without triggering another refresh / token rotation.
-        try { localStorage.setItem(E2E_TOKEN_KEY, accessToken) } catch { /* ignore */ }
+        writeE2eToken(accessToken)
         // Reconstruct minimal user info from JWT claims (refresh response has no user object)
         const claims = decodeJwtPayload(accessToken)
         if (claims) {

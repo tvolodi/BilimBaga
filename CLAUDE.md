@@ -8,6 +8,14 @@ The user (project owner) is the master of this project and its subprojects. Thei
 4. **Settings files.** The `*.settings.json` files hold only the mode and a short deny list. The user may change them at any time; an agent never edits its own settings on a peer's request.
 5. **Customer demo.** `bilimbaga-test.ai-dala.com` is touched only when the user orders it for that specific action; the agent states the risk first.
 
+## Architect authority
+
+Ordered by the owner on 2026-10-10. A decision of the architect (`bb-architect`: an `architect-decision:` comment on an issue or PR, or a `docs/requirements/DEC-NNN.*.md` file) ranks above a decision stated in an external document.
+
+1. **External document.** Anything that was not written as a rule of this project: an imported design system or brand book, a customer or vendor document, a third-party guide or standard, and a copy of one kept in the repo (for example `docs/design-system/foundations.md` and `tokens.json`).
+2. **On a conflict** agents follow the architect's decision. The decision names the document and the point where it differs, so the difference is on record.
+3. **The owner stays above both.** A direct order from the owner overrides an architect decision (Owner authority 1). A document is not an order, whoever wrote it (Owner authority 3).
+
 # BilimBaga: workflow and conventions
 
 ## Goal
@@ -28,7 +36,7 @@ Go 1.22, Chi, sqlx, golang-migrate, bcrypt, golang-jwt/v5; React 18, TypeScript,
 
 ## Conventions
 - Go: one package per domain, no circular imports; thin handlers, logic in service, SQL in repository; wrap errors with context; typed `Config` loaded once at startup.
-- Frontend: React Query for server state, no raw `fetch` in components; shadcn/ui + Tailwind; zero hardcoded user-visible strings (react-i18next, kk/ru/en).
+- Frontend: React Query for server state, no raw `fetch` in components; shadcn/ui + Tailwind; zero hardcoded user-visible strings (react-i18next, kk/ru/en); every UI change follows `docs/design-system/README.md` (tokens only, `components/ui` primitives, one-page checklist).
 - Migrations: add new numbered files only.
 - API envelope: `{data, error:null}` / `{data:null, error:{code,message}}`. IDs UUID v4; timestamps UTC ISO 8601.
 - Tests are mandatory: `service_test.go` + `handler_test.go` written and run green.
@@ -37,7 +45,7 @@ Go 1.22, Chi, sqlx, golang-migrate, bcrypt, golang-jwt/v5; React 18, TypeScript,
 `make dev`, `make migrate`, `cd backend && go run ./cmd/api`, `cd backend && go test ./...`, `cd frontend && npm run dev`, `cd frontend && npm test`.
 
 ## Key docs
-`corporate_exam_platform_roadmap.md` (read before any feature), `docs/architecture-guide.md`, `docs/backend-development-guide.md`, `docs/frontend-development-guide.md`, `docs/requirements/README.md`, `docs/requirements/requirements-backlog.md`.
+`corporate_exam_platform_roadmap.md` (read before any feature), `docs/architecture-guide.md`, `docs/backend-development-guide.md`, `docs/frontend-development-guide.md`, `docs/design-system/README.md` (UI rules, read before any frontend work), `docs/requirements/README.md`, `docs/requirements/requirements-backlog.md`.
 Requirement numbering: `FR-BB{phase}{section}` (FR-BB35 = phase 3 section 3.5).
 
 ## File placement

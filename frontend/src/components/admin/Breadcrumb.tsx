@@ -31,16 +31,16 @@ export function Breadcrumb() {
   }))
 
   return (
-    <nav aria-label="breadcrumb" className="flex items-center gap-1 text-sm text-gray-500 mb-4">
+    <nav aria-label="breadcrumb" className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
       {crumbs.map((crumb, i) => (
         <span key={crumb.pathname} className="flex items-center gap-1">
-          {i > 0 && <ChevronRight size={14} className="text-gray-400" />}
+          {i > 0 && <ChevronRight size={14} className="text-muted-foreground" />}
           {i < crumbs.length - 1 ? (
-            <Link to={crumb.pathname} className="hover:text-gray-700 transition-colors">
+            <Link to={crumb.pathname} className="hover:text-foreground transition-colors">
               {crumb.label}
             </Link>
           ) : (
-            <span className="text-gray-700 font-medium">{crumb.label}</span>
+            <span className="text-foreground font-medium">{crumb.label}</span>
           )}
         </span>
       ))}

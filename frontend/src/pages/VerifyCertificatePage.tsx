@@ -6,6 +6,7 @@ import { useVerifyCertificate } from '@/api/verify'
 import { useTenantConfig } from '@/api/useTenantConfig'
 import { TenantLogo } from '@/components/TenantLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -40,9 +41,12 @@ export function VerifyCertificatePage() {
       tabIndex={-1}
       className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-6 px-4 py-8 outline-none"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <TenantLogo appName={tenant?.app_name} />
-        <LocaleSwitcher />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <LocaleSwitcher />
+        </div>
       </div>
       {tenant?.app_name && <p className="text-center text-sm font-semibold">{tenant.app_name}</p>}
 
@@ -65,7 +69,7 @@ export function VerifyCertificatePage() {
 
           {isError && (
             <div className="space-y-3">
-              <p className="flex items-center gap-2 font-medium text-amber-600">
+              <p className="flex items-center gap-2 font-medium text-warning">
                 <AlertTriangle aria-hidden="true" className="h-5 w-5" />
                 {t('verify.unavailable')}
               </p>
@@ -79,7 +83,7 @@ export function VerifyCertificatePage() {
             <div className="space-y-4">
               <p
                 role="status"
-                className="flex items-center gap-2 text-lg font-semibold text-green-600"
+                className="flex items-center gap-2 text-lg font-semibold text-success"
               >
                 <CheckCircle2 aria-hidden="true" className="h-6 w-6" />
                 {t('verify.valid')}
@@ -106,7 +110,7 @@ export function VerifyCertificatePage() {
           )}
 
           {data && !data.valid && (
-            <p role="alert" className="flex items-center gap-2 text-lg font-semibold text-red-600">
+            <p role="alert" className="flex items-center gap-2 text-lg font-semibold text-danger">
               <XCircle aria-hidden="true" className="h-6 w-6" />
               {t('verify.invalid')}
             </p>

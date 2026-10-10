@@ -42,6 +42,13 @@ func newSelfChangeEnv(t *testing.T, now time.Time, force bool) *selfChangeEnv {
 		getUserByIDFn: func(context.Context, string) (*User, error) {
 			return &User{ID: "u1", Email: "a@example.com", RoleName: "employee", PasswordHash: string(hash), ForcePasswordChange: e.force}, nil
 		},
+		passwordStamp: func() *time.Time {
+			if e.changedAt.IsZero() {
+				return nil
+			}
+			t := e.changedAt
+			return &t
+		},
 		updatePasswordFn: func(_ context.Context, _ string, _ string, at time.Time) error {
 			e.events = append(e.events, "update+revoke")
 			e.changedAt, e.force, e.revoked = at, false, true
@@ -108,22 +115,23 @@ func TestSelfChange_OldTokenRevoked_NewTokenWorksImmediately(t *testing.T) {
 }
 
 func TestSelfChange_BoundarySameSecond(t *testing.T) {
-	// The clock sits 700ms into the second: the stamp is truncated to the second and the new
-	// token's iat is that same second, so iat == floor(stamp) and the new token passes.
+	// The clock sits 700ms into the second: the stamp is the start of the next second (#455), and the
+	// new token's iat is that stamp, so the new token passes at once.
 	now := testNow(700_000_000)
 	e := newSelfChangeEnv(t, now, false)
 	resp, _, err := e.change("OldPass123")
 	require.NoError(t, err)
 
 	require.Len(t, e.stamps, 1)
-	assert.Equal(t, now.Truncate(time.Second), e.stamps[0])
+	assert.Equal(t, now.Truncate(time.Second).Add(time.Second), e.stamps[0])
 	claims, err := e.svc.ParseAccessToken(resp.AccessToken)
 	require.NoError(t, err)
 	assert.Equal(t, e.stamps[0].Unix(), claims.IssuedAt.Unix(), "new token iat equals the stamp second")
 	assert.Equal(t, http.StatusOK, e.get(resp.AccessToken).Code)
 
-	// iat one second before the stamp is revoked; the same second is accepted (documented
-	// second-granularity caveat: the epoch is inclusive).
+	// A token issued in the change's own second, before the change, is revoked (#455); iat equal to
+	// the stamp is accepted, since the epoch is inclusive.
+	assert.Equal(t, http.StatusUnauthorized, e.get(e.tokenAt(now.Truncate(time.Second))).Code)
 	assert.Equal(t, http.StatusUnauthorized, e.get(e.tokenAt(e.stamps[0].Add(-time.Second))).Code)
 	assert.Equal(t, http.StatusOK, e.get(e.tokenAt(e.stamps[0])).Code)
 }

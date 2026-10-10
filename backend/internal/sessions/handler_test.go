@@ -717,6 +717,30 @@ func TestReportEvent_Handler_200_Warn(t *testing.T) {
 	assert.Equal(t, float64(3), data["event_count"])
 }
 
+// FR-BB319 AC-1 / AC-11: capped case (policy submit, blur) → 200 with warn=true and event_count,
+// and the JSON has no session_id or status key.
+func TestReportEvent_Handler_200_CappedBlur_NoSessionFields(t *testing.T) {
+	svc := &mockSvc{
+		reportEventFn: func(_ context.Context, _, _ string, _ ReportEventInput) (*ReportEventResponse, error) {
+			return &ReportEventResponse{Warn: true, EventCount: 1}, nil
+		},
+	}
+	h := NewHandler(svc)
+	w := httptest.NewRecorder()
+	h.ReportEvent(w, reportEventRequest(`{"type":"blur"}`))
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w.Body.Bytes())
+	assert.Nil(t, body["error"])
+	data, ok := body["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["warn"])
+	assert.Equal(t, float64(1), data["event_count"])
+	assert.NotContains(t, data, "session_id")
+	assert.NotContains(t, data, "status")
+	assert.NotContains(t, data, "score_pct")
+	assert.NotContains(t, data, "passed")
+}
+
 // AC-2: on_tab_switch='submit' → 200 with session_id + status=auto_submitted.
 func TestReportEvent_Handler_200_Submit(t *testing.T) {
 	sid := "sess-1"

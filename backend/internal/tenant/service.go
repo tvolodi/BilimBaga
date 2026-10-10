@@ -156,6 +156,12 @@ func (s *service) UpdateConfig(ctx context.Context, updates map[string]json.RawM
 		return nil, err
 	}
 
+	if primaryRaw, ok := updates["primary_color"]; ok {
+		if err := validatePrimaryColor(primaryRaw); err != nil {
+			return nil, err
+		}
+	}
+
 	if logoRaw, ok := updates["logo"]; ok {
 		var logoStr *string
 		if err := json.Unmarshal(logoRaw, &logoStr); err != nil {
@@ -224,6 +230,28 @@ func (s *service) GetAvailableLocales() []string {
 		return nil
 	}
 	return v
+}
+
+// validatePrimaryColor enforces FR-BB320 AC-1: the primary colour must be a #rgb or #rrggbb
+// value whose contrast against white reaches 4.5:1, because it carries the white text on
+// primary surfaces. A value that cannot be parsed has no contrast ratio and is rejected too.
+func validatePrimaryColor(raw json.RawMessage) error {
+	var colour string
+	if err := json.Unmarshal(raw, &colour); err != nil {
+		return &ValidationError{Code: "VALIDATION_ERROR", Message: "primary_color must be a hex colour string"}
+	}
+	ratio, err := ContrastRatio(colour, "#ffffff")
+	if err != nil {
+		return &ValidationError{Code: "VALIDATION_ERROR", Message: "primary_color must be a #rgb or #rrggbb hex colour"}
+	}
+	if ratio < minPrimaryContrast {
+		return &ValidationError{
+			Code: "VALIDATION_ERROR",
+			Message: fmt.Sprintf("primary_color contrast against white is %.2f:1; it must be at least %.1f:1",
+				ratio, minPrimaryContrast),
+		}
+	}
+	return nil
 }
 
 // validateLocaleConstraint enforces that default_locale ∈ available_locales.

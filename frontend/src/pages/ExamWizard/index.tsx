@@ -36,7 +36,7 @@ function StepIndicator({ currentStep, totalSteps, labels }: {
               isActive
                 ? 'bg-primary text-primary-foreground'
                 : isDone
-                ? 'bg-primary/20 text-primary'
+                ? 'bg-primary/20 text-foreground'
                 : 'bg-muted text-muted-foreground'
             }`}>
               {step}

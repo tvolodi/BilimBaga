@@ -1,0 +1,24 @@
+﻿BilimBaga swarm snapshot 2026-10-09T17:00:00Z
+
+Roster:
+  dev1  bb-dev1
+  dev2  bb-dev2
+  ba  bb-ba
+  uat  bb-uat
+  infra  bb-infra
+  architect  bb-architect
+  supervisor  bb-supervisor
+
+Open swarm issues by status:
+  status:ready = 2
+  status:in-progress = 1
+  status:review = 0
+  status:uat = 0
+  status:blocked = 0
+  status:done = 0
+
+Titles:
+  #1 [status:ready] first
+  #2 [status:in-progress] leaky [REDACTED]
+  #3 [status:ready] third password [REDACTED]
+

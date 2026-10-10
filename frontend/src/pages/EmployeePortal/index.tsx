@@ -8,6 +8,7 @@ import { ExamCard } from './ExamCard'
 import { ExamCardSkeleton } from './ExamCardSkeleton'
 import { StartExamModal } from './StartExamModal'
 import { EmptyPortal } from './EmptyPortal'
+import { requestDocumentFullscreen } from '@/lib/fullscreen'
 
 export function EmployeePortal() {
   const { t } = useTranslation()
@@ -24,6 +25,8 @@ export function EmployeePortal() {
   }
 
   function handleConfirm() {
+    // FR-BB319 AC-8: first statement, inside the user's click, so the browser allows fullscreen.
+    requestDocumentFullscreen()
     createSession.mutate(undefined, {
       onSuccess: (data) => {
         setSelectedExam(null)

@@ -53,6 +53,8 @@ jobs:
       - name: go test
         if: ${{ !cancelled() }}
         run: go test -p 2 ./...
+      - name: Sign-in limiter script refuses a non-local base (#484)
+        run: bash ../scripts/tests/test-limiter-forwarded-headers_test.sh
 
   frontend-tests:
     runs-on: ubuntu-latest

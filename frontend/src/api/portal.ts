@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from './apiFetch'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -43,60 +44,26 @@ export interface CreateSessionResponse {
 
 // ---- API helper -------------------------------------------------------------
 
-interface ApiResponse<T> {
-  data: T
-  error: null | { code: string; message: string }
-}
-
 export interface PortalApiError extends Error {
   code: string
-}
-
-async function apiFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
-  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-  const res = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
-  })
-  // A proxy/gateway error (502, HTML body) must still surface as a normal Error, not a JSON SyntaxError.
-  let body: ApiResponse<T> | null = null
-  try {
-    body = (await res.json()) as ApiResponse<T>
-  } catch {
-    body = null
-  }
-  if (body?.error) {
-    const err = new Error(body.error.message) as PortalApiError
-    err.code = body.error.code
-    throw err
-  }
-  if (!res.ok || !body) {
-    const err = new Error(`Request failed: ${res.status}`) as PortalApiError
-    err.code = 'ERR_HTTP'
-    throw err
-  }
-  return body.data
 }
 
 // ---- Hooks ------------------------------------------------------------------
 
 export function usePortalExams() {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<PortalExam[], Error>({
     queryKey: ['portal', 'exams'],
-    queryFn: () => apiFetch<PortalExam[]>('/api/v1/portal/exams', token),
+    queryFn: () => apiFetch<PortalExam[]>(qc, '/api/v1/portal/exams'),
     refetchInterval: 30_000,
   })
 }
 
 export function usePortalExam(examId: string | undefined) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<PortalExamDetail, Error>({
     queryKey: ['portal', 'exams', examId],
-    queryFn: () => apiFetch<PortalExamDetail>(`/api/v1/portal/exams/${examId}`, token),
+    queryFn: () => apiFetch<PortalExamDetail>(qc, `/api/v1/portal/exams/${examId}`),
     staleTime: Infinity,
     enabled: !!examId,
   })
@@ -106,8 +73,7 @@ export function useCreateSession(examId: string) {
   const queryClient = useQueryClient()
   return useMutation<CreateSessionResponse, Error, void>({
     mutationFn: () => {
-      const token = queryClient.getQueryData<string | null>(['auth', 'accessToken'])
-      return apiFetch<CreateSessionResponse>(`/api/v1/portal/exams/${examId}/sessions`, token, {
+      return apiFetch<CreateSessionResponse>(queryClient, `/api/v1/portal/exams/${examId}/sessions`, {
         method: 'POST',
       })
     },

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { errorWithCode } from '@/api/errors'
+import { apiFetch } from './apiFetch'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -112,36 +112,13 @@ export interface EventResponse {
 
 // ---- API helper -------------------------------------------------------------
 
-interface ApiResponse<T> {
-  data: T
-  error: null | { code: string; message: string }
-}
-
-async function apiFetch<T>(url: string, token?: string | null, options?: RequestInit): Promise<T> {
-  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-  const res = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: { ...authHeader, ...(options?.headers as Record<string, string>) },
-  })
-  const body: ApiResponse<T> = await res.json()
-  if (body.error) {
-    throw errorWithCode(body.error)
-  }
-  if (!res.ok) {
-    throw new Error(`Request failed: ${res.status}`)
-  }
-  return body.data
-}
-
 // ---- Hooks ------------------------------------------------------------------
 
 export function useSession(sessionId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<ResumeSessionResponse, Error>({
     queryKey: ['portal', 'sessions', sessionId],
-    queryFn: () => apiFetch<ResumeSessionResponse>(`/api/v1/portal/sessions/${sessionId}`, token),
+    queryFn: () => apiFetch<ResumeSessionResponse>(qc, `/api/v1/portal/sessions/${sessionId}`),
     staleTime: 30 * 1000, // AC-6: 30 seconds — session state changes frequently
     retry: false,
   })
@@ -149,12 +126,11 @@ export function useSession(sessionId: string) {
 
 export function useSaveAnswer(sessionId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useMutation<SaveAnswerResponse, Error, { questionId: string; answer: SaveAnswerRequest }>({
     mutationFn: ({ questionId, answer }) =>
       apiFetch<SaveAnswerResponse>(
+        qc,
         `/api/v1/portal/sessions/${sessionId}/answers/${questionId}`,
-        token,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -166,10 +142,9 @@ export function useSaveAnswer(sessionId: string) {
 
 export function useSubmitSession(sessionId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useMutation<SubmitResult, Error, void>({
     mutationFn: () =>
-      apiFetch<SubmitResult>(`/api/v1/portal/sessions/${sessionId}/submit`, token, {
+      apiFetch<SubmitResult>(qc, `/api/v1/portal/sessions/${sessionId}/submit`, {
         method: 'POST',
       }),
   })
@@ -177,10 +152,9 @@ export function useSubmitSession(sessionId: string) {
 
 export function useReportEvent(sessionId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useMutation<EventResponse, Error, EventPayload>({
     mutationFn: (payload) =>
-      apiFetch<EventResponse>(`/api/v1/portal/sessions/${sessionId}/events`, token, {
+      apiFetch<EventResponse>(qc, `/api/v1/portal/sessions/${sessionId}/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -190,10 +164,9 @@ export function useReportEvent(sessionId: string) {
 
 export function useSessionResult(sessionId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<SessionResult, Error>({
     queryKey: ['session-result', sessionId],
-    queryFn: () => apiFetch<SessionResult>(`/api/v1/portal/sessions/${sessionId}/result`, token),
+    queryFn: () => apiFetch<SessionResult>(qc, `/api/v1/portal/sessions/${sessionId}/result`),
     staleTime: Infinity,
     retry: false,
   })
@@ -203,10 +176,9 @@ export function useSessionResult(sessionId: string) {
 
 export function useNextAdaptiveQuestion(sessionId: string, enabled: boolean) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<NextQuestionResponse, Error>({
     queryKey: ['session-next-question', sessionId],
-    queryFn: () => apiFetch<NextQuestionResponse>(`/api/v1/portal/sessions/${sessionId}/next-question`, token),
+    queryFn: () => apiFetch<NextQuestionResponse>(qc, `/api/v1/portal/sessions/${sessionId}/next-question`),
     enabled,
     staleTime: 0, // always re-fetch on invalidation
     retry: false,
@@ -239,13 +211,12 @@ export interface MyResultsResponse {
 
 export function useMyResults(page: number, sort: 'date' | 'score', dir: 'asc' | 'desc') {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<MyResultsResponse, Error>({
     queryKey: ['my-results', page, sort, dir],
     queryFn: () =>
       apiFetch<MyResultsResponse>(
+        qc,
         `/api/v1/portal/results?page=${page}&sort=${sort}&dir=${dir}&per_page=20`,
-        token,
       ),
     placeholderData: keepPreviousData,
     retry: false,
@@ -272,13 +243,12 @@ export interface ExamHistoryResponse {
 
 export function useExamHistory(examId: string) {
   const qc = useQueryClient()
-  const token = qc.getQueryData<string | null>(['auth', 'accessToken'])
   return useQuery<ExamHistoryResponse, Error>({
     queryKey: ['exam-history', examId],
     queryFn: () =>
       apiFetch<ExamHistoryResponse>(
+        qc,
         `/api/v1/portal/exams/${examId}/history?page=1&per_page=1`,
-        token,
       ),
     enabled: !!examId,
     staleTime: 30 * 1000,

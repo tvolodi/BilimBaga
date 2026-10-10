@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
-import { apiFetch } from './apiFetch'
+import { apiFetch, apiFetchPaginated } from './apiFetch'
 import { SESSION_REVOKED_KEY } from '@/lib/sessionRevoked'
 
 function qcWithToken(token = 't0k3n') {
@@ -50,6 +50,65 @@ describe('apiFetch', () => {
     await expect(apiFetch(qcWithToken(), '/x', { method: 'DELETE' })).rejects.toMatchObject({
       code: 'ROLE_IN_USE',
       details: { count: 3 },
+    })
+  })
+
+  it('reports a gateway HTML body as ERR_HTTP, not a JSON SyntaxError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON')
+        },
+      }),
+    )
+    await expect(apiFetch(qcWithToken(), '/x')).rejects.toMatchObject({
+      code: 'ERR_HTTP',
+      message: 'Request failed: 502',
+      status: 502,
+    })
+  })
+
+  it('falls back to ERR_UNKNOWN for an error envelope without a code', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ data: null, error: { message: 'boom' } }) }),
+    )
+    await expect(apiFetch(qcWithToken(), '/x')).rejects.toMatchObject({ code: 'ERR_UNKNOWN', message: 'boom' })
+  })
+
+  it('carries the HTTP status and field errors from the envelope', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          data: null,
+          error: { code: 'VALIDATION', message: 'bad', fields: [{ field: 'email', message: 'taken' }] },
+        }),
+      }),
+    )
+    await expect(apiFetch(qcWithToken(), '/x')).rejects.toMatchObject({
+      status: 422,
+      fields: [{ field: 'email', message: 'taken' }],
+    })
+  })
+
+  it('apiFetchPaginated returns the rows and the envelope meta', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{ id: 1 }], meta: { page: 2, per_page: 20, total: 41 }, error: null }),
+      }),
+    )
+    await expect(apiFetchPaginated<{ id: number }[], { page: number; per_page: number; total: number }>(qcWithToken(), '/x')).resolves.toEqual({
+      data: [{ id: 1 }],
+      meta: { page: 2, per_page: 20, total: 41 },
     })
   })
 })

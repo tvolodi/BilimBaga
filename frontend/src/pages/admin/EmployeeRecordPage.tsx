@@ -28,8 +28,9 @@ function ValuesProfileSection({
   const [narrative, setNarrative] = useState<string | null>(null)
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
 
+  const qc = useQueryClient()
   const { mutate, isPending, isError } = useMutation({
-    mutationFn: () => fetchLoyaltyNarrative(sessionId),
+    mutationFn: () => fetchLoyaltyNarrative(qc, sessionId),
     onSuccess: (data) => {
       setNarrative(data.narrative)
       setGeneratedAt(data.generated_at)

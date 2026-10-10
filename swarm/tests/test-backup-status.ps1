@@ -32,11 +32,19 @@ Set-Content (Join-Path $env:SWARM_STATE_DIR 'sessions.json') '{"dev1":{"session_
 
 # --- backup: WhatIf writes nothing ---
 $root = Join-Path $tmp 'backups'
+New-Item -ItemType Directory -Path (Join-Path $tmp 'unused.git') | Out-Null   # #464: -PushRemote must be an existing local directory
 $o = Run 'backup-state.ps1' @('-WhatIf', '-BackupRoot', $root, '-PushRemote', (Join-Path $tmp 'unused.git'), '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T12:00:00Z')
 Check 'backup WhatIf plans the folder' ($o -match '20261009-120000')
 Check 'backup WhatIf creates nothing' (-not (Test-Path $root))
 Check 'backup WhatIf snapshot is scrubbed' (($o -match 'REDACTED') -and ($o -notmatch 'ghp_abcdef') -and ($o -notmatch 'hunter2'))
 Check 'snapshot excludes session ids' ($o -notmatch '11111111-1111')
+
+# --- #464: -PushRemote must be an existing local directory (a local bare repo). Anything else is refused before any copy ---
+$refusedRoot = Join-Path $tmp 'backups-refused'
+foreach ($bad in @('https://github.com/tvolodi/BilimBaga.git', 'git@github.com:tvolodi/BilimBaga.git', 'ssh://host/repo.git', 'origin', 'relative.git', '\\server\share\repo.git', (Join-Path $tmp 'no-such.git'))) {
+  $o = Run 'backup-state.ps1' @('-BackupRoot', $refusedRoot, '-PushRemote', $bad, '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T17:00:00Z')
+  Check "refuses -PushRemote '$bad' (exit 2, nothing copied)" (($LASTEXITCODE -eq 2) -and ($o -match 'refused') -and -not (Test-Path $refusedRoot))
+}
 
 # --- real copy into temp root, with foreign content that must survive pruning ---
 New-Item -ItemType Directory -Path $root | Out-Null
@@ -67,12 +75,14 @@ $root2 = Join-Path $tmp 'backups2'
 $o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', $bare, '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T12:00:00Z')
 $txt = (& git -C $bare show swarm-state:swarm-snapshot.txt 2>&1 | Out-String)
 Check 'snapshot pushed to branch swarm-state' ($txt -match 'status:ready = 2' -and $txt -match 'bb-dev1')
+Check 'accepts a local bare repo (not refused)' ($o -notmatch 'refused')
 Check 'pushed snapshot has no secrets' (($txt -notmatch 'ghp_abcdef') -and ($txt -notmatch 'hunter2') -and ($txt -notmatch 'session_id'))
 $files = (& git -C $bare ls-tree -r --name-only swarm-state 2>&1 | Out-String).Trim()
 Check 'branch holds only the snapshot file' ($files -eq 'swarm-snapshot.txt')
 $o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', $bare, '-QueueJsonFile', $queue2, '-NowUtc', '2026-10-09T13:00:00Z')
 Check 'second push is a fast-forward (2 commits)' ((& git -C $bare rev-list --count swarm-state) -eq '2')
-$o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', (Join-Path $tmp 'no-such.git'), '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T14:00:00Z')
+New-Item -ItemType Directory -Path (Join-Path $tmp 'not-a-repo.git') | Out-Null   # an existing directory that is not a bare repo, so the push fails
+$o = Run 'backup-state.ps1' @('-BackupRoot', $root2, '-PushRemote', (Join-Path $tmp 'not-a-repo.git'), '-QueueJsonFile', $queue, '-NowUtc', '2026-10-09T14:00:00Z')
 Check 'failed push only warns, backup still made' (($o -match 'snapshot push skipped') -and (Test-Path (Join-Path $root2 '20261009-140000\roster.json')) -and ($LASTEXITCODE -eq 0))
 
 # --- unchanged snapshot is skipped (only the timestamp differs) ---

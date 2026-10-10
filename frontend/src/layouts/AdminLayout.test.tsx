@@ -133,3 +133,47 @@ describe('AdminLayout sidebar below sm (FR-BB321 AC-6, #472)', () => {
     expect(aside).not.toHaveClass('fixed')
   })
 })
+
+describe('AdminLayout sidebar overlay keyboard (FR-BB321 AC-6, #472)', () => {
+  function stubWidth(sm: boolean) {
+    window.matchMedia = vi.fn(
+      (query: string) =>
+        ({ matches: sm, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList,
+    )
+  }
+
+  beforeEach(() => {
+    vi.mocked(useMe).mockReturnValue({ data: adminUser, isLoading: false } as ReturnType<typeof useMe>)
+    window.localStorage.removeItem('sidebar-collapsed')
+  })
+
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia
+    window.localStorage.removeItem('sidebar-collapsed')
+  })
+
+  it('Escape closes the open sidebar and returns focus to its toggle', async () => {
+    stubWidth(false)
+    renderLayout('/admin')
+    await userEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+    const aside = document.querySelector('aside') as HTMLElement
+    expect(aside).toHaveClass('fixed')
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(aside).not.toHaveClass('fixed')
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveFocus()
+  })
+
+  it('closes the open sidebar when focus moves to the top bar', async () => {
+    stubWidth(false)
+    renderLayout('/admin')
+    await userEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+    const aside = document.querySelector('aside') as HTMLElement
+    expect(aside).toHaveClass('fixed')
+
+    await userEvent.click(screen.getByRole('combobox'))
+
+    expect(aside).not.toHaveClass('fixed')
+  })
+})

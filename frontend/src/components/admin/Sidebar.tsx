@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router-dom'
 import { useTenantConfig } from '@/api/useTenantConfig'
@@ -32,8 +33,8 @@ interface SidebarProps {
   onToggle: () => void
   /** Below sm the expanded sidebar floats over the page instead of taking width from it (#472). */
   overlay?: boolean
-  /** Called when a link is followed, so an overlay closes. */
-  onNavigate?: () => void
+  /** Closes the overlay: a followed link, Escape, or focus leaving it (#472). */
+  onClose?: () => void
 }
 
 interface NavItem {
@@ -63,8 +64,10 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false, permission: PERM.settings },
 ]
 
-export function Sidebar({ collapsed, onToggle, overlay = false, onNavigate }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, overlay = false, onClose }: SidebarProps) {
   const { t } = useTranslation()
+  const asideRef = useRef<HTMLElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
   const { data: tenantConfig } = useTenantConfig()
   const { role, isCustom, permissions } = useMyPermissions()
   // Built-in roles: unchanged role-list logic. Custom roles: only links whose permission they hold
@@ -75,8 +78,36 @@ export function Sidebar({ collapsed, onToggle, overlay = false, onNavigate }: Si
       : !item.roles || (role !== undefined && item.roles.includes(role)),
   )
 
+  // An overlay closes on Escape (focus goes back to the toggle) and when focus leaves it, for example by
+  // Tab past the last link. Focus moving between items inside it keeps it open. The listeners are native:
+  // the aside is not interactive, so React handlers on it fail the jsx-a11y lint rule.
+  useEffect(() => {
+    const aside = asideRef.current
+    if (!aside || !overlay) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      toggleRef.current?.focus()
+      onClose?.()
+    }
+
+    function handleFocusOut(event: FocusEvent) {
+      const next = event.relatedTarget as Node | null
+      if (next && aside?.contains(next)) return
+      onClose?.()
+    }
+
+    aside.addEventListener('keydown', handleKeyDown)
+    aside.addEventListener('focusout', handleFocusOut)
+    return () => {
+      aside.removeEventListener('keydown', handleKeyDown)
+      aside.removeEventListener('focusout', handleFocusOut)
+    }
+  }, [overlay, onClose])
+
   return (
     <aside
+      ref={asideRef}
       className={cn(
         'flex flex-col h-screen bg-bg-navy text-text-on-navy transition-all duration-200',
         overlay && 'fixed inset-y-0 start-0 z-40 shadow-xl',
@@ -89,6 +120,7 @@ export function Sidebar({ collapsed, onToggle, overlay = false, onNavigate }: Si
           <span className="text-lg font-bold tracking-tight truncate">{tenantConfig?.app_name ?? 'BilimBaga'}</span>
         )}
         <button
+          ref={toggleRef}
           onClick={onToggle}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
@@ -116,7 +148,7 @@ export function Sidebar({ collapsed, onToggle, overlay = false, onNavigate }: Si
               )
             }
             title={collapsed ? t(labelKey) : undefined}
-            onClick={() => onNavigate?.()}
+            onClick={() => onClose?.()}
           >
             <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
             {!collapsed && <span className="truncate">{t(labelKey)}</span>}

@@ -39,7 +39,7 @@ export function AdminLayout() {
         collapsed={sidebarCollapsed}
         overlay={!smUp && !sidebarCollapsed}
         onToggle={toggleSidebar}
-        onNavigate={() => setMobileOpen(false)}
+        onClose={() => setMobileOpen(false)}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar user={user} />

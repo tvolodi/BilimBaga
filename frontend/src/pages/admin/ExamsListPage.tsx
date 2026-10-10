@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 
 function StatusBadge({ status }: { status: 'draft' | 'active' | 'archived' }) {
+  const { t } = useTranslation()
   const colors = {
     draft: 'bg-muted text-muted-foreground',
     active: 'bg-bg-success text-success',
@@ -24,7 +25,7 @@ function StatusBadge({ status }: { status: 'draft' | 'active' | 'archived' }) {
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors[status]}`}
     >
-      {status}
+      {t(`exam_list.status.${status}`)}
     </span>
   )
 }

@@ -73,7 +73,6 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		// Auth endpoints — tight rate limit: 10 req/min per IP (AC-1).
 		r.Group(func(r chi.Router) {
 			r.Use(ratelimit.AuthLimiter())
-			r.Get("/health", health.Handler(db, version))
 			r.Post("/auth/login", authHandler.Login)
 			r.Post("/auth/refresh", authHandler.Refresh)
 			r.Post("/auth/logout", authHandler.Logout)
@@ -85,6 +84,8 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 		// Public non-auth routes — general rate limit (AC-1).
 		r.Group(func(r chi.Router) {
 			r.Use(ratelimit.GlobalLimiter())
+			// Health (#475): not an auth endpoint, so it sits here and not in the auth bucket. Deploy scripts poll it.
+			r.Get("/health", health.Handler(db, version))
 			r.Get("/tenant/config", tenantHandler.GetConfig)
 			r.Get("/tenant/logo", tenantHandler.GetLogo)
 

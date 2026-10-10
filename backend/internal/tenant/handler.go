@@ -58,8 +58,11 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		var valErr *ValidationError
 		if errors.As(err, &valErr) {
 			status := http.StatusBadRequest
-			if valErr.Code == "LOGO_TOO_LARGE" {
+			switch valErr.Code {
+			case "LOGO_TOO_LARGE":
 				status = http.StatusRequestEntityTooLarge
+			case "VALIDATION_ERROR":
+				status = http.StatusUnprocessableEntity
 			}
 			writeJSON(w, status, nil, &apiError{Code: valErr.Code, Message: valErr.Message})
 			return

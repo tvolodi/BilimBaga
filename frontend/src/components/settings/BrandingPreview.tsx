@@ -22,7 +22,7 @@ export function BrandingPreview({ config }: BrandingPreviewProps) {
       <div className="rounded-lg border shadow-sm overflow-hidden">
         <div
           className="flex items-center gap-3 px-4 py-3"
-          style={{ backgroundColor: config.primary_color ?? '#0ea5e9' }}
+          style={{ backgroundColor: config.primary_color ?? '#2E6DB4' }}
           data-testid="branding-preview-header"
         >
           <TenantLogo appName={config.app_name} logoOverride={config.logo} className="h-8" />
@@ -43,7 +43,7 @@ export function BrandingPreview({ config }: BrandingPreviewProps) {
           <button
             type="button"
             className="mt-4 rounded px-4 py-2 text-white text-sm"
-            style={{ backgroundColor: config.accent_color ?? '#f59e0b' }}
+            style={{ backgroundColor: config.accent_color ?? '#C8A84B' }}
             data-testid="branding-preview-accent-button"
           >
             {t('settings.branding.previewButton')}

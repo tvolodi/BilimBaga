@@ -57,7 +57,7 @@ export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
         <li key={item.session_id} className="flex items-center gap-3 py-3 px-1">
           <div
             aria-hidden
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-foreground"
           >
             {initials(item.employee_name)}
           </div>

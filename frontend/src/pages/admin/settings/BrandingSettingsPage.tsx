@@ -10,6 +10,22 @@ import { LogoUploader } from '@/components/settings/LogoUploader'
 import { ColorPickerField } from '@/components/settings/ColorPickerField'
 import { LocaleSelector } from '@/components/settings/LocaleSelector'
 import { BrandingPreview } from '@/components/settings/BrandingPreview'
+import { contrastRatio, MIN_TEXT_CONTRAST, normaliseHex } from '@/lib/color'
+
+const WHITE = '#ffffff'
+const DEFAULT_PRIMARY = '#2E6DB4'
+const DEFAULT_ACCENT = '#C8A84B'
+
+type PrimaryIssue = { kind: 'invalid' } | { kind: 'contrast'; ratio: string } | null
+
+// FR-BB320 AC-1: the server rule, applied to the draft value before save.
+function primaryIssueFor(draftValue: string | undefined): PrimaryIssue {
+  if (draftValue === undefined) return null
+  const hex = normaliseHex(draftValue)
+  if (hex === null) return { kind: 'invalid' }
+  const ratio = contrastRatio(hex, WHITE)
+  return ratio < MIN_TEXT_CONTRAST ? { kind: 'contrast', ratio: ratio.toFixed(2) } : null
+}
 
 export function BrandingSettingsPage() {
   const { t } = useTranslation()
@@ -32,9 +48,13 @@ export function BrandingSettingsPage() {
   const defaultLocale = draft.default_locale ?? config?.default_locale ?? 'kk'
   const defaultIncluded = availableLocales.includes(defaultLocale)
 
+  // The primary is checked only when this draft sets it, matching the server rule.
+  // A stored colour that already fails is not blocked here, so other fields can still be saved.
+  const primaryIssue = primaryIssueFor(draft.primary_color)
+
   const hasDraftChanges = Object.keys(draft).length > 0
   const canSave =
-    hasDraftChanges && defaultIncluded && !updateConfig.isPending
+    hasDraftChanges && defaultIncluded && primaryIssue === null && !updateConfig.isPending
 
   async function handleSave() {
     if (!canSave) return
@@ -75,16 +95,24 @@ export function BrandingSettingsPage() {
 
           <ColorPickerField
             label={t('settings.branding.primaryColor')}
-            value={draft.primary_color ?? config?.primary_color ?? '#0ea5e9'}
+            value={draft.primary_color ?? config?.primary_color ?? DEFAULT_PRIMARY}
             onChange={(color) => setDraft((d) => ({ ...d, primary_color: color }))}
-            contrastAgainst="#ffffff"
+            contrastAgainst={WHITE}
           />
+
+          {primaryIssue && (
+            <p className="text-sm text-destructive" data-testid="primary-color-blocked">
+              {primaryIssue.kind === 'invalid'
+                ? t('settings.branding.primaryInvalid')
+                : t('settings.branding.primaryContrastBlocked', { ratio: primaryIssue.ratio })}
+            </p>
+          )}
 
           <ColorPickerField
             label={t('settings.branding.accentColor')}
-            value={draft.accent_color ?? config?.accent_color ?? '#f59e0b'}
+            value={draft.accent_color ?? config?.accent_color ?? DEFAULT_ACCENT}
             onChange={(color) => setDraft((d) => ({ ...d, accent_color: color }))}
-            contrastAgainst="#ffffff"
+            contrastAgainst={WHITE}
           />
 
           <LocaleSelector

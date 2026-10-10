@@ -147,3 +147,43 @@ func TestUpdateConfig_InvalidBody(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
 }
+
+// TestUpdateConfig_LowContrastPrimaryReturns422 verifies FR-BB320 AC-1 at the HTTP layer:
+// a primary colour below 4.5:1 against white is refused with 422 VALIDATION_ERROR.
+func TestUpdateConfig_LowContrastPrimaryReturns422(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := `{"primary_color": "#0ea5e9"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/tenant/config", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.UpdateConfig(w, req)
+
+	resp := w.Result()
+	assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+
+	var env struct {
+		Data  json.RawMessage `json:"data"`
+		Error *apiError       `json:"error"`
+	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&env))
+	assert.Equal(t, "null", string(env.Data))
+	require.NotNil(t, env.Error)
+	assert.Equal(t, "VALIDATION_ERROR", env.Error.Code)
+	assert.Contains(t, env.Error.Message, "primary_color")
+}
+
+// TestUpdateConfig_PassingPrimaryReturns200 verifies that a colour reaching 4.5:1 is accepted.
+func TestUpdateConfig_PassingPrimaryReturns200(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := `{"primary_color": "#2E6DB4"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/tenant/config", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.UpdateConfig(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+}

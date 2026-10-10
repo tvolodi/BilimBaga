@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -126,5 +126,84 @@ describe('BrandingSettingsPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/branding updated successfully/i)).toBeInTheDocument()
     })
+  })
+
+  it('blocks save and shows the contrast ratio when the primary colour fails 4.5:1 (FR-BB320 AC-1)', async () => {
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <BrandingSettingsPage />
+      </Wrapper>,
+    )
+    const hex = (await screen.findByLabelText('Primary Colour hex')) as HTMLInputElement
+    fireEvent.change(hex, { target: { value: '#0ea5e9' } })
+
+    expect(screen.getByText(/ratio: 2\.77:1/)).toBeInTheDocument()
+    expect(screen.getByTestId('primary-color-blocked')).toHaveTextContent(
+      /save is blocked until the primary colour reaches 4\.5:1/i,
+    )
+    expect(screen.getByTestId('primary-color-blocked')).toHaveTextContent('2.77:1')
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
+  })
+
+  it('blocks save when the primary colour is not a valid hex value', async () => {
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <BrandingSettingsPage />
+      </Wrapper>,
+    )
+    const hex = (await screen.findByLabelText('Primary Colour hex')) as HTMLInputElement
+    fireEvent.change(hex, { target: { value: 'not-a-colour' } })
+
+    expect(screen.getByTestId('primary-color-blocked')).toHaveTextContent(/enter a valid hex colour/i)
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
+  })
+
+  it('saves a primary colour that reaches 4.5:1 and sends it as the only change', async () => {
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <BrandingSettingsPage />
+      </Wrapper>,
+    )
+    const hex = (await screen.findByLabelText('Primary Colour hex')) as HTMLInputElement
+    fireEvent.change(hex, { target: { value: '#2e6db4' } })
+
+    expect(screen.queryByTestId('primary-color-blocked')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(lastPutBody).not.toBeNull()
+    })
+    expect(lastPutBody).toEqual({ primary_color: '#2e6db4' })
+  })
+
+  it('does not block other fields when the stored primary colour already fails', async () => {
+    server.use(
+      http.get('/api/v1/tenant/config', () =>
+        HttpResponse.json({
+          data: { ...initialConfig, primary_color: '#0ea5e9' },
+          error: null,
+        }),
+      ),
+    )
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <BrandingSettingsPage />
+      </Wrapper>,
+    )
+    const appName = (await screen.findByLabelText('Application Name')) as HTMLInputElement
+    await userEvent.clear(appName)
+    await userEvent.type(appName, 'NewName')
+
+    expect(screen.queryByTestId('primary-color-blocked')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(lastPutBody).not.toBeNull()
+    })
+    expect(lastPutBody).toEqual({ app_name: 'NewName' })
   })
 })

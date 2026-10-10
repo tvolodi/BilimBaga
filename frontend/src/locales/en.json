@@ -154,6 +154,8 @@
       "primaryColor": "Primary Colour",
       "accentColor": "Accent Colour",
       "contrastWarning": "Low contrast — text may be hard to read (ratio: {{ratio}}:1)",
+      "primaryContrastBlocked": "Save is blocked until the primary colour reaches 4.5:1 contrast against white (current: {{ratio}}:1).",
+      "primaryInvalid": "Enter a valid hex colour, for example #2E6DB4. Save is blocked until it is valid.",
       "locales": "Available Languages",
       "defaultLocale": "Default Language",
       "localeError": "Default language must be in the available languages list.",

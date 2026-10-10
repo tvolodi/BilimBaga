@@ -1,4 +1,4 @@
-import { useId, type ChangeEvent } from 'react'
+import { useId, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -28,14 +28,21 @@ export function ColorPickerField({
     onChange(e.target.value)
   }
 
+  // The text being typed is shown as typed. Expanding a shorthand or re-rendering the stored value on every
+  // keystroke rewrote the field mid-entry (typing 2E6DB4 ended as #22EE66), so the stored value is shown
+  // again only once the field is left.
+  const [draft, setDraft] = useState<string | null>(null)
+  const hexText = draft ?? value
+
   function handleHexChange(e: ChangeEvent<HTMLInputElement>) {
     const next = e.target.value
-    const normalised = normaliseHex(next)
-    if (normalised) {
-      onChange(normalised)
-    } else {
-      onChange(next)
-    }
+    setDraft(next)
+    // A complete value goes to the parent normalised, with its leading #. An incomplete one goes as typed.
+    onChange(normaliseHex(next) ?? next)
+  }
+
+  function handleHexBlur() {
+    setDraft(null)
   }
 
   const safeValue = normaliseHex(value) ?? '#000000'
@@ -57,8 +64,9 @@ export function ColorPickerField({
         <Input
           id={hexInputId}
           type="text"
-          value={value}
+          value={hexText}
           onChange={handleHexChange}
+          onBlur={handleHexBlur}
           aria-label={`${label} hex`}
           className="font-mono uppercase"
           maxLength={7}

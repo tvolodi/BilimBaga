@@ -96,6 +96,19 @@ describe('ColorPickerField', () => {
     expect(onChange).toHaveBeenLastCalledWith('#aabbcc')
   })
 
+  // Hand-typed values: each keystroke must leave the field showing what the user typed, and the parent
+  // must end up with the normalised hex that carries the leading #.
+  it.each(['2E6DB4', '#2E6DB4'])('keeps a hand-typed %s intact and sends the normalised hex', async (typed) => {
+    const onChange = vi.fn()
+    render(<Harness onChange={onChange} />)
+    const hexInput = screen.getByLabelText('Primary hex')
+    await userEvent.clear(hexInput)
+    await userEvent.type(hexInput, typed)
+    expect(onChange).toHaveBeenLastCalledWith('#2e6db4')
+    await userEvent.tab()
+    expect(hexInput).toHaveValue('#2e6db4')
+  })
+
   it('emits the native colour picker value unchanged', () => {
     const onChange = vi.fn()
     render(

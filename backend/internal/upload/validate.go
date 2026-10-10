@@ -90,7 +90,7 @@ func ValidateCSVFile(data []byte) error {
 }
 
 // ParseImportMultipart parses a multipart import upload after capping the request body at
-// MaxImportBodyBytes (http.MaxBytesReader) and limiting in-memory parsing to MaxCSVBytes, so an
+// MaxImportBodyBytes (http.MaxBytesReader) and parsing it entirely in memory, so an
 // oversize upload is rejected without being parsed. It returns ErrFileTooLarge when the body
 // exceeds the cap; any other error means the body is not valid multipart/form-data.
 func ParseImportMultipart(w http.ResponseWriter, r *http.Request) error {
@@ -100,7 +100,10 @@ func ParseImportMultipart(w http.ResponseWriter, r *http.Request) error {
 	}
 	capped := &errRecordingReader{r: http.MaxBytesReader(w, r.Body, MaxImportBodyBytes)}
 	r.Body = capped
-	err := r.ParseMultipartForm(MaxCSVBytes)
+	// Hold the whole capped body in memory (MaxImportBodyBytes, not MaxCSVBytes): a file over the
+	// content cap would otherwise spill to a temp file, and a failure there surfaced as a generic
+	// parse error (400) instead of the size answer (413). The content cap is checked by the handlers.
+	err := r.ParseMultipartForm(MaxImportBodyBytes)
 	if err == nil {
 		return nil
 	}

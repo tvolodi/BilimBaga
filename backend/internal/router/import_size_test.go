@@ -178,3 +178,58 @@ func TestQuestionsImport_RawCSVUnderCap_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	assert.Equal(t, "ERR_INVALID_BODY", errorCode(t, rec))
 }
+
+// Exact UAT request (#176): an 11000016-byte file in a multipart body of 11000214 bytes.
+const uatFileBytes = 11000016
+
+func TestQuestionsImport_UATExactSize_Returns413(t *testing.T) {
+	h := newQuestionsImportRouter(t)
+	body, ct := multipartCSVUpload(t, uatFileBytes)
+
+	rec := postUpload(h, "/api/v1/questions/import?dry_run=true", supToken(t), body, ct)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	assert.Equal(t, "ERR_FILE_TOO_LARGE", errorCode(t, rec))
+}
+
+func TestUsersImport_UATExactSize_Returns413(t *testing.T) {
+	h, _ := newUsersRouter(t)
+	body, ct := multipartCSVUpload(t, uatFileBytes)
+
+	rec := postUpload(h, "/api/v1/users/import", supToken(t), body, ct)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	assert.Equal(t, "FILE_TOO_LARGE", errorCode(t, rec))
+}
+
+// UAT's 400 came from the live API, where a file over the parser's in-memory limit spills to
+// a temp file. Pointing the temp directory at a missing path reproduces that: the parser errors
+// before any size check, and the upload must still be 413.
+func withMissingTempDir(t *testing.T) {
+	t.Helper()
+	missing := t.TempDir() + "/does-not-exist"
+	t.Setenv("TMP", missing)
+	t.Setenv("TEMP", missing)
+}
+
+func TestQuestionsImport_UATExactSize_MissingTempDir_Returns413(t *testing.T) {
+	withMissingTempDir(t)
+	h := newQuestionsImportRouter(t)
+	body, ct := multipartCSVUpload(t, uatFileBytes)
+
+	rec := postUpload(h, "/api/v1/questions/import?dry_run=true", supToken(t), body, ct)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	assert.Equal(t, "ERR_FILE_TOO_LARGE", errorCode(t, rec))
+}
+
+func TestUsersImport_UATExactSize_MissingTempDir_Returns413(t *testing.T) {
+	withMissingTempDir(t)
+	h, _ := newUsersRouter(t)
+	body, ct := multipartCSVUpload(t, uatFileBytes)
+
+	rec := postUpload(h, "/api/v1/users/import", supToken(t), body, ct)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	assert.Equal(t, "FILE_TOO_LARGE", errorCode(t, rec))
+}

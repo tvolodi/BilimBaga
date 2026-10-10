@@ -20,7 +20,7 @@ export function LikertInput({ options, selected, onChange }: LikertInputProps) {
             aria-checked={isSelected}
             onClick={() => onChange(opt.id)}
             className={cn(
-              'min-w-[2.5rem] h-10 px-3 rounded-md border text-sm font-medium transition-colors',
+              'min-w-11 h-11 px-3 rounded-md border text-sm font-medium transition-colors',
               isSelected
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'bg-background border-border hover:bg-muted',

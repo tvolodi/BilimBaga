@@ -16,7 +16,7 @@ export function FlagButton({ isFlagged, onToggle }: FlagButtonProps) {
       size="sm"
       onClick={onToggle}
       className={cn(
-        'shrink-0 text-xs',
+        'shrink-0 min-h-11 min-w-11 text-xs',
         isFlagged ? 'text-warning hover:text-warning' : 'text-muted-foreground',
       )}
       aria-pressed={isFlagged}

@@ -32,7 +32,7 @@ export function QuestionNavigator({
               key={q.id}
               onClick={() => onNavigate(q.id)}
               className={cn(
-                'w-8 h-8 rounded text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'h-11 w-11 rounded text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 isFlagged
                   ? 'bg-bg-warning border-warning text-warning hover:bg-warning/20'
                   : isAnswered

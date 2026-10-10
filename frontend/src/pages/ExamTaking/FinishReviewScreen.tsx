@@ -70,10 +70,10 @@ export function FinishReviewScreen({
         )}
 
         <div className="flex gap-3 pt-4">
-          <Button variant="outline" onClick={onGoBack}>
+          <Button variant="outline" className="min-h-11" onClick={onGoBack}>
             {t('exam.taking.review.goBack')}
           </Button>
-          <Button onClick={onSubmitAnyway}>
+          <Button className="min-h-11" onClick={onSubmitAnyway}>
             {t('exam.taking.review.submitAnyway')}
           </Button>
         </div>

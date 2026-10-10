@@ -41,6 +41,35 @@ func stampWriteViolations(name, src string) []string {
 	return out
 }
 
+// sqlLiteral matches a Go raw string literal, where the SQL of this package lives.
+var sqlLiteral = regexp.MustCompile("`([^`]*)`")
+
+// forcedChangeViolations flags every SQL statement that sets force_password_change = true without also
+// stamping password_changed_at (#466). A forced change is a session-ending event, so it must revoke
+// earlier access tokens like every other password writer does.
+func forcedChangeViolations(name, src string) []string {
+	var out []string
+	for _, m := range sqlLiteral.FindAllStringSubmatch(src, -1) {
+		q := m[1]
+		if strings.Contains(q, "force_password_change = true") && !regexp.MustCompile(`password_changed_at\s*=`).MatchString(q) {
+			out = append(out, name+": sets force_password_change = true without stamping password_changed_at")
+		}
+	}
+	return out
+}
+
+// TestStampGuard_FixtureForcedChangeWithoutStampIsFlagged shows the guard sees the #466 write.
+func TestStampGuard_FixtureForcedChangeWithoutStampIsFlagged(t *testing.T) {
+	fixture := "const q = `UPDATE users SET force_password_change = true, updated_at = now() WHERE id = $1`"
+	assert.NotEmpty(t, forcedChangeViolations("fixture.go", fixture), "a forced change that does not stamp must be flagged")
+}
+
+// TestStampGuard_FixtureForcedChangeWithStampIsAccepted shows a stamped forced change passes.
+func TestStampGuard_FixtureForcedChangeWithStampIsAccepted(t *testing.T) {
+	fixture := "const q = `UPDATE users SET force_password_change = true, password_changed_at = $3 WHERE id = $1`"
+	assert.Empty(t, forcedChangeViolations("fixture.go", fixture))
+}
+
 // TestStampGuard_FixtureWithDatabaseClockIsFlagged shows the guard catches the case it exists for.
 func TestStampGuard_FixtureWithDatabaseClockIsFlagged(t *testing.T) {
 	fixture := "const q = `UPDATE users SET password_changed_at = now() WHERE id = $1`"
@@ -69,6 +98,7 @@ func TestStampGuard_NoNonTestWriterBypassesTheRule(t *testing.T) {
 			require.NoError(t, err)
 			scanned++
 			violations = append(violations, stampWriteViolations(filepath.Join(dir, name), string(b))...)
+			violations = append(violations, forcedChangeViolations(filepath.Join(dir, name), string(b))...)
 		}
 	}
 	require.NotZero(t, scanned, "the guard must scan real sources")

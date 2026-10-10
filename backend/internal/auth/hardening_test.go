@@ -104,7 +104,8 @@ func TestForgotPassword_ConcurrentRequests_CannotExceedLimit(t *testing.T) {
 type txFakeDB struct {
 	mu        sync.Mutex
 	stmts     []string
-	lockRows  int // rows returned by the FOR UPDATE select (0 = no such active user)
+	args      [][]driver.Value // args[i] are the arguments of stmts[i] (#466)
+	lockRows  int              // rows returned by the FOR UPDATE select (0 = no such active user)
 	count     int64
 	begun     int
 	commits   int
@@ -140,16 +141,18 @@ func (t txTx) Commit() error {
 func (t txTx) Rollback() error { return nil }
 func (s txStmt) Close() error  { return nil }
 func (s txStmt) NumInput() int { return -1 }
-func (s txStmt) Exec([]driver.Value) (driver.Result, error) {
+func (s txStmt) Exec(args []driver.Value) (driver.Result, error) {
 	s.f.mu.Lock()
 	s.f.stmts = append(s.f.stmts, s.q)
+	s.f.args = append(s.f.args, append([]driver.Value(nil), args...))
 	s.f.mu.Unlock()
 	return driver.RowsAffected(1), nil
 }
-func (s txStmt) Query([]driver.Value) (driver.Rows, error) {
+func (s txStmt) Query(args []driver.Value) (driver.Rows, error) {
 	s.f.mu.Lock()
 	defer s.f.mu.Unlock()
 	s.f.stmts = append(s.f.stmts, s.q)
+	s.f.args = append(s.f.args, append([]driver.Value(nil), args...))
 	switch {
 	case strings.Contains(s.q, "password_changed_at") && strings.Contains(s.q, "FOR UPDATE"):
 		// The locked read of the previous stamp (#455): a NULL stamp, never reset before.

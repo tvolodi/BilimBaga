@@ -12,6 +12,9 @@
  *
  * The request is made by a sidebar click (or a portal tab click) after the revocation, so it uses
  * the token held in memory, the path AC-11 describes. A full reload would run the boot refresh path.
+ *
+ * Every context starts with empty storage state, so no seeded token from the project's storageState
+ * is in play. Sign-in checks that the token the page received belongs to the account under test.
  */
 import { test, expect, type Browser, type Locator, type Page } from '@playwright/test'
 import { requireTarget } from '../../scripts/lib/target-guard'
@@ -86,11 +89,11 @@ test.describe('TOKEN_REVOKED ends the session in a real browser', () => {
 
   test('(a) admin: password changed elsewhere ends the session at /login and restores the requested path', async ({ browser }) => {
     const admin = await createAccount('super_admin', 'e2e-revoke-admin')
-    const ctxA = await browser.newContext()
+    const ctxA = await isolatedContext(browser)
     const page = await ctxA.newPage()
     const hits = trackApi(page)
     try {
-      await signIn(page, admin.email, admin.password)
+      await signIn(page, admin)
       await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 })
       await page.goto('/admin/users')
       await expect(sidebar(page)).toBeVisible({ timeout: 20_000 })
@@ -114,11 +117,11 @@ test.describe('TOKEN_REVOKED ends the session in a real browser', () => {
 
   test('(a) portal: password changed elsewhere ends the session at /login and restores the requested path', async ({ browser }) => {
     const employee = await createAccount('employee', 'e2e-revoke-emp')
-    const ctxA = await browser.newContext()
+    const ctxA = await isolatedContext(browser)
     const page = await ctxA.newPage()
     const hits = trackApi(page)
     try {
-      await signIn(page, employee.email, employee.password)
+      await signIn(page, employee)
       await expect(page).toHaveURL(/\/portal/, { timeout: 20_000 })
       await page.goto('/portal')
       await expect(page).toHaveURL(/\/portal/, { timeout: 20_000 })
@@ -143,18 +146,18 @@ test.describe('TOKEN_REVOKED ends the session in a real browser', () => {
   test('(b) admin: department changed elsewhere refreshes once and the user stays signed in', async ({ browser }) => {
     const admin = await createAccount('super_admin', 'e2e-revoke-claims')
     const department = await createDepartment()
-    const ctxA = await browser.newContext()
+    const ctxA = await isolatedContext(browser)
     const page = await ctxA.newPage()
     const hits = trackApi(page)
     try {
-      await signIn(page, admin.email, admin.password)
+      await signIn(page, admin)
       await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 })
       await page.goto('/admin/users')
       await expect(sidebar(page)).toBeVisible({ timeout: 20_000 })
 
       await settle()
       // Change the account's department in context B (the JWT department claim no longer matches).
-      const ctxB = await browser.newContext()
+      const ctxB = await isolatedContext(browser)
       try {
         const roleId = await roleIdByName('super_admin')
         const res = await ctxB.request.put(`${BASE}/api/v1/users/${admin.id}`, {
@@ -253,9 +256,24 @@ function sidebarLink(page: Page, href: string): Locator {
   return sidebar(page).locator(`a[href="${href}"]`)
 }
 
-async function signIn(page: Page, email: string, password: string) {
+/**
+ * Signs in through the form. The access token the page receives must belong to the account under test,
+ * so the spec cannot pass by exercising another user's session.
+ */
+async function signIn(page: Page, account: Account) {
   await page.goto('/login')
-  await submitLogin(page, email, password)
+  const login = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/v1/auth/login' && r.status() === 200)
+  await submitLogin(page, account.email, account.password)
+  const body = (await (await login).json()) as { data: { access_token: string } }
+  const subject = JSON.parse(Buffer.from(body.data.access_token.split('.')[1], 'base64url').toString('utf8')) as {
+    sub?: string
+  }
+  expect(subject.sub, 'the page token must belong to the account under test').toBe(account.id)
+}
+
+/** A context with no storage state, so it never inherits the project's seeded admin or employee token. */
+function isolatedContext(browser: Browser) {
+  return browser.newContext({ storageState: { cookies: [], origins: [] } })
 }
 
 async function submitLogin(page: Page, email: string, password: string) {
@@ -270,7 +288,7 @@ function settle(): Promise<void> {
 
 /** Context B changes the account's password through the API; that revokes context A's token. */
 async function changePasswordInContextB(browser: Browser, account: Account, newPassword: string) {
-  const ctxB = await browser.newContext()
+  const ctxB = await isolatedContext(browser)
   try {
     const res = await ctxB.request.post(`${BASE}/api/v1/auth/change-password`, {
       headers: { Authorization: `Bearer ${account.token}` },

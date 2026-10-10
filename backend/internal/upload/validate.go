@@ -90,21 +90,41 @@ func ValidateCSVFile(data []byte) error {
 }
 
 // ParseImportMultipart parses a multipart import upload after capping the request body at
-// MaxImportBodyBytes (http.MaxBytesReader) and limiting in-memory parsing to MaxCSVBytes, so an
+// MaxImportBodyBytes (http.MaxBytesReader) and parsing it entirely in memory, so an
 // oversize upload is rejected without being parsed. It returns ErrFileTooLarge when the body
 // exceeds the cap; any other error means the body is not valid multipart/form-data.
 func ParseImportMultipart(w http.ResponseWriter, r *http.Request) error {
+	// A declared length over the cap is an oversize upload whatever its shape (#176).
+	if r.ContentLength > MaxImportBodyBytes {
+		return ErrFileTooLarge
+	}
 	capped := &errRecordingReader{r: http.MaxBytesReader(w, r.Body, MaxImportBodyBytes)}
 	r.Body = capped
-	if err := r.ParseMultipartForm(MaxCSVBytes); err != nil {
-		// The multipart parser may wrap or replace the underlying read error, so also
-		// consult the error the body reader itself reported.
-		if isTooLarge(err) || isTooLarge(capped.err) {
-			return ErrFileTooLarge
-		}
-		return err
+	// Hold the whole capped body in memory (MaxImportBodyBytes, not MaxCSVBytes): a file over the
+	// content cap would otherwise spill to a temp file, and a failure there surfaced as a generic
+	// parse error (400) instead of the size answer (413). The content cap is checked by the handlers.
+	err := r.ParseMultipartForm(MaxImportBodyBytes)
+	if err == nil {
+		return nil
 	}
-	return nil
+	// The multipart parser may wrap or replace the underlying read error, so also
+	// consult the error the body reader itself reported.
+	if isTooLarge(err) || isTooLarge(capped.err) {
+		return ErrFileTooLarge
+	}
+	// The parser can refuse a body before reading any of it (not multipart/form-data, missing
+	// boundary). Measure the rest of the body: an oversize body is 413 whatever its shape, while
+	// a small body keeps the parser's error (400).
+	if drainErr := drain(capped); isTooLarge(drainErr) || isTooLarge(capped.err) {
+		return ErrFileTooLarge
+	}
+	return err
+}
+
+// drain reads and discards the rest of the body and returns the first error other than EOF.
+func drain(r io.Reader) error {
+	_, err := io.Copy(io.Discard, r)
+	return err
 }
 
 func isTooLarge(err error) bool {

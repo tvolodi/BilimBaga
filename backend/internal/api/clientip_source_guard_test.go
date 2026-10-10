@@ -22,11 +22,20 @@ var remoteAddrWrite = regexp.MustCompile(`\.RemoteAddr\s*=[^=]`)
 // clientIPReader is the one file allowed to read RemoteAddr directly: the helper itself.
 const clientIPReader = "clientip.go"
 
+// realIPResolver is the one file allowed to read X-Real-IP: the router's resolution (#480).
+const realIPResolver = "router/realip.go"
+
 // clientAddressViolations returns the reasons src reads the client address outside the helper.
 func clientAddressViolations(name, src string) []string {
 	var out []string
 	if strings.Contains(src, `"X-Forwarded-For"`) {
 		out = append(out, name+`: reads the X-Forwarded-For header, which a client controls; use api.ClientIP`)
+	}
+	if strings.Contains(src, `"True-Client-IP"`) {
+		out = append(out, name+`: reads the True-Client-IP header, which a client controls; nothing in production may read it`)
+	}
+	if strings.Contains(src, `"X-Real-IP"`) && !strings.HasSuffix(filepath.ToSlash(name), realIPResolver) {
+		out = append(out, name+`: reads the X-Real-IP header outside `+realIPResolver+`; only the router's resolution may`)
 	}
 	for _, line := range strings.Split(src, "\n") {
 		if !strings.Contains(line, ".RemoteAddr") || remoteAddrWrite.MatchString(line) {
@@ -53,6 +62,24 @@ func TestClientAddressGuard_FixtureRemoteAddrReadIsFlagged(t *testing.T) {
 func TestClientAddressGuard_FixtureRemoteAddrWriteIsAccepted(t *testing.T) {
 	fixture := "r.RemoteAddr = ip"
 	assert.Empty(t, clientAddressViolations("fixture.go", fixture))
+}
+
+// #480: a client sends True-Client-IP freely, and nothing in production may read it.
+func TestClientAddressGuard_FixtureTrueClientIPReadIsFlagged(t *testing.T) {
+	fixture := `ip := r.Header.Get("True-Client-IP")`
+	assert.NotEmpty(t, clientAddressViolations("fixture.go", fixture))
+}
+
+// #480: X-Real-IP is read only by the router's resolution, in router/realip.go.
+func TestClientAddressGuard_FixtureXRealIPReadOutsideRealIPIsFlagged(t *testing.T) {
+	fixture := `ip := r.Header.Get("X-Real-IP")`
+	assert.NotEmpty(t, clientAddressViolations(filepath.Join("audit", "writer.go"), fixture))
+}
+
+// #480: the router's own read of X-Real-IP, in router/realip.go, is allowed.
+func TestClientAddressGuard_FixtureXRealIPReadInRealIPIsAccepted(t *testing.T) {
+	fixture := `ip := r.Header.Get("X-Real-IP")`
+	assert.Empty(t, clientAddressViolations(filepath.Join("router", "realip.go"), fixture))
 }
 
 // TestClientAddressGuard_NoProductionReadBypassesTheHelper scans the non-test sources under backend/internal.

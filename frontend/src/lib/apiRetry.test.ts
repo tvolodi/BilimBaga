@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { isNotFoundError, retryUnlessNotFound } from './apiRetry'
+import { ExamApiError } from '@/api/exams'
 
 function apiError(status: number | undefined, code: string) {
   return Object.assign(new Error(code), { status, code })
@@ -17,6 +18,27 @@ describe('isNotFoundError (#470)', () => {
     expect(isNotFoundError(apiError(403, 'FORBIDDEN'))).toBe(false)
     expect(isNotFoundError(new Error('network down'))).toBe(false)
     expect(isNotFoundError(null)).toBe(false)
+  })
+})
+
+// #487: the exam hooks throw ExamApiError (httpStatus, not status), and the API answers an unknown exam with 404
+// and ERR_NOT_FOUND. These are the real error type and the real code, not a hand-built shape.
+describe('isNotFoundError with the error the exam API layer throws (#487)', () => {
+  it('recognises the ExamApiError that examsFetch throws for a 404 ERR_NOT_FOUND', () => {
+    expect(isNotFoundError(new ExamApiError('exam not found', 'ERR_NOT_FOUND', 404))).toBe(true)
+  })
+
+  it('recognises a not-found answer by httpStatus alone and by the code alone', () => {
+    expect(isNotFoundError(new ExamApiError('exam not found', 'ERR_UNKNOWN', 404))).toBe(true)
+    expect(isNotFoundError(new ExamApiError('exam not found', 'ERR_NOT_FOUND', 0))).toBe(true)
+  })
+
+  it('does not treat other ExamApiError answers as not found', () => {
+    expect(isNotFoundError(new ExamApiError('boom', 'INTERNAL_ERROR', 500))).toBe(false)
+  })
+
+  it('does not retry the ExamApiError not-found answer', () => {
+    expect(retryUnlessNotFound(0, new ExamApiError('exam not found', 'ERR_NOT_FOUND', 404))).toBe(false)
   })
 })
 

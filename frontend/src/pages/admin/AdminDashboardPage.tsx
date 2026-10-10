@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next'
 import { RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDashboard } from '@/api/dashboard'
-import { useTenantConfig } from '@/api/useTenantConfig'
 import { KpiRow } from '@/components/dashboard/KpiRow'
 import { CompletionBarChart } from '@/components/dashboard/CompletionBarChart'
 import { OverdueTable } from '@/components/dashboard/OverdueTable'
@@ -17,7 +16,6 @@ export function AdminDashboardPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading, isError } = useDashboard()
-  const { data: tenantConfig } = useTenantConfig()
 
   function handleRefresh() {
     qc.invalidateQueries({ queryKey: ['dashboard'] })
@@ -62,7 +60,6 @@ export function AdminDashboardPage() {
               <CardContent>
                 <CompletionBarChart
                   data={data.completion_rate_by_exam}
-                  primaryColor={tenantConfig?.primary_color ?? '#6366f1'}
                 />
               </CardContent>
             </Card>

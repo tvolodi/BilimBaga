@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/components/ThemeProvider'
 import { cn } from '@/lib/utils'
 
 interface TenantLogoProps {
@@ -9,6 +10,7 @@ interface TenantLogoProps {
 
 export function TenantLogo({ appName, logoOverride, className }: TenantLogoProps) {
   const { t } = useTranslation()
+  const { resolved } = useTheme()
 
   function handleError(e: React.SyntheticEvent<HTMLImageElement>) {
     const img = e.currentTarget
@@ -27,7 +29,7 @@ export function TenantLogo({ appName, logoOverride, className }: TenantLogoProps
       <img
         src={src}
         alt={fallbackText}
-        className={cn('h-12 object-contain', className)}
+        className={cn('h-12 object-contain', resolved === 'dark' && 'bg-white rounded-md p-1', className)}
         onError={handleError}
       />
       <span style={{ display: 'none' }} className="text-lg font-bold">

@@ -1,4 +1,5 @@
 import type { i18n as I18n } from 'i18next'
+import { ensureLocale, isLocaleReady } from '@/i18n'
 
 /**
  * Languages the UI ships translations for (FR-BB116). The labels are the languages' own names,
@@ -21,10 +22,17 @@ export function isSupportedLocale(code: unknown): code is SupportedLocale {
 /**
  * Switch the UI language everywhere it is remembered: i18next, localStorage ('i18n-lang') and the
  * document language and direction. Storage can throw (private mode, blocked site data), so the
- * write is guarded; the switch itself still applies for the current page.
+ * write is guarded; the switch itself still applies for the current page. kk and ru are lazy: the
+ * language changes once its translations are loaded, so the page never shows missing strings. When
+ * they are already loaded the switch is synchronous, as before.
  */
 export function applyLocale(i18n: I18n, code: SupportedLocale): void {
-  void i18n.changeLanguage(code)
+  const switched = isLocaleReady(code)
+    ? i18n.changeLanguage(code)
+    : ensureLocale(code).then(() => i18n.changeLanguage(code))
+  void switched.catch((err: unknown) => {
+    console.error(`Could not load the ${code} translations`, err)
+  })
   try {
     localStorage.setItem('i18n-lang', code)
   } catch {

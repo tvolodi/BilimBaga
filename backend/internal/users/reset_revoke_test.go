@@ -22,7 +22,7 @@ func TestAdminReset_StampsFromTheClockUnderALockAndRevokesRefreshTokens(t *testi
 	db := sqlx.NewDb(sql.OpenDB(recConnector{f}), "postgres")
 	t.Cleanup(func() { _ = db.Close() })
 
-	appNow := time.Date(2026, 10, 10, 12, 0, 0, 700_000_000, time.UTC)
+	appNow := time.Now().UTC().Truncate(time.Second).Add(700 * time.Millisecond) // the real clock, as the other tests use
 	require.NoError(t, NewRepository(db).UpdatePassword(context.Background(), uuidA, "new-hash", appNow))
 
 	lock, update, refreshRevoke := -1, -1, -1
@@ -43,7 +43,7 @@ func TestAdminReset_StampsFromTheClockUnderALockAndRevokesRefreshTokens(t *testi
 	assert.NotContains(t, f.queries[update], "password_changed_at = now()", "the stamp is not taken from the database clock")
 	assert.NotContains(t, f.queries[update], "date_trunc", "the stamp is not computed in SQL")
 
-	want := time.Date(2026, 10, 10, 12, 0, 1, 0, time.UTC) // the start of the next second after appNow
+	want := appNow.Truncate(time.Second).Add(time.Second) // the start of the next second after appNow
 	assert.Contains(t, f.args[update], driver.Value(want), "the stamp is the next second after the application clock")
 
 	require.GreaterOrEqual(t, refreshRevoke, 0, "every refresh token of the user is revoked")

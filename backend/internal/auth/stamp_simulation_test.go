@@ -132,7 +132,9 @@ func (a *simAccount) accepts(tok string) bool {
 
 func TestStampSimulation_RandomSameSecondSequences(t *testing.T) {
 	rng := rand.New(rand.NewSource(simRandomSeed))
-	base := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	// The base is the real clock, as the neighbouring tests use: Authenticate checks token expiry against
+	// the real clock, so a fixed date would let the simulation's tokens expire (#455 review).
+	base := testNow(0)
 	for seq := 0; seq < simSequences; seq++ {
 		a := newSimAccount(t, base.Add(time.Duration(rng.Intn(1000))*time.Millisecond))
 		var tokens []simToken

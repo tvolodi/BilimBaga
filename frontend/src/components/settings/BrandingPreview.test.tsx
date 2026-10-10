@@ -3,8 +3,8 @@ import { render, screen, within } from '@testing-library/react'
 import i18n from '@/i18n'
 import { BrandingPreview } from './BrandingPreview'
 
-const DEFAULT_PRIMARY = '#0ea5e9'
-const DEFAULT_ACCENT = '#f59e0b'
+const DEFAULT_PRIMARY = '#2E6DB4'
+const DEFAULT_ACCENT = '#C8A84B'
 
 function renderPreview(config: Parameters<typeof BrandingPreview>[0]['config']) {
   render(<BrandingPreview config={config} />)

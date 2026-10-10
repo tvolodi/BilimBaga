@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -475,19 +474,9 @@ func (h *Handler) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": preview, "error": nil})
 }
 
-// clientIP extracts the caller's IP address, preferring X-Forwarded-For.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if ip := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); ip != "" {
-			return ip
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
+// clientIP is the caller's address for audit rows: the one helper, api.ClientIP (#478). It never reads
+// X-Forwarded-For, which a client sends freely.
+func clientIP(r *http.Request) string { return api.ClientIP(r) }
 
 // parseIntParam reads a query param as int, falling back to defaultVal on error or absence.
 func parseIntParam(r *http.Request, name string, defaultVal int) int {

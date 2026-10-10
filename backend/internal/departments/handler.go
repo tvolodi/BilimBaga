@@ -47,7 +47,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := auth.UserIDFromCtx(r.Context())
-	ipAddress := r.RemoteAddr
+	ipAddress := api.ClientIP(r)
 
 	dept, err := h.svc.Create(r.Context(), req, userID, ipAddress)
 	if err != nil {
@@ -82,7 +82,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := auth.UserIDFromCtx(r.Context())
-	ipAddress := r.RemoteAddr
+	ipAddress := api.ClientIP(r)
 
 	dept, err := h.svc.Update(r.Context(), id, req, userID, ipAddress)
 	if err != nil {
@@ -107,7 +107,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	userID := auth.UserIDFromCtx(r.Context())
-	ipAddress := r.RemoteAddr
+	ipAddress := api.ClientIP(r)
 
 	err := h.svc.Delete(r.Context(), id, userID, ipAddress)
 	if err != nil {

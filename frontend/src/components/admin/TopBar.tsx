@@ -22,10 +22,10 @@ export function TopBar({ user }: TopBarProps) {
     navigate('/login', { replace: true })
   }
 
+  // FR-BB321 AC-6: at 375 px the controls wrap onto a second line instead of overflowing. The toggle keeps its 44 px targets.
   return (
-    <header className="flex items-center justify-between h-14 px-6 border-b bg-card shadow-sm flex-shrink-0">
-      <div />
-      <div className="flex items-center gap-3">
+    <header className="flex min-h-14 flex-wrap items-center justify-end gap-x-3 gap-y-2 px-4 py-2 sm:px-6 border-b bg-card shadow-sm flex-shrink-0">
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
         <LocaleSwitcher />
         <ThemeToggle />
         {/* FR-BB116 AC-5: the name opens the caller's profile page. */}

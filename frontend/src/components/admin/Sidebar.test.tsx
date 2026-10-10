@@ -110,3 +110,40 @@ describe('Sidebar', () => {
     expect(hrefs).toContain('/admin/users')
   })
 })
+
+describe('Sidebar overlay and navigation (FR-BB321 AC-6, #472)', () => {
+  beforeEach(() => {
+    vi.mocked(useTenantConfig).mockReturnValue({
+      data: { app_name: 'BilimBaga', primary_color: '#000', accent_color: '#fff', default_locale: 'en', available_locales: ['en'] },
+    } as ReturnType<typeof useTenantConfig>)
+  })
+
+  function renderWith(props: { overlay?: boolean; onNavigate?: () => void }) {
+    const qc = new QueryClient()
+    qc.setQueryData(['auth', 'accessToken'], tokenFor('super_admin'))
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Sidebar collapsed={false} onToggle={vi.fn()} {...props} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('floats over the page when overlay is set', () => {
+    renderWith({ overlay: true })
+    expect(document.querySelector('aside')).toHaveClass('fixed', 'z-40')
+  })
+
+  it('takes its width in the layout when overlay is not set', () => {
+    renderWith({})
+    expect(document.querySelector('aside')).not.toHaveClass('fixed')
+  })
+
+  it('calls onNavigate when a link is followed, so an overlay can close', async () => {
+    const onNavigate = vi.fn()
+    renderWith({ overlay: true, onNavigate })
+    await userEvent.click(screen.getByRole('link', { name: /users/i }))
+    expect(onNavigate).toHaveBeenCalledTimes(1)
+  })
+})

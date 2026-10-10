@@ -113,12 +113,19 @@ test.describe('Theme switch — exam screen (FR-BB321 D-5, AC-12)', () => {
   })
 })
 
-// FR-BB321 AC-6 and AC-13: the admin top bar, with its toggle and locale switcher, fits 375 px.
-test.describe('Admin top bar at 375 px (FR-BB321 AC-6, AC-13)', () => {
+// FR-BB321 AC-6, AC-13 and #472: at 375 px the admin top bar fits, and the sidebar starts as a rail.
+test.describe('Admin layout at 375 px (FR-BB321 AC-6, AC-13, #472)', () => {
   test.use({ viewport: { width: 375, height: 812 } })
 
+  // Restores the admin's locale to the seeded default even when a test fails, so later specs are not affected.
+  test.afterEach(async ({ page }) => {
+    await page.goto('/admin')
+    await waitForContent(page)
+    await localeSelect(page).selectOption('en')
+  })
+
   for (const locale of ['kk', 'ru'] as const) {
-    test(`fits without horizontal scroll in ${locale}`, async ({ page }) => {
+    test(`top bar fits without horizontal scroll in ${locale}`, async ({ page }) => {
       await page.goto('/admin')
       await waitForContent(page)
       await localeSelect(page).selectOption(locale)
@@ -134,9 +141,23 @@ test.describe('Admin top bar at 375 px (FR-BB321 AC-6, AC-13)', () => {
       expect(overflow.page).toBeLessThanOrEqual(0)
       expect(overflow.header).toBeLessThanOrEqual(0)
       await expect(page.locator('header').getByRole('radiogroup', { name: 'Theme' })).toBeInViewport()
-
-      // Restore the admin's locale so later specs see the seeded default.
-      await localeSelect(page).selectOption('en')
     })
   }
+
+  test('the sidebar starts as a rail, opens over the page, and closes after a link is followed', async ({ page }) => {
+    await page.goto('/admin')
+    await waitForContent(page)
+    const toggle = page.getByRole('button', { name: /sidebar/i })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const box = await toggle.boundingBox()
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44)
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+
+    await page.getByRole('link', { name: 'Users', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp('/admin/users'))
+    await expect(page.getByRole('button', { name: /sidebar/i })).toHaveAttribute('aria-expanded', 'false')
+  })
 })

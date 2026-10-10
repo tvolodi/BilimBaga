@@ -30,6 +30,10 @@ import {
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  /** Below sm the expanded sidebar floats over the page instead of taking width from it (#472). */
+  overlay?: boolean
+  /** Called when a link is followed, so an overlay closes. */
+  onNavigate?: () => void
 }
 
 interface NavItem {
@@ -59,7 +63,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'settings', icon: Settings, path: '/admin/settings/branding', labelKey: 'nav.settings', end: false, permission: PERM.settings },
 ]
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, overlay = false, onNavigate }: SidebarProps) {
   const { t } = useTranslation()
   const { data: tenantConfig } = useTenantConfig()
   const { role, isCustom, permissions } = useMyPermissions()
@@ -75,6 +79,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     <aside
       className={cn(
         'flex flex-col h-screen bg-bg-navy text-text-on-navy transition-all duration-200',
+        overlay && 'fixed inset-y-0 start-0 z-40 shadow-xl',
         collapsed ? 'w-16' : 'w-56',
       )}
     >
@@ -86,7 +91,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <button
           onClick={onToggle}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="p-1 rounded hover:bg-text-on-navy/15 text-text-on-navy/80 hover:text-text-on-navy transition-colors ml-auto"
+          aria-expanded={!collapsed}
+          className="inline-flex items-center justify-center p-1 max-sm:min-h-11 max-sm:min-w-11 rounded hover:bg-text-on-navy/15 text-text-on-navy/80 hover:text-text-on-navy transition-colors ml-auto"
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
@@ -102,7 +108,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             aria-label={collapsed ? t(labelKey) : undefined}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors',
+                'flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors max-sm:min-h-11',
                 isActive
                   ? 'bg-text-on-navy/15 text-text-on-navy'
                   : 'text-text-on-navy/80 hover:bg-text-on-navy/10 hover:text-text-on-navy',
@@ -110,6 +116,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               )
             }
             title={collapsed ? t(labelKey) : undefined}
+            onClick={() => onNavigate?.()}
           >
             <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
             {!collapsed && <span className="truncate">{t(labelKey)}</span>}

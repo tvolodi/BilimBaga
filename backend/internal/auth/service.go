@@ -275,6 +275,11 @@ func (s *service) ChangePassword(ctx context.Context, userID string, req *Change
 
 	// Stamp and the new token's iat share one instant (truncated to seconds by the JWT lib).
 	changedAt := s.now().Truncate(time.Second)
+	// A token issued after the account's last stamp can carry an iat one second ahead of the clock (a
+	// sign-in in the reset's own second, #439). The new stamp must pass it, or that token survives.
+	if prev := user.PasswordChangedAt; prev != nil && !prev.Before(changedAt) {
+		changedAt = prev.Truncate(time.Second).Add(time.Second)
+	}
 	if err := s.repo.UpdatePassword(ctx, userID, string(newHash), changedAt); err != nil {
 		return nil, nil, fmt.Errorf("auth.service.ChangePassword: update password: %w", err)
 	}

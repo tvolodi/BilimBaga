@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, render } from '@testing-library/react'
-import { ThemeProvider, THEME_STORAGE_KEY, useTheme, type ThemePreference } from './ThemeProvider'
+import {
+  ThemeProvider,
+  THEME_STORAGE_KEY,
+  THEME_SWITCH_ENABLED,
+  useTheme,
+  type ThemePreference,
+} from './ThemeProvider'
 
 type ThemeValue = ReturnType<typeof useTheme>
 type Listener = (event: MediaQueryListEvent) => void
@@ -50,7 +56,7 @@ function stubSystemTheme(prefersDark: boolean): SystemThemeStub {
 
 // Renders a probe under the provider. It records the context value and what <html> looked like on
 // every render, so a test can check the class was already in place when React re-rendered.
-function renderProvider(storedValue?: string) {
+function renderProvider(storedValue?: string, switchEnabled = true) {
   if (storedValue !== undefined) window.localStorage.setItem(THEME_STORAGE_KEY, storedValue)
   const latest: { current?: ThemeValue } = {}
   const renders: { resolved: string; htmlDark: boolean }[] = []
@@ -64,7 +70,7 @@ function renderProvider(storedValue?: string) {
     return null
   }
   const view = render(
-    <ThemeProvider>
+    <ThemeProvider switchEnabled={switchEnabled}>
       <Probe />
     </ThemeProvider>,
   )
@@ -166,6 +172,47 @@ describe('ThemeProvider defaults and storage', () => {
     const view = renderProvider()
     expect(view.current().preference).toBe('system')
     expect(view.current().resolved).toBe('light')
+  })
+})
+
+describe('ThemeProvider while the switch is off (FR-BB321 part 1)', () => {
+  it('ships with the switch off', () => {
+    expect(THEME_SWITCH_ENABLED).toBe(false)
+  })
+
+  it('resolves light for a stored dark value and never adds the dark class', () => {
+    stubSystemTheme(true)
+    const view = renderProvider('dark', false)
+    expect(view.current().resolved).toBe('light')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(document.documentElement.style.colorScheme).toBe('light')
+  })
+
+  it('stays light when the OS prefers dark and the preference is system', () => {
+    stubSystemTheme(true)
+    const view = renderProvider(undefined, false)
+    expect(view.current().resolved).toBe('light')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+  })
+
+  it('stays light after a dark choice, while still storing the choice', () => {
+    stubSystemTheme(false)
+    const view = renderProvider(undefined, false)
+    view.choose('dark')
+    expect(view.current().resolved).toBe('light')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark')
+  })
+
+  it('exposes switchEnabled as false', () => {
+    stubSystemTheme(false)
+    expect(renderProvider(undefined, false).current().switchEnabled).toBe(false)
+  })
+
+  it('does not subscribe to OS changes', () => {
+    const system = stubSystemTheme(false)
+    renderProvider(undefined, false)
+    expect(system.addEventListener).not.toHaveBeenCalled()
   })
 })
 

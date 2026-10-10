@@ -13,13 +13,50 @@ function stubPrefersDark(prefersDark: boolean) {
   )
 }
 
-function runThemeInit() {
-  new Function(scriptText)()
+const SWITCH_LINE = 'var THEME_SWITCH_ENABLED = false;'
+
+// The shipped file has the switch off. The enabled-state tests flip the constant in the text
+// they run; the off-state tests run the file as shipped.
+function scriptWithSwitch(enabled: boolean): string {
+  if (!scriptText.includes(SWITCH_LINE)) throw new Error('switch line not found in theme-init.js')
+  return scriptText.replace(SWITCH_LINE, `var THEME_SWITCH_ENABLED = ${enabled};`)
+}
+
+function runThemeInit(enabled = true) {
+  new Function(scriptWithSwitch(enabled))()
 }
 
 function htmlIsDark() {
   return document.documentElement.classList.contains('dark')
 }
+
+describe('theme-init.js while the switch is off (FR-BB321 part 1)', () => {
+  it('ships with the switch off, matching ThemeProvider', () => {
+    expect(scriptText).toContain(SWITCH_LINE)
+  })
+
+  it('stays light for a stored dark value', () => {
+    stubPrefersDark(false)
+    window.localStorage.setItem('bb-theme', 'dark')
+    runThemeInit(false)
+    expect(htmlIsDark()).toBe(false)
+    expect(document.documentElement.style.colorScheme).toBe('light')
+  })
+
+  it('stays light when the OS prefers dark and nothing is stored', () => {
+    stubPrefersDark(true)
+    runThemeInit(false)
+    expect(htmlIsDark()).toBe(false)
+    expect(document.documentElement.style.colorScheme).toBe('light')
+  })
+
+  it('removes a dark class left on the page', () => {
+    stubPrefersDark(false)
+    document.documentElement.classList.add('dark')
+    runThemeInit(false)
+    expect(htmlIsDark()).toBe(false)
+  })
+})
 
 afterEach(() => {
   delete (window as { matchMedia?: unknown }).matchMedia

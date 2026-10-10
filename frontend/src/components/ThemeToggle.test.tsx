@@ -8,6 +8,7 @@ import type { ThemePreference } from './ThemeProvider'
 const theme = vi.hoisted(() => ({
   preference: 'system' as ThemePreference,
   setPreference: vi.fn(),
+  switchEnabled: true,
 }))
 
 vi.mock('@/components/ThemeProvider', () => ({
@@ -15,12 +16,14 @@ vi.mock('@/components/ThemeProvider', () => ({
     preference: theme.preference,
     resolved: 'light',
     setPreference: theme.setPreference,
+    switchEnabled: theme.switchEnabled,
   }),
 }))
 
 beforeEach(() => {
   theme.preference = 'system'
   theme.setPreference.mockReset()
+  theme.switchEnabled = true
 })
 
 function radios() {
@@ -32,6 +35,13 @@ function radios() {
 }
 
 describe('ThemeToggle', () => {
+  it('renders nothing while the switch is off (FR-BB321 part 1)', () => {
+    theme.switchEnabled = false
+    const { container } = render(<ThemeToggle />)
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+  })
+
   it('renders a labelled radio group with Light, System and Dark in that order', () => {
     render(<ThemeToggle />)
     expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument()

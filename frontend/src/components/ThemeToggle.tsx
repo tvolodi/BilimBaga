@@ -22,7 +22,7 @@ const OPTIONS: readonly ThemeOption[] = [
  */
 export function ThemeToggle() {
   const { t } = useTranslation()
-  const { preference, setPreference } = useTheme()
+  const { preference, setPreference, switchEnabled } = useTheme()
   const buttons = useRef<Partial<Record<ThemePreference, HTMLButtonElement | null>>>({})
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -50,6 +50,9 @@ export function ThemeToggle() {
     setPreference(option.value)
     buttons.current[option.value]?.focus()
   }
+
+  // While the switch is off (THEME_SWITCH_ENABLED) the page is light and the control is hidden.
+  if (!switchEnabled) return null
 
   return (
     <div

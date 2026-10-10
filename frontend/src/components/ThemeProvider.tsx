@@ -16,10 +16,19 @@ export type ResolvedTheme = 'light' | 'dark'
 export const THEME_STORAGE_KEY = 'bb-theme'
 const DARK_QUERY = '(prefers-color-scheme: dark)'
 
+/**
+ * FR-BB321 switch. Stays false until the nginx change (AC-4) is on main and every page is migrated
+ * (part 3). While false the resolved theme is always light and the toggle is hidden.
+ * Keep `public/theme-init.js` in step with this value.
+ */
+export const THEME_SWITCH_ENABLED = false
+
 interface ThemeContextValue {
   preference: ThemePreference
   resolved: ResolvedTheme
   setPreference: (preference: ThemePreference) => void
+  /** False while the switch is off: the toggle is hidden and the page stays light. */
+  switchEnabled: boolean
 }
 
 // Outside a provider the app still renders: light theme, and the setter does nothing.
@@ -27,6 +36,7 @@ const ThemeContext = createContext<ThemeContextValue>({
   preference: 'system',
   resolved: 'light',
   setPreference: () => {},
+  switchEnabled: THEME_SWITCH_ENABLED,
 })
 
 function isPreference(value: unknown): value is ThemePreference {
@@ -55,7 +65,12 @@ function systemPrefersDark(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia(DARK_QUERY).matches
 }
 
-function resolveTheme(preference: ThemePreference, systemDark: boolean): ResolvedTheme {
+function resolveTheme(
+  preference: ThemePreference,
+  systemDark: boolean,
+  switchEnabled: boolean,
+): ResolvedTheme {
+  if (!switchEnabled) return 'light'
   if (preference === 'system') return systemDark ? 'dark' : 'light'
   return preference
 }
@@ -67,10 +82,17 @@ function applyTheme(resolved: ResolvedTheme) {
   root.style.colorScheme = resolved
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({
+  children,
+  switchEnabled = THEME_SWITCH_ENABLED,
+}: {
+  children: ReactNode
+  /** Defaults to THEME_SWITCH_ENABLED; tests pass it explicitly to cover both states. */
+  switchEnabled?: boolean
+}) {
   const [preference, setPreferenceState] = useState<ThemePreference>(readStoredPreference)
   const [systemDark, setSystemDark] = useState<boolean>(systemPrefersDark)
-  const resolved = resolveTheme(preference, systemDark)
+  const resolved = resolveTheme(preference, systemDark, switchEnabled)
 
   // Keeps <html> in step with the resolved theme on mount and after any change. The handlers
   // below also apply the theme before they set state (AC-2); this effect only covers the mount.
@@ -78,30 +100,33 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyTheme(resolved)
   }, [resolved])
 
-  // Only while `system`: an explicit choice ignores later OS changes.
+  // Only while `system` and the switch is on: an explicit choice ignores later OS changes.
   useEffect(() => {
-    if (preference !== 'system' || typeof window.matchMedia !== 'function') return
+    if (!switchEnabled || preference !== 'system' || typeof window.matchMedia !== 'function') return
     const query = window.matchMedia(DARK_QUERY)
     const onChange = (event: MediaQueryListEvent) => {
       // The class changes before React state, so a consumer that re-renders sees the new theme.
-      applyTheme(event.matches ? 'dark' : 'light')
+      applyTheme(resolveTheme('system', event.matches, switchEnabled))
       setSystemDark(event.matches)
     }
     query.addEventListener('change', onChange)
     return () => query.removeEventListener('change', onChange)
-  }, [preference])
+  }, [preference, switchEnabled])
 
-  const setPreference = useCallback((next: ThemePreference) => {
-    const systemIsDark = systemPrefersDark()
-    writeStoredPreference(next)
-    applyTheme(resolveTheme(next, systemIsDark))
-    setSystemDark(systemIsDark)
-    setPreferenceState(next)
-  }, [])
+  const setPreference = useCallback(
+    (next: ThemePreference) => {
+      const systemIsDark = systemPrefersDark()
+      writeStoredPreference(next)
+      applyTheme(resolveTheme(next, systemIsDark, switchEnabled))
+      setSystemDark(systemIsDark)
+      setPreferenceState(next)
+    },
+    [switchEnabled],
+  )
 
   const value = useMemo(
-    () => ({ preference, resolved, setPreference }),
-    [preference, resolved, setPreference],
+    () => ({ preference, resolved, setPreference, switchEnabled }),
+    [preference, resolved, setPreference, switchEnabled],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

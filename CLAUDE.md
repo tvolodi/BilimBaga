@@ -28,7 +28,7 @@ Go 1.22, Chi, sqlx, golang-migrate, bcrypt, golang-jwt/v5; React 18, TypeScript,
 
 ## Conventions
 - Go: one package per domain, no circular imports; thin handlers, logic in service, SQL in repository; wrap errors with context; typed `Config` loaded once at startup.
-- Frontend: React Query for server state, no raw `fetch` in components; shadcn/ui + Tailwind; zero hardcoded user-visible strings (react-i18next, kk/ru/en).
+- Frontend: React Query for server state, no raw `fetch` in components; shadcn/ui + Tailwind; zero hardcoded user-visible strings (react-i18next, kk/ru/en); every UI change follows `docs/design-system/README.md` (tokens only, `components/ui` primitives, one-page checklist).
 - Migrations: add new numbered files only.
 - API envelope: `{data, error:null}` / `{data:null, error:{code,message}}`. IDs UUID v4; timestamps UTC ISO 8601.
 - Tests are mandatory: `service_test.go` + `handler_test.go` written and run green.
@@ -37,7 +37,7 @@ Go 1.22, Chi, sqlx, golang-migrate, bcrypt, golang-jwt/v5; React 18, TypeScript,
 `make dev`, `make migrate`, `cd backend && go run ./cmd/api`, `cd backend && go test ./...`, `cd frontend && npm run dev`, `cd frontend && npm test`.
 
 ## Key docs
-`corporate_exam_platform_roadmap.md` (read before any feature), `docs/architecture-guide.md`, `docs/backend-development-guide.md`, `docs/frontend-development-guide.md`, `docs/requirements/README.md`, `docs/requirements/requirements-backlog.md`.
+`corporate_exam_platform_roadmap.md` (read before any feature), `docs/architecture-guide.md`, `docs/backend-development-guide.md`, `docs/frontend-development-guide.md`, `docs/design-system/README.md` (UI rules, read before any frontend work), `docs/requirements/README.md`, `docs/requirements/requirements-backlog.md`.
 Requirement numbering: `FR-BB{phase}{section}` (FR-BB35 = phase 3 section 3.5).
 
 ## File placement

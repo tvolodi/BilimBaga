@@ -21,8 +21,9 @@ type Repository interface {
 	GetByID(ctx context.Context, id string) (*Exam, error)
 	ListFiltered(ctx context.Context, filter ExamFilter) ([]*ExamListItem, int, error)
 	Update(ctx context.Context, id string, input UpdateExamInput) (*Exam, error)
-	// UpdateAIGradingMode sets only ai_grading_mode, in any status (FR-BB73 AC-9, #566).
-	UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, error)
+	// UpdateAIGradingMode sets only ai_grading_mode, in any status (FR-BB73 AC-9, #566). An empty mode keeps the stored one.
+	// previous is the mode the row had under the write's own lock, so a concurrent change cannot hide this one (#570).
+	UpdateAIGradingMode(ctx context.Context, id, mode string) (updated *Exam, previous string, err error)
 	UpdateStatus(ctx context.Context, id, status string) error
 	DeleteByID(ctx context.Context, id string) error
 	GetWithDetails(ctx context.Context, id string) (*ExamDetail, error)
@@ -241,22 +242,44 @@ func (r *postgresRepository) Update(ctx context.Context, id string, input Update
 
 // UpdateAIGradingMode sets ai_grading_mode of an exam in any status and leaves every other column as it is (FR-BB73
 // AC-9, #566). The job reads the mode inside its write transaction, so a change applies to answers not yet claimed.
-func (r *postgresRepository) UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, error) {
+//
+// The previous mode is read under the row lock in the same transaction as the write (#570). In READ COMMITTED the locking
+// read returns the newest committed value once it holds the lock, and the write replaces exactly that value: a concurrent
+// request either finishes before this lock is taken, or waits for this transaction to commit.
+func (r *postgresRepository) UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, string, error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("exams: UpdateAIGradingMode: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var previous string
+	const lockQ = `SELECT ai_grading_mode FROM exams WHERE id = $1 FOR UPDATE`
+	if err := tx.GetContext(ctx, &previous, lockQ, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", fmt.Errorf("exams: UpdateAIGradingMode: lock: %w", err)
+	}
+
 	const q = `
-		UPDATE exams SET ai_grading_mode = $2
+		UPDATE exams SET ai_grading_mode = CASE WHEN $2::text = '' THEN ai_grading_mode ELSE $2::text END
 		WHERE id = $1
 		RETURNING id, title, description, status, time_limit_minutes, passing_score_pct,
 		          max_attempts, available_from, available_until, shuffle_questions, shuffle_options,
 		          show_answers, on_tab_switch, certificate_enabled, adaptive, created_by, created_at, updated_at,
 		          ai_grading_mode`
 	var e Exam
-	if err := r.db.GetContext(ctx, &e, q, id, mode); err != nil {
+	if err := tx.GetContext(ctx, &e, q, id, mode); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
+			return nil, "", ErrNotFound
 		}
-		return nil, fmt.Errorf("exams: UpdateAIGradingMode: %w", err)
+		return nil, "", fmt.Errorf("exams: UpdateAIGradingMode: %w", err)
 	}
-	return &e, nil
+	if err := tx.Commit(); err != nil {
+		return nil, "", fmt.Errorf("exams: UpdateAIGradingMode: commit: %w", err)
+	}
+	return &e, previous, nil
 }
 
 // CountQuestionsPerDifficulty counts active questions matching a rule's category/tag filters

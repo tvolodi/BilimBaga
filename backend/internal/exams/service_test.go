@@ -89,16 +89,19 @@ func (m *mockRepo) ListFiltered(ctx context.Context, f ExamFilter) ([]*ExamListI
 }
 
 // UpdateAIGradingMode replaces the stored exam with a copy whose mode changed, so a caller's earlier read keeps the old
-// value, as it does against the database.
-func (m *mockRepo) UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, error) {
+// value, as it does against the database. An empty mode keeps the stored one; previous is the stored mode before the write.
+func (m *mockRepo) UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, string, error) {
 	e, ok := m.exams[id]
 	if !ok {
-		return nil, ErrNotFound
+		return nil, "", ErrNotFound
 	}
+	previous := e.AIGradingMode
 	cp := *e
-	cp.AIGradingMode = mode
+	if mode != "" {
+		cp.AIGradingMode = mode
+	}
 	m.exams[id] = &cp
-	return &cp, nil
+	return &cp, previous, nil
 }
 
 func (m *mockRepo) Update(ctx context.Context, id string, input UpdateExamInput) (*Exam, error) {

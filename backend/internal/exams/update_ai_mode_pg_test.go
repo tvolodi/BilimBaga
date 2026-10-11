@@ -16,6 +16,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/audit"
 	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
@@ -175,4 +176,91 @@ func TestUpdateAIGradingMode_RealPostgres_SameDescriptionWithModeChangeIsAccepte
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	_, mode := storedMode(t, db, examID)
 	assert.Equal(t, "off", mode)
+}
+
+// staleReadRepo reads the exam the way the service does, and then sets the mode the way a concurrent request would, before
+// the service writes (#570 review). The service's read is therefore stale by the time it writes.
+type staleReadRepo struct {
+	Repository
+	db    *sqlx.DB
+	raced string
+}
+
+func (r *staleReadRepo) GetByID(ctx context.Context, id string) (*Exam, error) {
+	e, err := r.Repository.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := r.db.ExecContext(ctx, `UPDATE exams SET ai_grading_mode = $2 WHERE id = $1`, id, r.raced); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+// #570 review: the service read auto, a concurrent request set suggest, and this request asks for auto. The audit row must
+// say suggest to auto: the exam changed, so the row is written, and its from is the mode the write replaced.
+func TestUpdateAIGradingMode_RealPostgres_RaceAfterReadWritesTheTrueFromAndTo(t *testing.T) {
+	h, db := newExamsPGHandler(t)
+	examID, userID := seedPublishedExam(t, db, "active")
+	_, err := db.Exec(`UPDATE exams SET ai_grading_mode = 'auto' WHERE id = $1`, examID)
+	require.NoError(t, err)
+	racing := NewHandler(NewService(&staleReadRepo{Repository: NewRepository(db), db: db, raced: "suggest"}), h.writer)
+
+	w := putExam(t, racing, examID, userID, modeBody("Fire safety", "auto"))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	_, mode := storedMode(t, db, examID)
+	assert.Equal(t, "auto", mode)
+	var audits int
+	require.NoError(t, db.Get(&audits, `SELECT COUNT(*) FROM audit_log WHERE action = 'exam.update' AND entity_id = $1`, examID))
+	require.Equal(t, 1, audits, "the change is audited exactly once, although the service's read was stale")
+	var from, to string
+	require.NoError(t, db.QueryRow(`
+SELECT metadata->>'ai_grading_mode_from', metadata->>'ai_grading_mode_to'
+FROM audit_log WHERE action = 'exam.update' AND entity_id = $1`, examID).Scan(&from, &to))
+	assert.Equal(t, "suggest", from, "from is the mode the write replaced, not the one the service read")
+	assert.Equal(t, "auto", to)
+}
+
+// #570 review: the write takes the row lock before it reads the previous mode. A write that finds the row held waits for
+// the holder, and reports the mode the holder committed.
+func TestUpdateAIGradingMode_RealPostgres_WaitsForTheLockAndReportsTheCommittedMode(t *testing.T) {
+	_, db := newExamsPGHandler(t)
+	examID, _ := seedPublishedExam(t, db, "active")
+	repo := NewRepository(db)
+
+	holder, err := db.Beginx()
+	require.NoError(t, err)
+	defer holder.Rollback() //nolint:errcheck
+	var held string
+	require.NoError(t, holder.Get(&held, `SELECT ai_grading_mode FROM exams WHERE id = $1 FOR UPDATE`, examID))
+
+	type outcome struct {
+		updated  *Exam
+		previous string
+		err      error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		updated, previous, err := repo.UpdateAIGradingMode(context.Background(), examID, "auto")
+		done <- outcome{updated, previous, err}
+	}()
+	select {
+	case <-done:
+		t.Fatal("the write must wait while another transaction holds the row")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	_, err = holder.Exec(`UPDATE exams SET ai_grading_mode = 'off' WHERE id = $1`, examID)
+	require.NoError(t, err)
+	require.NoError(t, holder.Commit())
+
+	select {
+	case res := <-done:
+		require.NoError(t, res.err)
+		assert.Equal(t, "off", res.previous, "the previous mode is the one the holder committed, not the one before it")
+		assert.Equal(t, "auto", res.updated.AIGradingMode)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the write did not finish after the holder committed")
+	}
 }

@@ -132,15 +132,13 @@ func (s *service) UpdateExam(ctx context.Context, id string, input UpdateExamInp
 		if !onlyAIGradingModeChanged(e, input) {
 			return nil, ErrNotDraft
 		}
-		mode := input.AIGradingMode
-		if mode == "" {
-			mode = prevMode
-		}
-		updated, err := s.repo.UpdateAIGradingMode(ctx, id, mode)
+		// The previous mode comes from the write's own lock, not from the read above: a concurrent change in between must
+		// not hide this one (#570).
+		updated, previous, err := s.repo.UpdateAIGradingMode(ctx, id, input.AIGradingMode)
 		if err != nil {
 			return nil, fmt.Errorf("exams: UpdateExam: %w", err)
 		}
-		return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: prevMode, Changed: mode != prevMode}, nil
+		return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: previous, Changed: updated.AIGradingMode != previous}, nil
 	}
 	// AC-1: adaptive can only be changed in draft status (checked by onlyAIGradingModeChanged for a non-draft exam).
 	updated, err := s.repo.Update(ctx, id, input)

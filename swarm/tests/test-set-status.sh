@@ -58,6 +58,35 @@ run 5 done && logged "issue edit 5 --add-label status:done --remove-label status
   && ! grep -q "issue close" "$GH_LOG" \
   && check "done without --close clears role:* in the same edit, no close" ok || check "done without --close clears role:* in the same edit, no close" no
 
+# H (#518, architect): --role moves the role in the same edit as the status: adds role:uat, removes role:dev.
+export GH_LABELS="$(printf 'role:dev\nstatus:review\nswarm')" GH_PR_STATE=OPEN
+run 5 uat --role uat && logged "issue edit 5 --add-label status:uat --add-label role:uat --remove-label status:review --remove-label role:dev" \
+  && check "--role uat moves the role in one edit" ok || check "--role uat moves the role in one edit" no
+
+# I: a role that is already set is kept; only the other statuses are removed.
+export GH_LABELS="$(printf 'role:uat\nstatus:review')" GH_PR_STATE=OPEN
+run 5 uat --role uat && logged "issue edit 5 --add-label status:uat --add-label role:uat --remove-label status:review" \
+  && ! grep -q "remove-label role:uat" "$GH_LOG" \
+  && check "--role keeps a role already set" ok || check "--role keeps a role already set" no
+
+# J: an unknown role exits 2 and no label is changed.
+export GH_LABELS="$(printf 'role:dev\nstatus:review')" GH_PR_STATE=OPEN
+if run 5 ready --role qa; then rc=0; else rc=$?; fi
+[ "$rc" -eq 2 ] && ! grep -q "issue edit" "$GH_LOG" \
+  && check "unknown role exits 2 with no change" ok || check "unknown role exits 2 with no change" no
+
+# K: --role with done is refused: done clears role:* and cannot also set one.
+export GH_LABELS="$(printf 'role:dev\nstatus:review')" GH_PR_STATE=OPEN
+if run 5 done --role dev; then rc=0; else rc=$?; fi
+[ "$rc" -eq 2 ] && ! grep -q "issue edit" "$GH_LOG" \
+  && check "--role with done is refused, no change" ok || check "--role with done is refused, no change" no
+
+# L: --role without a value is a usage error.
+export GH_LABELS="$(printf 'role:dev\nstatus:review')" GH_PR_STATE=OPEN
+if run 5 ready --role; then rc=0; else rc=$?; fi
+[ "$rc" -eq 2 ] && ! grep -q "issue edit" "$GH_LOG" \
+  && check "--role without a value is a usage error" ok || check "--role without a value is a usage error" no
+
 # F: tick-log appends one UTC-prefixed line to ticks.log.
 state=$t/state && mkdir -p "$state"
 SWARM_STATE_DIR="$state" bash "$here/bin/tick-log.sh" "dispatched 1; merged 0" >/dev/null

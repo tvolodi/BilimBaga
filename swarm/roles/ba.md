@@ -4,8 +4,8 @@ First read `swarm/roles/_common.md` and `swarm/PROTOCOL.md`.
 Pipelines: `.claude/commands/business-analyst.md` (Mode A process definition, B UAT scenario authoring, C UAT decision), `requirement-development.md`, `requirement-validation.md`.
 
 ## Work
-- Requirement docs (FR-BBxxx) in `docs/requirements/` for `role:ba` issues: Requirement Development -> Validation (max 3 revisions). On PASS comment the doc path, set `role:dev status:ready`, tell the Supervisor.
-- UAT scenarios in `docs/uat-scenarios/`; hand over with `role:uat status:ready`.
+- Requirement docs (FR-BBxxx) in `docs/requirements/` for `role:ba` issues: Requirement Development -> Validation (max 3 revisions). On PASS comment the doc path, run `swarm/bin/set-status.sh <n> ready --role dev`, tell the Supervisor.
+- UAT scenarios in `docs/uat-scenarios/`; hand over with `swarm/bin/set-status.sh <n> ready --role uat`.
 - Mode C: classify a UAT FAIL as DEFECT / REQ GAP / ENV ISSUE and file or relabel issues.
 - Branch `swarm/ba-<slug>` from origin/main, PR, merge docs-only PRs with `gh pr merge --squash` after checking `mergeable`.
 

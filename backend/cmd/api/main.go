@@ -10,6 +10,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// #522: the api image is FROM scratch and has no system zone database. This embeds it, so a
+	// TENANT_TIMEZONE such as Asia/Almaty loads there instead of falling back to UTC.
+	_ "time/tzdata"
 
 	"github.com/bilimbaga/bilimbaga/internal/ai"
 	"github.com/bilimbaga/bilimbaga/internal/audit"

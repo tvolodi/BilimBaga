@@ -123,3 +123,56 @@ func TestUpdateAIGradingMode_RealPostgres_ArchivedModeChangeIsAccepted(t *testin
 	_, mode := storedMode(t, db, examID)
 	assert.Equal(t, "auto", mode)
 }
+
+// descBody repeats the seeded exam with a description, the way the wizard sends it.
+func descBody(description, mode string) string {
+	return fmt.Sprintf(`{"title":"Fire safety","description":%q,"time_limit_minutes":30,"passing_score_pct":70,"max_attempts":1,"show_answers":"never","on_tab_switch":"log","ai_grading_mode":%q}`, description, mode)
+}
+
+// #570: a request that repeats a published exam changes nothing and writes no audit row.
+func TestUpdateAIGradingMode_RealPostgres_NoChangeWritesNoAuditRow(t *testing.T) {
+	h, db := newExamsPGHandler(t)
+	examID, userID := seedPublishedExam(t, db, "active")
+
+	w := putExam(t, h, examID, userID, modeBody("Fire safety", "suggest"))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var audits int
+	require.NoError(t, db.Get(&audits, `SELECT COUNT(*) FROM audit_log WHERE action = 'exam.update' AND entity_id = $1`, examID))
+	assert.Zero(t, audits, "a request that changes nothing on a published exam writes no audit row")
+}
+
+// #570: a changed description sent with a mode change is refused, and nothing is written; the mode is not applied.
+func TestUpdateAIGradingMode_RealPostgres_ChangedDescriptionIsRefusedAndWritesNothing(t *testing.T) {
+	h, db := newExamsPGHandler(t)
+	examID, userID := seedPublishedExam(t, db, "active")
+	_, err := db.Exec(`UPDATE exams SET description = 'Old text' WHERE id = $1`, examID)
+	require.NoError(t, err)
+
+	w := putExam(t, h, examID, userID, descBody("New text", "off"))
+
+	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "EXAM_NOT_DRAFT")
+	var description string
+	require.NoError(t, db.Get(&description, `SELECT description FROM exams WHERE id = $1`, examID))
+	assert.Equal(t, "Old text", description)
+	_, mode := storedMode(t, db, examID)
+	assert.Equal(t, "suggest", mode, "the refused request does not change the mode either")
+	var audits int
+	require.NoError(t, db.Get(&audits, `SELECT COUNT(*) FROM audit_log WHERE action = 'exam.update' AND entity_id = $1`, examID))
+	assert.Zero(t, audits)
+}
+
+// #570: the same description with a mode change is not a change to the description, so the mode change goes through.
+func TestUpdateAIGradingMode_RealPostgres_SameDescriptionWithModeChangeIsAccepted(t *testing.T) {
+	h, db := newExamsPGHandler(t)
+	examID, userID := seedPublishedExam(t, db, "active")
+	_, err := db.Exec(`UPDATE exams SET description = 'Old text' WHERE id = $1`, examID)
+	require.NoError(t, err)
+
+	w := putExam(t, h, examID, userID, descBody("Old text", "off"))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	_, mode := storedMode(t, db, examID)
+	assert.Equal(t, "off", mode)
+}

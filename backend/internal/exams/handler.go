@@ -327,13 +327,16 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// FR-BB73 AC-9 (#566): the audit row carries the AI grading mode before and after the update.
+	// FR-BB73 AC-9 (#566): the audit row carries the AI grading mode before and after the update. A request that changes
+	// nothing on a published exam writes no row (#570).
 	exam := res.Exam
-	h.writer.Write(r.Context(), r, "exam.update", "exam", &exam.ID, map[string]any{
-		"title":                exam.Title,
-		"ai_grading_mode_from": res.PreviousAIGradingMode,
-		"ai_grading_mode_to":   exam.AIGradingMode,
-	})
+	if res.Changed {
+		h.writer.Write(r.Context(), r, "exam.update", "exam", &exam.ID, map[string]any{
+			"title":                exam.Title,
+			"ai_grading_mode_from": res.PreviousAIGradingMode,
+			"ai_grading_mode_to":   exam.AIGradingMode,
+		})
+	}
 
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": exam, "error": nil})
 }

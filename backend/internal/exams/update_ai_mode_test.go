@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ import (
 func modeOnlyRequest(e *Exam, mode string) UpdateExamInput {
 	return UpdateExamInput{
 		Title:              e.Title,
+		Description:        e.Description,
 		TimeLimitMinutes:   e.TimeLimitMinutes,
 		PassingScorePct:    e.PassingScorePct,
 		MaxAttempts:        e.MaxAttempts,
@@ -139,6 +141,110 @@ func TestUpdateExam_DraftModeChangeUsesTheFullUpdate(t *testing.T) {
 	assert.True(t, fullUpdate)
 	assert.Equal(t, "auto", res.Exam.AIGradingMode)
 	assert.Equal(t, "suggest", res.PreviousAIGradingMode)
+	assert.True(t, res.Changed, "a draft update is always a change for the audit log, as before #566")
+}
+
+// #570: a description sent with a mode change on a published exam is compared like every other field. A changed one is
+// refused; the same text, or no text on both sides, is not a change.
+func TestUpdateExam_PublishedDescriptionIsCompared(t *testing.T) {
+	old, same, other := "Old text", "Old text", "New text"
+	cases := []struct {
+		name    string
+		stored  *string
+		sent    *string
+		refused bool
+	}{
+		{"changed text", &old, &other, true},
+		{"same text", &old, &same, false},
+		{"text added", nil, &other, true},
+		{"text removed", &old, nil, true},
+		{"empty on both sides", nil, nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newMockRepo()
+			seedExamWithMode(repo, "exam-1", "active", "suggest")
+			repo.exams["exam-1"].Description = tc.stored
+			in := modeOnlyRequest(repo.exams["exam-1"], "auto")
+			in.Description = tc.sent
+
+			_, err := NewService(repo).UpdateExam(context.Background(), "exam-1", in)
+
+			if tc.refused {
+				assert.ErrorIs(t, err, ErrNotDraft)
+				assert.Equal(t, "suggest", repo.exams["exam-1"].AIGradingMode, "a refused request changes no field")
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, "auto", repo.exams["exam-1"].AIGradingMode)
+			}
+		})
+	}
+}
+
+// #570: the comparison covers every UpdateExamInput field except the mode. A field added later and left out of
+// onlyAIGradingModeChanged would let a published exam change silently, so this walks the struct and fails for it.
+func TestUpdateExam_EveryFieldButTheModeIsCompared(t *testing.T) {
+	typ := reflect.TypeOf(UpdateExamInput{})
+	for i := 0; i < typ.NumField(); i++ {
+		name := typ.Field(i).Name
+		if name == "AIGradingMode" {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			repo := newMockRepo()
+			seedExamWithMode(repo, "exam-1", "active", "suggest")
+			in := modeOnlyRequest(repo.exams["exam-1"], "auto")
+			changeField(t, reflect.ValueOf(&in).Elem().Field(i))
+
+			_, err := NewService(repo).UpdateExam(context.Background(), "exam-1", in)
+
+			assert.ErrorIs(t, err, ErrNotDraft, "%s changed on a published exam must keep the draft rule", name)
+			assert.Equal(t, "suggest", repo.exams["exam-1"].AIGradingMode)
+		})
+	}
+}
+
+// changeField sets a field to a value different from any stored exam's, by kind.
+func changeField(t *testing.T, f reflect.Value) {
+	t.Helper()
+	switch f.Kind() {
+	case reflect.String:
+		f.SetString(f.String() + "-changed")
+	case reflect.Bool:
+		f.SetBool(!f.Bool())
+	case reflect.Int:
+		f.SetInt(f.Int() + 1)
+	case reflect.Float64:
+		f.SetFloat(f.Float() + 1)
+	case reflect.Ptr:
+		switch f.Type().Elem() {
+		case reflect.TypeOf(""):
+			s := "changed"
+			f.Set(reflect.ValueOf(&s))
+		case reflect.TypeOf(time.Time{}):
+			later := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+			f.Set(reflect.ValueOf(&later))
+		default:
+			t.Fatalf("no change rule for pointer to %s: teach changeField the new kind", f.Type().Elem())
+		}
+	default:
+		t.Fatalf("no change rule for kind %s: teach changeField the new kind", f.Kind())
+	}
+}
+
+// #570: a request that repeats a published exam changes nothing, so the result is not a change and writes no audit row.
+// A mode change is a change.
+func TestUpdateExam_PublishedChangedFlag(t *testing.T) {
+	repo := newMockRepo()
+	seedExamWithMode(repo, "exam-1", "active", "suggest")
+
+	same, err := NewService(repo).UpdateExam(context.Background(), "exam-1", modeOnlyRequest(repo.exams["exam-1"], "suggest"))
+	require.NoError(t, err)
+	assert.False(t, same.Changed, "a no-op on a published exam is not a change")
+
+	moved, err := NewService(repo).UpdateExam(context.Background(), "exam-1", modeOnlyRequest(repo.exams["exam-1"], "auto"))
+	require.NoError(t, err)
+	assert.True(t, moved.Changed)
 }
 
 func TestUpdate_PublishedModeChangeAnswers200(t *testing.T) {

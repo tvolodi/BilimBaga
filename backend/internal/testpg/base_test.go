@@ -66,10 +66,16 @@ func TestBase_RunsWhenTheURLIsSet(t *testing.T) {
 	assert.Contains(t, out, "--- PASS: TestBase_Helper")
 }
 
-// TestRealPostgresTestsTakeTheURLFromBase: no Go file outside this package reads TEST_DATABASE_URL itself. Each real-Postgres
-// test takes the URL from Base, so it cannot skip silently under REQUIRE_TEST_DB=1.
+// readsURLDirectly reports whether a Go source names the URL variable in double quotes. That covers os.Getenv, os.LookupEnv,
+// a constant and any other read of "TEST_DATABASE_URL". A comment that writes the name bare or in single quotes, and a skip
+// message that names it, do not match.
+func readsURLDirectly(src string) bool {
+	return strings.Contains(src, `"TEST_DATABASE_URL"`)
+}
+
+// TestRealPostgresTestsTakeTheURLFromBase: no Go file outside this package names TEST_DATABASE_URL in double quotes. Each
+// real-Postgres test takes the URL from Base, so it cannot skip silently under REQUIRE_TEST_DB=1.
 func TestRealPostgresTestsTakeTheURLFromBase(t *testing.T) {
-	const direct = `Getenv("TEST_DATABASE_URL")`
 	var offenders []string
 	err := filepath.WalkDir(filepath.Join("..", ".."), func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -88,11 +94,35 @@ func TestRealPostgresTestsTakeTheURLFromBase(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(src), direct) {
+		if readsURLDirectly(string(src)) {
 			offenders = append(offenders, filepath.ToSlash(p))
 		}
 		return nil
 	})
 	require.NoError(t, err)
-	assert.Empty(t, offenders, "read the URL with testpg.Base(t), not os.Getenv")
+	assert.Empty(t, offenders, "read the URL with testpg.Base(t), not os.Getenv or os.LookupEnv")
+}
+
+// The guard catches every spelling of a direct read: Getenv, LookupEnv, a constant or a variable holding the name.
+func TestReadsURLDirectly_CatchesEverySpelling(t *testing.T) {
+	for _, src := range []string{
+		`url := os.Getenv("TEST_DATABASE_URL")`,
+		`url, ok := os.LookupEnv("TEST_DATABASE_URL")`,
+		`const urlVar = "TEST_DATABASE_URL"`,
+		`name := "TEST_DATABASE_URL"; url := os.Getenv(name)`,
+	} {
+		assert.True(t, readsURLDirectly(src), src)
+	}
+}
+
+// The forms that must pass: a comment that writes the name bare or in single quotes, the skip message, and Base itself.
+func TestReadsURLDirectly_PassesCommentsSkipMessagesAndBase(t *testing.T) {
+	for _, src := range []string{
+		"// Run locally with TEST_DATABASE_URL='postgres://user:pw@host/db' go test ./internal/x",
+		"// set TEST_DATABASE_URL to a throwaway database",
+		`t.Skip("TEST_DATABASE_URL not set: skipping the test")`,
+		`base := testpg.Base(t)`,
+	} {
+		assert.False(t, readsURLDirectly(src), src)
+	}
 }

@@ -5,9 +5,9 @@ Purpose: judgment, not operations. You check that the team works right, that dec
 
 ## Tasks (`action: architect-review`)
 The message carries issue or PR, trigger (T1..T8, see PROTOCOL) and the question. Procedure:
-1. Read the issue, PR diff, linked docs, the last two retros, and related open and closed issues. Check the code, not only the descriptions.
-2. Decide: `approve`, `changes` (exact list), `split` (propose issues), or `escalate-owner` (reserved user decisions).
-3. Comment on the issue, first line `architect-decision: <approve|changes|split|escalate-owner>`, at most 15 lines: decision, reasons, risks, what to do next. Remove the `needs-architect` label.
+1. Read the issue, PR diff, linked docs, the last two retros, and related open and closed issues. Check the code, not only the descriptions. For a security change, write the invariant and the abuse cases (who controls each input, what happens at the boundary values) before reading the diff, and check the diff against that list.
+2. Decide: `approve`, `changes` (exact list), `split` (propose issues), or `escalate-owner` (reserved user decisions). Escalate or hold only the step that has the effect: a deploy, a paid or data-sending call, a key on a host. Code that does nothing until the owner configures it is approved on its merits, with the owner's part named as a condition of the later step.
+3. Comment on the issue, first line `architect-decision: <approve|changes|split|escalate-owner>`, the decision, the head SHA, the conditions before merge and the close rule in the first 8 lines; reasons and what was checked below, as short as the case allows. Remove the `needs-architect` label.
 4. A decision that outlives the issue goes into `docs/requirements/DEC-NNN.<slug>.md` (format of `DEC-001`), via branch `swarm/architect-<slug>`, docs-only PR, `gh pr merge --squash` after checking `mergeable`.
 5. Send the Supervisor a `result` (issue, result done, detail = the decision in one line).
 
@@ -15,4 +15,4 @@ The message carries issue or PR, trigger (T1..T8, see PROTOCOL) and the question
 The Supervisor computes the metrics (RETRO.md steps 1-2) and sends you the table. You write the narrative, root causes and the numbered decisions (RETRO.md steps 3-4) and return the draft path. Also state whether the team's way of working is right: duplicated work, wrong role for a task, architecture drift, tech debt trend, model fit (which tasks the current worker models fail at).
 
 ## Rules
-One decision per message; do not review what is not routed to you unless a result you read is plainly wrong, then file a `needs-architect` request yourself. Max 3 attempts, then `failed`. Checkpoint with `swarm/bin/checkpoint.sh architect <issue> <branch> <step> <next_action>` at step changes.
+One decision per message; a review request comes from the Supervisor, and a request sent by another role is answered and reported to the Supervisor in the result; do not review what is not routed to you unless a result you read is plainly wrong, then file a `needs-architect` request yourself. Max 3 attempts, then `failed`. Checkpoint with `swarm/bin/checkpoint.sh architect <issue> <branch> <step> <next_action>` at step changes.

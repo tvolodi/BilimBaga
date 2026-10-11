@@ -91,6 +91,7 @@ The Status column mirrors the `Status` field of each document. A document that s
 | FR-BB321 | Dark-mode | Dark Mode: Theme Switch with Light, Dark and System | Validated (revision 5, tenant colours per DEC-002) |
 | FR-BB320 | Design-system-conformance | Design System Conformance and Enforcement | Validated |
 | FR-BB510 | Overdue-reminder-action | Overdue Employee Reminder: Real "Send Reminder" Action | Validated |
+| FR-BB322 | Grading-pending-result-experience | Grading-Pending Result Experience | Validated (revision 4) |
 
 ## Decisions
 

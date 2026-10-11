@@ -9,6 +9,7 @@ package testpg
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,20 @@ import (
 
 // trgmLockKey is the advisory lock that serialises the one-time pg_trgm install across test packages (#547).
 const trgmLockKey = 547
+
+// Base returns TEST_DATABASE_URL for a real-Postgres test. When it is not set the test is skipped, unless REQUIRE_TEST_DB is
+// 1 (CI sets it): then the test fails. A real-Postgres test therefore cannot pass by not running (retro-012 decision 4, #576).
+func Base(t testing.TB) string {
+	t.Helper()
+	if base := os.Getenv("TEST_DATABASE_URL"); base != "" {
+		return base
+	}
+	if os.Getenv("REQUIRE_TEST_DB") == "1" {
+		t.Fatal("TEST_DATABASE_URL is not set and REQUIRE_TEST_DB=1: the real-Postgres test cannot run, so it fails instead of skipping")
+	}
+	t.Skip("TEST_DATABASE_URL not set: skipping the real-Postgres test")
+	return ""
+}
 
 // NewSchema creates the throwaway schema prefix_<nanos> and returns a connection whose search_path is that schema,
 // then public. base is TEST_DATABASE_URL. The schema is dropped when the test ends.

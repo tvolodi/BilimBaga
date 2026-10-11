@@ -17,9 +17,10 @@ import (
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/deptscope"
+	"github.com/bilimbaga/bilimbaga/internal/testpg"
 	"github.com/jmoiron/sqlx"
-	"github.com/stretchr/testify/assert"
 	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,10 +43,7 @@ CREATE TABLE ai_insight_cache (
 );`
 
 func TestInsightCacheScope_RealPostgres(t *testing.T) {
-	base := os.Getenv("TEST_DATABASE_URL")
-	if base == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping real-Postgres insight scope test")
-	}
+	base := testpg.Base(t)
 	const up = "../../migrations/037_ai_insight_cache_scope.up.sql"
 	const down = "../../migrations/037_ai_insight_cache_scope.down.sql"
 	upSQL, err := os.ReadFile(up)

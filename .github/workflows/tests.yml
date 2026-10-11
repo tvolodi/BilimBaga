@@ -37,6 +37,8 @@ jobs:
           --health-retries 10
     env:
       TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/bilimbaga_test?sslmode=disable
+      # A real-Postgres test fails instead of skipping when the URL is missing (testpg.Base, retro-012 decision 4, #576).
+      REQUIRE_TEST_DB: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -53,9 +55,11 @@ jobs:
       - name: go test
         if: ${{ !cancelled() }}
         run: go test -p 2 ./...
-      - name: AI grading and grading-pending Postgres tests, verbose (#528, #545)
+      - name: Real-Postgres tests, verbose, every package that imports testpg (#576)
         if: ${{ !cancelled() }}
-        run: go test -count=1 -v -run '^(TestAIGrade_|TestGradingPending_)' ./internal/sessions/
+        run: |
+          PKGS=$(go list -f '{{.ImportPath}} {{join .TestImports " "}} {{join .XTestImports " "}}' ./... | grep -F 'internal/testpg' | awk '{print $1}')
+          go test -count=1 -v -p 2 $PKGS
       - name: Sign-in limiter script refuses a non-local base (#484)
         run: bash ../scripts/tests/test-limiter-forwarded-headers_test.sh
 

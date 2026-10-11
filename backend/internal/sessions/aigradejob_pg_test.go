@@ -11,7 +11,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"os"
 	"testing"
 
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
@@ -24,10 +23,7 @@ import (
 // newAIGradePGDB opens a connection to a fresh schema with every migration applied.
 func newAIGradePGDB(t *testing.T) *sqlx.DB {
 	t.Helper()
-	base := os.Getenv("TEST_DATABASE_URL")
-	if base == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping real-Postgres AI grading tests")
-	}
+	base := testpg.Base(t)
 	db := testpg.NewSchema(t, base, "bb_528")
 	require.NoError(t, dbpkg.RunMigrations(db, "../../migrations"))
 	return db

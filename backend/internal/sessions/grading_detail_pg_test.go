@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/bilimbaga/bilimbaga/internal/ctxkeys"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,7 @@ func TestAIGrade_GradingDetailShowsSuggestionAndAIGrades(t *testing.T) {
 	detail, err := repo.GetGradingDetail(ctx, finalSession)
 	require.NoError(t, err)
 	require.Len(t, detail.Questions, 2)
+	assert.Equal(t, "submitted", detail.SessionStatus, "the session is final, so its graded answers are read-only in the grader")
 	byID := map[string]GradingQuestionItem{}
 	for _, q := range detail.Questions {
 		byID[q.QuestionID] = q
@@ -72,6 +74,7 @@ func TestAIGrade_GradingDetailShowsSuggestionAndAIGrades(t *testing.T) {
 	detail, err = repo.GetGradingDetail(ctx, pendingSession)
 	require.NoError(t, err)
 	require.Len(t, detail.Questions, 1)
+	assert.Equal(t, "grading_pending", detail.SessionStatus)
 	waiting := detail.Questions[0]
 	assert.Equal(t, "pending_manual", waiting.GradingStatus)
 	assert.Nil(t, waiting.CurrentScorePct)
@@ -81,4 +84,18 @@ func TestAIGrade_GradingDetailShowsSuggestionAndAIGrades(t *testing.T) {
 	require.NotNil(t, waiting.AIReasoning)
 	assert.Equal(t, "half", *waiting.AIReasoning)
 	assert.Contains(t, waiting.AIFlags, aiFlagDecisivePass)
+
+	// The queue shows the exam's mode (FR-BB73 AC-22).
+	// The queue is scoped by the caller's role; a super admin sees every department.
+	superCtx := context.WithValue(ctx, ctxkeys.CtxRole, "super_admin")
+	items, _, err := repo.ListGradingQueue(superCtx, nil, nil, nil, 1, 20)
+	require.NoError(t, err)
+	var queued *GradingQueueItem
+	for i := range items {
+		if items[i].SessionID == pendingSession {
+			queued = &items[i]
+		}
+	}
+	require.NotNil(t, queued, "the waiting session is in the queue")
+	assert.Equal(t, "auto", queued.AIGradingMode)
 }

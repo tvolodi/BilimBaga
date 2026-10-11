@@ -1350,13 +1350,14 @@ SELECT
   u.full_name                                                          AS employee_name,
   e.id                                                                 AS exam_id,
   e.title                                                              AS exam_title,
+  e.ai_grading_mode                                                    AS ai_grading_mode,
   es.submitted_at,
   COUNT(sqs.question_id) FILTER (WHERE sqs.grading_status = 'pending_manual') AS pending_question_count
 FROM exam_sessions es
 JOIN users u  ON u.id  = es.user_id
 JOIN exams e  ON e.id  = es.exam_id
 JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere("$6", "$7") + `
-GROUP BY es.id, u.full_name, e.id, e.title, es.submitted_at
+GROUP BY es.id, u.full_name, e.id, e.title, e.ai_grading_mode, es.submitted_at
 ORDER BY es.submitted_at ASC
 LIMIT $4 OFFSET $5`
 
@@ -1385,17 +1386,19 @@ func (r *postgresRepository) GetGradingDetail(ctx context.Context, sessionID str
 SELECT es.id         AS session_id,
        u.full_name   AS employee_name,
        e.title       AS exam_title,
-       es.submitted_at
+       es.submitted_at,
+       es.status     AS session_status
 FROM exam_sessions es
 JOIN users u ON u.id = es.user_id
 JOIN exams e ON e.id = es.exam_id
 WHERE es.id = $1`
 
 	type headerRow struct {
-		SessionID    string     `db:"session_id"`
-		EmployeeName string     `db:"employee_name"`
-		ExamTitle    string     `db:"exam_title"`
-		SubmittedAt  *time.Time `db:"submitted_at"`
+		SessionID     string     `db:"session_id"`
+		EmployeeName  string     `db:"employee_name"`
+		ExamTitle     string     `db:"exam_title"`
+		SubmittedAt   *time.Time `db:"submitted_at"`
+		SessionStatus string     `db:"session_status"`
 	}
 	var hdr headerRow
 	if err := r.db.GetContext(ctx, &hdr, headerQ, sessionID); err != nil {
@@ -1453,11 +1456,12 @@ ORDER BY sq.sort_order ASC`
 	}
 
 	return &GradingDetailResponse{
-		SessionID:    hdr.SessionID,
-		EmployeeName: hdr.EmployeeName,
-		ExamTitle:    hdr.ExamTitle,
-		SubmittedAt:  hdr.SubmittedAt,
-		Questions:    questions,
+		SessionID:     hdr.SessionID,
+		EmployeeName:  hdr.EmployeeName,
+		ExamTitle:     hdr.ExamTitle,
+		SubmittedAt:   hdr.SubmittedAt,
+		SessionStatus: hdr.SessionStatus,
+		Questions:     questions,
 	}, nil
 }
 

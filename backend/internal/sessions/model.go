@@ -349,6 +349,8 @@ type GradingQueueItem struct {
 	ExamTitle            string     `json:"exam_title" db:"exam_title"`
 	SubmittedAt          *time.Time `json:"submitted_at" db:"submitted_at"`
 	PendingQuestionCount int64      `json:"pending_question_count" db:"pending_question_count"`
+	// AIGradingMode is the exam's ai_grading_mode, shown in the queue (FR-BB73 AC-22).
+	AIGradingMode string `json:"ai_grading_mode" db:"ai_grading_mode"`
 }
 
 // GradingQueueMeta holds pagination metadata for the grading queue (FR-BB42).
@@ -383,11 +385,14 @@ type GradingQuestionItem struct {
 
 // GradingDetailResponse is the response for GET /admin/grading/:sessionId (FR-BB42).
 type GradingDetailResponse struct {
-	SessionID    string                `json:"session_id"`
-	EmployeeName string                `json:"employee_name"`
-	ExamTitle    string                `json:"exam_title"`
-	SubmittedAt  *time.Time            `json:"submitted_at"`
-	Questions    []GradingQuestionItem `json:"questions"`
+	SessionID    string     `json:"session_id"`
+	EmployeeName string     `json:"employee_name"`
+	ExamTitle    string     `json:"exam_title"`
+	SubmittedAt  *time.Time `json:"submitted_at"`
+	// SessionStatus tells the grading screen whether the session is final (AC-19, FR-BB47 AC-5): a final session's
+	// graded answers are shown read-only.
+	SessionStatus string                `json:"session_status"`
+	Questions     []GradingQuestionItem `json:"questions"`
 }
 
 // GradeAnswerRequest is the request body for POST /admin/grading/:sessionId/answers/:questionId.

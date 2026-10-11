@@ -37,67 +37,60 @@ func NewService(repo Repository, tenantCfg TenantConfigProvider) Service {
 }
 
 func (s *service) GetOrCreate(ctx context.Context, sessionID, callerID string, isAdmin bool) (*Certificate, TemplateSnapshot, error) {
-	row, err := s.repo.GetSessionForCertificate(ctx, sessionID)
+	// The rules run inside the repository's transaction, after the session lock (FR-BB73 AC-20).
+	cert, err := s.repo.IssueLocked(ctx, sessionID, func(row certSessionRow, existing *Certificate) (*certInsert, error) {
+		// AC-1: ownership check (skipped for admin callers).
+		if !isAdmin && row.UserID != callerID {
+			return nil, ErrNotOwner
+		}
+
+		// AC-4: session must be in submitted state.
+		if row.Status != "submitted" {
+			return nil, ErrNotSubmitted
+		}
+
+		// AC-2: exam must have certificate_enabled = true.
+		if !row.CertificateEnabled {
+			return nil, ErrNotCertifiable
+		}
+
+		// AC-3: session must have passed.
+		if !row.Passed {
+			return nil, ErrNotPassed
+		}
+
+		// AC-5: return the existing certificate if already issued.
+		if existing != nil {
+			return nil, nil
+		}
+
+		// AC-9: capture tenant branding at issuance time.
+		scorePct := 0.0
+		if row.ScorePct != nil {
+			scorePct = *row.ScorePct
+		}
+		return &certInsert{
+			SessionID:        row.SessionID,
+			EmployeeName:     row.EmployeeName,
+			ExamTitle:        row.ExamTitle,
+			ScorePct:         scorePct,
+			TemplateSnapshot: s.buildSnapshot(),
+		}, nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, TemplateSnapshot{}, ErrNotFound
 		}
-		return nil, TemplateSnapshot{}, fmt.Errorf("certificates: GetOrCreate: fetch session: %w", err)
-	}
-
-	// AC-1: ownership check (skipped for admin callers).
-	if !isAdmin && row.UserID != callerID {
-		return nil, TemplateSnapshot{}, ErrNotOwner
-	}
-
-	// AC-4: session must be in submitted state.
-	if row.Status != "submitted" {
-		return nil, TemplateSnapshot{}, ErrNotSubmitted
-	}
-
-	// AC-2: exam must have certificate_enabled = true.
-	if !row.CertificateEnabled {
-		return nil, TemplateSnapshot{}, ErrNotCertifiable
-	}
-
-	// AC-3: session must have passed.
-	if !row.Passed {
-		return nil, TemplateSnapshot{}, ErrNotPassed
-	}
-
-	// AC-5: return existing certificate if already issued.
-	cert, err := s.repo.GetBySessionID(ctx, sessionID)
-	if err == nil {
-		snap, snapErr := parseSnapshot(cert.TemplateSnapshot)
-		if snapErr != nil {
-			snap = TemplateSnapshot{}
+		if errors.Is(err, ErrNotOwner) || errors.Is(err, ErrNotSubmitted) || errors.Is(err, ErrNotCertifiable) || errors.Is(err, ErrNotPassed) {
+			return nil, TemplateSnapshot{}, err
 		}
-		return cert, snap, nil
-	}
-	if !errors.Is(err, ErrNotFound) {
-		return nil, TemplateSnapshot{}, fmt.Errorf("certificates: GetOrCreate: check existing: %w", err)
+		return nil, TemplateSnapshot{}, fmt.Errorf("certificates: GetOrCreate: %w", err)
 	}
 
-	// AC-9: capture tenant branding at issuance time.
-	snap := s.buildSnapshot()
-
-	scorePct := 0.0
-	if row.ScorePct != nil {
-		scorePct = *row.ScorePct
+	snap, snapErr := parseSnapshot(cert.TemplateSnapshot)
+	if snapErr != nil {
+		snap = TemplateSnapshot{}
 	}
-
-	// AC-10: ON CONFLICT (session_id) DO NOTHING makes this idempotent under concurrency.
-	cert, err = s.repo.Create(ctx, certInsert{
-		SessionID:        sessionID,
-		EmployeeName:     row.EmployeeName,
-		ExamTitle:        row.ExamTitle,
-		ScorePct:         scorePct,
-		TemplateSnapshot: snap,
-	})
-	if err != nil {
-		return nil, TemplateSnapshot{}, fmt.Errorf("certificates: GetOrCreate: create: %w", err)
-	}
-
 	return cert, snap, nil
 }
 

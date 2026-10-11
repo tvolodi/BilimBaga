@@ -175,12 +175,13 @@ func TestAIGrade_TwoAnswersThatOnlyPassTogetherAreSuggested(t *testing.T) {
 // stays, and the notification does not fire twice.
 func TestAIGrade_HumanGradeDuringTheCallWins(t *testing.T) {
 	db := newAIGradePGDB(t)
-	sessionID, userID, qs := seedAIGradeSession(t, db, 1)
+	sessionID, _, qs := seedAIGradeSession(t, db, 1)
 	repo := NewRepository(db, NewGradingEngine())
+	grader := seedGrader(t, db) // the employee may not grade their own session (FR-BB73 AC-21)
 
 	client := &gradeStubClient{response: `{"score_pct": 0, "reasoning": "wrong"}`, tokens: 5}
 	client.onCall = func() {
-		_, err := repo.GradeAnswer(context.Background(), sessionID, qs[0], userID, "public", "127.0.0.1", 100, "human")
+		_, err := repo.GradeAnswer(context.Background(), sessionID, qs[0], grader, "public", "127.0.0.1", 100, "human")
 		require.NoError(t, err)
 	}
 	var finalised []string

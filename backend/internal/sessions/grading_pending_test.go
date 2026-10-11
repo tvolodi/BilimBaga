@@ -15,6 +15,7 @@ import (
 type mailRecorder struct {
 	submitted []string
 	results   []string
+	corrected []string
 }
 
 func (m *mailRecorder) TriggerSessionResult(sessionID string) {
@@ -22,6 +23,9 @@ func (m *mailRecorder) TriggerSessionResult(sessionID string) {
 }
 func (m *mailRecorder) TriggerExamSubmitted(sessionID string) {
 	m.submitted = append(m.submitted, sessionID)
+}
+func (m *mailRecorder) TriggerResultCorrected(sessionID string) {
+	m.corrected = append(m.corrected, sessionID)
 }
 
 // ── FR-BB322 AC-1/AC-3: the start check order ───────────────────────────────

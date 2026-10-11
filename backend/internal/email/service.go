@@ -140,6 +140,33 @@ func (s *EmailService) TriggerExamSubmitted(sessionID string) {
 	}()
 }
 
+// TriggerResultCorrected sends exam_result_corrected to the session owner when a final session's pass or fail changed
+// after an examiner's override (FR-BB73 AC-19). The mail states the outcome that now applies.
+func (s *EmailService) TriggerResultCorrected(sessionID string) {
+	go func() {
+		ctx := context.Background()
+		if s.repo == nil {
+			return
+		}
+		data, err := s.repo.GetSessionEmailData(ctx, sessionID)
+		if err != nil {
+			s.logger.Error("email: get session data", "session_id", sessionID, "error", err)
+			return
+		}
+		tmplData := map[string]any{
+			"ExamTitle":  data.ExamTitle,
+			"ScorePct":   fmt.Sprintf("%.1f", data.ScorePct),
+			"Passed":     data.Passed,
+			"ResultLink": s.sessionResultLink(sessionID),
+		}
+		sendErr := s.send(data.UserEmail, "exam_result_corrected", tmplData, data.UserLocale)
+		s.logAttempt(data.UserEmail, "exam_result_corrected", sendErr)
+		if sendErr != nil {
+			s.logger.Error("email send failed", "template", "exam_result_corrected", "to", data.UserEmail, "error", sendErr)
+		}
+	}()
+}
+
 // TriggerAssignment sends new_exam_assigned to the relevant users when an exam
 // is assigned.
 func (s *EmailService) TriggerAssignment(examID, examTitle string, deadline *time.Time, assigneeType string, assigneeID *string) {

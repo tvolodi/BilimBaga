@@ -1308,6 +1308,11 @@ type gradeAnswerResult struct {
 	finalScorePct *float64
 	passed        *bool
 	sessionStatus string
+	// previousStatus is the session status before this grade, read under the session lock. The mail decision needs it:
+	// the result mail goes out on the transition from grading_pending only (FR-BB73 AC-19).
+	previousStatus string
+	// passedFlipped is true when a final session changed its pass or fail with this grade.
+	passedFlipped bool
 }
 
 // ListGradingQueue returns sessions with status='grading_pending' (FR-BB42 AC-1/AC-2/AC-3).
@@ -1450,68 +1455,6 @@ ORDER BY sq.sort_order ASC`
 		SubmittedAt:  hdr.SubmittedAt,
 		Questions:    questions,
 	}, nil
-}
-
-// GradeAnswer scores one short-text answer inside a transaction (FR-BB42 AC-7/AC-10).
-func (r *postgresRepository) GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error) {
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: begin tx: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	// 0. Lock the session before any grading write (see lockSessionForGrading, #528).
-	if err := lockSessionForGrading(ctx, tx, sessionID); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
-	}
-
-	// 1. Fetch max_score.
-	var maxScore float64
-	const maxQ = `SELECT max_score FROM session_question_scores WHERE session_id = $1 AND question_id = $2`
-	if err := tx.QueryRowContext(ctx, maxQ, sessionID, questionID).Scan(&maxScore); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrSessionNotFound
-		}
-		return nil, fmt.Errorf("sessions: GradeAnswer: fetch max_score: %w", err)
-	}
-
-	// 2. Compute raw score.
-	score := scorePct / 100.0 * maxScore
-
-	// 3. Update the score row (AC-10: persist graded_by, graded_at, manual_feedback).
-	const updateQ = `
-UPDATE session_question_scores
-SET score           = $3,
-    grading_status  = 'graded',
-    manual_feedback = $4,
-    graded_by       = $5,
-    graded_at       = NOW()
-WHERE session_id = $1 AND question_id = $2`
-	if _, err := tx.ExecContext(ctx, updateQ, sessionID, questionID, score, feedback, graderID); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: update score: %w", err)
-	}
-
-	// 4-5. Count the pending answers and, when none are left, finalise the session (AC-6/AC-7). The same helper
-	// finalises an AI-graded answer (#528).
-	fin, err := finaliseSessionIfAllGraded(ctx, tx, sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
-	}
-	res := &fin
-
-	// 6. Write audit log entry (AC-8).
-	const auditQ = `
-INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
-VALUES ($1, $2, 'answer.grade', 'session_answer', $3, $4,
-        jsonb_build_object('grader_id', $7::text, 'session_id', $5::text, 'score_pct', $6::numeric))`
-	if _, err := tx.ExecContext(ctx, auditQ, tenantID, graderID, questionID, actorIP, sessionID, scorePct, graderID); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: audit: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: commit: %w", err)
-	}
-	return res, nil
 }
 
 // lockSessionForGrading takes the exam_sessions row lock that every grading write takes before its score update.

@@ -49,6 +49,15 @@ func TestRenderTemplate_AllTemplates(t *testing.T) {
 			},
 		},
 		{
+			name: "exam_result_corrected",
+			data: map[string]any{
+				"ExamTitle":  "Go Fundamentals",
+				"ScorePct":   "45.0",
+				"Passed":     false,
+				"ResultLink": "http://localhost/portal/sessions/test-id/result",
+			},
+		},
+		{
 			name: "deadline_reminder",
 			data: map[string]any{
 				"ExamTitle": "Go Fundamentals",

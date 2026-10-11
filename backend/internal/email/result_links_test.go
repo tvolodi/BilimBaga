@@ -25,7 +25,7 @@ func TestSessionResultMails_LinkToTheResultPage(t *testing.T) {
 		"SubmittedAt":       "2026-10-11 09:30 UTC",
 	}
 	for _, locale := range []string{"en", "kk", "ru"} {
-		for _, tmpl := range []string{"exam_passed", "exam_failed", "exam_submitted"} {
+		for _, tmpl := range []string{"exam_passed", "exam_failed", "exam_submitted", "exam_result_corrected"} {
 			r, err := renderTemplate(tmpl, data, locale)
 			require.NoError(t, err, tmpl+" "+locale)
 			if tmpl != "exam_submitted" {

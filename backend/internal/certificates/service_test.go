@@ -48,6 +48,31 @@ func (m *mockRepo) GetByVerificationCode(ctx context.Context, code string) (*Cer
 	return nil, ErrNotFound
 }
 
+// IssueLocked runs the decision on the mock's session and certificate, as the transaction does. The fake has no lock;
+// the lock order is tested against Postgres.
+func (m *mockRepo) IssueLocked(ctx context.Context, sessionID string, decide IssueDecision) (*Certificate, error) {
+	row, err := m.GetSessionForCertificate(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	var existing *Certificate
+	cert, err := m.GetBySessionID(ctx, sessionID)
+	switch {
+	case err == nil:
+		existing = cert
+	case !errors.Is(err, ErrNotFound):
+		return nil, err
+	}
+	ins, err := decide(*row, existing)
+	if err != nil {
+		return nil, err
+	}
+	if ins == nil {
+		return existing, nil
+	}
+	return m.Create(ctx, *ins)
+}
+
 // ── Mock TenantConfigProvider ─────────────────────────────────────────────────
 
 type mockTenant struct {

@@ -15,7 +15,8 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   expect: {
-    toHaveScreenshot: { animations: 'disabled', caret: 'hide' },
+    // FR-BB320 AC-11: up to 1% of the pixels may differ. Zero tolerance is tracked in #588 (see #587).
+    toHaveScreenshot: { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01 },
   },
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:4173',

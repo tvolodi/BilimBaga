@@ -1416,7 +1416,11 @@ SELECT
        THEN ROUND(sqs.score / NULLIF(sqs.max_score, 0) * 100, 2)
        ELSE NULL
   END                            AS current_score_pct,
-  sqs.manual_feedback
+  sqs.manual_feedback,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_suggested_score_pct END AS ai_suggested_score_pct,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_suggested_at END        AS ai_suggested_at,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_reasoning END           AS ai_reasoning,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_flags END               AS ai_flags
 FROM session_question_scores sqs
 JOIN questions q
     ON q.id = sqs.question_id

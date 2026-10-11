@@ -3,6 +3,8 @@ package sessions
 import (
 	"errors"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // AdaptiveState holds the per-session state for adaptive question serving (FR-BB72).
@@ -370,6 +372,13 @@ type GradingQuestionItem struct {
 	GradingStatus   string   `json:"grading_status" db:"grading_status"`
 	CurrentScorePct *float64 `json:"current_score_pct" db:"current_score_pct"`
 	ManualFeedback  *string  `json:"manual_feedback" db:"manual_feedback"`
+	// FR-BB73 AC-18: the AI suggestion of a waiting answer, and the AI marker, score and reasoning of an ai_graded answer
+	// (every ai_graded row is shown, so an examiner who lowers a grade sees what else counts). Only examiners see these;
+	// no employee endpoint returns this type.
+	AISuggestedScorePct *float64       `json:"ai_suggested_score_pct" db:"ai_suggested_score_pct"`
+	AISuggestedAt       *time.Time     `json:"ai_suggested_at" db:"ai_suggested_at"`
+	AIReasoning         *string        `json:"ai_reasoning" db:"ai_reasoning"`
+	AIFlags             pq.StringArray `json:"ai_flags" db:"ai_flags"`
 }
 
 // GradingDetailResponse is the response for GET /admin/grading/:sessionId (FR-BB42).

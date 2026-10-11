@@ -99,7 +99,7 @@ func (c *httpAnthropicClient) GenerateText(ctx context.Context, prompt, model st
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		c.logger.Warn("anthropic API returned non-200", "status", resp.StatusCode, "body", string(respBytes))
+		logUpstreamFailure(c.logger, AIProviderAnthropic, resp.StatusCode, respBytes, c.apiKey)
 		return "", 0, fmt.Errorf("%w: HTTP %d", ErrAIUnavailable, resp.StatusCode)
 	}
 

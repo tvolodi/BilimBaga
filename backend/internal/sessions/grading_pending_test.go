@@ -2,6 +2,8 @@ package sessions
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -122,6 +124,60 @@ func TestSubmitSession_FinalSendsResultOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"sess-1"}, mailer.results)
 	assert.Empty(t, mailer.submitted)
+}
+
+// FR-BB322 AC-13: the submit response of a waiting session carries no score and no pass, even though the repository
+// stores and returns the partial values. Both the transition and a replayed submit are covered.
+func TestSubmitSession_WaitingSessionReturnsNoScoreOnTransition(t *testing.T) {
+	score := 40.0
+	passed := true
+	mailer := &mailRecorder{}
+	repo := &mockRepo{
+		submitSessionFn: func(_ context.Context, sessionID, _, _, _ string) (*SubmitSessionResponse, error) {
+			return &SubmitSessionResponse{SessionID: sessionID, Status: "grading_pending", ScorePct: &score, Passed: &passed, Transitioned: true}, nil
+		},
+	}
+	resp, err := NewService(repo, WithResultMailer(mailer)).SubmitSession(context.Background(), "sess-1", "user-1", "t", "ip")
+	require.NoError(t, err)
+	assert.Nil(t, resp.ScorePct)
+	assert.Nil(t, resp.Passed)
+	assert.Equal(t, []string{"sess-1"}, mailer.submitted, "the mail decision still sees the transition")
+}
+
+func TestSubmitSession_WaitingSessionReturnsNoScoreOnReplay(t *testing.T) {
+	score := 40.0
+	passed := true
+	repo := &mockRepo{
+		submitSessionFn: func(_ context.Context, sessionID, _, _, _ string) (*SubmitSessionResponse, error) {
+			return &SubmitSessionResponse{SessionID: sessionID, Status: "grading_pending", ScorePct: &score, Passed: &passed}, nil
+		},
+	}
+	resp, err := NewService(repo).SubmitSession(context.Background(), "sess-1", "user-1", "t", "ip")
+	require.NoError(t, err)
+	assert.Nil(t, resp.ScorePct)
+	assert.Nil(t, resp.Passed)
+}
+
+// FR-BB322 AC-13 through the HTTP handler and the real service: the JSON body carries null, not the partial values.
+func TestSubmitSession_Handler_WaitingSessionBodyHasNullScoreAndPass(t *testing.T) {
+	score := 40.0
+	passed := true
+	repo := &mockRepo{
+		submitSessionFn: func(_ context.Context, sessionID, _, _, _ string) (*SubmitSessionResponse, error) {
+			return &SubmitSessionResponse{SessionID: sessionID, Status: "grading_pending", SubmittedAt: time.Now().UTC(), ScorePct: &score, Passed: &passed, Transitioned: true}, nil
+		},
+	}
+	h := NewHandler(NewService(repo))
+	w := httptest.NewRecorder()
+	h.SubmitSession(w, submitRequest("sess-7"))
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"score_pct":null,"passed":null`)
+	body := decodeBody(t, w.Body.Bytes())
+	data, ok := body["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Nil(t, data["score_pct"])
+	assert.Nil(t, data["passed"])
 }
 
 func TestReportEvent_AutoSubmitWaitingSendsExamSubmittedAndHidesScore(t *testing.T) {

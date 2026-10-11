@@ -657,6 +657,12 @@ func (s *service) SubmitSession(ctx context.Context, sessionID, userID, tenantID
 			s.mailer.TriggerSessionResult(result.SessionID)
 		}
 	}
+	// FR-BB322 AC-13: a waiting session returns no score and no pass to the employee, on the transition and on a
+	// replayed submit. The stored values stay in the database for the examiner.
+	if result.Status == "grading_pending" {
+		result.ScorePct = nil
+		result.Passed = nil
+	}
 	return result, nil
 }
 

@@ -26,7 +26,7 @@ Target: local | qa (default: local; never the production-class demo instance, se
 | Step | Actor | Action | Expected Outcome | Pass/Fail |
 |------|-------|--------|-----------------|-----------|
 | 1 | Employee | Log in as `uat.employee@test.com`, open Exam A, click "Start exam" | The exam opens | |
-| 2 | Employee | Answer the single-choice question, answer the short-text question with "Use the north stairs", click "Submit" | The submit succeeds and the browser opens the result page for the session | |
+| 2 | Employee | Answer the single-choice question, answer the short-text question with "Use the north stairs", click "Submit" | The submit succeeds and the browser opens the result page for the session. In the browser network log, the response of `POST /api/v1/portal/sessions/<session id>/submit` has `"status": "grading_pending"`, `"score_pct": null` and `"passed": null` (no score and no pass for a short-text exam) | |
 | 3 | Employee | Read the result page | The page shows "Your answers are waiting for an examiner. You will get an email when the result is ready." and "1 of 1 answers are still being checked"; there is no score dial and no pass/fail banner; no certificate, retake or "Download" action is shown | |
 | 4 | Employee | Read the question review | The short-text question shows "Awaiting grading" in the Points cell, and its correct answer and explanation cells are empty | |
 | 5 | Employee | Open the Employee Portal | The Exam A card shows the badge "Awaiting grading" and the line "Submitted <date and time>"; it has no "Start exam" button; the button reads "View status" | |

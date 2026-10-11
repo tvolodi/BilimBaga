@@ -231,6 +231,13 @@ type UpdateExamInput struct {
 	Adaptive           bool
 }
 
+// UpdateExamResult is the updated exam and the AI grading mode it had before the update, for the exam.update audit row
+// (FR-BB73 AC-9, #566).
+type UpdateExamResult struct {
+	Exam                  *Exam
+	PreviousAIGradingMode string
+}
+
 // defaultAIGradingMode is the mode of an exam created without one (FR-BB73 AC-9): suggest.
 func defaultAIGradingMode(mode string) string {
 	if mode == "" {

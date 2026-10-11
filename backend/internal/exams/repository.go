@@ -21,6 +21,8 @@ type Repository interface {
 	GetByID(ctx context.Context, id string) (*Exam, error)
 	ListFiltered(ctx context.Context, filter ExamFilter) ([]*ExamListItem, int, error)
 	Update(ctx context.Context, id string, input UpdateExamInput) (*Exam, error)
+	// UpdateAIGradingMode sets only ai_grading_mode, in any status (FR-BB73 AC-9, #566).
+	UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, error)
 	UpdateStatus(ctx context.Context, id, status string) error
 	DeleteByID(ctx context.Context, id string) error
 	GetWithDetails(ctx context.Context, id string) (*ExamDetail, error)
@@ -233,6 +235,26 @@ func (r *postgresRepository) Update(ctx context.Context, id string, input Update
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("exams: Update: %w", err)
+	}
+	return &e, nil
+}
+
+// UpdateAIGradingMode sets ai_grading_mode of an exam in any status and leaves every other column as it is (FR-BB73
+// AC-9, #566). The job reads the mode inside its write transaction, so a change applies to answers not yet claimed.
+func (r *postgresRepository) UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, error) {
+	const q = `
+		UPDATE exams SET ai_grading_mode = $2
+		WHERE id = $1
+		RETURNING id, title, description, status, time_limit_minutes, passing_score_pct,
+		          max_attempts, available_from, available_until, shuffle_questions, shuffle_options,
+		          show_answers, on_tab_switch, certificate_enabled, adaptive, created_by, created_at, updated_at,
+		          ai_grading_mode`
+	var e Exam
+	if err := r.db.GetContext(ctx, &e, q, id, mode); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("exams: UpdateAIGradingMode: %w", err)
 	}
 	return &e, nil
 }

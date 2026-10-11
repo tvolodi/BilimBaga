@@ -88,6 +88,19 @@ func (m *mockRepo) ListFiltered(ctx context.Context, f ExamFilter) ([]*ExamListI
 	return []*ExamListItem{}, 0, nil
 }
 
+// UpdateAIGradingMode replaces the stored exam with a copy whose mode changed, so a caller's earlier read keeps the old
+// value, as it does against the database.
+func (m *mockRepo) UpdateAIGradingMode(ctx context.Context, id, mode string) (*Exam, error) {
+	e, ok := m.exams[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	cp := *e
+	cp.AIGradingMode = mode
+	m.exams[id] = &cp
+	return &cp, nil
+}
+
 func (m *mockRepo) Update(ctx context.Context, id string, input UpdateExamInput) (*Exam, error) {
 	if m.updateFn != nil {
 		return m.updateFn(ctx, id, input)
@@ -506,7 +519,7 @@ func TestUpdateExam_UpdatesDraftExam(t *testing.T) {
 	repo := newMockRepo()
 	seedExam(repo, "exam-1", "draft")
 	svc := NewService(repo)
-	e, err := svc.UpdateExam(context.Background(), "exam-1", UpdateExamInput{
+	res, err := svc.UpdateExam(context.Background(), "exam-1", UpdateExamInput{
 		Title:            "Updated",
 		TimeLimitMinutes: 45,
 		PassingScorePct:  75,
@@ -515,7 +528,7 @@ func TestUpdateExam_UpdatesDraftExam(t *testing.T) {
 		OnTabSwitch:      "log",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "Updated", e.Title)
+	assert.Equal(t, "Updated", res.Exam.Title)
 }
 
 func TestUpdateExam_RejectsArchivedExam(t *testing.T) {

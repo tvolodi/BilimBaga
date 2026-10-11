@@ -25,7 +25,7 @@ type Service interface {
 	CreateExam(ctx context.Context, input CreateExamInput) (*Exam, error)
 	GetExam(ctx context.Context, id string) (*ExamDetail, error)
 	ListExams(ctx context.Context, filter ExamFilter) ([]*ExamListItem, int, error)
-	UpdateExam(ctx context.Context, id string, input UpdateExamInput) (*Exam, error)
+	UpdateExam(ctx context.Context, id string, input UpdateExamInput) (*UpdateExamResult, error)
 	TransitionStatus(ctx context.Context, id, newStatus string) (*Exam, error)
 	Publish(ctx context.Context, id string) (*Exam, error)
 	Archive(ctx context.Context, id string) (*Exam, error)
@@ -120,21 +120,59 @@ func (s *service) ListExams(ctx context.Context, filter ExamFilter) ([]*ExamList
 	return items, total, nil
 }
 
-func (s *service) UpdateExam(ctx context.Context, id string, input UpdateExamInput) (*Exam, error) {
+func (s *service) UpdateExam(ctx context.Context, id string, input UpdateExamInput) (*UpdateExamResult, error) {
 	e, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("exams: UpdateExam: %w", err)
 	}
+	prevMode := e.AIGradingMode
+	// FR-BB73 AC-9 (#566): ai_grading_mode may change in every status, because the job reads it at grading time. Any
+	// other field of a non-draft exam keeps the draft rule, so the request must leave all of them as they are.
 	if e.Status != "draft" {
-		return nil, ErrNotDraft
+		if !onlyAIGradingModeChanged(e, input) {
+			return nil, ErrNotDraft
+		}
+		mode := input.AIGradingMode
+		if mode == "" {
+			mode = prevMode
+		}
+		updated, err := s.repo.UpdateAIGradingMode(ctx, id, mode)
+		if err != nil {
+			return nil, fmt.Errorf("exams: UpdateExam: %w", err)
+		}
+		return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: prevMode}, nil
 	}
-	// AC-1: adaptive can only be changed in draft status (already enforced by ErrNotDraft above).
-	// If the exam is not draft and the caller tries to change adaptive, it is rejected.
+	// AC-1: adaptive can only be changed in draft status (checked by onlyAIGradingModeChanged for a non-draft exam).
 	updated, err := s.repo.Update(ctx, id, input)
 	if err != nil {
 		return nil, fmt.Errorf("exams: UpdateExam: %w", err)
 	}
-	return updated, nil
+	return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: prevMode}, nil
+}
+
+// onlyAIGradingModeChanged reports whether input leaves every field other than ai_grading_mode as e has it (#566).
+// Description is not compared: UpdateExam requests do not carry it, and the mode-only update never writes it.
+func onlyAIGradingModeChanged(e *Exam, in UpdateExamInput) bool {
+	return e.Title == in.Title &&
+		e.TimeLimitMinutes == in.TimeLimitMinutes &&
+		e.PassingScorePct == in.PassingScorePct &&
+		e.MaxAttempts == in.MaxAttempts &&
+		sameTime(e.AvailableFrom, in.AvailableFrom) &&
+		sameTime(e.AvailableUntil, in.AvailableUntil) &&
+		e.ShuffleQuestions == in.ShuffleQuestions &&
+		e.ShuffleOptions == in.ShuffleOptions &&
+		e.ShowAnswers == in.ShowAnswers &&
+		e.OnTabSwitch == in.OnTabSwitch &&
+		e.CertificateEnabled == in.CertificateEnabled &&
+		e.Adaptive == in.Adaptive
+}
+
+// sameTime compares two optional instants; both nil is equal, one nil is not.
+func sameTime(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Equal(*b)
 }
 
 func (s *service) TransitionStatus(ctx context.Context, id, newStatus string) (*Exam, error) {

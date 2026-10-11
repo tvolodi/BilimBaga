@@ -6,7 +6,8 @@
 #        SWARM_NOW_UTC    ISO-8601 UTC "now" (tests); default the current time.
 # Retro rule (RETRO.md): closures since the last cut >= interval, and the last cut is at least 4 h old.
 #        A retro.json without last_cut_utc has no gap check.
-# Exit:  0 ok (retro due or not); 1 gh or state error, nothing written; 2 usage.
+# Exit:  0 ok (retro due or not); 1 "retro check failed" when gh cannot count (the tick is still logged and
+#        stamped); 2 usage, or a report that is not one line (nothing written).
 set -eo pipefail
 
 [ "$#" -eq 1 ] || { echo 'usage: tick-end.sh "<report line>"' >&2; exit 2; }
@@ -28,16 +29,16 @@ interval=$(jq -r '.interval // 15' "$dir/retro.json")
 cut_closed=$(jq -r '.last_retro_closed_count // 0' "$dir/retro.json")
 last_cut=$(jq -r '.last_cut_utc // empty' "$dir/retro.json")
 
-# Count first: if gh fails, nothing is written.
-closed_json=$(gh issue list --label swarm --state closed --json number --limit 1000) \
-  || { echo "gh issue list failed; nothing written" >&2; exit 1; }
-closed=$(printf '%s' "$closed_json" | jq 'length')
-diff=$((closed - cut_closed))
-
+# The tick is logged and stamped first, so a failed closure count below never loses it.
 bash "$here/tick-log.sh" "$1"
 
 tmp=$(mktemp)
 jq --arg t "$now" '.last_tick_utc = $t' "$dir/retro.json" > "$tmp" && mv "$tmp" "$dir/retro.json"
+
+closed_json=$(gh issue list --label swarm --state closed --json number --limit 1000) \
+  || { echo "retro check failed: gh issue list failed (the tick is logged)" >&2; exit 1; }
+closed=$(printf '%s' "$closed_json" | jq 'length')
+diff=$((closed - cut_closed))
 
 if [ "$diff" -lt "$interval" ]; then
   echo "retro not due: $diff of $interval closures since the last cut"

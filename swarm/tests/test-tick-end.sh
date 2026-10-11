@@ -69,14 +69,15 @@ check "the report is appended to ticks.log" \
 check "retro.json.last_tick_utc is stamped with the tick time" \
   "$(yn bash -c '[ "$(jq -r .last_tick_utc "$1")" = "$2" ]' _ "$t/state/retro.json" "$now")"
 
-# gh failure: nothing is written.
+# gh failure: the log line and last_tick_utc are written first, then the failed check is reported loudly.
 write_retro 15 null
 rm -f "$t/state/ticks.log"
 code=0; out=$(PATH="$t/bin:$PATH" STUB_GH_FAIL=1 SWARM_NOW_UTC="$now" SWARM_STATE_DIR="$t/state" \
   bash "$here/bin/tick-end.sh" "failing tick" 2>&1) || code=$?
 check "a gh failure exits non-zero" "$(yn [ "$code" -ne 0 ])"
-check "a gh failure writes neither ticks.log nor last_tick_utc" \
-  "$(yn bash -c '[ ! -f "$1/ticks.log" ] && [ "$(jq -r .last_tick_utc "$1/retro.json")" = null ]' _ "$t/state")"
+check "a gh failure prints retro check failed" "$(yn bash -c '[[ "$1" == *"retro check failed"* ]]' _ "$out")"
+check "a gh failure still logs the tick and stamps last_tick_utc" \
+  "$(yn bash -c 'grep -q "failing tick" "$1/ticks.log" && [ "$(jq -r .last_tick_utc "$1/retro.json")" = "$2" ]' _ "$t/state" "$now")"
 
 # A report that is not one line is refused by tick-log.sh, and nothing is written.
 write_retro 15 null

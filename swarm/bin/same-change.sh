@@ -22,11 +22,12 @@ if [ "$approved" = "$new" ]; then
   exit 0
 fi
 
-# patch_id <full-sha>: the patch-id of the change from the merge base with main to the head.
+# patch_id <full-sha>: the patch-id of the change from the merge base with main to the head. --binary keeps binary
+# content in the diff, and --verbatim keeps whitespace: without them an indentation-only or binary change would match.
 patch_id() {
   local base
   base=$(git merge-base "$main" "$1") || { echo "no merge base with $main for $1" >&2; exit 2; }
-  git diff "$base" "$1" | git patch-id | awk '{print $1}'
+  git diff --binary "$base" "$1" | git patch-id --verbatim | awk '{print $1}'
 }
 a=$(patch_id "$approved")
 n=$(patch_id "$new")

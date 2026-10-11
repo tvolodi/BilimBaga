@@ -58,4 +58,33 @@ check "one argument is a usage error (exit 2)" "$([ "$code" -eq 2 ] && echo ok |
 code=0; run "$approved" "0000000000000000000000000000000000000000" >/dev/null || code=$?
 check "an unknown commit is an error (exit 2)" "$([ "$code" -eq 2 ] && echo ok || echo no)"
 
+# Whitespace and binary changes must not match (the default patch-id drops whitespace and ignores binary content).
+g checkout -q -b ws-approved "$main_tip"
+mkdir -p ci
+printf 'steps:\n  - run: a\n' > ci/ci.yml
+g add -A && g commit -qm "indent two"
+ws_approved=$(git rev-parse HEAD)
+
+g checkout -q -b ws-new "$main_tip"
+mkdir -p ci
+printf 'steps:\n      - run: a\n' > ci/ci.yml
+g add -A && g commit -qm "indent six"
+ws_new=$(git rev-parse HEAD)
+
+out=$(run "$ws_approved" "$ws_new") && code=0 || code=$?
+check "an indentation-only YAML change is DIFFERENT" "$([ "$out" = DIFFERENT ] && [ "$code" -eq 0 ] && echo ok || echo no)"
+
+g checkout -q -b bin-approved "$main_tip"
+printf '\x00\x01\x02' > img.bin
+g add -A && g commit -qm "binary a"
+bin_approved=$(git rev-parse HEAD)
+
+g checkout -q -b bin-new "$main_tip"
+printf '\x00\x01\x03' > img.bin
+g add -A && g commit -qm "binary b"
+bin_new=$(git rev-parse HEAD)
+
+out=$(run "$bin_approved" "$bin_new") && code=0 || code=$?
+check "a changed binary file is DIFFERENT" "$([ "$out" = DIFFERENT ] && [ "$code" -eq 0 ] && echo ok || echo no)"
+
 exit "$fail"

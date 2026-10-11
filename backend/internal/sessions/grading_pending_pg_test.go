@@ -52,7 +52,7 @@ RETURNING id::text`, categoryID, userID))
 }
 
 // FR-BB322 AC-9: a manual submit sends exam_submitted once; a second submit is a replay and sends nothing.
-func TestSubmitSession_MailOncePerSession(t *testing.T) {
+func TestGradingPending_SubmitMailOncePerSession(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, _, userID, _ := seedInProgressSession(t, db, 1, "1 hour")
 	rec := &mailRecorder{}
@@ -73,7 +73,7 @@ func TestSubmitSession_MailOncePerSession(t *testing.T) {
 }
 
 // FR-BB322 AC-9: an auto-submit that arrives after a manual submit is a replay: no transition, no mail.
-func TestAutoSubmitSession_AfterManualSubmitIsReplay(t *testing.T) {
+func TestGradingPending_AutoSubmitAfterManualIsReplay(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, _, userID, _ := seedInProgressSession(t, db, 1, "1 hour")
 	repo := NewRepository(db, NewGradingEngine())
@@ -89,7 +89,7 @@ func TestAutoSubmitSession_AfterManualSubmitIsReplay(t *testing.T) {
 }
 
 // FR-BB322 AC-9: the expiry job sends exam_submitted once, for a session that moved to grading_pending.
-func TestAutoSubmitJob_ExpiredShortTextSendsOneMail(t *testing.T) {
+func TestGradingPending_ExpiredShortTextSendsOneMail(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, examID, userID, _ := seedInProgressSession(t, db, 1, "-1 hour")
 	rec := &mailRecorder{}
@@ -107,7 +107,7 @@ func TestAutoSubmitJob_ExpiredShortTextSendsOneMail(t *testing.T) {
 }
 
 // FR-BB322 AC-9: an expired session without short-text answers is auto-submitted and sends no exam_submitted mail.
-func TestAutoSubmitJob_ExpiredWithoutShortTextSendsNoMail(t *testing.T) {
+func TestGradingPending_ExpiredWithoutShortTextSendsNoMail(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, examID, userID, _ := seedInProgressSession(t, db, 0, "-1 hour")
 	rec := &mailRecorder{}
@@ -122,7 +122,7 @@ func TestAutoSubmitJob_ExpiredWithoutShortTextSendsNoMail(t *testing.T) {
 
 // FR-BB322 AC-13: a waiting session returns no score and no pass to the employee, from the real rows, while the
 // examiner keeps the stored values.
-func TestEmployeeReads_MaskAWaitingSession(t *testing.T) {
+func TestGradingPending_EmployeeReadsMaskWaitingSession(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, userID, _ := seedAIGradeSession(t, db, 1)
 	_, err := db.ExecContext(context.Background(), `UPDATE exam_sessions SET score_pct = 40, passed = true WHERE id = $1`, sessionID)
@@ -164,7 +164,7 @@ func TestEmployeeReads_MaskAWaitingSession(t *testing.T) {
 }
 
 // FR-BB322 AC-1: the start check, the history and the my-results count all see a waiting session.
-func TestCountingPlaces_SeeAWaitingSession(t *testing.T) {
+func TestGradingPending_CountingPlacesSeeWaitingSession(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, userID, _ := seedAIGradeSession(t, db, 1)
 	repo := NewRepository(db, NewGradingEngine())
@@ -192,7 +192,7 @@ func TestCountingPlaces_SeeAWaitingSession(t *testing.T) {
 
 // FR-BB322 AC-4: the number the result service uses to name the grader is the job's own selection. When an answer
 // drops out of the job's predicate, both drop it.
-func TestGradingExpectedBy_UsesTheJobsPredicate(t *testing.T) {
+func TestGradingPending_GradingExpectedByUsesJobPredicate(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, userID, qs := seedAIGradeSession(t, db, 2)
 	repo := NewRepository(db, NewGradingEngine())

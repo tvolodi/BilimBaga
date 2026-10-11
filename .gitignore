@@ -40,3 +40,7 @@ swarm/state/*
 swarm/locks/
 swarm/backups/
 swarm-snapshot.txt
+
+# UAT Playwright output (#532): local evidence, not committed. UAT keeps its copies on disk.
+e2e-uat-results-temp/
+e2e-uat-temp-output/

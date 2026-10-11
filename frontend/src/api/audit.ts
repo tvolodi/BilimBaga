@@ -52,6 +52,7 @@ export const AUDIT_ACTIONS = [
   'session.expire',
   'session.pending_manual_grade',
   'answer.grade',
+  'answer.ai_grade',
   'certificate.issue',
   'question.create',
   'question.update',

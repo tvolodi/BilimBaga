@@ -232,10 +232,12 @@ type UpdateExamInput struct {
 }
 
 // UpdateExamResult is the updated exam and the AI grading mode it had before the update, for the exam.update audit row
-// (FR-BB73 AC-9, #566).
+// (FR-BB73 AC-9, #566). Changed tells whether the audit row is written: a draft update always is (as before #566); a
+// published exam's update is only when its AI grading mode changed, so a request that repeats the exam writes nothing (#570).
 type UpdateExamResult struct {
 	Exam                  *Exam
 	PreviousAIGradingMode string
+	Changed               bool
 }
 
 // defaultAIGradingMode is the mode of an exam created without one (FR-BB73 AC-9): suggest.

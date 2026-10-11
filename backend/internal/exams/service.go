@@ -132,28 +132,27 @@ func (s *service) UpdateExam(ctx context.Context, id string, input UpdateExamInp
 		if !onlyAIGradingModeChanged(e, input) {
 			return nil, ErrNotDraft
 		}
-		mode := input.AIGradingMode
-		if mode == "" {
-			mode = prevMode
-		}
-		updated, err := s.repo.UpdateAIGradingMode(ctx, id, mode)
+		// The previous mode comes from the write's own lock, not from the read above: a concurrent change in between must
+		// not hide this one (#570).
+		updated, previous, err := s.repo.UpdateAIGradingMode(ctx, id, input.AIGradingMode)
 		if err != nil {
 			return nil, fmt.Errorf("exams: UpdateExam: %w", err)
 		}
-		return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: prevMode}, nil
+		return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: previous, Changed: updated.AIGradingMode != previous}, nil
 	}
 	// AC-1: adaptive can only be changed in draft status (checked by onlyAIGradingModeChanged for a non-draft exam).
 	updated, err := s.repo.Update(ctx, id, input)
 	if err != nil {
 		return nil, fmt.Errorf("exams: UpdateExam: %w", err)
 	}
-	return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: prevMode}, nil
+	return &UpdateExamResult{Exam: updated, PreviousAIGradingMode: prevMode, Changed: true}, nil
 }
 
-// onlyAIGradingModeChanged reports whether input leaves every field other than ai_grading_mode as e has it (#566).
-// Description is not compared: UpdateExam requests do not carry it, and the mode-only update never writes it.
+// onlyAIGradingModeChanged reports whether input leaves every field other than ai_grading_mode as e has it (#566, #570).
+// Every UpdateExamInput field is compared here; a test walks the struct so that a new field cannot be left out.
 func onlyAIGradingModeChanged(e *Exam, in UpdateExamInput) bool {
-	return e.Title == in.Title &&
+	return sameDescription(e.Description, in.Description) &&
+		e.Title == in.Title &&
 		e.TimeLimitMinutes == in.TimeLimitMinutes &&
 		e.PassingScorePct == in.PassingScorePct &&
 		e.MaxAttempts == in.MaxAttempts &&
@@ -165,6 +164,14 @@ func onlyAIGradingModeChanged(e *Exam, in UpdateExamInput) bool {
 		e.OnTabSwitch == in.OnTabSwitch &&
 		e.CertificateEnabled == in.CertificateEnabled &&
 		e.Adaptive == in.Adaptive
+}
+
+// sameDescription compares two optional descriptions; both nil is equal, one nil is not (#570).
+func sameDescription(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // sameTime compares two optional instants; both nil is equal, one nil is not.

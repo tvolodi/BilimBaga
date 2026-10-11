@@ -6,7 +6,7 @@
 | ID | FR-BB73 |
 | Phase | 7 — AI Layer |
 | Priority | 1 |
-| Status | Implemented (revision 1); revision 2 Draft (Validated (revision 2, PASS on the fourth draft, 2026-10-11); merges after FR-BB322 (PR #541), which it cites), issue #534, architect constraints on the issue |
+| Status | Implemented (revision 1); revision 2 Validated 2026-10-11 (PASS on the fourth draft), issue #534, architect constraints on the issue; merges after FR-BB322 (PR #541), which it cites |
 | Depends On | FR-BB311, FR-BB71, FR-BB42, FR-BB47, FR-BB43, FR-BB312; FR-BB322 (pending-result experience, #535, defines `grading_expected_by`, whose predicate gains the mode clause of AC-11) |
 
 ## Affected Layers

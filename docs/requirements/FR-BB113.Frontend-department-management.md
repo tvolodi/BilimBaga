@@ -6,7 +6,7 @@
 | ID | FR-BB113 |
 | Phase | 1 — Foundation |
 | Priority | 2 |
-| Status | Validated |
+| Status | Implemented |
 | Depends On | FR-BB17, FR-BB111 |
 
 ## Description

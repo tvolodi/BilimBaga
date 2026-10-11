@@ -6,7 +6,7 @@
 | ID | FR-BB17 |
 | Phase | 1 — Foundation |
 | Priority | 2 |
-| Status | Ready |
+| Status | Implemented |
 | Depends On | FR-BB16 |
 
 ## Description

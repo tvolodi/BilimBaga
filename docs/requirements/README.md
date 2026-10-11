@@ -6,6 +6,10 @@
 
 `FR-BB{phase}{section}` — e.g. `FR-BB14` = Phase 1, Section 1.4 — Authentication
 
+## Status values
+
+The Status column mirrors the `Status` field of each document. A document that says `uat-verified` is shown here as `Implemented`; `Partial` names what is missing. Allowed values in a document: `Draft`, `Validated` (accepted, not built), `Implemented`, `uat-verified`, `Partial`. `Ready` is not used. When a PR implements a requirement it sets the document and this index to `Implemented` together.
+
 ## Index
 
 | ID | Slug | Title | Status |

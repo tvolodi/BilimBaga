@@ -2,6 +2,8 @@ package sessions
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -24,7 +26,6 @@ const (
 	aiGradeMaxAttempts    = 2
 	aiGradeAnswerMaxRunes = 4000
 	aiGradeLogMaxRunes    = 200
-	aiGradeWindow         = 24 * time.Hour
 	aiGradeFeature        = "short_text_grading"
 
 	aiAnswerBegin = "BEGIN_EMPLOYEE_ANSWER"
@@ -180,7 +181,11 @@ func gradeAIAnswer(ctx context.Context, db *sqlx.DB, logger *slog.Logger, cfg AI
 
 	callCtx, cancel := context.WithTimeout(ctx, aiGradeDeadline)
 	defer cancel()
-	text, tokens, err := cfg.Client.GenerateText(callCtx, buildAIGradePrompt(c.ModelAnswer, c.TextAnswer), cfg.Model)
+	prompt, err := buildAIGradePrompt(c.ModelAnswer, c.TextAnswer)
+	if err != nil {
+		return err
+	}
+	text, tokens, err := cfg.Client.GenerateText(callCtx, prompt, cfg.Model)
 	if err != nil {
 		return fmt.Errorf("provider: %w", err)
 	}
@@ -255,12 +260,26 @@ func recordAIGradeUsage(ctx context.Context, db *sqlx.DB, logger *slog.Logger, m
 	}
 }
 
-// buildAIGradePrompt puts the employee's answer in a marked block and says it is data. The markers are removed from
-// the answer, so it cannot close the block early, and the answer is cut to aiGradeAnswerMaxRunes.
-func buildAIGradePrompt(modelAnswer, employeeAnswer string) string {
-	answer := strings.ReplaceAll(employeeAnswer, aiAnswerEnd, "")
-	answer = strings.ReplaceAll(answer, aiAnswerBegin, "")
-	answer = truncateRunes(answer, aiGradeAnswerMaxRunes)
+// newAIGradeMarkerSuffix returns 8 random bytes as hex. The employee cannot know it, so cannot forge the closing
+// marker of the answer block. Stripping marker text from the answer is not enough: a nested marker survives one pass.
+func newAIGradeMarkerSuffix() (string, error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("marker suffix: %w", err)
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// buildAIGradePrompt puts the employee's answer in a block whose markers carry a suffix made for this call, and says
+// the block is data. The answer is not edited, only cut to aiGradeAnswerMaxRunes.
+func buildAIGradePrompt(modelAnswer, employeeAnswer string) (string, error) {
+	suffix, err := newAIGradeMarkerSuffix()
+	if err != nil {
+		return "", err
+	}
+	begin := aiAnswerBegin + "_" + suffix
+	end := aiAnswerEnd + "_" + suffix
+	answer := truncateRunes(employeeAnswer, aiGradeAnswerMaxRunes)
 
 	return fmt.Sprintf(`You are an exam grader. Compare the employee's answer to the model answer and provide a score.
 
@@ -276,7 +295,7 @@ Respond with ONLY valid JSON in this exact format, no other text:
 {"score_pct": <integer 0-100>, "reasoning": "<brief explanation>"}
 
 Where score_pct is 100 if the answer is fully correct, 0 if completely wrong, and a proportional value in between for partial credit.`,
-		aiAnswerBegin, aiAnswerEnd, modelAnswer, aiAnswerBegin, answer, aiAnswerEnd)
+		begin, end, modelAnswer, begin, answer, end), nil
 }
 
 // parseAIGradeResponse reads the first JSON object in the reply and checks the score. Errors that echo the reply keep

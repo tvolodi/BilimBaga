@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
-	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,8 +119,7 @@ func TestCountAnsweredForSession_CountAndError(t *testing.T) {
 	assert.ErrorContains(t, err, "CountAnsweredForSession")
 }
 
-// Grading engine constructors (tech debt #299): both return a usable engine.
-func TestNewGradingEngines_NonNil(t *testing.T) {
+// The grading engine (#299, #528): submit only records, and the engine has no AI client.
+func TestNewGradingEngine_NonNil(t *testing.T) {
 	assert.NotNil(t, NewGradingEngine())
-	assert.NotNil(t, NewAIGradingEngine(nil, "model", nil, slog.Default()))
 }

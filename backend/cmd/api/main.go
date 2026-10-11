@@ -237,19 +237,29 @@ func serve() {
 	logAIStatus(slogger, cfg.AI)
 
 	// Wire up session creation (FR-BB35).
-	// With an AI provider, use AI-backed grading for short-text questions (FR-BB73).
-	var gradingEngine sessions.GradingEngine
-	if cfg.AI.Provider != "" {
-		gradingEngine = sessions.NewAIGradingEngine(aiClient, cfg.AI.Model, db, slogger)
-	} else {
-		gradingEngine = sessions.NewGradingEngine()
-	}
+	// Submit only records short-text answers as pending_manual. The AI grading job below grades them outside the
+	// submit transaction (FR-BB73, #528).
+	gradingEngine := sessions.NewGradingEngine()
 	sessionsRepo := sessions.NewRepository(db, gradingEngine)
 	sessionsSvc := sessions.NewService(sessionsRepo, emailSvc)
 	sessionsHandler := sessions.NewHandler(sessionsSvc)
 
 	// Start FR-BB310 auto-submit background job.
 	go sessions.AutoSubmitJob(appCtx, db, slogger, gradingEngine)
+
+	// Start the AI grading job (FR-BB73, #528) only with a provider and a non-zero daily cap.
+	if cfg.AI.Provider != "" && cfg.AIGradingDailyLimit != 0 {
+		var onGradeFinalised func(sessionID string)
+		if emailSvc != nil {
+			onGradeFinalised = emailSvc.TriggerSessionResult
+		}
+		go sessions.AIGradeJob(appCtx, db, slogger, sessions.AIGradeConfig{
+			Client:      aiClient,
+			Model:       cfg.AI.Model,
+			DailyLimit:  cfg.AIGradingDailyLimit,
+			OnFinalised: onGradeFinalised,
+		})
+	}
 
 	// Wire up certificates (FR-BB43).
 	certsRepo := certificates.NewRepository(db)

@@ -205,6 +205,7 @@ func TestAutoSubmitSession_ErrorsWrapped(t *testing.T) {
 
 func TestGradeAnswer_LastAnswerFinalisesSession(t *testing.T) {
 	db, f := newFakeDB(t)
+	f.queue([]string{"id"}, [][]driver.Value{{"sess-1"}})
 	f.queue([]string{"max_score"}, [][]driver.Value{{float64(10)}})
 	f.queue([]string{"count"}, [][]driver.Value{{int64(0)}})
 	f.queue([]string{"round"}, [][]driver.Value{{float64(80)}})
@@ -219,10 +220,12 @@ func TestGradeAnswer_LastAnswerFinalisesSession(t *testing.T) {
 	assert.True(t, *res.passed)
 	assert.Equal(t, 1, countQueries(f, "UPDATE exam_sessions SET score_pct"))
 	assert.Equal(t, 1, countQueries(f, "audit_log"))
+	assert.Equal(t, 1, countQueries(f, "FOR UPDATE"), "the session row is locked before the score write (#528)")
 }
 
 func TestGradeAnswer_OtherAnswersPendingLeavesSessionOpen(t *testing.T) {
 	db, f := newFakeDB(t)
+	f.queue([]string{"id"}, [][]driver.Value{{"sess-1"}})
 	f.queue([]string{"max_score"}, [][]driver.Value{{float64(10)}})
 	f.queue([]string{"count"}, [][]driver.Value{{int64(2)}})
 	res, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "grader-1", "tenant-1", "", 50, "")
@@ -235,11 +238,12 @@ func TestGradeAnswer_OtherAnswersPendingLeavesSessionOpen(t *testing.T) {
 
 func TestGradeAnswer_NotFoundAndUpdateErrorWrapped(t *testing.T) {
 	db, f := newFakeDB(t)
-	f.queue([]string{"max_score"}, nil)
+	f.queue([]string{"id"}, nil)
 	_, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "g", "t", "", 50, "")
 	assert.ErrorIs(t, err, ErrSessionNotFound)
 
 	db2, f2 := newFakeDB(t)
+	f2.queue([]string{"id"}, [][]driver.Value{{"sess-1"}})
 	f2.queue([]string{"max_score"}, [][]driver.Value{{float64(10)}})
 	f2.xErr = errors.New("boom")
 	_, err = NewRepository(db2, nil).GradeAnswer(context.Background(), "sess-1", "q1", "g", "t", "", 50, "")

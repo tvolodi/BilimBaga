@@ -6,7 +6,7 @@
 | ID | FR-BB14 |
 | Phase | 1 — Foundation |
 | Priority | 1 |
-| Status | Ready |
+| Status | Implemented |
 | Depends On | FR-BB12, FR-BB16, FR-BB17, FR-BB19 |
 
 ## Scope

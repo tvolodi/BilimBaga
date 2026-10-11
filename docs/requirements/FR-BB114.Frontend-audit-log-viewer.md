@@ -6,7 +6,7 @@
 | ID | FR-BB114 |
 | Phase | 1 — Foundation |
 | Priority | 4 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB19, FR-BB111 |
 | Supersedes (partial) | Pulls forward the basic viewer portion of FR-BB55; FR-BB55 remains for advanced filtering/correlation in Phase 5 |
 

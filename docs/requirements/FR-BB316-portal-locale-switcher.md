@@ -1,6 +1,6 @@
 # FR-BB316 — Portal Locale Switcher
 
-**Status**: draft  
+**Status**: Implemented  
 **Phase**: 3.16  
 **Depends on**: FR-BB313 (Frontend: Employee Portal), FR-BB62 (Full i18n Coverage)
 

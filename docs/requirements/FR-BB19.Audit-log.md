@@ -6,7 +6,7 @@
 | ID | FR-BB19 |
 | Phase | 1 — Foundation |
 | Priority | 2 |
-| Status | Draft |
+| Status | Implemented |
 | Depends On | FR-BB16 |
 
 ## Scope

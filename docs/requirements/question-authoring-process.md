@@ -2,7 +2,7 @@
 slug: question-authoring
 title: "Question Authoring"
 type: process-description
-status: draft
+status: uat-verified
 created: 2026-06-09
 related_requirements: [FR-BB21, FR-BB22, FR-BB23, FR-BB24, FR-BB25, FR-BB26, FR-BB27, FR-BB28, FR-BB29, FR-BB71]
 ---

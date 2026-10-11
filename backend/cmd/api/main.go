@@ -233,7 +233,7 @@ func serve() {
 
 	// AI provider (FR-BB71, #232): one client for insights, question generation and AI grading. With no usable
 	// key it is off: one warning names the variables, and the AI routes answer 503 AI_UNAVAILABLE.
-	aiClient := ai.NewProviderClient(cfg.AI.Provider, cfg.AI.BaseURL, cfg.AI.APIKey, slogger)
+	aiClient := ai.NewProviderClient(cfg.AI.Provider, cfg.AI.BaseURL, cfg.AI.APIKey, slogger, ai.WithTimeout(cfg.AI.Timeout))
 	logAIStatus(slogger, cfg.AI)
 
 	// Wire up session creation (FR-BB35).

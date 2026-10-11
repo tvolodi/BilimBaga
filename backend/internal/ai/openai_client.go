@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // openAICompatibleClient calls any provider that accepts POST {base}/chat/completions with a Bearer key (#232).
@@ -23,11 +22,11 @@ type openAICompatibleClient struct {
 
 // NewOpenAICompatibleClient returns an AnthropicClient for {baseURL}/chat/completions, for example
 // https://api.x.ai/v1. The key is sent only in the Authorization header and never logged.
-func NewOpenAICompatibleClient(baseURL, apiKey string, logger *slog.Logger) AnthropicClient {
+func NewOpenAICompatibleClient(baseURL, apiKey string, logger *slog.Logger, opts ...ClientOption) AnthropicClient {
 	return &openAICompatibleClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		apiKey:  apiKey,
-		httpCli: &http.Client{Timeout: 60 * time.Second},
+		httpCli: newHTTPClient(opts),
 		logger:  logger,
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/api"
 	"github.com/bilimbaga/bilimbaga/internal/auth"
@@ -66,6 +67,10 @@ func (h *Handler) HandleGenerateQuestions(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// InsightsWriteBudget is how long an insights response may take to be written (#519): the largest AI_TIMEOUT_SECONDS plus
+// the 30 s nginx margin. The nginx insights location waits the same 180 s.
+const InsightsWriteBudget = 180 * time.Second
+
 // HandleGetInsights handles GET /api/v1/admin/ai/insights/{examId}.
 //
 // AC-2: JWT auth + examiner role enforced at router level via rbac.RequirePermission.
@@ -74,6 +79,9 @@ func (h *Handler) HandleGenerateQuestions(w http.ResponseWriter, r *http.Request
 // AC-6: Anthropic errors → 503 AI_UNAVAILABLE.
 // ISS-232: daily per-user cap exceeded → 429 AI_RATE_LIMITED.
 func (h *Handler) HandleGetInsights(w http.ResponseWriter, r *http.Request) {
+	// #519: a provider call can take up to AI_TIMEOUT_SECONDS, longer than the server's 15 s WriteTimeout, so this response
+	// gets its own write deadline. ResponseController reaches the connection through the request logger's wrapper.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(InsightsWriteBudget))
 	userID := auth.UserIDFromCtx(r.Context())
 	if userID == "" {
 		api.WriteError(w, http.StatusUnauthorized, "MISSING_TOKEN", "authentication required")

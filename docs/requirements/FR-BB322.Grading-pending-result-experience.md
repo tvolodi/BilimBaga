@@ -6,7 +6,7 @@
 | ID | FR-BB322 |
 | Phase | 4 — Results & Certificates |
 | Priority | 2 |
-| Status | Validated (revision 4, PASS after three FAILs, 2026-10-11); amended 2026-10-11 (#551: AC-10 final includes `auto_submitted`, new AC-15 result mail on automatic submit, AC-8 partial points), amendment validation pending |
+| Status | Validated (revision 4, PASS after three FAILs, 2026-10-11); amended 2026-10-11 (#551: AC-10 final includes `auto_submitted`, new AC-15 result mail on automatic submit, AC-8 partial points), amendment validated (PASS) |
 | Depends On | FR-BB39, FR-BB41, FR-BB45, FR-BB313, FR-BB46, FR-BB61, FR-BB73 |
 | Amends | FR-BB45 AC-8, FR-BB313 attempt counting and status, FR-BB46 list scope, FR-BB61 result mail link |
 | Issue | #535 (gap G2 of `docs/handoffs/roadmap-gap-audit-20261011/gap-list.md`) |

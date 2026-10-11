@@ -6,7 +6,7 @@
 | ID | FR-BB55 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 2 |
-| Status | uat-verified; amended 2026-10-11 (#544: AC-2 filter options come from the backend, AC-11 to AC-14), amendment validation pending |
+| Status | uat-verified; amended 2026-10-11 (#544: AC-2 filter options come from the backend, AC-11 to AC-14), amendment validated (PASS) |
 | Depends On | FR-BB19 |
 
 ## Description

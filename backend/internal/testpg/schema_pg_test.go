@@ -2,7 +2,6 @@ package testpg
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,10 +10,7 @@ import (
 // #547: two test packages share one database. A schema's gin_trgm_ops index must survive another schema's drop, and
 // pg_trgm must live in public, where NewSchema installs it. Skipped unless TEST_DATABASE_URL is set.
 func TestNewSchema_RealPostgres_TrgmSurvivesAnotherSchemasDrop(t *testing.T) {
-	base := os.Getenv("TEST_DATABASE_URL")
-	if base == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping the real-Postgres schema helper test")
-	}
+	base := Base(t)
 	ctx := context.Background()
 	first := NewSchema(t, base, "bb_547a")
 	second := NewSchema(t, base, "bb_547b")

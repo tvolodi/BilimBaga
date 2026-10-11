@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -62,10 +61,7 @@ func modeBody(title, mode string) string {
 
 func newExamsPGHandler(t *testing.T) (*Handler, *sqlx.DB) {
 	t.Helper()
-	base := os.Getenv("TEST_DATABASE_URL")
-	if base == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping the real-Postgres exam mode update test")
-	}
+	base := testpg.Base(t)
 	db := testpg.NewSchema(t, base, "bb_566")
 	require.NoError(t, dbpkg.RunMigrations(db, "../../migrations"))
 	svc := NewService(NewRepository(db))

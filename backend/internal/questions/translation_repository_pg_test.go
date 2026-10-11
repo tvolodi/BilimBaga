@@ -35,10 +35,7 @@ type pgTranslationFixture struct {
 // options, and drops the schema when the test ends.
 func newPGTranslationFixture(t *testing.T) pgTranslationFixture {
 	t.Helper()
-	base := os.Getenv("TEST_DATABASE_URL")
-	if base == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping the real-Postgres translation repository test")
-	}
+	base := testpg.Base(t)
 	migrations, err := filepath.Abs(filepath.Join("..", "..", "migrations"))
 	require.NoError(t, err)
 

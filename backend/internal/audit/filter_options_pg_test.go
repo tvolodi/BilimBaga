@@ -8,7 +8,6 @@ package audit_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/bilimbaga/bilimbaga/internal/audit"
@@ -21,10 +20,7 @@ import (
 
 func newAuditPGDB(t *testing.T) *sqlx.DB {
 	t.Helper()
-	base := os.Getenv("TEST_DATABASE_URL")
-	if base == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping the real-Postgres audit filter options test")
-	}
+	base := testpg.Base(t)
 	db := testpg.NewSchema(t, base, "bb_557")
 	require.NoError(t, dbpkg.RunMigrations(db, "../../migrations"))
 	return db

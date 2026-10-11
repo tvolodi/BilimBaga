@@ -6,7 +6,7 @@
 | ID | FR-BB55 |
 | Phase | 5 — Analytics & Reporting |
 | Priority | 2 |
-| Status | uat-verified |
+| Status | uat-verified; amended 2026-10-11 (#544: AC-2 filter options come from the backend, AC-11 to AC-14), amendment validated (PASS) |
 | Depends On | FR-BB19 |
 
 ## Description
@@ -14,7 +14,7 @@ Provides the admin-facing frontend for browsing, filtering, and exporting the au
 
 ## Acceptance Criteria
 - [ ] AC-1: The audit log page is accessible only to users with `role IN (examiner, hr_admin, super_admin)`; non-admin users are redirected.
-- [ ] AC-2: The page displays a filter bar with: date range picker (from/to), free-text actor name search, action type multi-select dropdown populated from a fixed list of known action codes, and entity type filter dropdown.
+- [ ] AC-2: The page displays a filter bar with: date range picker (from/to), free-text actor name search, action type multi-select dropdown and entity type filter dropdown, both populated from the backend (AC-11, AC-12; amended, it was a fixed list in the frontend that drifted from what the backend writes).
 - [ ] AC-3: Filters are reflected in URL query parameters (`?from=&to=&actor=&action=&entity_type=`) so the view is bookmarkable and shareable.
 - [ ] AC-4: The table shows at minimum: timestamp (formatted as local datetime), actor name (linked to user record), action code, entity type, entity ID (truncated to 8 chars with full value in tooltip), IP address.
 - [ ] AC-5: Each row is expandable (click to toggle) to reveal the full metadata JSON rendered as a pretty-printed `<pre>` block.
@@ -23,6 +23,10 @@ Provides the admin-facing frontend for browsing, filtering, and exporting the au
 - [ ] AC-8: The `GET /api/v1/audit/export` endpoint (add to FR-BB19's audit package if not present) streams a CSV with columns: `timestamp`, `actor_id`, `actor_name`, `action`, `entity_type`, `entity_id`, `ip_address`, `metadata_json`; requires examiner+ role.
 - [ ] AC-9: The table uses `useQuery` with `queryKey: ['audit-log', filters, page]`; changing any filter resets to page 1.
 - [ ] AC-10: Zero hardcoded user-visible strings; all text uses `useTranslation` i18n keys.
+- [ ] AC-11: Filter options come from the data. `GET /api/v1/audit/actions` (same authentication and permission as `GET /api/v1/audit`, same tenant scope) returns `{ data: { actions: string[], entity_types: string[] }, error: null }`: the distinct non-empty `action` and `entity_type` values of the caller's tenant in `audit_log`, sorted ascending. No new migration: a `SELECT DISTINCT action ... WHERE tenant_id = $1` (and the same for `entity_type`) is acceptable at the current volume; the dev notes the two query plans in the PR and adds an index only if a plan is poor. An empty log returns two empty arrays. Handler and repository tests cover the empty log, tenant isolation and sorting.
+- [ ] AC-12: The frontend removes the constants `AUDIT_ACTIONS` (`api/audit.ts`) and `ENTITY_TYPES` (hard-coded in `AuditFilterBar.tsx`, which lacks real values such as `session_answer` and `exam_session`); the two dropdowns are filled by a `useAuditFilterOptions` query (`['audit-filter-options']`, `staleTime` five minutes). While it loads the dropdowns are disabled; if it fails the dropdowns stay disabled with an inline error and the log table still loads with the remaining filters. The `action` query parameters of AC-3 keep carrying raw action codes. `AuditFilterBar.test.tsx` (it imports `AUDIT_ACTIONS` and queries the options synchronously) is updated to mock the options query and wait for it.
+- [ ] AC-13: Labels (recommendation, owner may drop this AC and keep raw codes). Each action code and each entity type is shown with a translated label: `audit.actions.<code with each "." replaced by "_">` and `audit.entityTypes.<type>` in `frontend/src/locales/{kk,ru,en}.json`. A code with no key is shown as the raw code (`defaultValue`), so a new backend action never breaks the page. In the table the raw code stays visible as secondary text and in the tooltip; the CSV export (AC-8) and the URL carry raw codes only. The dev adds keys for every action the backend writes at the time of the PR, found by `git grep` for `writer.Write(` and the five direct `INSERT INTO audit_log` sites outside `audit/writer.go` (four in `internal/sessions`, one in `internal/users`), with the entity types that occur (including `session_answer` and `exam_session`), and the existing key-parity check keeps kk, ru and en aligned.
+- [ ] AC-14: The six entries of the old list that no backend code writes (`user.login`, `user.logout`, `session.start`, `session.expire`, `certificate.issue`, `tenant.update`) disappear with the constant, and so do the codes the backend does write but the list lacked (for example `auth.login.success`, `session.auto_submit`) because the options now come from the data; no replacement or alias is added. Action naming of the backend is not changed by this requirement (some codes use a plural or a different prefix, for example `users.unlock`, `tenant_config.update`, `auth.login.success`); that is history, not a defect to fix here.
 
 ## Technical Specification
 

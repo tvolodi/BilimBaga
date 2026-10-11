@@ -15,7 +15,6 @@ import {
   ROLES_MANAGE_ROLES,
   ROUTE_PERMISSIONS as PERM,
 } from '@/lib/routeRoles'
-import { AdminHome } from '@/components/admin/AdminHome'
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useRefreshToken } from '@/api/auth'
@@ -28,7 +27,6 @@ import { createAppQueryClient } from '@/lib/passwordChangeRequired'
 import { LoginPage } from '@/pages/auth/LoginPage'
 
 // Layouts — eagerly loaded (shell chrome shared by all authenticated routes)
-import { AdminLayout } from '@/layouts/AdminLayout'
 import { PortalLayout } from '@/layouts/PortalLayout'
 
 const ChangePasswordPage = lazy(() =>
@@ -98,6 +96,9 @@ const ExamWizardCreatePage = lazy(() =>
 const ExamWizardEditPage = lazy(() =>
   import('@/pages/ExamWizard').then((m) => ({ default: m.ExamWizardEditPage })),
 )
+// #511: the admin shell is loaded only on admin routes, so /portal does not carry its code (sidebar, usehooks-ts).
+const AdminLayout = lazy(() => import('@/layouts/AdminLayout').then((m) => ({ default: m.AdminLayout })))
+const AdminHome = lazy(() => import('@/components/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
 // FR-BB320 AC-9: @__PURE__ lets the build drop this import when DESIGN_GALLERY_ON folds to false.
 const DesignGalleryPage = /* @__PURE__ */ lazy(() =>
   import('@/pages/DesignGallery').then((m) => ({ default: m.DesignGalleryPage })),
@@ -211,7 +212,14 @@ function AuthedRoutes() {
               </RequireRole>
             }
           >
-            <Route index element={<AdminHome />} />
+            <Route
+              index
+              element={
+                <Suspense fallback={<FullPageSpinner />}>
+                  <AdminHome />
+                </Suspense>
+              }
+            />
             <Route path="profile" element={<ProfilePage />} />
             <Route
               path="dashboard"

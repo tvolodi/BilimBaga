@@ -8,10 +8,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- #511: the font stylesheet does not block the first paint. It loads with media="print" and switches to
+         "all" on load; display=swap keeps the text visible meanwhile. The noscript copy covers no-JS clients. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    </noscript>
     <title>BilimBaga</title>
   </head>
   <body>

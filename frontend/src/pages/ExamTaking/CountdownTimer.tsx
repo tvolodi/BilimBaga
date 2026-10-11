@@ -52,6 +52,7 @@ export function CountdownTimer({ remainingSeconds, totalSeconds, onExpire }: Cou
       </div>
       <div
         aria-hidden="true"
+        data-visual-mask
         className={cn(
           'font-mono text-sm font-semibold px-2 py-1 rounded',
           isCritical

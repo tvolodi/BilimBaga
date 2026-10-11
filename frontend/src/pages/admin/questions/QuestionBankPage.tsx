@@ -466,7 +466,7 @@ function VersionHistorySlideover({ questionId, onClose }: VersionHistorySlideove
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{t('questionBank.versions.label', { version: v.version })}</span>
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-muted-foreground text-xs" data-visual-mask>
                       {formatRelativeTime(v.created_at)}
                     </span>
                   </div>
@@ -1364,7 +1364,7 @@ export function QuestionBankPage() {
                         {item.created_by_name}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(item.updated_at)}
+                        <span data-visual-mask>{formatRelativeTime(item.updated_at)}</span>
                       </TableCell>
                       <TableCell>
                         <RowActionsMenu

@@ -14,7 +14,7 @@ export function TimeTakenBadge({ seconds }: TimeTakenBadgeProps) {
   const formatted = `${minutes}m ${remainingSeconds}s`
 
   return (
-    <p className="text-sm text-muted-foreground">
+    <p className="text-sm text-muted-foreground" data-visual-mask>
       <span className="font-medium">{t('result.time_taken')}: </span>
       {formatted}
     </p>

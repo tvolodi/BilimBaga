@@ -114,7 +114,7 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
             : t('portal.card.noDeadline')}
         </div>
         {displayStatus === 'grading_pending' && exam.pending_submitted_at && (
-          <p className="text-xs text-muted-foreground mb-4">
+          <p className="text-xs text-muted-foreground mb-4" data-visual-mask>
             {t('portal.card.pendingSubmitted', {
               date: new Date(exam.pending_submitted_at).toLocaleString(i18n.language),
             })}

@@ -32,8 +32,8 @@ func seedInProgressSession(t *testing.T, db *sqlx.DB, questionCount int, expires
 	must(db.GetContext(ctx, &categoryID, `INSERT INTO categories (name) VALUES ('fr322') RETURNING id::text`))
 	must(db.GetContext(ctx, &examID, `INSERT INTO exams (title, time_limit_minutes, passing_score_pct, created_by, certificate_enabled) VALUES ('FR-BB322', 30, 50, $1, true) RETURNING id::text`, userID))
 	must(db.GetContext(ctx, &sessionID, `
-INSERT INTO exam_sessions (exam_id, user_id, status, seed, expires_at)
-VALUES ($1, $2, 'in_progress', 42, NOW() + $3::interval)
+INSERT INTO exam_sessions (exam_id, user_id, status, seed, started_at, expires_at)
+VALUES ($1, $2, 'in_progress', 42, NOW() - INTERVAL '2 hours', NOW() + $3::interval)
 RETURNING id::text`, examID, userID, expiresIn))
 
 	for i := 0; i < questionCount; i++ {

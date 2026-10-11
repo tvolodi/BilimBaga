@@ -3,9 +3,15 @@ package audit
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
+
+// filterOptionsTTL bounds how stale a tenant's filter options can be (#563). A new action code or entity type is offered
+// by the filters at most this long after its first audit row, and the tenant's log is scanned once per TTL, not per request.
+const filterOptionsTTL = 5 * time.Minute
 
 // Service defines the business-logic interface for the audit domain.
 type Service interface {
@@ -17,11 +23,30 @@ type Service interface {
 
 type service struct {
 	db *sqlx.DB
+	// loadFilterOptions reads a tenant's options from the log. Production uses ListFilterOptions; tests replace it.
+	loadFilterOptions func(ctx context.Context, tenantID string) (AuditFilterOptions, error)
+	now               func() time.Time
+
+	mu            sync.Mutex
+	filterOptions map[string]cachedFilterOptions
+}
+
+// cachedFilterOptions is one tenant's options and the time until which they are served from the cache.
+type cachedFilterOptions struct {
+	opts    AuditFilterOptions
+	expires time.Time
 }
 
 // NewService creates a new Service backed by the given database connection.
 func NewService(db *sqlx.DB) Service {
-	return &service{db: db}
+	return &service{
+		db: db,
+		loadFilterOptions: func(ctx context.Context, tenantID string) (AuditFilterOptions, error) {
+			return ListFilterOptions(ctx, db, tenantID)
+		},
+		now:           time.Now,
+		filterOptions: map[string]cachedFilterOptions{},
+	}
 }
 
 // List returns a paginated, tenant-scoped slice of audit entries.
@@ -51,11 +76,24 @@ func (s *service) Export(ctx context.Context, tenantID string, filters AuditFilt
 	return entries, nil
 }
 
-// FilterOptions returns the distinct action codes and entity types of the tenant's audit log (#557).
+// FilterOptions returns the distinct action codes and entity types of the tenant's audit log (#557), cached per tenant for
+// filterOptionsTTL (#563). Callers must not modify the returned slices: they are shared with later callers.
 func (s *service) FilterOptions(ctx context.Context, tenantID string) (AuditFilterOptions, error) {
-	opts, err := ListFilterOptions(ctx, s.db, tenantID)
+	now := s.now()
+	s.mu.Lock()
+	cached, ok := s.filterOptions[tenantID]
+	s.mu.Unlock()
+	if ok && now.Before(cached.expires) {
+		return cached.opts, nil
+	}
+
+	opts, err := s.loadFilterOptions(ctx, tenantID)
 	if err != nil {
+		// Errors are not cached: the next call reads the log again.
 		return AuditFilterOptions{}, fmt.Errorf("audit.Service.FilterOptions: %w", err)
 	}
+	s.mu.Lock()
+	s.filterOptions[tenantID] = cachedFilterOptions{opts: opts, expires: now.Add(filterOptionsTTL)}
+	s.mu.Unlock()
 	return opts, nil
 }

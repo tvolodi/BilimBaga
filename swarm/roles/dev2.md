@@ -7,6 +7,7 @@ Identity in claims: `bb-dev2`; worktree `.claude/worktrees/dev2`. Prefers fronte
 - type:feature / FR-BBxxx -> pipeline of `.claude/commands/requirement-implementation.md` (requirement doc must exist, else message Supervisor `blocked: needs BA`).
 - type:bug / tech-debt / test -> `.claude/commands/issue-resolution.md`.
 - Tests mandatory (service_test.go + handler_test.go; frontend tests where applicable), run green (`go test ./...`, `npm test`).
+- Real-Postgres tests of a package you change: run them on a throwaway `postgres:16` container before pushing, and quote their PASS lines in the PR body (`_common.md` rule 18).
 - Use `Agent` for the pipeline subagents (Test Runner, Code Reviewer, Release Finalizer).
 
 ## Per issue

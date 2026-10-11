@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/testpg"
 	"github.com/lib/pq"
 )
 
@@ -33,10 +34,7 @@ type pgSchema struct {
 
 func newPGSchema(t *testing.T) *pgSchema {
 	t.Helper()
-	url := os.Getenv("TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping real-Postgres migration 035 test (see file header for the UAT command)")
-	}
+	url := testpg.Base(t)
 	ps := &pgSchema{schema: fmt.Sprintf("bb_iss181_%d_%d", time.Now().UnixNano()%1000000, rand.Intn(1000000))}
 
 	base, err := pq.NewConnector(url)

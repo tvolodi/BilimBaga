@@ -10,12 +10,12 @@ package users
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bilimbaga/bilimbaga/internal/deptscope"
+	"github.com/bilimbaga/bilimbaga/internal/testpg"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,10 +35,7 @@ const (
 )
 
 func TestUserInDeptScope_RealPostgres(t *testing.T) {
-	base := os.Getenv("TEST_DATABASE_URL")
-	if base == "" {
-		t.Skip("TEST_DATABASE_URL not set: skipping real-Postgres department-scope test")
-	}
+	base := testpg.Base(t)
 	schema := fmt.Sprintf("bb_253_%d", time.Now().UnixNano())
 	sep := "?"
 	if strings.Contains(base, "?") {

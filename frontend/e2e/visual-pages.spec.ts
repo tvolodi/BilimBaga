@@ -5,7 +5,7 @@
  * clock) carry data-visual-mask and are passed to toHaveScreenshot as mask. Runs only through scripts/visual/run.sh.
  */
 
-import { test, expect, type Browser, type Page } from '@playwright/test'
+import { test, expect, type Browser, type Locator, type Page } from '@playwright/test'
 import {
   ADMIN_STORAGE_STATE,
   EMPLOYEE_STORAGE_STATE,
@@ -41,16 +41,38 @@ interface VisualPage {
   name: string
   auth: Auth
   path: () => string
+  /** An element that only the loaded page has: the capture waits for it, so it never runs during a loading state (#585). */
+  ready: (page: Page) => Locator
 }
 
 const PAGES: VisualPage[] = [
-  { name: 'login', auth: 'none', path: () => '/login' },
-  { name: 'admin-dashboard', auth: 'admin', path: () => '/admin/dashboard' },
-  { name: 'users-list', auth: 'admin', path: () => '/admin/users' },
-  { name: 'question-bank', auth: 'admin', path: () => '/admin/questions' },
-  { name: 'employee-portal', auth: 'employee', path: () => '/portal' },
-  { name: 'exam-taking', auth: 'employee', path: () => `/portal/sessions/${readVisualFixtures().takingSessionId}` },
-  { name: 'result', auth: 'employee', path: () => `/portal/sessions/${readVisualFixtures().resultSessionId}/result` },
+  { name: 'login', auth: 'none', path: () => '/login', ready: (page) => page.locator('input[type="password"]') },
+  {
+    name: 'admin-dashboard',
+    auth: 'admin',
+    path: () => '/admin/dashboard',
+    ready: (page) => page.locator('[data-visual-mask] [role="img"]'),
+  },
+  { name: 'users-list', auth: 'admin', path: () => '/admin/users', ready: (page) => page.locator('tbody tr') },
+  { name: 'question-bank', auth: 'admin', path: () => '/admin/questions', ready: (page) => page.locator('tbody tr') },
+  {
+    name: 'employee-portal',
+    auth: 'employee',
+    path: () => '/portal',
+    ready: (page) => page.getByText('Visual exam (take)', { exact: true }),
+  },
+  {
+    name: 'exam-taking',
+    auth: 'employee',
+    path: () => `/portal/sessions/${readVisualFixtures().takingSessionId}`,
+    ready: (page) => page.getByText('Visual question', { exact: true }),
+  },
+  {
+    name: 'result',
+    auth: 'employee',
+    path: () => `/portal/sessions/${readVisualFixtures().resultSessionId}/result`,
+    ready: (page) => page.getByText('Visual exam (result)', { exact: true }),
+  },
 ]
 
 const STORAGE: Record<Auth, string | undefined> = {
@@ -77,6 +99,8 @@ test.describe('visual pages (FR-BB320 AC-13)', () => {
             await context.addInitScript((lang: string) => localStorage.setItem('i18n-lang', lang), locale)
             const page = await context.newPage()
             await page.goto(visualPage.path())
+            // Wait for the page's own data before anything else: network idle can fire before a list has even asked for it.
+            await expect(visualPage.ready(page).first()).toBeVisible({ timeout: 15_000 })
             await waitForContent(page)
             await expect(page).toHaveScreenshot(`${visualPage.name}-${width}-${locale}.png`, {
               fullPage: true,

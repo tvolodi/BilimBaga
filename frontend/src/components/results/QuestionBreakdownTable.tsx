@@ -65,6 +65,8 @@ export function QuestionBreakdownTable({ breakdown }: QuestionBreakdownTableProp
           </TableHeader>
           <TableBody>
             {breakdown.map((item) => {
+              // FR-BB322 AC-8: a question awaiting grading has no points and no right or wrong colour yet.
+              const pending = item.grading_status === 'pending_manual'
               const isCorrect =
                 item.points_earned > 0 && item.points_earned === item.max_points
               const isWrong = item.points_earned < item.max_points
@@ -77,18 +79,22 @@ export function QuestionBreakdownTable({ breakdown }: QuestionBreakdownTableProp
                 <TableRow key={item.question_id}>
                   <TableCell className="align-top text-sm">{stem}</TableCell>
                   <TableCell
-                    className={`align-top text-sm ${isWrong && !isCorrect ? 'bg-bg-danger' : ''}`}
+                    className={`align-top text-sm ${isWrong && !isCorrect && !pending ? 'bg-bg-danger' : ''}`}
                   >
                     {item.employee_answer.join(', ') || '—'}
                   </TableCell>
-                  <TableCell className="align-top text-sm bg-bg-success font-semibold">
-                    {item.correct_answer.join(', ') || '—'}
+                  <TableCell
+                    className={`align-top text-sm font-semibold ${pending ? '' : 'bg-bg-success'}`}
+                  >
+                    {pending ? '—' : item.correct_answer.join(', ') || '—'}
                   </TableCell>
                   <TableCell className="align-top text-sm text-right whitespace-nowrap">
-                    {item.points_earned} / {item.max_points}
+                    {pending
+                      ? <span className="text-warning">{t('result.question_pending')}</span>
+                      : <>{item.points_earned} / {item.max_points}</>}
                   </TableCell>
                   <TableCell className="align-top text-sm max-w-[240px]">
-                    <ExplanationCell text={item.explanation} />
+                    <ExplanationCell text={pending ? null : item.explanation} />
                   </TableCell>
                   <TableCell className="align-top text-sm max-w-[240px]">
                     {item.manual_feedback

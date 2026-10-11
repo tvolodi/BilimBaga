@@ -22,8 +22,21 @@ type Repository interface {
 	// via department, or via 'all').
 	IsAssigned(ctx context.Context, examID, userID, deptID string) (bool, error)
 
-	// CountFinishedSessions returns the number of non-in_progress sessions for user+exam.
+	// CountFinishedSessions returns the sessions that use an attempt: submitted, auto_submitted and grading_pending
+	// (FR-BB322 AC-1).
 	CountFinishedSessions(ctx context.Context, examID, userID string) (int, error)
+
+	// HasGradingPendingSession reports whether the user has a session of this exam waiting for grading (FR-BB322 AC-3).
+	HasGradingPendingSession(ctx context.Context, examID, userID string) (bool, error)
+
+	// GradableCounts returns the answers still pending_manual and the short-text answers of a session (FR-BB322 AC-4).
+	GradableCounts(ctx context.Context, sessionID string) (pending, total int, err error)
+
+	// AICandidateCount counts the session's answers the AI grading job may grade now (FR-BB322 AC-4).
+	AICandidateCount(ctx context.Context, sessionID string) (int, error)
+
+	// AIDailyUsage counts the AI grading calls of the last 24 hours (FR-BB322 AC-4).
+	AIDailyUsage(ctx context.Context) (int, error)
 
 	// HasOpenSession returns true if there is an in_progress session with expires_at > NOW().
 	HasOpenSession(ctx context.Context, examID, userID string) (bool, error)
@@ -201,6 +214,8 @@ type autoSubmitResult struct {
 	Status    string
 	ScorePct  *float64
 	Passed    *bool
+	// Transitioned is true only for the call that moved the session out of in_progress (FR-BB322 AC-9).
+	Transitioned bool
 }
 
 // upsertAnswerInput holds all fields for the INSERT … ON CONFLICT upsert.
@@ -262,6 +277,7 @@ type questionBreakdownRow struct {
 	MaxPoints      float64 `db:"max_points"`
 	Explanation    *string `db:"explanation"`
 	ManualFeedback *string `db:"manual_feedback"`
+	GradingStatus  string  `db:"grading_status"`
 }
 
 // historyRow holds one session in an exam's history list (FR-BB41).
@@ -327,12 +343,57 @@ SELECT EXISTS (
 func (r *postgresRepository) CountFinishedSessions(ctx context.Context, examID, userID string) (int, error) {
 	const q = `
 SELECT COUNT(*) FROM exam_sessions
-WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted')`
+WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted', 'grading_pending')`
 	var count int
 	if err := r.db.GetContext(ctx, &count, q, examID, userID); err != nil {
 		return 0, fmt.Errorf("sessions: CountFinishedSessions: %w", err)
 	}
 	return count, nil
+}
+
+// HasGradingPendingSession reports whether the user has a session of this exam waiting for grading (FR-BB322 AC-3).
+func (r *postgresRepository) HasGradingPendingSession(ctx context.Context, examID, userID string) (bool, error) {
+	const q = `
+SELECT EXISTS (
+    SELECT 1 FROM exam_sessions
+    WHERE exam_id = $1 AND user_id = $2 AND status = 'grading_pending'
+)`
+	var exists bool
+	if err := r.db.GetContext(ctx, &exists, q, examID, userID); err != nil {
+		return false, fmt.Errorf("sessions: HasGradingPendingSession: %w", err)
+	}
+	return exists, nil
+}
+
+// GradableCounts returns how many answers of a session still wait for grading and how many short-text answers the
+// session has (FR-BB322 AC-4).
+func (r *postgresRepository) GradableCounts(ctx context.Context, sessionID string) (int, int, error) {
+	const q = `
+SELECT
+    COUNT(*) FILTER (WHERE sqs.grading_status = 'pending_manual') AS pending,
+    COUNT(*)                                                      AS total
+FROM session_question_scores sqs
+JOIN questions q ON q.id = sqs.question_id
+WHERE sqs.session_id = $1 AND q.type = 'shorttext'`
+	var counts struct {
+		Pending int `db:"pending"`
+		Total   int `db:"total"`
+	}
+	if err := r.db.GetContext(ctx, &counts, q, sessionID); err != nil {
+		return 0, 0, fmt.Errorf("sessions: GradableCounts: %w", err)
+	}
+	return counts.Pending, counts.Total, nil
+}
+
+// AICandidateCount counts the session's answers the AI grading job may grade now. It runs the job's own predicate, so
+// the count and the job cannot disagree (FR-BB322 AC-4).
+func (r *postgresRepository) AICandidateCount(ctx context.Context, sessionID string) (int, error) {
+	return countAIEligibleAnswers(ctx, r.db, sessionID)
+}
+
+// AIDailyUsage counts the AI grading calls made in the last 24 hours (FR-BB322 AC-4).
+func (r *postgresRepository) AIDailyUsage(ctx context.Context) (int, error) {
+	return countAIGradingUsage(ctx, r.db)
 }
 
 func (r *postgresRepository) HasOpenSession(ctx context.Context, examID, userID string) (bool, error) {
@@ -747,16 +808,22 @@ SELECT EXISTS (
 		newStatus = "grading_pending"
 	}
 
+	// FR-BB322 AC-9: only the call that leaves in_progress transitions. A replay changes nothing and grades nothing.
 	const updateQ = `
 UPDATE exam_sessions SET status = $2, submitted_at = NOW()
-WHERE id = $1
+WHERE id = $1 AND status = 'in_progress'
 RETURNING id, status, score_pct, passed`
 	var res autoSubmitResult
-	if err := tx.QueryRowxContext(ctx, updateQ, sessionID, newStatus).Scan(
+	err = tx.QueryRowxContext(ctx, updateQ, sessionID, newStatus).Scan(
 		&res.SessionID, &res.Status, &res.ScorePct, &res.Passed,
-	); err != nil {
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return r.autoSubmitReplay(ctx, sessionID)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("sessions: AutoSubmitSession: update status: %w", err)
 	}
+	res.Transitioned = true
 
 	// Run the grading engine (handles all question types including shorttext → pending_manual).
 	scorePct, passed, err := r.engine.Grade(tx, sessionID)
@@ -768,6 +835,19 @@ RETURNING id, status, score_pct, passed`
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("sessions: AutoSubmitSession: commit: %w", err)
+	}
+	return &res, nil
+}
+
+// autoSubmitReplay returns the state of a session that is no longer in_progress, without changing it (FR-BB322 AC-9).
+func (r *postgresRepository) autoSubmitReplay(ctx context.Context, sessionID string) (*autoSubmitResult, error) {
+	const q = `SELECT id, status, score_pct, passed FROM exam_sessions WHERE id = $1`
+	var res autoSubmitResult
+	if err := r.db.QueryRowxContext(ctx, q, sessionID).Scan(&res.SessionID, &res.Status, &res.ScorePct, &res.Passed); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("sessions: AutoSubmitSession: replay: %w", err)
 	}
 	return &res, nil
 }
@@ -905,11 +985,12 @@ RETURNING id, status, submitted_at, score_pct, passed`
 	}
 
 	return &SubmitSessionResponse{
-		SessionID:   updated.ID,
-		Status:      updated.Status,
-		SubmittedAt: submittedAt,
-		ScorePct:    &scorePct,
-		Passed:      &passed,
+		SessionID:    updated.ID,
+		Status:       updated.Status,
+		SubmittedAt:  submittedAt,
+		ScorePct:     &scorePct,
+		Passed:       &passed,
+		Transitioned: true,
 	}, nil
 }
 
@@ -1031,7 +1112,8 @@ SELECT
     sqs.score           AS points_earned,
     sqs.max_score       AS max_points,
     qt.explanation,
-    sqs.manual_feedback
+    sqs.manual_feedback,
+    sqs.grading_status::text AS grading_status
 FROM session_question_scores sqs
 JOIN session_questions sq   ON sq.session_id = sqs.session_id AND sq.question_id = sqs.question_id
 JOIN questions q            ON q.id = sqs.question_id
@@ -1111,17 +1193,20 @@ ORDER BY ao.sort_order`, strings.Join(placeholders, ","))
 func (r *postgresRepository) GetExamHistory(ctx context.Context, examID, userID string, page, perPage int) ([]historyRow, int, error) {
 	const countQ = `
 SELECT COUNT(*) FROM exam_sessions
-WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted')`
+WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted', 'grading_pending')`
 	var total int
 	if err := r.db.GetContext(ctx, &total, countQ, examID, userID); err != nil {
 		return nil, 0, fmt.Errorf("sessions: GetExamHistory: count: %w", err)
 	}
 
+	// FR-BB322 AC-13: a waiting session has no score and no pass yet, so its stored values are not returned.
 	const rowsQ = `
-SELECT id AS session_id, started_at, submitted_at, score_pct,
-       COALESCE(passed, false) AS passed, status
+SELECT id AS session_id, started_at, submitted_at,
+       CASE WHEN status = 'grading_pending' THEN NULL ELSE score_pct END AS score_pct,
+       CASE WHEN status = 'grading_pending' THEN false ELSE COALESCE(passed, false) END AS passed,
+       status
 FROM exam_sessions
-WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted')
+WHERE exam_id = $1 AND user_id = $2 AND status IN ('submitted', 'auto_submitted', 'grading_pending')
 ORDER BY started_at ASC
 LIMIT $3 OFFSET $4`
 
@@ -1173,7 +1258,7 @@ func (r *postgresRepository) GetMyResults(ctx context.Context, userID string, pa
 	const countQ = `
 SELECT COUNT(*)
 FROM exam_sessions es
-WHERE es.user_id = $1 AND es.status IN ('submitted', 'auto_submitted')`
+WHERE es.user_id = $1 AND es.status IN ('submitted', 'auto_submitted', 'grading_pending')`
 	var total int
 	if err := r.db.GetContext(ctx, &total, countQ, userID); err != nil {
 		return nil, 0, fmt.Errorf("sessions: GetMyResults: count: %w", err)
@@ -1185,13 +1270,14 @@ SELECT es.id AS session_id,
        es.exam_id,
        e.title AS exam_title,
        es.submitted_at,
-       COALESCE(es.score_pct, 0) AS score_pct,
-       COALESCE(es.passed, false) AS passed,
+       -- FR-BB322 AC-13: a waiting session has no score, no pass and no certificate yet.
+       CASE WHEN es.status = 'grading_pending' THEN NULL ELSE es.score_pct END AS score_pct,
+       CASE WHEN es.status = 'grading_pending' THEN false ELSE COALESCE(es.passed, false) END AS passed,
        EXTRACT(EPOCH FROM (es.submitted_at - es.started_at))::bigint AS time_taken_seconds,
-       (COALESCE(es.passed, false) AND e.certificate_enabled) AS certificate_available
+       (es.status <> 'grading_pending' AND COALESCE(es.passed, false) AND e.certificate_enabled) AS certificate_available
 FROM exam_sessions es
 JOIN exams e ON es.exam_id = e.id
-WHERE es.user_id = $1 AND es.status IN ('submitted', 'auto_submitted')
+WHERE es.user_id = $1 AND es.status IN ('submitted', 'auto_submitted', 'grading_pending')
 ORDER BY %s %s
 LIMIT $2 OFFSET $3`, col, direction)
 

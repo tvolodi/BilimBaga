@@ -685,12 +685,14 @@
         "in_progress": "In progress",
         "passed": "Passed",
         "failed": "Failed",
-        "expired": "Expired"
+        "expired": "Expired",
+        "grading_pending": "Awaiting grading"
       },
       "cta": {
         "start": "Start exam",
         "continue": "Continue",
-        "viewResult": "View result"
+        "viewResult": "View result",
+        "viewStatus": "View status"
       },
       "timeLimit": "{{minutes}} min",
       "passingScore": "Pass: {{pct}}%",
@@ -699,6 +701,7 @@
       "deadline": "Due {{countdown}}",
       "windowNotOpen": "Opens {{date}}",
       "windowClosed": "The availability window for this exam has closed.",
+      "pendingSubmitted": "Submitted {{date}}",
       "noDeadline": "No deadline"
     },
     "startError": {
@@ -730,7 +733,14 @@
     "title": "Exam Result",
     "passed": "Passed",
     "failed": "Failed",
-    "pending_grading": "Your answers are under review. Results will be available after manual grading.",
+    "pending_ai": "Your answers are being checked automatically. This usually takes a few minutes.",
+    "pending_examiner": "Your answers are waiting for an examiner. You will get an email when the result is ready.",
+    "pending_count": "{{pending}} of {{total}} answers are still being checked",
+    "pending_submitted": "Submitted {{date}}",
+    "pending_stopped": "We stopped checking automatically. Refresh to see the latest state.",
+    "refresh": "Refresh",
+    "ready": "Your result is ready.",
+    "question_pending": "Awaiting grading",
     "score_label": "Your Score",
     "time_taken": "Time Taken",
     "attempt_number": "Attempt",

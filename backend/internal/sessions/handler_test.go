@@ -22,20 +22,20 @@ import (
 // ── Mock service ─────────────────────────────────────────────────────────────
 
 type mockSvc struct {
-	createSessionFn    func(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error)
-	saveAnswerFn       func(ctx context.Context, sessionID, questionID, userID string, input SaveAnswerInput) (*SaveAnswerResponse, error)
-	getSessionStateFn  func(ctx context.Context, sessionID, userID string) (*ResumeSessionResponse, error)
-	reportEventFn      func(ctx context.Context, sessionID, userID string, input ReportEventInput) (*ReportEventResponse, error)
-	submitSessionFn    func(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error)
-	getSessionResultFn func(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error)
-	getAdminResultFn   func(ctx context.Context, sessionID string) (*SessionResultResponse, error)
-	getExamHistoryFn   func(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
-	listGradingQueueFn                func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
-	getGradingDetailFn                func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
-	gradeAnswerFn                     func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
-	getMyResultsFn                    func(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error)
-	selectNextAdaptiveQuestionFn      func(ctx context.Context, sessionID, userID string) (*NextQuestionResponse, error)
-	recordAdaptiveAnswerFn            func(ctx context.Context, sessionID, questionID string, correct bool) error
+	createSessionFn              func(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error)
+	saveAnswerFn                 func(ctx context.Context, sessionID, questionID, userID string, input SaveAnswerInput) (*SaveAnswerResponse, error)
+	getSessionStateFn            func(ctx context.Context, sessionID, userID string) (*ResumeSessionResponse, error)
+	reportEventFn                func(ctx context.Context, sessionID, userID string, input ReportEventInput) (*ReportEventResponse, error)
+	submitSessionFn              func(ctx context.Context, sessionID, userID, tenantID, actorIP string) (*SubmitSessionResponse, error)
+	getSessionResultFn           func(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error)
+	getAdminResultFn             func(ctx context.Context, sessionID string) (*SessionResultResponse, error)
+	getExamHistoryFn             func(ctx context.Context, examID, userID string, page, perPage int) (*ExamHistoryResponse, error)
+	listGradingQueueFn           func(ctx context.Context, examID *string, dateFrom, dateTo *time.Time, page, perPage int) (*GradingQueueResponse, error)
+	getGradingDetailFn           func(ctx context.Context, sessionID string) (*GradingDetailResponse, error)
+	gradeAnswerFn                func(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, req GradeAnswerRequest) (*GradeAnswerResponse, error)
+	getMyResultsFn               func(ctx context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error)
+	selectNextAdaptiveQuestionFn func(ctx context.Context, sessionID, userID string) (*NextQuestionResponse, error)
+	recordAdaptiveAnswerFn       func(ctx context.Context, sessionID, questionID string, correct bool) error
 }
 
 func (m *mockSvc) CreateSession(ctx context.Context, examID, userID, deptID string) (*CreateSessionResponse, error) {
@@ -1383,6 +1383,7 @@ func TestHandleGradeAnswer_200_AllGraded(t *testing.T) {
 func TestHandleGetMyResults_200_Success(t *testing.T) {
 	now := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
 	taken := int64(600)
+	score := 88.0
 	svc := &mockSvc{
 		getMyResultsFn: func(_ context.Context, userID string, page, perPage int, sort, dir string) (*MyResultsResponse, error) {
 			return &MyResultsResponse{
@@ -1392,7 +1393,7 @@ func TestHandleGetMyResults_200_Success(t *testing.T) {
 						ExamID:               "exam-1",
 						ExamTitle:            "Test Exam",
 						SubmittedAt:          now,
-						ScorePct:             88.0,
+						ScorePct:             &score,
 						Passed:               true,
 						TimeTakenSeconds:     &taken,
 						CertificateAvailable: true,

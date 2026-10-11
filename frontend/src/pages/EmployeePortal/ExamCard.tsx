@@ -14,6 +14,7 @@ const STATUS_VARIANT: Record<UserStatus, BadgeVariant> = {
   passed: 'success',
   failed: 'destructive',
   expired: 'warning',
+  grading_pending: 'secondary',
 }
 
 interface ExamCardProps {
@@ -54,6 +55,9 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
       case 'failed':
         navigate(`/portal/exams/${exam.id}/result`)
         break
+      case 'grading_pending':
+        if (exam.pending_session_id) navigate(`/portal/sessions/${exam.pending_session_id}/result`)
+        break
     }
   }
 
@@ -66,6 +70,9 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
       case 'passed':
       case 'failed':
         return t('portal.card.cta.viewResult')
+      case 'grading_pending':
+        // FR-BB322 AC-3: a waiting session offers no Start and no retake, only its status.
+        return t('portal.card.cta.viewStatus')
       default:
         return null
     }
@@ -106,6 +113,13 @@ export function ExamCard({ exam, onStart }: ExamCardProps) {
             ? t('portal.card.deadline', { countdown })
             : t('portal.card.noDeadline')}
         </div>
+        {displayStatus === 'grading_pending' && exam.pending_submitted_at && (
+          <p className="text-xs text-muted-foreground mb-4">
+            {t('portal.card.pendingSubmitted', {
+              date: new Date(exam.pending_submitted_at).toLocaleString(i18n.language),
+            })}
+          </p>
+        )}
         {windowBlock && (
           <p id={`start-reason-${exam.id}`} role="status" className="text-xs text-warning mb-2">
             {windowBlock === 'notOpen'

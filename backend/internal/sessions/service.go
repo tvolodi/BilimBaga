@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/bilimbaga/bilimbaga/internal/email"
 	"github.com/bilimbaga/bilimbaga/internal/exams"
 )
 
@@ -71,18 +70,44 @@ type Service interface {
 	RecordAdaptiveAnswer(ctx context.Context, sessionID, questionID string, correct bool) error
 }
 
-type service struct {
-	repo     Repository
-	emailSvc *email.EmailService
+// ResultMailer sends the session mails: exam_submitted when a session first moves to grading_pending, and the result
+// mails once a session is final (FR-BB322 AC-9, AC-10). *email.EmailService implements it.
+type ResultMailer interface {
+	TriggerSessionResult(sessionID string)
+	TriggerExamSubmitted(sessionID string)
 }
 
-// NewService returns a Service backed by the given Repository.
-// An optional EmailService may be passed as the second argument to enable
-// transactional email delivery; pass nil or omit to disable.
-func NewService(repo Repository, emailSvc ...*email.EmailService) Service {
+// aiGradingSettings tells the result service whether the AI grading job will grade a waiting answer (FR-BB322 AC-4).
+type aiGradingSettings struct {
+	enabled    bool // an AI provider is configured and the grading job runs
+	dailyLimit int  // AI_GRADING_DAILY_LIMIT; 0 turns the job off
+}
+
+type service struct {
+	repo   Repository
+	mailer ResultMailer
+	ai     aiGradingSettings
+}
+
+// ServiceOption configures a sessions Service.
+type ServiceOption func(*service)
+
+// WithResultMailer enables the session mails. Without it no mail is sent.
+func WithResultMailer(m ResultMailer) ServiceOption {
+	return func(s *service) { s.mailer = m }
+}
+
+// WithAIGrading tells the result service how the AI grading job is set up: enabled when an AI provider is configured,
+// and dailyLimit as AI_GRADING_DAILY_LIMIT (FR-BB322 AC-4).
+func WithAIGrading(enabled bool, dailyLimit int) ServiceOption {
+	return func(s *service) { s.ai = aiGradingSettings{enabled: enabled, dailyLimit: dailyLimit} }
+}
+
+// NewService returns a Service backed by the given Repository, configured by the options.
+func NewService(repo Repository, opts ...ServiceOption) Service {
 	s := &service{repo: repo}
-	if len(emailSvc) > 0 {
-		s.emailSvc = emailSvc[0]
+	for _, opt := range opts {
+		opt(s)
 	}
 	return s
 }
@@ -119,6 +144,16 @@ func (s *service) CreateSession(ctx context.Context, examID, userID, deptID stri
 	}
 	if cfg.AvailableUntil != nil && current.After(*cfg.AvailableUntil) {
 		return nil, ErrExamOutsideWindow
+	}
+
+	// FR-BB322 AC-1/AC-3: a session waiting for grading blocks a new attempt. This check comes first, so the error says
+	// why the employee cannot start.
+	waiting, err := s.repo.HasGradingPendingSession(ctx, examID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: CreateSession: pending check: %w", err)
+	}
+	if waiting {
+		return nil, ErrGradingPending
 	}
 
 	// AC-4: attempt limit.
@@ -584,12 +619,21 @@ func (s *service) ReportEvent(ctx context.Context, sessionID, userID string, inp
 		}
 		sid := result.SessionID
 		status := result.Status
+		// FR-BB322 AC-13: a session waiting for grading shows no score or pass yet. AC-9: its exam_submitted mail goes
+		// out once, on the call that moved it.
+		scorePct, passed := result.ScorePct, result.Passed
+		if result.Status == "grading_pending" {
+			scorePct, passed = nil, nil
+			if result.Transitioned && s.mailer != nil {
+				s.mailer.TriggerExamSubmitted(sid)
+			}
+		}
 		return &ReportEventResponse{
 			Warn:      false,
 			SessionID: &sid,
 			Status:    &status,
-			ScorePct:  result.ScorePct,
-			Passed:    result.Passed,
+			ScorePct:  scorePct,
+			Passed:    passed,
 		}, nil
 	case "warn":
 		return &ReportEventResponse{Warn: true, EventCount: eventCount}, nil
@@ -603,8 +647,21 @@ func (s *service) SubmitSession(ctx context.Context, sessionID, userID, tenantID
 	if err != nil {
 		return nil, fmt.Errorf("sessions: SubmitSession: %w", err)
 	}
-	if s.emailSvc != nil && result.Passed != nil {
-		s.emailSvc.TriggerSessionResult(result.SessionID)
+	// FR-BB322 AC-9/AC-10: mails follow the transition, not the call. A replayed submit sends nothing. A session waiting
+	// for grading gets exam_submitted, and never a result mail; a final session gets its result mail.
+	if result.Transitioned && s.mailer != nil {
+		switch {
+		case result.Status == "grading_pending":
+			s.mailer.TriggerExamSubmitted(result.SessionID)
+		case result.Passed != nil:
+			s.mailer.TriggerSessionResult(result.SessionID)
+		}
+	}
+	// FR-BB322 AC-13: a waiting session returns no score and no pass to the employee, on the transition and on a
+	// replayed submit. The stored values stay in the database for the examiner.
+	if result.Status == "grading_pending" {
+		result.ScorePct = nil
+		result.Passed = nil
 	}
 	return result, nil
 }
@@ -616,7 +673,8 @@ func shufflePoolQuestions(pool []poolQuestion, rng *rand.Rand) {
 
 // buildSessionResult converts a sessionResultRow into a SessionResultResponse,
 // fetching per-section and per-question data as determined by show_answers_mode.
-func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow, alwaysBreakdown bool) (*SessionResultResponse, error) {
+// admin is true for the examiner's read, which keeps the stored score of a waiting session (FR-BB322 AC-4, AC-13).
+func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow, admin bool) (*SessionResultResponse, error) {
 	sections, err := s.repo.GetSectionScores(ctx, row.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("sessions: buildSessionResult: section scores: %w", err)
@@ -636,8 +694,29 @@ func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow,
 		PerSectionScores: sections,
 	}
 
+	// FR-BB322 AC-4: a waiting session says what is still open and who grades it.
+	if row.Status == "grading_pending" {
+		pending, total, err := s.repo.GradableCounts(ctx, row.SessionID)
+		if err != nil {
+			return nil, fmt.Errorf("sessions: buildSessionResult: gradable counts: %w", err)
+		}
+		expected, err := s.gradingExpectedBy(ctx, row.SessionID)
+		if err != nil {
+			return nil, fmt.Errorf("sessions: buildSessionResult: grading expected by: %w", err)
+		}
+		resp.PendingQuestionCount = pending
+		resp.TotalGradableCount = total
+		resp.GradingExpectedBy = &expected
+		if !admin {
+			// FR-BB322 AC-13: an employee sees no score, no pass and no section scores for a waiting session.
+			resp.ScorePct = nil
+			resp.Passed = false
+			resp.PerSectionScores = []SectionScore{}
+		}
+	}
+
 	// AC-3: include breakdown when show_answers_mode != 'never', or always for admin (AC-5).
-	includeBreakdown := alwaysBreakdown || row.ShowAnswersMode != "never"
+	includeBreakdown := admin || row.ShowAnswersMode != "never"
 	if includeBreakdown {
 		bRows, err := s.repo.GetQuestionBreakdown(ctx, row.SessionID, "")
 		if err != nil {
@@ -706,7 +785,7 @@ func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow,
 				correct = []string{}
 			}
 
-			breakdown[i] = QuestionBreakdownItem{
+			item := QuestionBreakdownItem{
 				QuestionID:     b.QuestionID,
 				Stem:           b.Stem,
 				EmployeeAnswer: empAnswer,
@@ -715,12 +794,42 @@ func (s *service) buildSessionResult(ctx context.Context, row *sessionResultRow,
 				MaxPoints:      b.MaxPoints,
 				Explanation:    b.Explanation,
 				ManualFeedback: b.ManualFeedback,
+				GradingStatus:  b.GradingStatus,
 			}
+			if !admin && b.GradingStatus == "pending_manual" {
+				// FR-BB322 AC-8: a question still waiting for grading shows no answer and no explanation.
+				item.CorrectAnswer = []string{}
+				item.Explanation = nil
+			}
+			breakdown[i] = item
 		}
 		resp.PerQuestionBreakdown = &breakdown
 	}
 
 	return resp, nil
+}
+
+// gradingExpectedBy says who grades the waiting answers of a session: "ai" when the AI job will grade at least one of
+// them, otherwise "examiner" (FR-BB322 AC-4). It uses the job's predicate and its daily cap, so the two cannot disagree.
+func (s *service) gradingExpectedBy(ctx context.Context, sessionID string) (string, error) {
+	if !s.ai.enabled || s.ai.dailyLimit <= 0 {
+		return "examiner", nil
+	}
+	eligible, err := s.repo.AICandidateCount(ctx, sessionID)
+	if err != nil {
+		return "", fmt.Errorf("sessions: gradingExpectedBy: candidates: %w", err)
+	}
+	if eligible == 0 {
+		return "examiner", nil
+	}
+	used, err := s.repo.AIDailyUsage(ctx)
+	if err != nil {
+		return "", fmt.Errorf("sessions: gradingExpectedBy: usage: %w", err)
+	}
+	if used >= s.ai.dailyLimit {
+		return "examiner", nil
+	}
+	return "ai", nil
 }
 
 func (s *service) GetSessionResult(ctx context.Context, sessionID, userID string) (*SessionResultResponse, error) {
@@ -989,8 +1098,8 @@ func (s *service) GradeAnswer(ctx context.Context, sessionID, questionID, grader
 		FinalScorePct: result.finalScorePct,
 		Passed:        result.passed,
 	}
-	if s.emailSvc != nil && resp.AllGraded {
-		s.emailSvc.TriggerSessionResult(sessionID)
+	if s.mailer != nil && resp.AllGraded {
+		s.mailer.TriggerSessionResult(sessionID)
 	}
 	return resp, nil
 }

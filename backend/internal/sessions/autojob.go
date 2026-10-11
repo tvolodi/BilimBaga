@@ -25,11 +25,11 @@ type jobDeps struct {
 	processOne   func(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession) error
 }
 
-func defaultJobDeps(engine GradingEngine) jobDeps {
+func defaultJobDeps(engine GradingEngine, onGradingPending func(sessionID string)) jobDeps {
 	return jobDeps{
 		queryExpired: queryExpiredSessions,
 		processOne: func(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession) error {
-			return processOneExpiredSession(ctx, db, logger, sess, engine)
+			return processOneExpiredSession(ctx, db, logger, sess, engine, onGradingPending)
 		},
 	}
 }
@@ -37,10 +37,11 @@ func defaultJobDeps(engine GradingEngine) jobDeps {
 // AutoSubmitJob polls every 60 seconds for in_progress sessions whose
 // expires_at has passed, auto-submits them, grades them, and writes audit log
 // entries. It shuts down when ctx is cancelled (AC-6).
+// onGradingPending is called after the commit of a session that moved to grading_pending (FR-BB322 AC-9); it may be nil.
 //
-// Call as: go AutoSubmitJob(ctx, db, logger, engine)
-func AutoSubmitJob(ctx context.Context, db *sqlx.DB, logger *slog.Logger, engine GradingEngine) {
-	autoSubmitJobWithDeps(ctx, db, logger, defaultJobDeps(engine))
+// Call as: go AutoSubmitJob(ctx, db, logger, engine, onGradingPending)
+func AutoSubmitJob(ctx context.Context, db *sqlx.DB, logger *slog.Logger, engine GradingEngine, onGradingPending func(sessionID string)) {
+	autoSubmitJobWithDeps(ctx, db, logger, defaultJobDeps(engine, onGradingPending))
 }
 
 func autoSubmitJobWithDeps(ctx context.Context, db *sqlx.DB, logger *slog.Logger, deps jobDeps) {
@@ -136,7 +137,7 @@ FOR UPDATE SKIP LOCKED`
 
 // processOneExpiredSession runs the full auto-submit lifecycle for a single
 // session inside its own transaction (AC-8: one tx per session).
-func processOneExpiredSession(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession, engine GradingEngine) error {
+func processOneExpiredSession(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession, engine GradingEngine, onGradingPending func(sessionID string)) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -196,5 +197,12 @@ VALUES ('public', NULL, 'session.auto_submit', 'exam_session', $1, '', $2::jsonb
 		logger.Error("auto-submit: audit log write failed", "session_id", sess.ID, "err", err)
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	// FR-BB322 AC-9: the exam_submitted mail goes out once, after the commit that moved the session to grading_pending.
+	if hasShortText && onGradingPending != nil {
+		onGradingPending(sess.ID)
+	}
+	return nil
 }

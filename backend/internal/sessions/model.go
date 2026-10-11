@@ -14,11 +14,13 @@ type AdaptiveState struct {
 }
 
 var (
-	ErrNotAssigned           = errors.New("exam not assigned to user")
-	ErrExamNotActive         = errors.New("exam is not active")
-	ErrExamArchived          = errors.New("exam has been archived")
-	ErrExamOutsideWindow     = errors.New("exam outside availability window")
-	ErrAttemptsExhausted     = errors.New("all allowed attempts exhausted")
+	ErrNotAssigned       = errors.New("exam not assigned to user")
+	ErrExamNotActive     = errors.New("exam is not active")
+	ErrExamArchived      = errors.New("exam has been archived")
+	ErrExamOutsideWindow = errors.New("exam outside availability window")
+	ErrAttemptsExhausted = errors.New("all allowed attempts exhausted")
+	// ErrGradingPending: the employee has a session waiting for grading, so no new attempt may start (FR-BB322 AC-3).
+	ErrGradingPending        = errors.New("a session is waiting for grading")
 	ErrSessionAlreadyOpen    = errors.New("active session already exists for this exam")
 	ErrInsufficientQuestions = errors.New("not enough active questions to satisfy a random rule")
 
@@ -233,6 +235,9 @@ type SubmitSessionResponse struct {
 	SubmittedAt time.Time `json:"submitted_at"`
 	ScorePct    *float64  `json:"score_pct"`
 	Passed      *bool     `json:"passed"`
+	// Transitioned is true only for the call that moved the session out of in_progress (FR-BB322 AC-9). It is internal:
+	// the client never sees it, and a replayed submit returns false.
+	Transitioned bool `json:"-"`
 }
 
 // SectionScore is one entry in the per-section scores list (FR-BB41).
@@ -252,6 +257,8 @@ type QuestionBreakdownItem struct {
 	MaxPoints      float64  `json:"max_points"`
 	Explanation    *string  `json:"explanation"`
 	ManualFeedback *string  `json:"manual_feedback"`
+	// GradingStatus is graded or pending_manual (FR-BB322 AC-8): a pending question shows no answer or explanation.
+	GradingStatus string `json:"grading_status"`
 }
 
 // SessionResultResponse is the response for GET /portal/sessions/:id/result
@@ -271,6 +278,11 @@ type SessionResultResponse struct {
 	ShowAnswersMode      string                   `json:"show_answers_mode"`
 	PerSectionScores     []SectionScore           `json:"per_section_scores"`
 	PerQuestionBreakdown *[]QuestionBreakdownItem `json:"per_question_breakdown,omitempty"`
+	// FR-BB322 AC-4: answers still waiting for grading, the short-text answers of the session, and who grades them
+	// ("ai" or "examiner"). For a final session the count is 0 and grading_expected_by is null.
+	PendingQuestionCount int     `json:"pending_question_count"`
+	TotalGradableCount   int     `json:"total_gradable_count"`
+	GradingExpectedBy    *string `json:"grading_expected_by"`
 }
 
 // HistorySession is one session in the exam history list (FR-BB41).
@@ -306,7 +318,7 @@ type MyResultsItem struct {
 	ExamID               string    `db:"exam_id"               json:"exam_id"`
 	ExamTitle            string    `db:"exam_title"            json:"exam_title"`
 	SubmittedAt          time.Time `db:"submitted_at"          json:"submitted_at"`
-	ScorePct             float64   `db:"score_pct"             json:"score_pct"`
+	ScorePct             *float64  `db:"score_pct"             json:"score_pct"`
 	Passed               bool      `db:"passed"                json:"passed"`
 	TimeTakenSeconds     *int64    `db:"time_taken_seconds"    json:"time_taken_seconds"`
 	CertificateAvailable bool      `db:"certificate_available" json:"certificate_available"`

@@ -18,20 +18,25 @@ const (
 	UserStatusPassed     UserStatus = "passed"
 	UserStatusFailed     UserStatus = "failed"
 	UserStatusExpired    UserStatus = "expired"
+	// UserStatusGradingPending: a session is waiting for grading and none passed (FR-BB322 AC-2).
+	UserStatusGradingPending UserStatus = "grading_pending"
 )
 
 // PortalExamItem is the summary row returned by the list endpoint.
 type PortalExamItem struct {
-	ID                 string     `json:"id"`
-	Title              string     `json:"title"`
-	Description        *string    `json:"description"`
-	TimeLimitMinutes   int        `json:"time_limit_minutes"`
-	PassingScorePct    float64    `json:"passing_score_pct"`
-	MaxAttempts        int        `json:"max_attempts"`
-	AttemptsUsed       int        `json:"attempts_used"`
-	Deadline           *time.Time `json:"deadline"`
-	UserStatus         UserStatus `json:"user_status"`
-	OpenSessionID      *string    `json:"open_session_id"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Description      *string    `json:"description"`
+	TimeLimitMinutes int        `json:"time_limit_minutes"`
+	PassingScorePct  float64    `json:"passing_score_pct"`
+	MaxAttempts      int        `json:"max_attempts"`
+	AttemptsUsed     int        `json:"attempts_used"`
+	Deadline         *time.Time `json:"deadline"`
+	UserStatus       UserStatus `json:"user_status"`
+	OpenSessionID    *string    `json:"open_session_id"`
+	// FR-BB322 AC-3: the newest session waiting for grading, and when it was submitted.
+	PendingSessionID   *string    `json:"pending_session_id"`
+	PendingSubmittedAt *time.Time `json:"pending_submitted_at"`
 	ShowAnswers        string     `json:"show_answers"`
 	ShuffleQuestions   bool       `json:"shuffle_questions"`
 	ShuffleOptions     bool       `json:"shuffle_options"`
@@ -69,6 +74,8 @@ type PortalExamDetail struct {
 	UserStatus         UserStatus       `json:"user_status"`
 	AttemptsUsed       int              `json:"attempts_used"`
 	OpenSessionID      *string          `json:"open_session_id"`
+	PendingSessionID   *string          `json:"pending_session_id"`
+	PendingSubmittedAt *time.Time       `json:"pending_submitted_at"`
 	AttemptHistory     []AttemptHistory `json:"attempt_history"`
 }
 

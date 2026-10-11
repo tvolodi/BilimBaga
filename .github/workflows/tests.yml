@@ -53,9 +53,9 @@ jobs:
       - name: go test
         if: ${{ !cancelled() }}
         run: go test -p 2 ./...
-      - name: AI grading Postgres tests, verbose (#528)
+      - name: AI grading and grading-pending Postgres tests, verbose (#528, #545)
         if: ${{ !cancelled() }}
-        run: go test -count=1 -v -run '^TestAIGrade_' ./internal/sessions/
+        run: go test -count=1 -v -run '^(TestAIGrade_|TestGradingPending_)' ./internal/sessions/
       - name: Sign-in limiter script refuses a non-local base (#484)
         run: bash ../scripts/tests/test-limiter-forwarded-headers_test.sh
 

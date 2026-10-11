@@ -74,11 +74,10 @@ func (s *EmailService) TriggerSessionResult(sessionID string) {
 
 		var tmplData map[string]any
 		if data.Passed {
-			certLink := s.cfg.APIBaseURL + "/portal/sessions/" + sessionID + "/certificate"
 			tmplData = map[string]any{
-				"ExamTitle":        data.ExamTitle,
-				"ScorePct":         fmt.Sprintf("%.1f", data.ScorePct),
-				"CertDownloadLink": certLink,
+				"ExamTitle":  data.ExamTitle,
+				"ScorePct":   fmt.Sprintf("%.1f", data.ScorePct),
+				"ResultLink": s.sessionResultLink(sessionID),
 			}
 		} else {
 			attemptsRemaining := 0
@@ -93,6 +92,7 @@ func (s *EmailService) TriggerSessionResult(sessionID string) {
 				"ScorePct":          fmt.Sprintf("%.1f", data.ScorePct),
 				"PassingScorePct":   fmt.Sprintf("%.1f", data.PassingScorePct),
 				"AttemptsRemaining": attemptsRemaining,
+				"ResultLink":        s.sessionResultLink(sessionID),
 			}
 		}
 
@@ -100,6 +100,42 @@ func (s *EmailService) TriggerSessionResult(sessionID string) {
 		s.logAttempt(data.UserEmail, tmplName, sendErr)
 		if sendErr != nil {
 			s.logger.Error("email send failed", "template", tmplName, "to", data.UserEmail, "error", sendErr)
+		}
+	}()
+}
+
+// sessionResultLink is the SPA result page of a session (FR-BB322 AC-10). It is an SPA route, so the employee
+// signs in there, and the certificate is downloaded from that page with a token.
+func (s *EmailService) sessionResultLink(sessionID string) string {
+	return strings.TrimRight(s.cfg.PublicAppURL, "/") + "/portal/sessions/" + sessionID + "/result"
+}
+
+// TriggerExamSubmitted sends exam_submitted to the session owner when a session first moves to grading_pending
+// (FR-BB322 AC-9). The caller decides that the transition happened; this only sends the mail.
+func (s *EmailService) TriggerExamSubmitted(sessionID string) {
+	go func() {
+		ctx := context.Background()
+		if s.repo == nil {
+			return
+		}
+		data, err := s.repo.GetSessionEmailData(ctx, sessionID)
+		if err != nil {
+			s.logger.Error("email: get session data", "session_id", sessionID, "error", err)
+			return
+		}
+		submittedAt := ""
+		if data.SubmittedAt != nil {
+			submittedAt = data.SubmittedAt.UTC().Format("2006-01-02 15:04 UTC")
+		}
+		tmplData := map[string]any{
+			"ExamTitle":   data.ExamTitle,
+			"SubmittedAt": submittedAt,
+			"ResultLink":  s.sessionResultLink(sessionID),
+		}
+		sendErr := s.send(data.UserEmail, "exam_submitted", tmplData, data.UserLocale)
+		s.logAttempt(data.UserEmail, "exam_submitted", sendErr)
+		if sendErr != nil {
+			s.logger.Error("email send failed", "template", "exam_submitted", "to", data.UserEmail, "error", sendErr)
 		}
 	}()
 }

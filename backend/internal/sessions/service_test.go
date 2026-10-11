@@ -13,6 +13,10 @@ import (
 // ── Mock repository ──────────────────────────────────────────────────────────
 
 type mockRepo struct {
+	hasGradingPendingFn     func(ctx context.Context, examID, userID string) (bool, error)
+	gradableCountsFn        func(ctx context.Context, sessionID string) (int, int, error)
+	aiCandidateCountFn      func(ctx context.Context, sessionID string) (int, error)
+	aiDailyUsageFn          func(ctx context.Context) (int, error)
 	isAssignedFn            func(ctx context.Context, examID, userID, deptID string) (bool, error)
 	getExamConfigFn         func(ctx context.Context, examID string) (*examConfig, error)
 	countFinishedSessionsFn func(ctx context.Context, examID, userID string) (int, error)
@@ -69,6 +73,30 @@ func (m *mockRepo) GetExamConfig(ctx context.Context, examID string) (*examConfi
 func (m *mockRepo) CountFinishedSessions(ctx context.Context, examID, userID string) (int, error) {
 	if m.countFinishedSessionsFn != nil {
 		return m.countFinishedSessionsFn(ctx, examID, userID)
+	}
+	return 0, nil
+}
+func (m *mockRepo) HasGradingPendingSession(ctx context.Context, examID, userID string) (bool, error) {
+	if m.hasGradingPendingFn != nil {
+		return m.hasGradingPendingFn(ctx, examID, userID)
+	}
+	return false, nil
+}
+func (m *mockRepo) GradableCounts(ctx context.Context, sessionID string) (int, int, error) {
+	if m.gradableCountsFn != nil {
+		return m.gradableCountsFn(ctx, sessionID)
+	}
+	return 0, 0, nil
+}
+func (m *mockRepo) AICandidateCount(ctx context.Context, sessionID string) (int, error) {
+	if m.aiCandidateCountFn != nil {
+		return m.aiCandidateCountFn(ctx, sessionID)
+	}
+	return 0, nil
+}
+func (m *mockRepo) AIDailyUsage(ctx context.Context) (int, error) {
+	if m.aiDailyUsageFn != nil {
+		return m.aiDailyUsageFn(ctx)
 	}
 	return 0, nil
 }
@@ -2043,6 +2071,7 @@ func TestGetMyResults_ReturnsEmptySlice_WhenNoSessions(t *testing.T) {
 func TestGetMyResults_ReturnsMappedItems(t *testing.T) {
 	now := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
 	timeTaken := int64(1200)
+	score := 82.5
 	repo := &mockRepo{
 		getMyResultsFn: func(_ context.Context, _ string, _, _ int, _, _ string) ([]MyResultsItem, int, error) {
 			return []MyResultsItem{
@@ -2051,7 +2080,7 @@ func TestGetMyResults_ReturnsMappedItems(t *testing.T) {
 					ExamID:               "exam-1",
 					ExamTitle:            "Test Exam",
 					SubmittedAt:          now,
-					ScorePct:             82.5,
+					ScorePct:             &score,
 					Passed:               true,
 					TimeTakenSeconds:     &timeTaken,
 					CertificateAvailable: true,
@@ -2066,7 +2095,8 @@ func TestGetMyResults_ReturnsMappedItems(t *testing.T) {
 	item := resp.Sessions[0]
 	assert.Equal(t, "sess-1", item.SessionID)
 	assert.Equal(t, "Test Exam", item.ExamTitle)
-	assert.InDelta(t, 82.5, item.ScorePct, 0.01)
+	require.NotNil(t, item.ScorePct)
+	assert.InDelta(t, 82.5, *item.ScorePct, 0.01)
 	assert.True(t, item.Passed)
 	assert.True(t, item.CertificateAvailable)
 	assert.Equal(t, int64(1200), *item.TimeTakenSeconds)

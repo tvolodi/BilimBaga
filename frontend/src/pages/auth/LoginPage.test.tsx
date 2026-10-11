@@ -42,6 +42,7 @@ function renderLoginFrom(from: string) {
           <Route path="/admin" element={<div>Admin Home</div>} />
           <Route path="/admin/departments" element={<div>Departments Page</div>} />
           <Route path="/portal/results" element={<div>Results Page</div>} />
+          <Route path="/portal/sessions/:sessionId/result" element={<div>Session Result Page</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -103,6 +104,15 @@ describe('LoginPage return path after a revoked session (AC-11)', () => {
     renderLoginFrom('/portal/results')
     submitCredentials()
     expect(await screen.findByText('Results Page')).toBeInTheDocument()
+  })
+
+  // FR-BB322 AC-10: a result mail opened while signed out returns to the session result page.
+  it('restores a session result path for an employee (result mail link)', async () => {
+    await i18n.changeLanguage('en')
+    mutateAsync.mockResolvedValueOnce({ user: { role: 'employee', force_password_change: false } })
+    renderLoginFrom('/portal/sessions/sess-1/result')
+    submitCredentials()
+    expect(await screen.findByText('Session Result Page')).toBeInTheDocument()
   })
 
   it('ignores a return target that is not an in-app path', async () => {

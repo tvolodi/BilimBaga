@@ -383,6 +383,9 @@ func (h *Handler) HandleGradeAnswer(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrCannotGradeOwnSession):
 			api.WriteError(w, http.StatusForbidden, "CANNOT_GRADE_OWN_SESSION",
 				"You cannot grade your own exam session.")
+		case errors.Is(err, ErrAnswerNotGradable):
+			api.WriteError(w, http.StatusUnprocessableEntity, "ANSWER_NOT_GRADABLE",
+				"Only short-text answers are graded by hand.")
 		case errors.Is(err, ErrSessionFinalised):
 			api.WriteError(w, http.StatusConflict, "SESSION_FINALISED",
 				"The session is final and this answer is already graded.")

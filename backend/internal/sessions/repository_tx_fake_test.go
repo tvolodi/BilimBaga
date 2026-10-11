@@ -208,10 +208,16 @@ func queueGradeLock(f *fakeDB, owner, status string, passed bool) {
 	f.queue([]string{"user_id", "status", "passed"}, [][]driver.Value{{owner, status, passed}})
 }
 
-// queueGradeRow queues the answer being graded: its status, maximum points, points, suggestion and flags.
+// queueGradeRow queues the answer being graded: its status, maximum points, points, suggestion, flags and the type of its
+// question (FR-BB42 AC-11, #565). The rows of these tests are short-text.
 func queueGradeRow(f *fakeDB, gradingStatus string, score float64, suggested any, flags any) {
-	f.queue([]string{"grading_status", "max_score", "score", "ai_suggested_score_pct", "ai_flags"},
-		[][]driver.Value{{gradingStatus, float64(10), score, suggested, flags}})
+	queueGradeRowOfType(f, gradingStatus, score, suggested, flags, "shorttext")
+}
+
+// queueGradeRowOfType is queueGradeRow for a question of the given type.
+func queueGradeRowOfType(f *fakeDB, gradingStatus string, score float64, suggested any, flags any, questionType string) {
+	f.queue([]string{"grading_status", "max_score", "score", "ai_suggested_score_pct", "ai_flags", "question_type"},
+		[][]driver.Value{{gradingStatus, float64(10), score, suggested, flags, questionType}})
 }
 
 func TestGradeAnswer_LastAnswerFinalisesSession(t *testing.T) {

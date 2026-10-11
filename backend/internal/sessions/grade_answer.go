@@ -19,6 +19,8 @@ var (
 	ErrCertificateIssued = errors.New("a certificate was issued for this session")
 	// ErrCannotGradeOwnSession: the acting user is the employee of the session, for every role (AC-21, 403).
 	ErrCannotGradeOwnSession = errors.New("the employee cannot grade their own session")
+	// ErrAnswerNotGradable: the row's question is not short-text, so manual grading does not apply (FR-BB42 AC-11, 422).
+	ErrAnswerNotGradable = errors.New("only short-text answers are graded by hand")
 )
 
 // gradeLockedSession is the session as read under its row lock, before any grading rule is applied.
@@ -35,6 +37,7 @@ type gradeRow struct {
 	Score         float64         `db:"score"`
 	Suggested     sql.NullFloat64 `db:"ai_suggested_score_pct"`
 	Flags         pq.StringArray  `db:"ai_flags"`
+	QuestionType  string          `db:"question_type"`
 }
 
 // GradeAnswer scores one short-text answer inside one transaction (FR-BB42 AC-7/AC-10; FR-BB73 AC-17 to AC-21). The
@@ -59,6 +62,11 @@ func (r *postgresRepository) GradeAnswer(ctx context.Context, sessionID, questio
 	row, err := readGradeRow(ctx, tx, sessionID, questionID)
 	if err != nil {
 		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
+	}
+	// FR-BB42 AC-11 (#565): manual grading is for short-text rows only. The check follows the row read and comes before
+	// the row rules, so a row of another type writes nothing.
+	if row.QuestionType != "shorttext" {
+		return nil, ErrAnswerNotGradable
 	}
 
 	final := sess.Status == "submitted" || sess.Status == "auto_submitted"
@@ -137,9 +145,10 @@ FOR UPDATE`
 // readGradeRow reads the answer being graded. The session lock is already held.
 func readGradeRow(ctx context.Context, tx *sqlx.Tx, sessionID, questionID string) (gradeRow, error) {
 	const q = `
-SELECT grading_status, max_score, score, ai_suggested_score_pct, ai_flags
-FROM session_question_scores
-WHERE session_id = $1 AND question_id = $2`
+SELECT sqs.grading_status, sqs.max_score, sqs.score, sqs.ai_suggested_score_pct, sqs.ai_flags, q.type AS question_type
+FROM session_question_scores sqs
+JOIN questions q ON q.id = sqs.question_id
+WHERE sqs.session_id = $1 AND sqs.question_id = $2`
 	var row gradeRow
 	if err := tx.GetContext(ctx, &row, q, sessionID, questionID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -52,6 +52,12 @@ if run 5 review --close; then rc=0; else rc=$?; fi
 [ "$rc" -ne 0 ] && ! grep -q "issue edit\|issue close" "$GH_LOG" \
   && check "--close requires done" ok || check "--close requires done" no
 
+# G (#518): done without --close still clears role:* in the same edit; it only records the status, it does not close.
+export GH_LABELS="$(printf 'role:dev\nstatus:review\nswarm')" GH_PR_STATE=OPEN
+run 5 done && logged "issue edit 5 --add-label status:done --remove-label status:review --remove-label role:dev" \
+  && ! grep -q "issue close" "$GH_LOG" \
+  && check "done without --close clears role:* in the same edit, no close" ok || check "done without --close clears role:* in the same edit, no close" no
+
 # F: tick-log appends one UTC-prefixed line to ticks.log.
 state=$t/state && mkdir -p "$state"
 SWARM_STATE_DIR="$state" bash "$here/bin/tick-log.sh" "dispatched 1; merged 0" >/dev/null

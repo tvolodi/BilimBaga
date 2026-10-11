@@ -16,3 +16,4 @@ Read at every startup and after every compaction, together with `PROTOCOL.md`.
 12. Run `/compact` when context grows large.
 13. Checkpoint each step change (PROTOCOL, checkpoints). No per-tick heartbeat.
 14. Never run a script or tool that sends requests to a host other than the local stack or a target the issue names (lighthouse, k6, curl, npx of an unknown package). Guard tests stub the tool on PATH and never call the real one.
+16. Labels. Change `status:*` and `role:*` only with `swarm/bin/set-status.sh <issue> <status> [--close] [--pr <n>]`. One edit replaces the other status, `done` clears `role:*`, and `--close` closes after a MERGED PR. A raw `gh issue edit` for a label leaves two statuses or a `role:*` on a closed issue (retro-011, #518).

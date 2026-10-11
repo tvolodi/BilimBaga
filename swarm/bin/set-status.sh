@@ -2,7 +2,8 @@
 # Set an issue's status label, and optionally close it (retro-010 decision 1).
 # Usage: set-status.sh <issue> <ready|in-progress|review|uat|blocked|done> [--close] [--pr <n>]
 #   One gh issue edit removes every other status:* label and adds the new one.
-#   --close requires status done, removes role:* in the same edit, then closes the issue.
+#   Status done removes role:* in the same edit (#518: closed issues carry no role, with or without --close).
+#   --close requires status done, then closes the issue.
 #   --pr <n> is only valid with --close: the close is refused unless gh pr view <n> reports MERGED.
 #   Without --pr, --close is a report-only close (no PR).
 # All checks run before any label is changed, so a refused close leaves the issue as it was.
@@ -52,7 +53,7 @@ while IFS= read -r label; do
   [ -n "$label" ] || continue
   case "$label" in
     status:*) [ "$label" = "status:$status" ] || status_rm+=("--remove-label" "$label") ;;
-    role:*) [ "$close" -eq 1 ] && role_rm+=("--remove-label" "$label") ;;
+    role:*) if [ "$close" -eq 1 ] || [ "$status" = done ]; then role_rm+=("--remove-label" "$label"); fi ;;
   esac
 done <<< "$labels"
 

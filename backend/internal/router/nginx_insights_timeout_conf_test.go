@@ -11,7 +11,8 @@ import (
 
 // #519: an insights answer waits for the provider for up to AI_TIMEOUT_SECONDS. Every hop that proxies the insights
 // path must wait longer than that: the container nginx and both edge vhosts. The location names the path with ^~, so it
-// wins over the /api/ location. deploy/nginx/bilimbaga-test.conf (customer demo, owner-only) is not covered here.
+// wins over the /api/ location. The demo vhost (customer demo, owner-protected) carries the same block, so a slow
+// provider call does not hit the edge's 60 s default.
 
 var (
 	insightsLocation = regexp.MustCompile(`location \^~ /api/v1/admin/ai/ \{([^}]*)\}`)
@@ -26,6 +27,7 @@ func TestNginx_InsightsLocationWaitsLongerThanTheLargestAITimeout(t *testing.T) 
 		"../../../deploy/nginx.conf",
 		"../../../deploy/nginx/bilimbaga.conf",
 		"../../../deploy/nginx/bilimbaga-qa.conf",
+		"../../../deploy/nginx/bilimbaga-test.conf",
 	} {
 		raw, err := os.ReadFile(path)
 		if err != nil {

@@ -9,10 +9,11 @@ import (
 // #519: AI_TIMEOUT_SECONDS bounds one provider call. Its largest accepted value plus 30 s must fit under the nginx
 // insights location, which the router guard test checks.
 
-func TestAI_TimeoutDefaultsTo120Seconds(t *testing.T) {
+// The default is 90 s: behind Cloudflare a response is cut at 100 s with a 524 (architect fix list, #519).
+func TestAI_TimeoutDefaultsTo90Seconds(t *testing.T) {
 	ai, err := loadAI(t, map[string]string{"ANTHROPIC_API_KEY": testAnthropicKey})
-	if err != nil || ai.Timeout != 120*time.Second {
-		t.Fatalf("default timeout want 120s, got %v err=%v", ai.Timeout, err)
+	if err != nil || ai.Timeout != 90*time.Second {
+		t.Fatalf("default timeout want 90s, got %v err=%v", ai.Timeout, err)
 	}
 }
 

@@ -231,16 +231,19 @@ func serve() {
 	portalSvc := portal.NewService(portalRepo)
 	portalHandler := portal.NewHandler(portalSvc)
 
-	// AI provider (FR-BB71, #232): one client for insights, question generation and AI grading. With no usable
-	// key it is off: one warning names the variables, and the AI routes answer 503 AI_UNAVAILABLE.
+	// AI provider (FR-BB71, #232): one client for insights, question generation and the loyalty narrative, timed by
+	// AI_TIMEOUT_SECONDS (#519). With no usable key it is off: one warning names the variables, and the AI routes answer
+	// 503 AI_UNAVAILABLE.
 	aiClient := ai.NewProviderClient(cfg.AI.Provider, cfg.AI.BaseURL, cfg.AI.APIKey, slogger, ai.WithTimeout(cfg.AI.Timeout))
+	// Grading has its own client at its own timeout: it calls the provider inside the submit transaction (#519).
+	gradingClient := ai.NewProviderClient(cfg.AI.Provider, cfg.AI.BaseURL, cfg.AI.APIKey, slogger, ai.WithTimeout(ai.GradingClientTimeout))
 	logAIStatus(slogger, cfg.AI)
 
 	// Wire up session creation (FR-BB35).
 	// With an AI provider, use AI-backed grading for short-text questions (FR-BB73).
 	var gradingEngine sessions.GradingEngine
 	if cfg.AI.Provider != "" {
-		gradingEngine = sessions.NewAIGradingEngine(aiClient, cfg.AI.Model, db, slogger)
+		gradingEngine = sessions.NewAIGradingEngine(gradingClient, cfg.AI.Model, db, slogger)
 	} else {
 		gradingEngine = sessions.NewGradingEngine()
 	}

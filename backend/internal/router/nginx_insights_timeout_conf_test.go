@@ -14,7 +14,7 @@ import (
 // wins over the /api/ location. deploy/nginx/bilimbaga-test.conf (customer demo, owner-only) is not covered here.
 
 var (
-	insightsLocation = regexp.MustCompile(`location \^~ /api/v1/admin/ai/insights/ \{([^}]*)\}`)
+	insightsLocation = regexp.MustCompile(`location \^~ /api/v1/admin/ai/ \{([^}]*)\}`)
 	insightsTimeout  = regexp.MustCompile(`proxy_read_timeout\s+(\d+)s;`)
 	insightsProxy    = regexp.MustCompile(`proxy_pass\s+http://`)
 	insightsClearTCI = regexp.MustCompile(`proxy_set_header\s+True-Client-IP\s+"";`)
@@ -33,7 +33,7 @@ func TestNginx_InsightsLocationWaitsLongerThanTheLargestAITimeout(t *testing.T) 
 		}
 		m := insightsLocation.FindSubmatch(raw)
 		if m == nil {
-			t.Errorf("%s: no `location ^~ /api/v1/admin/ai/insights/` block", path)
+			t.Errorf("%s: no `location ^~ /api/v1/admin/ai/` block", path)
 			continue
 		}
 		body := string(m[1])

@@ -29,7 +29,11 @@ type httpAnthropicClient struct {
 
 // DefaultClientTimeout is the whole-request timeout of a provider client when no WithTimeout option sets one. It is the
 // default of AI_TIMEOUT_SECONDS (config.DefaultAITimeoutSeconds, #519).
-const DefaultClientTimeout = 120 * time.Second
+const DefaultClientTimeout = 90 * time.Second
+
+// GradingClientTimeout is the timeout of the grading client (#519). Grading calls the provider once per short-text answer
+// inside the submit transaction, so it keeps the 60 s it had before AI_TIMEOUT_SECONDS existed.
+const GradingClientTimeout = 60 * time.Second
 
 // ClientOption tunes a provider client.
 type ClientOption func(*http.Client)

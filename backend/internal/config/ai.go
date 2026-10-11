@@ -23,10 +23,11 @@ const (
 	DefaultXAIModel = "grok-4.7"
 )
 
-// AI request timeout (AI_TIMEOUT_SECONDS, #519). An insights answer waits for the provider for up to this long. The
-// container nginx and both edge vhosts wait MaxAITimeoutSeconds + 30 s on the insights location (router guard test).
+// AI request timeout (AI_TIMEOUT_SECONDS, #519). An AI route waits for the provider for up to this long. The container
+// nginx and both edge vhosts wait MaxAITimeoutSeconds + 30 s on the /api/v1/admin/ai/ location (router guard test). The
+// default is 90 s: behind Cloudflare a response is cut at 100 s with a 524.
 const (
-	DefaultAITimeoutSeconds = 120
+	DefaultAITimeoutSeconds = 90
 	MaxAITimeoutSeconds     = 150
 	minAITimeoutSeconds     = 10
 )

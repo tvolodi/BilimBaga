@@ -25,11 +25,11 @@ type jobDeps struct {
 	processOne   func(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession) error
 }
 
-func defaultJobDeps(engine GradingEngine, onGradingPending func(sessionID string)) jobDeps {
+func defaultJobDeps(engine GradingEngine, onGradingPending, onFinal func(sessionID string)) jobDeps {
 	return jobDeps{
 		queryExpired: queryExpiredSessions,
 		processOne: func(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession) error {
-			return processOneExpiredSession(ctx, db, logger, sess, engine, onGradingPending)
+			return processOneExpiredSession(ctx, db, logger, sess, engine, onGradingPending, onFinal)
 		},
 	}
 }
@@ -38,10 +38,12 @@ func defaultJobDeps(engine GradingEngine, onGradingPending func(sessionID string
 // expires_at has passed, auto-submits them, grades them, and writes audit log
 // entries. It shuts down when ctx is cancelled (AC-6).
 // onGradingPending is called after the commit of a session that moved to grading_pending (FR-BB322 AC-9); it may be nil.
+// onFinal is called after the commit of a session that became final at once, with no short-text answer (FR-BB322 AC-15);
+// it may be nil.
 //
-// Call as: go AutoSubmitJob(ctx, db, logger, engine, onGradingPending)
-func AutoSubmitJob(ctx context.Context, db *sqlx.DB, logger *slog.Logger, engine GradingEngine, onGradingPending func(sessionID string)) {
-	autoSubmitJobWithDeps(ctx, db, logger, defaultJobDeps(engine, onGradingPending))
+// Call as: go AutoSubmitJob(ctx, db, logger, engine, onGradingPending, onFinal)
+func AutoSubmitJob(ctx context.Context, db *sqlx.DB, logger *slog.Logger, engine GradingEngine, onGradingPending, onFinal func(sessionID string)) {
+	autoSubmitJobWithDeps(ctx, db, logger, defaultJobDeps(engine, onGradingPending, onFinal))
 }
 
 func autoSubmitJobWithDeps(ctx context.Context, db *sqlx.DB, logger *slog.Logger, deps jobDeps) {
@@ -137,7 +139,7 @@ FOR UPDATE SKIP LOCKED`
 
 // processOneExpiredSession runs the full auto-submit lifecycle for a single
 // session inside its own transaction (AC-8: one tx per session).
-func processOneExpiredSession(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession, engine GradingEngine, onGradingPending func(sessionID string)) error {
+func processOneExpiredSession(ctx context.Context, db *sqlx.DB, logger *slog.Logger, sess expiredSession, engine GradingEngine, onGradingPending, onFinal func(sessionID string)) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -201,8 +203,12 @@ VALUES ('public', NULL, 'session.auto_submit', 'exam_session', $1, '', $2::jsonb
 		return err
 	}
 	// FR-BB322 AC-9: the exam_submitted mail goes out once, after the commit that moved the session to grading_pending.
-	if hasShortText && onGradingPending != nil {
+	// AC-15: a session with no short-text answer is final at once, so its result mail goes out after the same commit.
+	switch {
+	case hasShortText && onGradingPending != nil:
 		onGradingPending(sess.ID)
+	case !hasShortText && onFinal != nil:
+		onFinal(sess.ID)
 	}
 	return nil
 }

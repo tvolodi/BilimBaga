@@ -98,8 +98,8 @@ func TestGradingPending_ExpiredShortTextSendsOneMail(t *testing.T) {
 	logger := slog.Default()
 	engine := NewGradingEngine()
 
-	require.NoError(t, processOneExpiredSession(ctx, db, logger, sess, engine, rec.TriggerExamSubmitted))
-	require.NoError(t, processOneExpiredSession(ctx, db, logger, sess, engine, rec.TriggerExamSubmitted), "a second run finds nothing to do")
+	require.NoError(t, processOneExpiredSession(ctx, db, logger, sess, engine, rec.TriggerExamSubmitted, rec.TriggerSessionResult))
+	require.NoError(t, processOneExpiredSession(ctx, db, logger, sess, engine, rec.TriggerExamSubmitted, rec.TriggerSessionResult), "a second run finds nothing to do")
 
 	assert.Equal(t, []string{sessionID}, rec.submitted)
 	status, _, _ := readAIGradeSession(t, db, sessionID)
@@ -113,9 +113,29 @@ func TestGradingPending_ExpiredWithoutShortTextSendsNoMail(t *testing.T) {
 	rec := &mailRecorder{}
 	sess := expiredSession{ID: sessionID, ExamID: examID, UserID: userID, ExpiresAt: time.Now().Add(-time.Hour)}
 
-	require.NoError(t, processOneExpiredSession(context.Background(), db, slog.Default(), sess, NewGradingEngine(), rec.TriggerExamSubmitted))
+	require.NoError(t, processOneExpiredSession(context.Background(), db, slog.Default(), sess, NewGradingEngine(), rec.TriggerExamSubmitted, rec.TriggerSessionResult))
 
 	assert.Empty(t, rec.submitted)
+	status, _, _ := readAIGradeSession(t, db, sessionID)
+	assert.Equal(t, "auto_submitted", status)
+}
+
+// FR-BB322 AC-15: an expired session with no short-text answer is final at once. The expiry job sends its result mail
+// once, and a second run of the job sends nothing more.
+func TestGradingPending_ExpiredFinalSendsResultMailOnce(t *testing.T) {
+	db := newAIGradePGDB(t)
+	sessionID, examID, userID, _ := seedInProgressSession(t, db, 0, "-1 hour")
+	rec := &mailRecorder{}
+	sess := expiredSession{ID: sessionID, ExamID: examID, UserID: userID, ExpiresAt: time.Now().Add(-time.Hour)}
+	ctx := context.Background()
+	logger := slog.Default()
+	engine := NewGradingEngine()
+
+	require.NoError(t, processOneExpiredSession(ctx, db, logger, sess, engine, rec.TriggerExamSubmitted, rec.TriggerSessionResult))
+	require.NoError(t, processOneExpiredSession(ctx, db, logger, sess, engine, rec.TriggerExamSubmitted, rec.TriggerSessionResult), "a second run finds nothing to do")
+
+	assert.Equal(t, []string{sessionID}, rec.results, "one result mail, sent by the call that made the session final")
+	assert.Empty(t, rec.submitted, "a final session never gets exam_submitted")
 	status, _, _ := readAIGradeSession(t, db, sessionID)
 	assert.Equal(t, "auto_submitted", status)
 }

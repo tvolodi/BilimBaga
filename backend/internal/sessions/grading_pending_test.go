@@ -227,6 +227,91 @@ func TestReportEvent_AutoSubmitReplayResendsNoMail(t *testing.T) {
 	assert.Empty(t, mailer.submitted, "Transitioned is false on a replay")
 }
 
+// FR-BB322 AC-15: an automatic submit that is final at once sends one result mail, pass or fail, on the transition.
+func TestReportEvent_AutoSubmitFinalSendsResultMailOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		passed bool
+	}{{"pass", true}, {"fail", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixNow(t, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+			mailer := &mailRecorder{}
+			score := 40.0
+			passed := tc.passed
+			repo := &mockRepo{
+				getSessionForUserFn: func(_ context.Context, _, userID string) (*sessionStateRow, error) {
+					return activeSession(userID), nil
+				},
+				getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
+					cfg := defaultConfig()
+					cfg.OnTabSwitch = "submit"
+					return cfg, nil
+				},
+				autoSubmitSessionFn: func(_ context.Context, sessionID string) (*autoSubmitResult, error) {
+					return &autoSubmitResult{SessionID: sessionID, Status: "auto_submitted", ScorePct: &score, Passed: &passed, Transitioned: true}, nil
+				},
+			}
+			resp, err := NewService(repo, WithResultMailer(mailer)).ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: "tab_switch"})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"sess-1"}, mailer.results)
+			assert.Empty(t, mailer.submitted, "a final session never gets exam_submitted")
+			require.NotNil(t, resp.Status)
+			assert.Equal(t, "auto_submitted", *resp.Status)
+			require.NotNil(t, resp.Passed, "a final session shows its result, unlike a waiting one (AC-13)")
+			assert.Equal(t, tc.passed, *resp.Passed)
+		})
+	}
+}
+
+// FR-BB322 AC-15: an automatic submit of a session that is already final sends nothing.
+func TestReportEvent_AutoSubmitOfFinalSessionSendsNoResultMail(t *testing.T) {
+	fixNow(t, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+	mailer := &mailRecorder{}
+	score := 40.0
+	passed := true
+	repo := &mockRepo{
+		getSessionForUserFn: func(_ context.Context, _, userID string) (*sessionStateRow, error) {
+			return activeSession(userID), nil
+		},
+		getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
+			cfg := defaultConfig()
+			cfg.OnTabSwitch = "submit"
+			return cfg, nil
+		},
+		autoSubmitSessionFn: func(_ context.Context, sessionID string) (*autoSubmitResult, error) {
+			return &autoSubmitResult{SessionID: sessionID, Status: "submitted", ScorePct: &score, Passed: &passed}, nil
+		},
+	}
+	_, err := NewService(repo, WithResultMailer(mailer)).ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: "tab_switch"})
+	require.NoError(t, err)
+	assert.Empty(t, mailer.results, "Transitioned is false, so the result mail was sent by the manual submit")
+	assert.Empty(t, mailer.submitted)
+}
+
+// FR-BB322 AC-15: with no result mailer (SMTP off) an automatic submit that is final still answers and does not fail.
+func TestReportEvent_AutoSubmitFinalWithoutMailerDoesNotFail(t *testing.T) {
+	fixNow(t, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+	score := 40.0
+	passed := false
+	repo := &mockRepo{
+		getSessionForUserFn: func(_ context.Context, _, userID string) (*sessionStateRow, error) {
+			return activeSession(userID), nil
+		},
+		getExamConfigFn: func(_ context.Context, _ string) (*examConfig, error) {
+			cfg := defaultConfig()
+			cfg.OnTabSwitch = "submit"
+			return cfg, nil
+		},
+		autoSubmitSessionFn: func(_ context.Context, sessionID string) (*autoSubmitResult, error) {
+			return &autoSubmitResult{SessionID: sessionID, Status: "auto_submitted", ScorePct: &score, Passed: &passed, Transitioned: true}, nil
+		},
+	}
+	resp, err := NewService(repo).ReportEvent(context.Background(), "sess-1", "user-1", ReportEventInput{Type: "tab_switch"})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Status)
+	assert.Equal(t, "auto_submitted", *resp.Status)
+}
+
 // ── FR-BB322 AC-4/AC-13: the result of a waiting session ────────────────────
 
 // waitingRow is a session that is waiting for grading and carries a stored partial score and pass.
@@ -362,4 +447,44 @@ func TestGetSessionResult_PendingQuestionHidesAnswerForEmployee(t *testing.T) {
 	assert.Equal(t, "graded", items[1].GradingStatus)
 	assert.Equal(t, []string{"Answer B"}, items[1].CorrectAnswer, "graded questions render as before")
 	assert.Equal(t, &explanation, items[1].Explanation)
+}
+
+// FR-BB322 AC-8: while a session waits, a graded question shows its points under show_answers_mode, and a 'never'
+// session shows no breakdown at all. The waiting session shows no percent or pass either way (AC-13).
+func TestGetSessionResult_PendingGradedPointsFollowShowAnswersMode(t *testing.T) {
+	score := 50.0
+	now := time.Now().UTC()
+	for _, tc := range []struct {
+		mode      string
+		breakdown bool
+	}{{"after_completion", true}, {"never", false}} {
+		t.Run(tc.mode, func(t *testing.T) {
+			repo := &mockRepo{
+				getSessionResultFn: func(_ context.Context, _, _ string) (*sessionResultRow, error) {
+					return &sessionResultRow{SessionID: "sess-1", ExamID: "exam-1", ExamTitle: "T", UserID: "user-1",
+						Status: "grading_pending", ScorePct: &score, ShowAnswersMode: tc.mode, AttemptNumber: 1, SubmittedAt: &now}, nil
+				},
+				getQuestionBreakdownFn: func(_ context.Context, _, _ string) ([]questionBreakdownRow, error) {
+					return []questionBreakdownRow{
+						{QuestionID: "q-1", Stem: "Open", GradingStatus: "pending_manual", MaxPoints: 2},
+						{QuestionID: "q-2", Stem: "Closed", GradingStatus: "graded", PointsEarned: 1, MaxPoints: 1},
+					}, nil
+				},
+			}
+			resp, err := NewService(repo).GetSessionResult(context.Background(), "sess-1", "user-1")
+			require.NoError(t, err)
+			assert.Nil(t, resp.ScorePct, "no percent while the session waits (AC-13)")
+			assert.False(t, resp.Passed, "no pass while the session waits (AC-13)")
+			if !tc.breakdown {
+				assert.Nil(t, resp.PerQuestionBreakdown, "show_answers_mode=never hides the points of graded questions")
+				return
+			}
+			require.NotNil(t, resp.PerQuestionBreakdown)
+			items := *resp.PerQuestionBreakdown
+			require.Len(t, items, 2)
+			assert.Equal(t, "graded", items[1].GradingStatus)
+			assert.EqualValues(t, 1, items[1].PointsEarned, "graded points follow show_answers_mode != never")
+			assert.EqualValues(t, 1, items[1].MaxPoints)
+		})
+	}
 }

@@ -248,8 +248,9 @@ func serve() {
 	sessionsHandler := sessions.NewHandler(sessionsSvc)
 
 	// Start FR-BB310 auto-submit background job.
-	// FR-BB322 AC-9: the expiry job sends exam_submitted when it moves a session to grading_pending.
-	go sessions.AutoSubmitJob(appCtx, db, slogger, gradingEngine, emailSvc.TriggerExamSubmitted)
+	// FR-BB322 AC-9: the expiry job sends exam_submitted when it moves a session to grading_pending. AC-15: it sends the
+	// result mail when it makes a session without short-text answers final.
+	go sessions.AutoSubmitJob(appCtx, db, slogger, gradingEngine, emailSvc.TriggerExamSubmitted, emailSvc.TriggerSessionResult)
 
 	// Start the AI grading job (FR-BB73, #528) only with a provider and a non-zero daily cap.
 	if cfg.AI.Provider != "" && cfg.AIGradingDailyLimit != 0 {

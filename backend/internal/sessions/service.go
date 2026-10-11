@@ -628,6 +628,10 @@ func (s *service) ReportEvent(ctx context.Context, sessionID, userID string, inp
 				s.mailer.TriggerExamSubmitted(sid)
 			}
 		}
+		// FR-BB322 AC-15: an automatic submit that is final at once sends the result mail, on the call that moved it.
+		if result.Status == "auto_submitted" && result.Transitioned && s.mailer != nil {
+			s.mailer.TriggerSessionResult(sid)
+		}
 		return &ReportEventResponse{
 			Warn:      false,
 			SessionID: &sid,

@@ -108,3 +108,16 @@ Target: local | qa (default: local; never the production-class demo instance, se
 
 - Delete the test sessions created in Exam A and Exam B, or leave them for the next UAT run if the runner keeps the test data.
 - Do not leave `AI_GRADING_DAILY_LIMIT` above 0 on a shared stack after Scenario 2.
+
+---
+
+## Scenario 8: Automatic submit without a short-text answer — one result mail
+
+**Preconditions:** Exam C, "Fire safety (auto-submit)": active, assigned to the employee, `max_attempts = 3`, single-choice questions only, time limit 2 minutes, "on tab switch" set to `submit`. The mail log (`email_log`) can be read by the UAT runner.
+
+| Step | Actor | Action | Expected Outcome | Pass/Fail |
+|------|-------|--------|-----------------|-----------|
+| 1 | Employee | Start Exam C, answer one question, switch to another browser tab and back | The session ends by automatic submit and cannot be continued | |
+| 2 | Admin | Read `email_log` for the employee's address | Exactly one entry for that session: `exam_passed` or `exam_failed` according to the score; no `exam_submitted`; the link is `{PUBLIC_APP_URL}/portal/sessions/<session id>/result` | |
+| 3 | Employee | Start Exam C again and leave it untouched until the 2-minute limit passes | The expiry job submits the session within about one minute after the deadline (status `auto_submitted`) | |
+| 4 | Admin | Read `email_log` after about two more expiry-job runs (2 minutes) | Exactly one result mail for the expired session, and no duplicate | |

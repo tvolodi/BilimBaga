@@ -6,7 +6,7 @@
 | ID | FR-BB42 |
 | Phase | 4 — Results & Certificates |
 | Priority | 1 |
-| Status | uat-verified |
+| Status | uat-verified; amended 2026-10-11 (#559: AC-11 manual grading is for short-text rows only) |
 | Depends On | FR-BB39, FR-BB311 |
 
 ## Scope
@@ -32,6 +32,7 @@ Provides the backend API for reviewing and scoring short-text answers that requi
 - [ ] AC-8: Each grade submission writes an audit log entry: `action = 'answer.grade'`, `entity_type = 'session_answer'`, `entity_id = question_id`, metadata includes `grader_id`, `session_id`, `score_pct`.
 - [ ] AC-9: `GET /admin/grading`, `GET /admin/grading/:sessionId`, and `POST /admin/grading/:sessionId/answers/:questionId` require the `grading:read` or `grading:write` permission respectively. Roles `examiner`, `department_admin`, and `super_admin` hold these permissions. Employees receive HTTP 403.
 - [ ] AC-10: `graded_by`, `graded_at`, and `manual_feedback` are persisted on `session_question_scores` for every scored short-text answer.
+- [ ] AC-11: Manual grading is for short-text rows only (#559). `POST /admin/grading/:sessionId/answers/:questionId` accepts only a row whose question has `type = 'shorttext'`; for any other row of the session (multiple choice, true/false, and any other auto-graded type) it answers 422 `ANSWER_NOT_GRADABLE` and writes nothing. The 422 is chosen because the request can never succeed for that question (a property of the question, not of the session state), and the code is not `VALIDATION_ERROR` because no body field is wrong. An examiner override of an auto-graded answer is not intended: the answer key is corrected in the question bank (a new question version), not per session. If the owner later wants a per-session override of auto-graded answers it is a separate requirement with its own audit action. The check runs in the grading transaction after the self-grading rule (FR-BB73 AC-21) and the row read (404 for an unknown row), and before the row-status rules of FR-BB73 AC-19. The type is read with a join on `questions` (the row read of `readGradeRow` covers `session_question_scores` only). Tests: a multiple-choice row of a `grading_pending` session answers 422 and its `score` and `grading_status` stay unchanged; a short-text row of the same session is graded; the grading detail (AC-4) still lists short-text rows only.
 
 ## Technical Specification
 

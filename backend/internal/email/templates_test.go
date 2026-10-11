@@ -25,9 +25,9 @@ func TestRenderTemplate_AllTemplates(t *testing.T) {
 		{
 			name: "exam_passed",
 			data: map[string]any{
-				"ExamTitle":        "Go Fundamentals",
-				"ScorePct":         "90.0",
-				"CertDownloadLink": "http://localhost/portal/sessions/test-id/certificate",
+				"ExamTitle":  "Go Fundamentals",
+				"ScorePct":   "90.0",
+				"ResultLink": "http://localhost/portal/sessions/test-id/result",
 			},
 		},
 		{
@@ -37,6 +37,15 @@ func TestRenderTemplate_AllTemplates(t *testing.T) {
 				"ScorePct":          "40.0",
 				"PassingScorePct":   "60.0",
 				"AttemptsRemaining": 2,
+				"ResultLink":        "http://localhost/portal/sessions/test-id/result",
+			},
+		},
+		{
+			name: "exam_submitted",
+			data: map[string]any{
+				"ExamTitle":   "Go Fundamentals",
+				"SubmittedAt": "2026-10-11 09:00 UTC",
+				"ResultLink":  "http://localhost/portal/sessions/test-id/result",
 			},
 		},
 		{

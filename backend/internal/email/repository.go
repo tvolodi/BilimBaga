@@ -36,6 +36,8 @@ type SessionEmailData struct {
 	AttemptNumber   int
 	Passed          bool
 	SessionID       string
+	// SubmittedAt is nil for a session that was never submitted (FR-BB322 AC-9).
+	SubmittedAt *time.Time
 }
 
 // Repository defines the data access contract for the email package.
@@ -76,15 +78,16 @@ type userEmailRow struct {
 
 // internal scan struct for session result rows
 type sessionEmailRow struct {
-	UserEmail       string  `db:"user_email"`
-	UserLocale      string  `db:"user_locale"`
-	ExamTitle       string  `db:"exam_title"`
-	ScorePct        float64 `db:"score_pct"`
-	PassingScorePct float64 `db:"passing_score_pct"`
-	MaxAttempts     int     `db:"max_attempts"`
-	AttemptNumber   int     `db:"attempt_number"`
-	Passed          bool    `db:"passed"`
-	SessionID       string  `db:"session_id"`
+	UserEmail       string     `db:"user_email"`
+	UserLocale      string     `db:"user_locale"`
+	ExamTitle       string     `db:"exam_title"`
+	ScorePct        float64    `db:"score_pct"`
+	PassingScorePct float64    `db:"passing_score_pct"`
+	MaxAttempts     int        `db:"max_attempts"`
+	AttemptNumber   int        `db:"attempt_number"`
+	Passed          bool       `db:"passed"`
+	SessionID       string     `db:"session_id"`
+	SubmittedAt     *time.Time `db:"submitted_at"`
 }
 
 // internal scan struct for reminder rows
@@ -219,6 +222,7 @@ func (r *postgresRepository) GetSessionEmailData(ctx context.Context, sessionID 
 			 WHERE es2.exam_id = es.exam_id
 			   AND es2.user_id = es.user_id
 			   AND es2.started_at <= es.started_at)::int                    AS attempt_number
+		, es.submitted_at AS submitted_at
 		FROM exam_sessions es
 		JOIN users u ON u.id = es.user_id
 		JOIN exams e ON e.id = es.exam_id
@@ -238,6 +242,7 @@ func (r *postgresRepository) GetSessionEmailData(ctx context.Context, sessionID 
 		AttemptNumber:   row.AttemptNumber,
 		Passed:          row.Passed,
 		SessionID:       row.SessionID,
+		SubmittedAt:     row.SubmittedAt,
 	}, nil
 }
 

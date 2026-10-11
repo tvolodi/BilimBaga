@@ -49,6 +49,9 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrExamOutsideWindow):
 			api.WriteError(w, http.StatusUnprocessableEntity, "EXAM_OUTSIDE_WINDOW",
 				"This exam is not available at this time.")
+		case errors.Is(err, ErrGradingPending):
+			api.WriteError(w, http.StatusConflict, "GRADING_PENDING",
+				"Your previous attempt is still being graded. You can start a new attempt when its result is ready.")
 		case errors.Is(err, ErrAttemptsExhausted):
 			api.WriteError(w, http.StatusUnprocessableEntity, "ATTEMPTS_EXHAUSTED",
 				"You have used all allowed attempts for this exam.")

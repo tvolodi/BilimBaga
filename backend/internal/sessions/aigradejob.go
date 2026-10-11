@@ -123,21 +123,40 @@ WHERE feature = $1 AND created_at > NOW() - INTERVAL '24 hours'`
 
 // selectAIGradeCandidates returns up to limit pending short-text answers of submitted sessions (last 24 h) whose
 // question is auto-graded, has a model answer, and whose answer text is not null, with fewer than aiGradeMaxAttempts.
-func selectAIGradeCandidates(ctx context.Context, db *sqlx.DB, limit int) ([]aiGradeCandidate, error) {
-	const q = `
-SELECT sqs.session_id, sqs.question_id, sqs.ai_grade_attempts, sqs.max_score,
-       q.model_answer, sa.text_answer
+// aiGradeFromSQL joins the answers the AI job may grade with their session, question and answer.
+const aiGradeFromSQL = `
 FROM session_question_scores sqs
 JOIN exam_sessions es ON es.id = sqs.session_id
 JOIN questions q ON q.id = sqs.question_id
-JOIN session_answers sa ON sa.session_id = sqs.session_id AND sa.question_id = sqs.question_id
-WHERE sqs.grading_status = 'pending_manual'
+JOIN session_answers sa ON sa.session_id = sqs.session_id AND sa.question_id = sqs.question_id`
+
+// aiGradeEligibleSQL is the predicate of an answer the AI job may grade (FR-BB322 AC-4). Its parameter $1 is the
+// attempt cap. The job's batch query and the result service's grading_expected_by both use it, so they cannot drift.
+const aiGradeEligibleSQL = `
+  sqs.grading_status = 'pending_manual'
   AND sqs.ai_grade_attempts < $1
   AND q.type = 'shorttext'
   AND q.auto_grade
   AND q.model_answer IS NOT NULL AND btrim(q.model_answer) <> ''
   AND sa.text_answer IS NOT NULL
-  AND es.submitted_at > NOW() - INTERVAL '24 hours'
+  AND es.submitted_at > NOW() - INTERVAL '24 hours'`
+
+// countAIEligibleAnswers counts a session's answers that the AI job may grade now (FR-BB322 AC-4).
+func countAIEligibleAnswers(ctx context.Context, db *sqlx.DB, sessionID string) (int, error) {
+	q := `SELECT COUNT(*)` + aiGradeFromSQL + `
+WHERE sqs.session_id = $2 AND` + aiGradeEligibleSQL
+	var n int
+	if err := db.GetContext(ctx, &n, q, aiGradeMaxAttempts, sessionID); err != nil {
+		return 0, fmt.Errorf("count eligible answers: %w", err)
+	}
+	return n, nil
+}
+
+func selectAIGradeCandidates(ctx context.Context, db *sqlx.DB, limit int) ([]aiGradeCandidate, error) {
+	q := `
+SELECT sqs.session_id, sqs.question_id, sqs.ai_grade_attempts, sqs.max_score,
+       q.model_answer, sa.text_answer` + aiGradeFromSQL + `
+WHERE` + aiGradeEligibleSQL + `
 ORDER BY es.submitted_at
 LIMIT $2`
 

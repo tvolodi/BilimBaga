@@ -58,6 +58,27 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Actions handles GET /api/v1/audit/actions (FR-BB55 AC-2, #557).
+// Returns the distinct action codes and entity types of the tenant's audit log, for the filter options.
+func (h *Handler) Actions(w http.ResponseWriter, r *http.Request) {
+	tenantID := ctxkeys.TenantIDFromCtx(r.Context())
+	if tenantID == "" {
+		api.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing tenant context")
+		return
+	}
+
+	opts, err := h.svc.FilterOptions(r.Context(), tenantID)
+	if err != nil {
+		api.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list audit filter options")
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"data":  opts,
+		"error": nil,
+	})
+}
+
 // Export handles GET /api/v1/audit/export.
 // Returns the filtered audit log as a CSV file with columns matching AC-8:
 // timestamp, actor_id, actor_name, action, entity_type, entity_id, ip_address, metadata_json.

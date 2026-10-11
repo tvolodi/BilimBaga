@@ -11,6 +11,8 @@ import (
 type Service interface {
 	List(ctx context.Context, tenantID string, filters AuditFilters, page, perPage int) ([]AuditEntry, int, error)
 	Export(ctx context.Context, tenantID string, filters AuditFilters) ([]AuditEntry, error)
+	// FilterOptions returns the action codes and entity types the tenant's audit log holds (#557).
+	FilterOptions(ctx context.Context, tenantID string) (AuditFilterOptions, error)
 }
 
 type service struct {
@@ -47,4 +49,13 @@ func (s *service) Export(ctx context.Context, tenantID string, filters AuditFilt
 		return nil, fmt.Errorf("audit.Service.Export: %w", err)
 	}
 	return entries, nil
+}
+
+// FilterOptions returns the distinct action codes and entity types of the tenant's audit log (#557).
+func (s *service) FilterOptions(ctx context.Context, tenantID string) (AuditFilterOptions, error) {
+	opts, err := ListFilterOptions(ctx, s.db, tenantID)
+	if err != nil {
+		return AuditFilterOptions{}, fmt.Errorf("audit.Service.FilterOptions: %w", err)
+	}
+	return opts, nil
 }

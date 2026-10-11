@@ -17,8 +17,16 @@ import (
 
 // mockService is a test double for audit.Service.
 type mockService struct {
-	listFn   func(ctx context.Context, tenantID string, filters audit.AuditFilters, page, perPage int) ([]audit.AuditEntry, int, error)
-	exportFn func(ctx context.Context, tenantID string, filters audit.AuditFilters) ([]audit.AuditEntry, error)
+	listFn    func(ctx context.Context, tenantID string, filters audit.AuditFilters, page, perPage int) ([]audit.AuditEntry, int, error)
+	exportFn  func(ctx context.Context, tenantID string, filters audit.AuditFilters) ([]audit.AuditEntry, error)
+	optionsFn func(ctx context.Context, tenantID string) (audit.AuditFilterOptions, error)
+}
+
+func (m *mockService) FilterOptions(ctx context.Context, tenantID string) (audit.AuditFilterOptions, error) {
+	if m.optionsFn != nil {
+		return m.optionsFn(ctx, tenantID)
+	}
+	return audit.AuditFilterOptions{}, nil
 }
 
 func (m *mockService) List(ctx context.Context, tenantID string, filters audit.AuditFilters, page, perPage int) ([]audit.AuditEntry, int, error) {

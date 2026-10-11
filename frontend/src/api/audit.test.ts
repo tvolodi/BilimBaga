@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { downloadFile } from '@/api/download'
-import { useAuditLog, exportAuditLog, type AuditFilters } from './audit'
+import { useAuditLog, useAuditFilterOptions, exportAuditLog, type AuditFilters } from './audit'
 
 vi.mock('@/api/download', () => ({ downloadFile: vi.fn(async () => undefined) }))
 
@@ -92,5 +92,30 @@ describe('exportAuditLog', () => {
     const { qc } = makeWrapper()
 
     await expect(exportAuditLog(qc, { from: '2026-01-01' })).rejects.toThrow('export too large')
+  })
+})
+
+describe('useAuditFilterOptions', () => {
+  it('requests the tenant options from /audit/actions with the access token, kept for five minutes', async () => {
+    const fetchMock = okFetch({ actions: ['exam.create'], entity_types: ['exam'] })
+    vi.stubGlobal('fetch', fetchMock)
+    const { qc, wrapper } = makeWrapper('tok-3')
+
+    const { result } = renderHook(() => useAuditFilterOptions(), { wrapper })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/audit/actions')
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-3')
+    expect(result.current.data).toEqual({ actions: ['exam.create'], entity_types: ['exam'] })
+    expect(qc.getQueryCache().find({ queryKey: ['audit-filter-options'] })?.options).toMatchObject({ staleTime: 5 * 60 * 1000 })
+  })
+
+  it('reports a failed request, so the filter bar can show its inline error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
+    const { wrapper } = makeWrapper()
+
+    const { result } = renderHook(() => useAuditFilterOptions(), { wrapper })
+    await waitFor(() => expect(result.current.isError).toBe(true))
   })
 })

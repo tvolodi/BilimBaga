@@ -3,18 +3,24 @@ import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
-import { AUDIT_ACTIONS, type AuditFilters } from '@/api/audit'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useAuditFilterOptions, type AuditFilters } from '@/api/audit'
 
 interface AuditFilterBarProps {
   filters: AuditFilters
   onChange: (f: AuditFilters) => void
 }
 
-// Known entity types derived from AUDIT_ACTIONS prefixes.
-const ENTITY_TYPES = ['user', 'exam', 'session', 'answer', 'certificate', 'question', 'tenant']
-
 export function AuditFilterBar({ filters, onChange }: AuditFilterBarProps) {
   const { t } = useTranslation()
+
+  // The action and entity options come from the tenant's own audit log (FR-BB55 AC-2, #557). While they load, the
+  // dropdown and the chips are disabled. If they fail, an inline error shows, and the date, actor and clear controls
+  // keep working.
+  const options = useAuditFilterOptions()
+  const optionsLoading = options.isPending
+  const actionOptions = options.data?.actions ?? []
+  const entityOptions = options.data?.entity_types ?? []
 
   // Debounced actor name input — fires onChange 300ms after the user stops typing.
   const [actorInput, setActorInput] = useState(filters.actor ?? '')
@@ -102,12 +108,13 @@ export function AuditFilterBar({ filters, onChange }: AuditFilterBarProps) {
           <Select
             className="h-9 w-40 text-sm"
             value={filters.entityType ?? ''}
+            disabled={optionsLoading}
             onChange={(e) =>
               onChange({ ...filters, entityType: e.target.value || undefined })
             }
           >
             <option value="">{t('audit.filter_entity')}</option>
-            {ENTITY_TYPES.map((et) => (
+            {entityOptions.map((et) => (
               <option key={et} value={et}>
                 {et}
               </option>
@@ -129,12 +136,14 @@ export function AuditFilterBar({ filters, onChange }: AuditFilterBarProps) {
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-muted-foreground">{t('audit.filter_action')}</label>
         <div className="flex flex-wrap gap-1.5">
-          {AUDIT_ACTIONS.map((action) => {
+          {optionsLoading && <Skeleton className="h-6 w-56" />}
+          {actionOptions.map((action) => {
             const selected = filters.actions?.includes(action) ?? false
             return (
               <button
                 key={action}
                 type="button"
+                disabled={optionsLoading}
                 onClick={() => handleActionToggle(action)}
                 className={[
                   'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
@@ -148,6 +157,11 @@ export function AuditFilterBar({ filters, onChange }: AuditFilterBarProps) {
             )
           })}
         </div>
+        {options.isError && (
+          <p role="alert" className="text-xs text-danger">
+            {t('audit.filter_options_error')}
+          </p>
+        )}
       </div>
     </div>
   )

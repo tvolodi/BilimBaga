@@ -793,6 +793,7 @@
     "filter_action": "Әрекет",
     "filter_entity": "Нысан түрі",
     "filter_clear": "Сүзгілерді тазалау",
+    "filter_options_error": "Сүзгі нұсқаларын жүктеу мүмкін болмады. Күн мен орындаушы бойынша сүзе аласыз.",
     "col_timestamp": "Уақыт",
     "col_actor": "Орындаушы",
     "col_action": "Әрекет",

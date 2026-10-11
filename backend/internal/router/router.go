@@ -177,6 +177,8 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 				Get("/audit", auditHandler.List)
 			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).
 				Get("/audit/export", auditHandler.Export)
+			r.With(rbac.RequirePermission(rbacCache, "audit", "read")).
+				Get("/audit/actions", auditHandler.Actions)
 
 			// Categories — tree is readable by any authenticated user;
 			// mutations require categories:manage (examiner+ and super_admin).

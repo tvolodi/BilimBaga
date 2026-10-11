@@ -12,11 +12,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 	"testing"
-	"time"
 
 	dbpkg "github.com/bilimbaga/bilimbaga/internal/db"
+	"github.com/bilimbaga/bilimbaga/internal/testpg"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,22 +28,7 @@ func newAIGradePGDB(t *testing.T) *sqlx.DB {
 	if base == "" {
 		t.Skip("TEST_DATABASE_URL not set: skipping real-Postgres AI grading tests")
 	}
-	schema := fmt.Sprintf("bb_528_%d", time.Now().UnixNano())
-	sep := "?"
-	if strings.Contains(base, "?") {
-		sep = "&"
-	}
-
-	admin, err := sqlx.Open("postgres", base)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = admin.Close() })
-	_, err = admin.Exec(`CREATE SCHEMA ` + schema)
-	require.NoError(t, err)
-	t.Cleanup(func() { _, _ = admin.Exec(`DROP SCHEMA IF EXISTS ` + schema + ` CASCADE`) })
-
-	db, err := sqlx.Open("postgres", base+sep+"search_path="+schema)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	db := testpg.NewSchema(t, base, "bb_528")
 	require.NoError(t, dbpkg.RunMigrations(db, "../../migrations"))
 	return db
 }

@@ -376,6 +376,9 @@ func TestEveryDBCallingFileIsScanned(t *testing.T) {
 var nonLiteralAllowed = map[string]string{
 	// SQL is assembled from fragments at runtime; covered by TestDynamicSQLFragments.
 	"../audit/repository.go": "dynamic WHERE built with fmt.Sprintf",
+	// #547: test-only helper that creates the throwaway schema and installs pg_trgm. Its SQL is admin DDL and an
+	// advisory lock with no application tables, so there is nothing to check against the migrated schema.
+	"../testpg/schema.go": "test helper: admin DDL and advisory lock, no application tables",
 }
 
 // dynamicFragmentFiles maps files with runtime-assembled SQL to the table

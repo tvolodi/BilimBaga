@@ -308,7 +308,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exam, err := h.svc.UpdateExam(r.Context(), id, UpdateExamInput(req))
+	res, err := h.svc.UpdateExam(r.Context(), id, UpdateExamInput(req))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):
@@ -327,8 +327,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FR-BB73 AC-9 (#566): the audit row carries the AI grading mode before and after the update.
+	exam := res.Exam
 	h.writer.Write(r.Context(), r, "exam.update", "exam", &exam.ID, map[string]any{
-		"title": exam.Title,
+		"title":                exam.Title,
+		"ai_grading_mode_from": res.PreviousAIGradingMode,
+		"ai_grading_mode_to":   exam.AIGradingMode,
 	})
 
 	api.WriteJSON(w, http.StatusOK, map[string]any{"data": exam, "error": nil})

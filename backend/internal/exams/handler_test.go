@@ -59,11 +59,15 @@ func (m *mockSvc) ListExams(ctx context.Context, filter ExamFilter) ([]*ExamList
 	}
 	return []*ExamListItem{}, 0, nil
 }
-func (m *mockSvc) UpdateExam(ctx context.Context, id string, input UpdateExamInput) (*Exam, error) {
+func (m *mockSvc) UpdateExam(ctx context.Context, id string, input UpdateExamInput) (*UpdateExamResult, error) {
 	if m.updateExamFn != nil {
-		return m.updateExamFn(ctx, id, input)
+		e, err := m.updateExamFn(ctx, id, input)
+		if err != nil {
+			return nil, err
+		}
+		return &UpdateExamResult{Exam: e}, nil
 	}
-	return &Exam{ID: id, Title: input.Title, Status: "draft"}, nil
+	return &UpdateExamResult{Exam: &Exam{ID: id, Title: input.Title, Status: "draft"}}, nil
 }
 func (m *mockSvc) TransitionStatus(ctx context.Context, id, newStatus string) (*Exam, error) {
 	if m.transitionStatusFn != nil {

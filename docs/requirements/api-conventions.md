@@ -121,9 +121,9 @@ Note on validation codes in this section's domain: exam create and update answer
 | INVALID_ANSWER_OPTION, INVALID_ANSWER_FORMAT, INVALID_TIME_SPENT, INVALID_EVENT_TYPE, INVALID_DATE | 400 | `sessions/handler.go:107-117,91,143,316,324` |
 | INVALID_SCORE | 422 | `sessions/handler.go:380` |
 | CANNOT_GRADE_OWN_SESSION | 403 | `sessions/handler.go:384` (grading: the acting user is the employee of the session, any role; FR-BB73 AC-21) |
-| SESSION_FINALISED | 409 | `sessions/handler.go:387` (grading: the session is final and the answer was graded by a person; FR-BB73 AC-19) |
-| CERTIFICATE_ISSUED | 409 | `sessions/handler.go:390` (grading: override of an `ai_graded` answer of a final session that has a certificate; FR-BB73 AC-20) |
-| ANSWER_NOT_GRADABLE | 422 | specified in FR-BB42 AC-11 and implemented by issue #565; not in the code when this row was written (grading: the question of the row is not short-text) |
+| SESSION_FINALISED | 409 | `sessions/handler.go:390` (grading: the session is final and the answer was graded by a person; FR-BB73 AC-19) |
+| CERTIFICATE_ISSUED | 409 | `sessions/handler.go:393` (grading: override of an `ai_graded` answer of a final session that has a certificate; FR-BB73 AC-20) |
+| ANSWER_NOT_GRADABLE | 422 | `sessions/handler.go:387` (grading: the question of the row is not short-text; FR-BB42 AC-11, issue #565) |
 | GRADING_PENDING | 409 | `sessions/handler.go:53` (start: a previous attempt of that user and exam is `grading_pending`; FR-BB322 AC-1 and AC-3, checked before `ATTEMPTS_EXHAUSTED`) |
 | NOT_ADAPTIVE | 404 | `sessions/handler.go:404` |
 | SESSION_NOT_SUBMITTED, SESSION_NOT_PASSED, EXAM_NOT_CERTIFIABLE | 422 | `certificates/handler.go:84-92` |

@@ -37,6 +37,13 @@ describe('AuditFilterBar', () => {
     expect(onChange).toHaveBeenLastCalledWith({ actions: undefined })
   })
 
+  it('filters by the AI grading action (#540)', () => {
+    const onChange = vi.fn()
+    render(<AuditFilterBar filters={{}} onChange={onChange} />)
+    fireEvent.click(screen.getByText('answer.ai_grade'))
+    expect(onChange).toHaveBeenLastCalledWith({ actions: ['answer.ai_grade'] })
+  })
+
   it('changes entity type and clears all filters', () => {
     const onChange = vi.fn()
     render(<AuditFilterBar filters={{ actor: 'bob' }} onChange={onChange} />)

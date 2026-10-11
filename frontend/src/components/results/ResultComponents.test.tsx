@@ -74,6 +74,7 @@ function item(overrides: Partial<QuestionBreakdownItem> = {}): QuestionBreakdown
     max_points: 1,
     explanation: null,
     manual_feedback: null,
+    grading_status: 'graded',
     ...overrides,
   }
 }

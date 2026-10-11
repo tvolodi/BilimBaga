@@ -98,9 +98,14 @@ export function ResultsTable({ sessions, sortCol, sortDir, onSort }: ResultsTabl
               <TableCell>
                 {new Date(s.submitted_at).toLocaleDateString()}
               </TableCell>
-              <TableCell>{s.score_pct.toFixed(1)}%</TableCell>
+              {/* FR-BB322 AC-13: a session waiting for grading has no score and no pass yet */}
               <TableCell>
-                {s.passed ? (
+                {s.score_pct === null ? t('portal.card.status.grading_pending') : `${s.score_pct.toFixed(1)}%`}
+              </TableCell>
+              <TableCell>
+                {s.score_pct === null ? (
+                  '—'
+                ) : s.passed ? (
                   <Badge variant="success">{t('history.status.passed')}</Badge>
                 ) : (
                   <Badge variant="destructive">{t('history.status.failed')}</Badge>

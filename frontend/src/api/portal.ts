@@ -3,7 +3,7 @@ import { apiFetch } from './apiFetch'
 
 // ---- Types ------------------------------------------------------------------
 
-export type UserStatus = 'not_started' | 'in_progress' | 'passed' | 'failed' | 'expired'
+export type UserStatus = 'not_started' | 'in_progress' | 'grading_pending' | 'passed' | 'failed' | 'expired'
 export type ShowAnswers = 'never' | 'after_completion' | 'after_all_attempts'
 
 export interface PortalExam {
@@ -17,6 +17,9 @@ export interface PortalExam {
   deadline: string | null
   user_status: UserStatus
   open_session_id: string | null
+  // FR-BB322 AC-3: the newest session waiting for grading, and when it was submitted (UTC ISO 8601).
+  pending_session_id: string | null
+  pending_submitted_at: string | null
   show_answers: ShowAnswers
   shuffle_questions: boolean
   shuffle_options: boolean

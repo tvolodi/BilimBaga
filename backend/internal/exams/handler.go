@@ -40,6 +40,7 @@ type createExamReq struct {
 	OnTabSwitch        string     `json:"on_tab_switch"`
 	CertificateEnabled bool       `json:"certificate_enabled"`
 	Adaptive           bool       `json:"adaptive"`
+	AIGradingMode      string     `json:"ai_grading_mode"`
 }
 
 type updateExamReq struct {
@@ -54,6 +55,7 @@ type updateExamReq struct {
 	ShuffleOptions     bool       `json:"shuffle_options"`
 	ShowAnswers        string     `json:"show_answers"`
 	OnTabSwitch        string     `json:"on_tab_switch"`
+	AIGradingMode      string     `json:"ai_grading_mode"`
 	CertificateEnabled bool       `json:"certificate_enabled"`
 	Adaptive           bool       `json:"adaptive"`
 }
@@ -108,6 +110,8 @@ func writeValidationErrors(w http.ResponseWriter, errs []fieldError) {
 var (
 	validShowAnswers = map[string]bool{"never": true, "after_completion": true, "after_all_attempts": true}
 	validTabSwitch   = map[string]bool{"log": true, "warn": true, "submit": true}
+	// FR-BB73 AC-22: the AI grading mode of an exam.
+	validAIGradingMode = map[string]bool{"off": true, "suggest": true, "auto": true}
 )
 
 func validateCreateExam(req createExamReq) []fieldError {
@@ -129,6 +133,9 @@ func validateCreateExam(req createExamReq) []fieldError {
 	}
 	if req.OnTabSwitch != "" && !validTabSwitch[req.OnTabSwitch] {
 		errs = append(errs, fieldError{"on_tab_switch", "on_tab_switch must be one of: log, warn, submit"})
+	}
+	if req.AIGradingMode != "" && !validAIGradingMode[req.AIGradingMode] {
+		errs = append(errs, fieldError{"ai_grading_mode", "ai_grading_mode must be one of: off, suggest, auto"})
 	}
 	if req.AvailableFrom != nil && req.AvailableUntil != nil && !req.AvailableFrom.Before(*req.AvailableUntil) {
 		errs = append(errs, fieldError{"available_until", "available_until must be after available_from"})
@@ -221,6 +228,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if onTabSwitch == "" {
 		onTabSwitch = "log"
 	}
+	// AC-22: an exam created without a mode takes the default, suggest (AC-9).
+	aiGradingMode := req.AIGradingMode
+	if aiGradingMode == "" {
+		aiGradingMode = "suggest"
+	}
 	maxAttempts := req.MaxAttempts
 	if maxAttempts == 0 {
 		maxAttempts = 1
@@ -238,6 +250,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ShuffleOptions:     req.ShuffleOptions,
 		ShowAnswers:        showAnswers,
 		OnTabSwitch:        onTabSwitch,
+		AIGradingMode:      aiGradingMode,
 		CertificateEnabled: req.CertificateEnabled,
 		Adaptive:           req.Adaptive,
 		CreatedBy:          actorFromCtx(r),
@@ -286,6 +299,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		MaxAttempts:      req.MaxAttempts,
 		ShowAnswers:      req.ShowAnswers,
 		OnTabSwitch:      req.OnTabSwitch,
+		AIGradingMode:    req.AIGradingMode,
 		AvailableFrom:    req.AvailableFrom,
 		AvailableUntil:   req.AvailableUntil,
 	}

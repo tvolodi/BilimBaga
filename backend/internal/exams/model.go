@@ -39,6 +39,8 @@ type Exam struct {
 	ShuffleOptions     bool       `db:"shuffle_options"     json:"shuffle_options"`
 	ShowAnswers        string     `db:"show_answers"        json:"show_answers"`
 	OnTabSwitch        string     `db:"on_tab_switch"       json:"on_tab_switch"`
+	// AIGradingMode is off, suggest or auto (FR-BB73 AC-9, AC-22).
+	AIGradingMode string `db:"ai_grading_mode" json:"ai_grading_mode"`
 	CertificateEnabled bool       `db:"certificate_enabled" json:"certificate_enabled"`
 	Adaptive           bool       `db:"adaptive"            json:"adaptive"`
 	CreatedBy          string     `db:"created_by"          json:"created_by"`
@@ -140,6 +142,7 @@ type ExamDetail struct {
 	ShuffleOptions     bool                 `json:"shuffle_options"`
 	ShowAnswers        string               `json:"show_answers"`
 	OnTabSwitch        string               `json:"on_tab_switch"`
+	AIGradingMode      string               `json:"ai_grading_mode"`
 	CertificateEnabled bool                 `json:"certificate_enabled"`
 	Adaptive           bool                 `json:"adaptive"`
 	CreatedBy          string               `json:"created_by"`
@@ -202,6 +205,8 @@ type CreateExamInput struct {
 	ShuffleOptions     bool
 	ShowAnswers        string
 	OnTabSwitch        string
+	// AIGradingMode is set by the create handler (default suggest) and must be valid.
+	AIGradingMode      string
 	CertificateEnabled bool
 	Adaptive           bool
 	CreatedBy          string
@@ -220,8 +225,18 @@ type UpdateExamInput struct {
 	ShuffleOptions     bool
 	ShowAnswers        string
 	OnTabSwitch        string
+	// AIGradingMode empty means unchanged (AC-22: omitted on update leaves the value).
+	AIGradingMode      string
 	CertificateEnabled bool
 	Adaptive           bool
+}
+
+// defaultAIGradingMode is the mode of an exam created without one (FR-BB73 AC-9): suggest.
+func defaultAIGradingMode(mode string) string {
+	if mode == "" {
+		return "suggest"
+	}
+	return mode
 }
 
 // AdaptivePublishValidationError is returned when an adaptive exam has insufficient

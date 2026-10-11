@@ -20,7 +20,7 @@ const (
 // aiEnv names every variable the AI resolution reads, so a developer's shell cannot change a test.
 var aiEnv = []string{
 	"ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "AI_PROVIDER", "AI_BASE_URL", "AI_API_KEY", "AI_MODEL",
-	"XAI_API_KEY", "xai_api_key",
+	"XAI_API_KEY", "xai_api_key", "AI_TIMEOUT_SECONDS",
 }
 
 // loadAI loads the config with only the given AI variables set, and returns the resolved AI settings.

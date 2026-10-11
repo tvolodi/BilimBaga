@@ -348,17 +348,22 @@ func New(tenantHandler *tenant.Handler, authHandler *auth.Handler, deptHandler *
 			// Email notification test (FR-BB61) — super_admin only.
 			r.With(rbac.RequirePermission(rbacCache, "tenant", "manage")).Post("/admin/notifications/test", emailHandler.HandleTestNotification)
 
-			// AI question generation (FR-BB71) — examiner+ only.
-			r.With(rbac.RequirePermission(rbacCache, "questions", "write")).
-				Post("/admin/ai/generate-questions", aiHandler.HandleGenerateQuestions)
+			// AI routes (FR-BB71, FR-BB74, FR-BB75): one write deadline for the whole group (#519).
+			r.Group(func(g chi.Router) {
+				g.Use(ai.WriteDeadline(ai.AIWriteBudget))
 
-			// AI performance insight summaries (FR-BB74) — examiner+ only.
-			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
-				Get("/admin/ai/insights/{examId}", aiHandler.HandleGetInsights)
+				// AI question generation (FR-BB71) — examiner+ only.
+				g.With(rbac.RequirePermission(rbacCache, "questions", "write")).
+					Post("/admin/ai/generate-questions", aiHandler.HandleGenerateQuestions)
 
-			// AI loyalty profile narrative (FR-BB75) — department_admin+ only.
-			r.With(rbac.RequirePermission(rbacCache, "reports", "read")).
-				Get("/admin/ai/loyalty-summary/{sessionId}", aiHandler.GetLoyaltyNarrative)
+				// AI performance insight summaries (FR-BB74) — examiner+ only.
+				g.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+					Get("/admin/ai/insights/{examId}", aiHandler.HandleGetInsights)
+
+				// AI loyalty profile narrative (FR-BB75) — department_admin+ only.
+				g.With(rbac.RequirePermission(rbacCache, "reports", "read")).
+					Get("/admin/ai/loyalty-summary/{sessionId}", aiHandler.GetLoyaltyNarrative)
+			})
 		})
 	})
 

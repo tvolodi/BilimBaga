@@ -32,15 +32,15 @@ func logUpstreamFailure(logger *slog.Logger, provider string, status int, body [
 
 // NewProviderClient returns the AnthropicClient for the resolved provider (#232). Without a provider or a key it
 // returns a client that answers ErrAIUnavailable and makes no request, so the AI routes answer 503 AI_UNAVAILABLE.
-func NewProviderClient(provider, baseURL, apiKey string, logger *slog.Logger) AnthropicClient {
+func NewProviderClient(provider, baseURL, apiKey string, logger *slog.Logger, opts ...ClientOption) AnthropicClient {
 	if apiKey == "" {
 		return unavailableClient{}
 	}
 	switch provider {
 	case AIProviderAnthropic:
-		return NewAnthropicClient(apiKey, logger)
+		return NewAnthropicClient(apiKey, logger, opts...)
 	case AIProviderOpenAICompatible:
-		return NewOpenAICompatibleClient(baseURL, apiKey, logger)
+		return NewOpenAICompatibleClient(baseURL, apiKey, logger, opts...)
 	default:
 		return unavailableClient{}
 	}

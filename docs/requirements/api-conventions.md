@@ -103,6 +103,8 @@ There is no `ROLE_*` family of codes in the code; role-related endpoints use the
 | RULE_NOT_MANUAL | 400 | `exams/handler.go:806` |
 | EXAM_NOT_FOUND | 404 | `exams/handler.go:823`, `reports/handler.go:60`, `ai/handler.go:95` (exam CRUD itself uses ERR_NOT_FOUND; I-4) |
 
+Note on validation codes in this section's domain: exam create and update answer a field error with 422 `ERR_VALIDATION` and a `fields[]` list (`exams/handler.go:103`, for example `ai_grading_mode must be one of: off, suggest, auto`), not `VALIDATION_ERROR`; new requirements for exam endpoints name `ERR_VALIDATION` (issue I-4).
+
 ### 2.6 Sessions, results, certificates, AI
 
 | Code | HTTP | Where |
@@ -117,13 +119,20 @@ There is no `ROLE_*` family of codes in the code; role-related endpoints use the
 | SESSION_EXPIRED | 422 | `sessions/handler.go:103,154` |
 | SESSION_IN_PROGRESS | 422 | `sessions/handler.go:225,246` |
 | INVALID_ANSWER_OPTION, INVALID_ANSWER_FORMAT, INVALID_TIME_SPENT, INVALID_EVENT_TYPE, INVALID_DATE | 400 | `sessions/handler.go:107-117,91,143,316,324` |
-| INVALID_SCORE | 422 | `sessions/handler.go:377` |
+| INVALID_SCORE | 422 | `sessions/handler.go:380` |
+| CANNOT_GRADE_OWN_SESSION | 403 | `sessions/handler.go:384` (grading: the acting user is the employee of the session, any role; FR-BB73 AC-21) |
+| SESSION_FINALISED | 409 | `sessions/handler.go:387` (grading: the session is final and the answer was graded by a person; FR-BB73 AC-19) |
+| CERTIFICATE_ISSUED | 409 | `sessions/handler.go:390` (grading: override of an `ai_graded` answer of a final session that has a certificate; FR-BB73 AC-20) |
+| ANSWER_NOT_GRADABLE | 422 | specified in FR-BB42 AC-11 and implemented by issue #565; not in the code when this row was written (grading: the question of the row is not short-text) |
+| GRADING_PENDING | 409 | `sessions/handler.go:53` (start: a previous attempt of that user and exam is `grading_pending`; FR-BB322 AC-1 and AC-3, checked before `ATTEMPTS_EXHAUSTED`) |
 | NOT_ADAPTIVE | 404 | `sessions/handler.go:404` |
 | SESSION_NOT_SUBMITTED, SESSION_NOT_PASSED, EXAM_NOT_CERTIFIABLE | 422 | `certificates/handler.go:84-92` |
 | NOT_A_LOYALTY_SESSION | 400 | `ai/handler.go:140` |
 | AI_RATE_LIMITED | 429 | `ai/handler.go:51` (hourly generation cap) |
 | AI_UNAVAILABLE | 503 | `ai/handler.go:54,144` |
 | INVALID_PARAM | 400 | `ai/handler.go:84,128` (cf. ERR_INVALID_PARAM) |
+
+**Grading refusals (`POST /api/v1/admin/grading/{sessionId}/answers/{questionId}`), in the order the transaction applies them:** body score outside 0 to 100 `INVALID_SCORE` 422; unknown session `SESSION_NOT_FOUND` 404 (after the session lock); acting user is the employee `CANNOT_GRADE_OWN_SESSION` 403; unknown row `SESSION_NOT_FOUND` 404; question not short-text `ANSWER_NOT_GRADABLE` 422; final session and a person-graded answer `SESSION_FINALISED` 409; override of an `ai_graded` answer with an issued certificate `CERTIFICATE_ISSUED` 409. Status choice: 409 means the request is valid but the current state of the session or certificate forbids it and may change; 422 means the request can never succeed for that question or value; 403 is about who is asking.
 
 ### 2.7 Blank answer option text (PR #196, issue #173)
 

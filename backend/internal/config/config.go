@@ -66,9 +66,8 @@ type Config struct {
 	// Logging
 	LogLevel string // debug | info | warn | error; default "info"
 
-	// Anthropic AI (FR-BB71)
-	AnthropicAPIKey string
-	AnthropicModel  string
+	// AI provider (FR-BB71, #232): resolved by resolveAI from the AI_* and ANTHROPIC_* variables.
+	AI AIConfig
 	// AIInsightsDailyLimit (AI_INSIGHTS_DAILY_LIMIT, ISS-232) caps paid AI insight
 	// calls per user per 24 h; 0 disables the cap. Default 50.
 	AIInsightsDailyLimit int
@@ -168,9 +167,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: BOOTSTRAP_ADMIN_GENERATE must be true or false: %w", err)
 	}
 
-	// Anthropic AI (FR-BB71) — optional; handlers return 503 if key is blank.
-	cfg.AnthropicAPIKey = getEnv("ANTHROPIC_API_KEY", "")
-	cfg.AnthropicModel = getEnv("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
+	// AI provider (FR-BB71, #232) — optional; with no usable key the AI routes answer 503 and grading stays off.
+	cfg.AI, err = resolveAI(func(key string) string { return getEnv(key, "") })
+	if err != nil {
+		return nil, err
+	}
 
 	cfg.AIInsightsDailyLimit, err = getEnvInt("AI_INSIGHTS_DAILY_LIMIT", 50)
 	if err != nil {

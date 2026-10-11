@@ -228,12 +228,18 @@ func serve() {
 	portalSvc := portal.NewService(portalRepo)
 	portalHandler := portal.NewHandler(portalSvc)
 
+	// AI provider (FR-BB71, #232): one client for insights, question generation and AI grading. With no usable
+	// key it is off: one warning names the variables, and the AI routes answer 503 AI_UNAVAILABLE.
+	aiClient := ai.NewProviderClient(cfg.AI.Provider, cfg.AI.BaseURL, cfg.AI.APIKey, slogger)
+	if cfg.AI.Provider == "" {
+		slogger.Warn(cfg.AI.OffReason)
+	}
+
 	// Wire up session creation (FR-BB35).
-	// If AnthropicAPIKey is configured, use AI-backed grading for short-text questions (FR-BB73).
+	// With an AI provider, use AI-backed grading for short-text questions (FR-BB73).
 	var gradingEngine sessions.GradingEngine
-	if cfg.AnthropicAPIKey != "" {
-		aiGradingClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, slogger)
-		gradingEngine = sessions.NewAIGradingEngine(aiGradingClient, cfg.AnthropicModel, db, slogger)
+	if cfg.AI.Provider != "" {
+		gradingEngine = sessions.NewAIGradingEngine(aiClient, cfg.AI.Model, db, slogger)
 	} else {
 		gradingEngine = sessions.NewGradingEngine()
 	}
@@ -256,8 +262,7 @@ func serve() {
 
 	// Wire up AI question generation (FR-BB71).
 	aiRepo := ai.NewRepository(db)
-	aiClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, slogger)
-	aiSvc := ai.NewService(aiRepo, aiClient, cfg.AnthropicModel, slogger, ai.WithInsightsDailyLimit(cfg.AIInsightsDailyLimit))
+	aiSvc := ai.NewService(aiRepo, aiClient, cfg.AI.Model, slogger, ai.WithInsightsDailyLimit(cfg.AIInsightsDailyLimit))
 	aiHandler := ai.NewHandler(aiSvc)
 
 	// Wire up role management (FR-BB117); the cache is rebuilt after every mutation.

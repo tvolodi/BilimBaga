@@ -1374,6 +1374,11 @@ func (r *postgresRepository) GradeAnswer(ctx context.Context, sessionID, questio
 	}
 	defer tx.Rollback() //nolint:errcheck
 
+	// 0. Lock the session before any grading write (see lockSessionForGrading, #528).
+	if err := lockSessionForGrading(ctx, tx, sessionID); err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
+	}
+
 	// 1. Fetch max_score.
 	var maxScore float64
 	const maxQ = `SELECT max_score FROM session_question_scores WHERE session_id = $1 AND question_id = $2`
@@ -1400,47 +1405,13 @@ WHERE session_id = $1 AND question_id = $2`
 		return nil, fmt.Errorf("sessions: GradeAnswer: update score: %w", err)
 	}
 
-	// 4. Check whether all answers are now graded.
-	var pendingCount int
-	const pendingQ = `SELECT COUNT(*) FROM session_question_scores WHERE session_id = $1 AND grading_status = 'pending_manual'`
-	if err := tx.QueryRowContext(ctx, pendingQ, sessionID).Scan(&pendingCount); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: count pending: %w", err)
+	// 4-5. Count the pending answers and, when none are left, finalise the session (AC-6/AC-7). The same helper
+	// finalises an AI-graded answer (#528).
+	fin, err := finaliseSessionIfAllGraded(ctx, tx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
 	}
-	allGraded := pendingCount == 0
-
-	res := &gradeAnswerResult{
-		allGraded:     allGraded,
-		sessionStatus: "grading_pending",
-	}
-
-	// 5. If all graded, recalculate final score and transition session (AC-6/AC-7).
-	if allGraded {
-		// Recalculate aggregate score_pct.
-		var finalScorePct float64
-		const finalQ = `SELECT ROUND(SUM(score) / NULLIF(SUM(max_score), 0) * 100, 2) FROM session_question_scores WHERE session_id = $1`
-		if err := tx.QueryRowContext(ctx, finalQ, sessionID).Scan(&finalScorePct); err != nil {
-			return nil, fmt.Errorf("sessions: GradeAnswer: recalculate final score: %w", err)
-		}
-
-		// Fetch passing_score_pct from the exam.
-		var passingScorePct float64
-		const passingQ = `SELECT e.passing_score_pct FROM exams e JOIN exam_sessions es ON es.exam_id = e.id WHERE es.id = $1`
-		if err := tx.QueryRowContext(ctx, passingQ, sessionID).Scan(&passingScorePct); err != nil {
-			return nil, fmt.Errorf("sessions: GradeAnswer: fetch passing score: %w", err)
-		}
-
-		passed := finalScorePct >= passingScorePct
-
-		// Transition session to 'submitted'.
-		const transitionQ = `UPDATE exam_sessions SET score_pct = $2, passed = $3, status = 'submitted' WHERE id = $1`
-		if _, err := tx.ExecContext(ctx, transitionQ, sessionID, finalScorePct, passed); err != nil {
-			return nil, fmt.Errorf("sessions: GradeAnswer: transition session: %w", err)
-		}
-
-		res.finalScorePct = &finalScorePct
-		res.passed = &passed
-		res.sessionStatus = "submitted"
-	}
+	res := &fin
 
 	// 6. Write audit log entry (AC-8).
 	const auditQ = `
@@ -1454,6 +1425,67 @@ VALUES ($1, $2, 'answer.grade', 'session_answer', $3, $4,
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("sessions: GradeAnswer: commit: %w", err)
 	}
+	return res, nil
+}
+
+// lockSessionForGrading takes the exam_sessions row lock that every grading write takes before its score update.
+// SubmitSession locks the same row first, so the order is the same everywhere. Writers therefore finalise one at a
+// time, and the last two answers cannot both see the other as still pending (#528).
+func lockSessionForGrading(ctx context.Context, tx *sqlx.Tx, sessionID string) error {
+	const q = `SELECT id FROM exam_sessions WHERE id = $1 FOR UPDATE`
+	var id string
+	if err := tx.QueryRowContext(ctx, q, sessionID).Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrSessionNotFound
+		}
+		return fmt.Errorf("lock session: %w", err)
+	}
+	return nil
+}
+
+// finaliseSessionIfAllGraded is the one finalise path for manual grading (GradeAnswer) and AI grading
+// (AIGradeJob, #528). It counts the session's answers still pending_manual. When none are left, it recalculates
+// score_pct and passed from the score rows and moves the session to 'submitted' (AC-6/AC-7). It runs inside the
+// caller's transaction; the caller triggers the result notification after it commits.
+func finaliseSessionIfAllGraded(ctx context.Context, tx *sqlx.Tx, sessionID string) (gradeAnswerResult, error) {
+	var pendingCount int
+	const pendingQ = `SELECT COUNT(*) FROM session_question_scores WHERE session_id = $1 AND grading_status = 'pending_manual'`
+	if err := tx.QueryRowContext(ctx, pendingQ, sessionID).Scan(&pendingCount); err != nil {
+		return gradeAnswerResult{}, fmt.Errorf("count pending: %w", err)
+	}
+	res := gradeAnswerResult{
+		allGraded:     pendingCount == 0,
+		sessionStatus: "grading_pending",
+	}
+	if !res.allGraded {
+		return res, nil
+	}
+
+	// Recalculate aggregate score_pct.
+	var finalScorePct float64
+	const finalQ = `SELECT ROUND(SUM(score) / NULLIF(SUM(max_score), 0) * 100, 2) FROM session_question_scores WHERE session_id = $1`
+	if err := tx.QueryRowContext(ctx, finalQ, sessionID).Scan(&finalScorePct); err != nil {
+		return gradeAnswerResult{}, fmt.Errorf("recalculate final score: %w", err)
+	}
+
+	// Fetch passing_score_pct from the exam.
+	var passingScorePct float64
+	const passingQ = `SELECT e.passing_score_pct FROM exams e JOIN exam_sessions es ON es.exam_id = e.id WHERE es.id = $1`
+	if err := tx.QueryRowContext(ctx, passingQ, sessionID).Scan(&passingScorePct); err != nil {
+		return gradeAnswerResult{}, fmt.Errorf("fetch passing score: %w", err)
+	}
+
+	passed := finalScorePct >= passingScorePct
+
+	// Transition session to 'submitted'.
+	const transitionQ = `UPDATE exam_sessions SET score_pct = $2, passed = $3, status = 'submitted' WHERE id = $1`
+	if _, err := tx.ExecContext(ctx, transitionQ, sessionID, finalScorePct, passed); err != nil {
+		return gradeAnswerResult{}, fmt.Errorf("transition session: %w", err)
+	}
+
+	res.finalScorePct = &finalScorePct
+	res.passed = &passed
+	res.sessionStatus = "submitted"
 	return res, nil
 }
 

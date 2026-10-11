@@ -66,7 +66,7 @@ export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
             <p className="truncate text-xs text-muted-foreground">{item.exam_title}</p>
           </div>
           <ScoreBadge score={item.score_pct} passed={item.passed} />
-          <span className="flex-shrink-0 text-xs text-muted-foreground">
+          <span className="flex-shrink-0 text-xs text-muted-foreground" data-visual-mask>
             {formatDistanceToNow(new Date(item.submitted_at), { addSuffix: true })}
           </span>
         </li>

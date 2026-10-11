@@ -58,9 +58,12 @@ export function AdminDashboardPage() {
                 <h2 className="text-base font-semibold">{t('dashboard.chart_title')}</h2>
               </CardHeader>
               <CardContent>
-                <CompletionBarChart
-                  data={data.completion_rate_by_exam}
-                />
+                {/* The chart is data-driven and animated; its bars and labels change between runs (FR-BB320 AC-13). */}
+                <div data-visual-mask>
+                  <CompletionBarChart
+                    data={data.completion_rate_by_exam}
+                  />
+                </div>
               </CardContent>
             </Card>
           )}
@@ -81,7 +84,10 @@ export function AdminDashboardPage() {
                 <h2 className="text-base font-semibold">{t('dashboard.activity_title')}</h2>
               </CardHeader>
               <CardContent className="pt-0">
-                <RecentActivityFeed activities={data.recent_activity} />
+                {/* A live feed of the latest submissions: its rows, order and scores change with the clock (FR-BB320 AC-13). */}
+                <div data-visual-mask>
+                  <RecentActivityFeed activities={data.recent_activity} />
+                </div>
               </CardContent>
             </Card>
           </div>

@@ -17,6 +17,8 @@ frontend/coverage/
 frontend/playwright-report-live/
 frontend/test-results/
 frontend/.auth/
+# FR-BB320 AC-11: the API binary that the visual container runs (scripts/visual/run.sh).
+.visual/
 e2e-results.json
 screenshots/
 

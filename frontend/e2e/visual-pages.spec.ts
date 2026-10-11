@@ -14,6 +14,9 @@ import {
   readVisualFixtures,
 } from './fixtures/visual'
 
+// The visual suite runs only through scripts/visual/run.sh, which sets VISUAL_MODE (FR-BB320 AC-11).
+test.skip(!process.env.VISUAL_MODE, 'visual suite: run through scripts/visual/run.sh')
+
 const WIDTHS = [1280, 375] as const
 const LOCALES = ['en', 'kk'] as const
 

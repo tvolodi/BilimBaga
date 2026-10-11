@@ -7,6 +7,9 @@
 import { test, expect, type Page } from '@playwright/test'
 import { loadAppFonts } from './fixtures/visual'
 
+// The visual suite runs only through scripts/visual/run.sh, which sets VISUAL_MODE (FR-BB320 AC-11).
+test.skip(!process.env.VISUAL_MODE, 'visual suite: run through scripts/visual/run.sh')
+
 const WIDTHS = [375, 768, 1280] as const
 const LOCALES = ['kk', 'ru', 'en'] as const
 

@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
+  // The visual suite runs only in the pinned container, through playwright.visual.config.ts (FR-BB320 AC-11).
+  testIgnore: ['**/design-gallery.spec.ts', '**/visual-pages.spec.ts'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

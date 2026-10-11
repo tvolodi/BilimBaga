@@ -37,8 +37,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The exact image, from the official registry. Nothing is piped from the network into a shell (CLAUDE.md Owner authority 6).
+# The exact images, from the official registries. Nothing is piped from the network into a shell (CLAUDE.md Owner
+# authority 6). Each image is used if it is already present, and pulled if not.
 docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE"
+docker image inspect postgres:16 >/dev/null 2>&1 || docker pull postgres:16
 
 # Throwaway secrets for this run only: generated here, passed as environment, never written to a file.
 DB_PASS=$(openssl rand -hex 16)
@@ -48,7 +50,7 @@ mkdir -p "$ROOT/.visual"
 (cd "$ROOT/backend" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$HROOT/.visual/api" ./cmd/api)
 
 docker network create "$NET" >/dev/null
-docker run -d --name "$PG" --network "$NET" --pull never \
+docker run -d --name "$PG" --network "$NET" \
   -e POSTGRES_USER=bilimbaga -e POSTGRES_PASSWORD="$DB_PASS" -e POSTGRES_DB=bilimbaga postgres:16 >/dev/null
 for _ in $(seq 1 60); do
   docker exec "$PG" pg_isready -U bilimbaga -d bilimbaga >/dev/null 2>&1 && break
@@ -60,6 +62,7 @@ docker run --rm --name "$APP" --network "$NET" --shm-size=1g \
   -v "$HROOT/scripts:/work/scripts:ro" \
   -v "$HROOT/frontend:/work/frontend" \
   -v "bb-visual-node-modules:/work/frontend/node_modules" \
+  -v "bb-visual-dist:/work/frontend/dist" \
   -v "$HROOT/backend/migrations:/work/backend/migrations:ro" \
   -v "$HROOT/.visual/api:/work/backend/bin/api:ro" \
   -e VISUAL_MODE="$MODE" \

@@ -28,6 +28,7 @@ export function GradingQueueTable({ sessions }: GradingQueueTableProps) {
           <TableHead>{t('grading.col_exam')}</TableHead>
           <TableHead>{t('grading.col_submitted')}</TableHead>
           <TableHead>{t('grading.col_pending')}</TableHead>
+          <TableHead>{t('grading.col_ai_mode')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -45,6 +46,9 @@ export function GradingQueueTable({ sessions }: GradingQueueTableProps) {
             <TableCell>{new Date(item.submitted_at).toLocaleString()}</TableCell>
             <TableCell>
               <Badge variant="outline">{item.pending_question_count}</Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline">{t(`exam.wizard.aiGradingMode.${item.ai_grading_mode}`)}</Badge>
             </TableCell>
           </TableRow>
         ))}

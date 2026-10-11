@@ -1,10 +1,17 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import '@/i18n'
 import { Step1BasicSettings } from './Step1BasicSettings'
 import type { ExamDetail } from '@/api/exams'
+
+// Only the update hook is replaced, so the test can read the payload Step 1 sends (FR-BB73 AC-22).
+const { updateExamMock } = vi.hoisted(() => ({ updateExamMock: vi.fn() }))
+vi.mock('@/api/exams', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/exams')>()
+  return { ...actual, useUpdateExam: () => ({ mutateAsync: updateExamMock, isPending: false }) }
+})
 
 function makeExam(overrides: Partial<ExamDetail> = {}): ExamDetail {
   return {
@@ -22,6 +29,7 @@ function makeExam(overrides: Partial<ExamDetail> = {}): ExamDetail {
     show_answers: 'never',
     on_tab_switch: 'log',
     certificate_enabled: false,
+    ai_grading_mode: 'suggest',
     created_by: 'user-1',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -110,5 +118,25 @@ describe('Step1BasicSettings', () => {
 
     expect(screen.getByRole('textbox', { name: /exam title/i })).not.toBeDisabled()
     expect(screen.queryByText(/unpublish it to make changes/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the exam AI grading mode with the help text of that mode (FR-BB73 AC-22)', () => {
+    renderStep1(makeExam({ ai_grading_mode: 'auto' }))
+
+    expect(screen.getByRole('combobox', { name: /ai grading/i })).toHaveValue('auto')
+    expect(screen.getByTestId('ai-grading-mode-help')).toHaveTextContent(/cannot decide pass or fail/i)
+  })
+
+  it('sends the chosen AI grading mode with the save (FR-BB73 AC-22)', async () => {
+    updateExamMock.mockReset()
+    updateExamMock.mockResolvedValue(makeExam())
+    const onDone = vi.fn()
+    renderStep1(makeExam({ ai_grading_mode: 'suggest' }), onDone)
+
+    fireEvent.change(screen.getByRole('combobox', { name: /ai grading/i }), { target: { value: 'off' } })
+    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(updateExamMock).toHaveBeenCalledWith(expect.objectContaining({ ai_grading_mode: 'off' }))
   })
 })

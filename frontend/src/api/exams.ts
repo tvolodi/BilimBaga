@@ -62,6 +62,8 @@ export interface ExamDetail {
   show_answers: 'never' | 'after_completion' | 'after_all_attempts'
   on_tab_switch: 'log' | 'warn' | 'submit'
   certificate_enabled: boolean
+  // FR-BB73 AC-22: how the AI treats this exam's short-text answers.
+  ai_grading_mode: 'off' | 'suggest' | 'auto'
   created_by: string
   created_at: string
   updated_at: string
@@ -82,6 +84,8 @@ export interface CreateExamPayload {
   show_answers: string
   on_tab_switch: string
   certificate_enabled: boolean
+  // Omitted on update leaves the mode unchanged; omitted on create takes 'suggest' (FR-BB73 AC-22).
+  ai_grading_mode?: 'off' | 'suggest' | 'auto'
 }
 
 export interface QuestionRulePayload {

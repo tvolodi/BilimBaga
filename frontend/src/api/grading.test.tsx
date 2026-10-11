@@ -107,4 +107,17 @@ describe('grading api hooks', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(spy).not.toHaveBeenCalledWith({ queryKey: ['grading-queue'] })
   })
+
+  it('useSubmitGrade refreshes the queue when the suggestion is accepted (FR-BB73 AC-18)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      okFetch({ question_id: 'q1', grading_status: 'graded', score_pct: 60, session_status: 'grading_pending', all_graded: false }),
+    )
+    const { qc, wrapper } = makeWrapper()
+    const spy = vi.spyOn(qc, 'invalidateQueries')
+    const { result } = renderHook(() => useSubmitGrade('s1'), { wrapper })
+    result.current.mutate({ questionId: 'q1', scorePct: 60, feedback: '', accepted: true })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['grading-queue'] })
+  })
 })

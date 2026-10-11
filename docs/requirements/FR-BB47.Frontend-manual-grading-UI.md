@@ -27,10 +27,10 @@ Provides the examiner-facing UI for reviewing and scoring short-text answers. A 
 - [ ] AC-2: Queue table columns: session ID (first 8 chars), employee name, exam name, submission date, count of pending questions; rows are sorted by submission date ascending (oldest first).
 - [ ] AC-3: Clicking a queue row navigates to the grading detail page for that session.
 - [ ] AC-4: The grading detail page shows one question at a time with a "Question X of Y" indicator; Previous/Next navigation buttons allow moving between questions.
-- [ ] AC-5: Already-graded questions show their current score and feedback as pre-filled values so the examiner can revise them.
+- [ ] AC-5: Already-graded questions show their current score and feedback as pre-filled values so the examiner can revise them. Amended by FR-BB73 revision 2 (AC-19): while the session is `grading_pending` this holds; once the session is final (`submitted`), its graded answers are shown read-only and the server answers 409 `SESSION_FINALISED` to a re-grade.
 - [ ] AC-6: The score input is a combined slider (0–100) and numeric text field that stay in sync; entering a value outside 0–100 in the text field disables the Submit button and shows an inline error.
 - [ ] AC-7: The "Submit All Grades" button is enabled only when every question has a score value assigned (no `null` scores).
-- [ ] AC-8: Clicking "Submit All Grades" fires `POST /admin/grading/:sessionId/answers/:questionId` sequentially for each question via React Query mutations; a loading spinner is shown during submission.
+- [ ] AC-8: Clicking "Submit All Grades" fires `POST /admin/grading/:sessionId/answers/:questionId` sequentially for each question via React Query mutations; a loading spinner is shown during submission. Amended by FR-BB73 revision 2: only rows that are pending or whose score or feedback the examiner changed are posted, so an unchanged graded row is never re-posted; a pending row shows the AI suggestion with an Accept button that posts the suggested value (FR-BB73 AC-17, AC-18).
 - [ ] AC-9: On successful submission of all grades, a success toast is shown and the examiner is navigated back to the queue; the queue list is invalidated and refetched.
 - [ ] AC-10: Zero hardcoded user-visible strings; all text uses `useTranslation` i18n keys.
 - [ ] AC-11: If any grade submission mutation fails, an error toast is shown identifying the failed question; remaining mutations are not fired; the Submit button returns to enabled state for retry.

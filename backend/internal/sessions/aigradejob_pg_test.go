@@ -51,7 +51,8 @@ func seedAIGradeSession(t *testing.T, db *sqlx.DB, questionCount int) (sessionID
 	must(db.GetContext(ctx, &categoryID, `INSERT INTO categories (name) VALUES ('ai-grade') RETURNING id::text`))
 
 	var examID string
-	must(db.GetContext(ctx, &examID, `INSERT INTO exams (title, time_limit_minutes, passing_score_pct, created_by) VALUES ('AI grading', 30, 50, $1) RETURNING id::text`, userID))
+	// The #528 tests grade automatically: the exam is in auto (FR-BB73 AC-9 makes suggest the default).
+	must(db.GetContext(ctx, &examID, `INSERT INTO exams (title, time_limit_minutes, passing_score_pct, created_by, ai_grading_mode) VALUES ('AI grading', 30, 50, $1, 'auto') RETURNING id::text`, userID))
 
 	must(db.GetContext(ctx, &sessionID, `
 INSERT INTO exam_sessions (exam_id, user_id, status, seed, expires_at, submitted_at)
@@ -115,7 +116,9 @@ func gradeOne(t *testing.T, db *sqlx.DB, cfg AIGradeConfig) {
 	require.NoError(t, gradeAIAnswer(context.Background(), db, slog.Default(), cfg, cands[0]))
 }
 
-func TestAIGrade_TickGradesAndFinalisesTheLastAnswer(t *testing.T) {
+// FR-BB73 AC-15: one answer on a 50% exam decides pass or fail by itself, so the AI score is a suggestion, never a
+// grade, and the AI alone never finalises the session.
+func TestAIGrade_DecisiveSingleAnswerIsSuggested(t *testing.T) {
 	db := newAIGradePGDB(t)
 	sessionID, _, qs := seedAIGradeSession(t, db, 1)
 
@@ -131,39 +134,41 @@ func TestAIGrade_TickGradesAndFinalisesTheLastAnswer(t *testing.T) {
 
 	require.Equal(t, 1, client.calls)
 	row := readAIGradeScore(t, db, sessionID, qs[0])
-	assert.Equal(t, "ai_graded", row.Status)
-	assert.InDelta(t, 1.0, row.Score, 1e-9, "50% of max_score 2")
-	assert.Equal(t, "half", row.Reason.String)
-	assert.Equal(t, 1, row.Attempts)
+	assert.Equal(t, "pending_manual", row.Status)
+	assert.InDelta(t, 0.0, row.Score, 1e-9, "a suggestion changes no score")
+	sug := readAISuggestion(t, db, sessionID, qs[0])
+	require.True(t, sug.Pct.Valid)
+	assert.InDelta(t, 50.0, sug.Pct.Float64, 1e-9)
+	assert.Contains(t, sug.Flags, "decisive_pass")
 
-	status, scorePct, passed := readAIGradeSession(t, db, sessionID)
-	assert.Equal(t, "submitted", status)
-	require.True(t, scorePct.Valid)
-	assert.InDelta(t, 50.0, scorePct.Float64, 1e-9)
-	assert.True(t, passed, "50% meets the 50% pass mark")
-	assert.Equal(t, []string{sessionID}, finalised, "the result notification fires once, when the session finalises")
-	assert.Equal(t, 1, countAIGradeUsage(t, db))
+	status, _, _ := readAIGradeSession(t, db, sessionID)
+	assert.Equal(t, "grading_pending", status, "the AI alone never finalises a session it can decide")
+	assert.Empty(t, finalised)
+	assert.Equal(t, 1, countAudit(t, db, "answer.ai_suggest"))
+	assert.Equal(t, 0, countAudit(t, db, "answer.ai_grade"))
 }
 
-func TestAIGrade_SessionStaysPendingUntilTheLastAnswer(t *testing.T) {
+// FR-BB73 AC-15, constraint 1 of the architect: two AI answers that only pass together. Each sees the other as open, so
+// both are flagged and both stay suggestions, whatever order they are graded in.
+func TestAIGrade_TwoAnswersThatOnlyPassTogetherAreSuggested(t *testing.T) {
 	db := newAIGradePGDB(t)
-	sessionID, _, _ := seedAIGradeSession(t, db, 2)
+	sessionID, _, qs := seedAIGradeSession(t, db, 2)
 
 	client := &gradeStubClient{response: `{"score_pct": 100, "reasoning": "right"}`, tokens: 5}
 	var finalised []string
 	cfg := AIGradeConfig{Client: client, DailyLimit: 10, OnFinalised: func(id string) { finalised = append(finalised, id) }}
+	runAIGradeTick(context.Background(), db, slog.Default(), cfg)
 
-	gradeOne(t, db, cfg)
+	require.Equal(t, 2, client.calls)
+	for _, qid := range qs {
+		row := readAIGradeScore(t, db, sessionID, qid)
+		assert.Equal(t, "pending_manual", row.Status, "no AI answer is applied as a grade")
+		sug := readAISuggestion(t, db, sessionID, qid)
+		assert.Contains(t, sug.Flags, "decisive_pass")
+	}
 	status, _, _ := readAIGradeSession(t, db, sessionID)
-	assert.Equal(t, "grading_pending", status, "one answer is still pending")
+	assert.Equal(t, "grading_pending", status)
 	assert.Empty(t, finalised)
-
-	gradeOne(t, db, cfg)
-	status, scorePct, _ := readAIGradeSession(t, db, sessionID)
-	assert.Equal(t, "submitted", status)
-	require.True(t, scorePct.Valid)
-	assert.InDelta(t, 100.0, scorePct.Float64, 1e-9)
-	assert.Equal(t, []string{sessionID}, finalised)
 }
 
 // A person grades the answer while the provider call is in flight. The AI result is discarded, the person's score
@@ -236,8 +241,12 @@ func TestAIGrade_ProviderErrorIsRetriedFromTheDatabase(t *testing.T) {
 	working := &gradeStubClient{response: `{"score_pct": 100, "reasoning": "right"}`, tokens: 5}
 	runAIGradeTick(context.Background(), db, slog.Default(), AIGradeConfig{Client: working, DailyLimit: 10})
 	row = readAIGradeScore(t, db, sessionID, qs[0])
-	assert.Equal(t, "ai_graded", row.Status)
+	// The single answer is decisive (FR-BB73 AC-15), so the working reply is a flagged suggestion, not a grade.
+	assert.Equal(t, "pending_manual", row.Status)
 	assert.Equal(t, 2, row.Attempts)
+	sug := readAISuggestion(t, db, sessionID, qs[0])
+	require.True(t, sug.Pct.Valid)
+	assert.Contains(t, sug.Flags, "decisive_pass")
 }
 
 // A reply without JSON leaves the answer pending.

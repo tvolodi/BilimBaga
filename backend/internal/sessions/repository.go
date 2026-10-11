@@ -388,7 +388,7 @@ WHERE sqs.session_id = $1 AND q.type = 'shorttext'`
 // AICandidateCount counts the session's answers the AI grading job may grade now. It runs the job's own predicate, so
 // the count and the job cannot disagree (FR-BB322 AC-4).
 func (r *postgresRepository) AICandidateCount(ctx context.Context, sessionID string) (int, error) {
-	return countAIEligibleAnswers(ctx, r.db, sessionID)
+	return countAIAutoEligibleAnswers(ctx, r.db, sessionID)
 }
 
 // AIDailyUsage counts the AI grading calls made in the last 24 hours (FR-BB322 AC-4).

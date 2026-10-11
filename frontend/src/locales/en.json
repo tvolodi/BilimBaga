@@ -793,6 +793,7 @@
     "filter_action": "Action",
     "filter_entity": "Entity Type",
     "filter_clear": "Clear Filters",
+    "filter_options_error": "Filter options could not be loaded. You can still filter by date and actor.",
     "col_timestamp": "Timestamp",
     "col_actor": "Actor",
     "col_action": "Action",

@@ -88,3 +88,31 @@ func ListAudit(
 	}
 	return entries, total, nil
 }
+
+// ListFilterOptions returns the distinct, non-empty action codes and entity types of tenantID's audit log, each sorted in
+// C collation so the order does not depend on the database locale. tenantID is the first condition, as in ListAudit.
+func ListFilterOptions(ctx context.Context, db *sqlx.DB, tenantID string) (AuditFilterOptions, error) {
+	actions, err := distinctAuditValues(ctx, db, tenantID, "action")
+	if err != nil {
+		return AuditFilterOptions{}, err
+	}
+	entityTypes, err := distinctAuditValues(ctx, db, tenantID, "entity_type")
+	if err != nil {
+		return AuditFilterOptions{}, err
+	}
+	return AuditFilterOptions{Actions: actions, EntityTypes: entityTypes}, nil
+}
+
+// distinctAuditValues reads one column of tenantID's audit log. column is one of two fixed names that ListFilterOptions
+// passes, never user input.
+func distinctAuditValues(ctx context.Context, db *sqlx.DB, tenantID, column string) ([]string, error) {
+	q := fmt.Sprintf(
+		"SELECT DISTINCT %[1]s COLLATE \"C\" AS value FROM audit_log WHERE tenant_id = $1 AND %[1]s IS NOT NULL AND %[1]s <> '' ORDER BY value",
+		column,
+	)
+	values := []string{}
+	if err := db.SelectContext(ctx, &values, q, tenantID); err != nil {
+		return nil, fmt.Errorf("audit filter options %s: %w", column, err)
+	}
+	return values, nil
+}

@@ -36,29 +36,12 @@ export interface AuditLogResponse {
   meta: AuditMeta
 }
 
-export const AUDIT_ACTIONS = [
-  'user.login',
-  'user.logout',
-  'user.create',
-  'user.update',
-  'user.deactivate',
-  'user.reactivate',
-  'exam.create',
-  'exam.update',
-  'exam.publish',
-  'exam.archive',
-  'session.start',
-  'session.submit',
-  'session.expire',
-  'session.pending_manual_grade',
-  'answer.grade',
-  'answer.ai_grade',
-  'certificate.issue',
-  'question.create',
-  'question.update',
-  'question.delete',
-  'tenant.update',
-] as const
+// The values the audit filter offers for this tenant: the distinct action codes and entity types its log holds, sorted
+// (FR-BB55 AC-2, #557). Codes are shown as they are; the backend codes are never renamed.
+export interface AuditFilterOptions {
+  actions: string[]
+  entity_types: string[]
+}
 
 // ---- API helpers ------------------------------------------------------------
 
@@ -91,6 +74,16 @@ export function useAuditLog(filters: AuditFilters, page: number) {
   return useQuery<AuditLogResponse, Error>({
     queryKey: ['audit-log', filters, page],
     queryFn: () => apiFetch<AuditLogResponse>(qc, buildAuditURL(filters, page)),
+  })
+}
+
+// The filter options change only when a new code is first written, so they are kept for five minutes.
+export function useAuditFilterOptions() {
+  const qc = useQueryClient()
+  return useQuery<AuditFilterOptions, Error>({
+    queryKey: ['audit-filter-options'],
+    queryFn: () => apiFetch<AuditFilterOptions>(qc, '/api/v1/audit/actions'),
+    staleTime: 5 * 60 * 1000,
   })
 }
 

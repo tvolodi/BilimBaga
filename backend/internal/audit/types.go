@@ -32,3 +32,10 @@ type AuditFilters struct {
 
 // maxExportRows caps the number of rows returned by the CSV export.
 const maxExportRows = 10_000
+
+// AuditFilterOptions lists the values the audit filter offers for one tenant: the distinct action codes and entity
+// types its audit log holds, sorted (FR-BB55 AC-2, amended by #557).
+type AuditFilterOptions struct {
+	Actions     []string `json:"actions"`
+	EntityTypes []string `json:"entity_types"`
+}

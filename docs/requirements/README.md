@@ -75,7 +75,7 @@
 | FR-BB67 | e2e-coverage-employee-portal-exam-taking-grading | E2E Coverage: Employee Portal, Exam Taking, Result & Grading Flows | Implemented |
 | FR-BB71 | Question-generation-assist | Question Generation Assist | Implemented |
 | FR-BB72 | Adaptive-difficulty | Adaptive Difficulty | Implemented |
-| FR-BB73 | Short-text-auto-grading | Short-Text Auto-Grading | Implemented |
+| FR-BB73 | Short-text-auto-grading | Short-Text Auto-Grading | Implemented (revision 2 Validated, #534: modes off/suggest/auto, flags, re-grading rules) |
 | FR-BB74 | Performance-insight-summaries | Performance Insight Summaries | Implemented |
 | FR-BB75 | Loyalty-profile-narrative | Loyalty Profile Narrative | Implemented |
 | FR-BB315 | exam-step4-eligible-question-counts | Exam Step 4: Eligible Question Counts per Rule | Implemented |

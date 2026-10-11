@@ -27,11 +27,36 @@ type httpAnthropicClient struct {
 	logger  *slog.Logger
 }
 
+// DefaultClientTimeout is the whole-request timeout of a provider client when no WithTimeout option sets one. It is the
+// default of AI_TIMEOUT_SECONDS (config.DefaultAITimeoutSeconds, #519).
+const DefaultClientTimeout = 90 * time.Second
+
+// GradingClientTimeout is the timeout of the grading client (#519). Grading calls the provider once per short-text answer
+// inside the submit transaction, so it keeps the 60 s it had before AI_TIMEOUT_SECONDS existed.
+const GradingClientTimeout = 60 * time.Second
+
+// ClientOption tunes a provider client.
+type ClientOption func(*http.Client)
+
+// WithTimeout sets the whole-request timeout of a provider client (AI_TIMEOUT_SECONDS, #519).
+func WithTimeout(d time.Duration) ClientOption {
+	return func(c *http.Client) { c.Timeout = d }
+}
+
+// newHTTPClient returns the HTTP client a provider uses: DefaultClientTimeout, then the options.
+func newHTTPClient(opts []ClientOption) *http.Client {
+	c := &http.Client{Timeout: DefaultClientTimeout}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
+}
+
 // NewAnthropicClient returns a production AnthropicClient using the given API key.
-func NewAnthropicClient(apiKey string, logger *slog.Logger) AnthropicClient {
+func NewAnthropicClient(apiKey string, logger *slog.Logger, opts ...ClientOption) AnthropicClient {
 	return &httpAnthropicClient{
 		apiKey:  apiKey,
-		httpCli: &http.Client{Timeout: 60 * time.Second},
+		httpCli: newHTTPClient(opts),
 		logger:  logger,
 	}
 }

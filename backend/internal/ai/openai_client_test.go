@@ -159,6 +159,21 @@ func TestOpenAIClient_LogCutCountsCharactersNotBytes(t *testing.T) {
 	}
 }
 
+// #510: a 200 whose first choice has no text is not an answer, so it is ErrAIUnavailable, as a failed call is.
+func TestOpenAIClient_EmptyFirstChoiceContentIsUnavailable(t *testing.T) {
+	for _, content := range []string{"", "   \n\t"} {
+		var buf bytes.Buffer
+		c := newOpenAITestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"`+content+`"}}],`+
+				`"usage":{"prompt_tokens":3,"completion_tokens":0}}`)
+		}, &buf)
+		text, _, err := c.GenerateText(context.Background(), "p", "m")
+		if !errors.Is(err, ErrAIUnavailable) || text != "" {
+			t.Fatalf("empty content %q: want ErrAIUnavailable and no text, got text=%q err=%v", content, text, err)
+		}
+	}
+}
+
 func TestOpenAIClient_TransportFailureIsUnavailable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	url := srv.URL + "/v1"

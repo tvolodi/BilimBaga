@@ -105,5 +105,10 @@ func (c *openAICompatibleClient) GenerateText(ctx context.Context, prompt, model
 		return "", 0, fmt.Errorf("%w: no choices in response", ErrAIUnavailable)
 	}
 
-	return apiResp.Choices[0].Message.Content, apiResp.Usage.PromptTokens + apiResp.Usage.CompletionTokens, nil
+	// #510: a first choice with no text is not an answer, so it is ErrAIUnavailable, as a failed call is.
+	text := apiResp.Choices[0].Message.Content
+	if strings.TrimSpace(text) == "" {
+		return "", 0, fmt.Errorf("%w: empty answer", ErrAIUnavailable)
+	}
+	return text, apiResp.Usage.PromptTokens + apiResp.Usage.CompletionTokens, nil
 }

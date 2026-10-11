@@ -10,14 +10,13 @@ package questions
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/bilimbaga/bilimbaga/internal/testpg"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -44,22 +43,7 @@ func newPGTranslationFixture(t *testing.T) pgTranslationFixture {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	schema := fmt.Sprintf("bb_514_%d", time.Now().UnixNano())
-
-	admin, err := sqlx.Open("postgres", base)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = admin.Close() })
-	_, err = admin.ExecContext(ctx, "CREATE SCHEMA "+schema)
-	require.NoError(t, err)
-	t.Cleanup(func() { _, _ = admin.ExecContext(ctx, "DROP SCHEMA "+schema+" CASCADE") })
-
-	sep := "?"
-	if strings.Contains(base, "?") {
-		sep = "&"
-	}
-	db, err := sqlx.Open("postgres", base+sep+"search_path="+schema)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	db := testpg.NewSchema(t, base, "bb_514")
 	applyUpMigrations(t, db, migrations)
 
 	var roleID, catID, userID, qID string

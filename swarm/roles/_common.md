@@ -16,3 +16,4 @@ Read at every startup and after every compaction, together with `PROTOCOL.md`.
 12. Run `/compact` when context grows large.
 13. Checkpoint each step change (PROTOCOL, checkpoints). No per-tick heartbeat.
 14. Never run a script or tool that sends requests to a host other than the local stack or a target the issue names (lighthouse, k6, curl, npx of an unknown package). Guard tests stub the tool on PATH and never call the real one.
+15. Secrets. An agent never reads, prints, copies or moves the value of a key, token or password: no `cat .env`, no `docker compose config`, no `env` dump of a container, no second file that holds the value, under any name. A stack that needs the owner's `.env` is started with `--env-file <path to the main checkout's .env>`. That a secret is loaded is shown by behaviour (a 200, a startup line), never by its value.

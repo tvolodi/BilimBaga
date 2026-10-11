@@ -380,6 +380,15 @@ func (h *Handler) HandleGradeAnswer(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusUnprocessableEntity, "INVALID_SCORE", "score_pct must be between 0 and 100")
 		case errors.Is(err, ErrSessionNotFound):
 			api.WriteError(w, http.StatusNotFound, "SESSION_NOT_FOUND", "Session not found.")
+		case errors.Is(err, ErrCannotGradeOwnSession):
+			api.WriteError(w, http.StatusForbidden, "CANNOT_GRADE_OWN_SESSION",
+				"You cannot grade your own exam session.")
+		case errors.Is(err, ErrSessionFinalised):
+			api.WriteError(w, http.StatusConflict, "SESSION_FINALISED",
+				"The session is final and this answer is already graded.")
+		case errors.Is(err, ErrCertificateIssued):
+			api.WriteError(w, http.StatusConflict, "CERTIFICATE_ISSUED",
+				"A certificate was issued for this session, so its result cannot be changed.")
 		default:
 			slog.Error("GradeAnswer failed", "error", err, "sessionId", sessionID, "questionId", questionID)
 			api.WriteError(w, http.StatusInternalServerError, "ERR_INTERNAL", "failed to grade answer")

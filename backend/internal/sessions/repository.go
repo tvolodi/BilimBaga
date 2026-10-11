@@ -388,7 +388,7 @@ WHERE sqs.session_id = $1 AND q.type = 'shorttext'`
 // AICandidateCount counts the session's answers the AI grading job may grade now. It runs the job's own predicate, so
 // the count and the job cannot disagree (FR-BB322 AC-4).
 func (r *postgresRepository) AICandidateCount(ctx context.Context, sessionID string) (int, error) {
-	return countAIEligibleAnswers(ctx, r.db, sessionID)
+	return countAIAutoEligibleAnswers(ctx, r.db, sessionID)
 }
 
 // AIDailyUsage counts the AI grading calls made in the last 24 hours (FR-BB322 AC-4).
@@ -1308,6 +1308,11 @@ type gradeAnswerResult struct {
 	finalScorePct *float64
 	passed        *bool
 	sessionStatus string
+	// previousStatus is the session status before this grade, read under the session lock. The mail decision needs it:
+	// the result mail goes out on the transition from grading_pending only (FR-BB73 AC-19).
+	previousStatus string
+	// passedFlipped is true when a final session changed its pass or fail with this grade.
+	passedFlipped bool
 }
 
 // ListGradingQueue returns sessions with status='grading_pending' (FR-BB42 AC-1/AC-2/AC-3).
@@ -1345,13 +1350,14 @@ SELECT
   u.full_name                                                          AS employee_name,
   e.id                                                                 AS exam_id,
   e.title                                                              AS exam_title,
+  e.ai_grading_mode                                                    AS ai_grading_mode,
   es.submitted_at,
   COUNT(sqs.question_id) FILTER (WHERE sqs.grading_status = 'pending_manual') AS pending_question_count
 FROM exam_sessions es
 JOIN users u  ON u.id  = es.user_id
 JOIN exams e  ON e.id  = es.exam_id
 JOIN session_question_scores sqs ON sqs.session_id = es.id` + baseWhere("$6", "$7") + `
-GROUP BY es.id, u.full_name, e.id, e.title, es.submitted_at
+GROUP BY es.id, u.full_name, e.id, e.title, e.ai_grading_mode, es.submitted_at
 ORDER BY es.submitted_at ASC
 LIMIT $4 OFFSET $5`
 
@@ -1380,17 +1386,19 @@ func (r *postgresRepository) GetGradingDetail(ctx context.Context, sessionID str
 SELECT es.id         AS session_id,
        u.full_name   AS employee_name,
        e.title       AS exam_title,
-       es.submitted_at
+       es.submitted_at,
+       es.status     AS session_status
 FROM exam_sessions es
 JOIN users u ON u.id = es.user_id
 JOIN exams e ON e.id = es.exam_id
 WHERE es.id = $1`
 
 	type headerRow struct {
-		SessionID    string     `db:"session_id"`
-		EmployeeName string     `db:"employee_name"`
-		ExamTitle    string     `db:"exam_title"`
-		SubmittedAt  *time.Time `db:"submitted_at"`
+		SessionID     string     `db:"session_id"`
+		EmployeeName  string     `db:"employee_name"`
+		ExamTitle     string     `db:"exam_title"`
+		SubmittedAt   *time.Time `db:"submitted_at"`
+		SessionStatus string     `db:"session_status"`
 	}
 	var hdr headerRow
 	if err := r.db.GetContext(ctx, &hdr, headerQ, sessionID); err != nil {
@@ -1411,7 +1419,11 @@ SELECT
        THEN ROUND(sqs.score / NULLIF(sqs.max_score, 0) * 100, 2)
        ELSE NULL
   END                            AS current_score_pct,
-  sqs.manual_feedback
+  sqs.manual_feedback,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_suggested_score_pct END AS ai_suggested_score_pct,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_suggested_at END        AS ai_suggested_at,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_reasoning END           AS ai_reasoning,
+  CASE WHEN sqs.grading_status IN ('pending_manual', 'ai_graded') THEN sqs.ai_flags END               AS ai_flags
 FROM session_question_scores sqs
 JOIN questions q
     ON q.id = sqs.question_id
@@ -1444,74 +1456,13 @@ ORDER BY sq.sort_order ASC`
 	}
 
 	return &GradingDetailResponse{
-		SessionID:    hdr.SessionID,
-		EmployeeName: hdr.EmployeeName,
-		ExamTitle:    hdr.ExamTitle,
-		SubmittedAt:  hdr.SubmittedAt,
-		Questions:    questions,
+		SessionID:     hdr.SessionID,
+		EmployeeName:  hdr.EmployeeName,
+		ExamTitle:     hdr.ExamTitle,
+		SubmittedAt:   hdr.SubmittedAt,
+		SessionStatus: hdr.SessionStatus,
+		Questions:     questions,
 	}, nil
-}
-
-// GradeAnswer scores one short-text answer inside a transaction (FR-BB42 AC-7/AC-10).
-func (r *postgresRepository) GradeAnswer(ctx context.Context, sessionID, questionID, graderID, tenantID, actorIP string, scorePct float64, feedback string) (*gradeAnswerResult, error) {
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: begin tx: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	// 0. Lock the session before any grading write (see lockSessionForGrading, #528).
-	if err := lockSessionForGrading(ctx, tx, sessionID); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
-	}
-
-	// 1. Fetch max_score.
-	var maxScore float64
-	const maxQ = `SELECT max_score FROM session_question_scores WHERE session_id = $1 AND question_id = $2`
-	if err := tx.QueryRowContext(ctx, maxQ, sessionID, questionID).Scan(&maxScore); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrSessionNotFound
-		}
-		return nil, fmt.Errorf("sessions: GradeAnswer: fetch max_score: %w", err)
-	}
-
-	// 2. Compute raw score.
-	score := scorePct / 100.0 * maxScore
-
-	// 3. Update the score row (AC-10: persist graded_by, graded_at, manual_feedback).
-	const updateQ = `
-UPDATE session_question_scores
-SET score           = $3,
-    grading_status  = 'graded',
-    manual_feedback = $4,
-    graded_by       = $5,
-    graded_at       = NOW()
-WHERE session_id = $1 AND question_id = $2`
-	if _, err := tx.ExecContext(ctx, updateQ, sessionID, questionID, score, feedback, graderID); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: update score: %w", err)
-	}
-
-	// 4-5. Count the pending answers and, when none are left, finalise the session (AC-6/AC-7). The same helper
-	// finalises an AI-graded answer (#528).
-	fin, err := finaliseSessionIfAllGraded(ctx, tx, sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: %w", err)
-	}
-	res := &fin
-
-	// 6. Write audit log entry (AC-8).
-	const auditQ = `
-INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
-VALUES ($1, $2, 'answer.grade', 'session_answer', $3, $4,
-        jsonb_build_object('grader_id', $7::text, 'session_id', $5::text, 'score_pct', $6::numeric))`
-	if _, err := tx.ExecContext(ctx, auditQ, tenantID, graderID, questionID, actorIP, sessionID, scorePct, graderID); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: audit: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("sessions: GradeAnswer: commit: %w", err)
-	}
-	return res, nil
 }
 
 // lockSessionForGrading takes the exam_sessions row lock that every grading write takes before its score update.

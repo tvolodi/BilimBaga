@@ -7,18 +7,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/bilimbaga/bilimbaga/internal/ai"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
-// AI grading job (#528). Submitting an exam only records a short-text answer as pending_manual. This job grades
-// those answers in the background. Invariant: no network call happens inside a database transaction, and submitting
-// never waits for the provider. Each answer is a row of session_question_scores, so the rows are the queue: a restart
-// loses nothing.
+// AI grading job (#528, FR-BB73 revision 2). Submitting an exam only records a short-text answer as pending_manual.
+// This job asks the provider about those answers in the background. Invariant: no network call happens inside a
+// database transaction, and submitting never waits for the provider. Each answer is a row of session_question_scores,
+// so the rows are the queue: a restart loses nothing.
+//
+// What the job does with the result depends on the exam's ai_grading_mode, read inside the write transaction after the
+// session lock (AC-14): "auto" grades the answer unless a flag routes it to a person, and "suggest" (and any flagged
+// answer) stores only a suggestion for a person to confirm (AC-13). "off" discards the result.
 const (
 	aiGradeInterval       = 15 * time.Second
 	aiGradeDeadline       = 30 * time.Second
@@ -121,30 +127,33 @@ WHERE feature = $1 AND created_at > NOW() - INTERVAL '24 hours'`
 	return n, nil
 }
 
-// selectAIGradeCandidates returns up to limit pending short-text answers of submitted sessions (last 24 h) whose
-// question is auto-graded, has a model answer, and whose answer text is not null, with fewer than aiGradeMaxAttempts.
-// aiGradeFromSQL joins the answers the AI job may grade with their session, question and answer.
+// aiGradeFromSQL joins the answers the AI job may grade with their session, question, answer and exam.
 const aiGradeFromSQL = `
 FROM session_question_scores sqs
 JOIN exam_sessions es ON es.id = sqs.session_id
 JOIN questions q ON q.id = sqs.question_id
-JOIN session_answers sa ON sa.session_id = sqs.session_id AND sa.question_id = sqs.question_id`
+JOIN session_answers sa ON sa.session_id = sqs.session_id AND sa.question_id = sqs.question_id
+JOIN exams ex ON ex.id = es.exam_id`
 
-// aiGradeEligibleSQL is the predicate of an answer the AI job may grade (FR-BB322 AC-4). Its parameter $1 is the
-// attempt cap. The job's batch query and the result service's grading_expected_by both use it, so they cannot drift.
+// aiGradeEligibleSQL is the predicate of an answer the AI job may grade (FR-BB322 AC-4, FR-BB73 AC-11). Its parameter $1
+// is the attempt cap. The job's batch query and the result service's grading_expected_by both use it, so they cannot
+// drift. The mode is read at grading time; an answer that holds a suggestion has had its one suggestion.
 const aiGradeEligibleSQL = `
   sqs.grading_status = 'pending_manual'
   AND sqs.ai_grade_attempts < $1
+  AND sqs.ai_suggested_score_pct IS NULL
+  AND ex.ai_grading_mode IN ('suggest', 'auto')
   AND q.type = 'shorttext'
   AND q.auto_grade
   AND q.model_answer IS NOT NULL AND btrim(q.model_answer) <> ''
   AND sa.text_answer IS NOT NULL
   AND es.submitted_at > NOW() - INTERVAL '24 hours'`
 
-// countAIEligibleAnswers counts a session's answers that the AI job may grade now (FR-BB322 AC-4).
-func countAIEligibleAnswers(ctx context.Context, db *sqlx.DB, sessionID string) (int, error) {
+// countAIAutoEligibleAnswers counts a session's answers that the AI will grade automatically: the job's predicate, for
+// exams in auto (FR-BB73 AC-11). Only these answers make grading_expected_by "ai".
+func countAIAutoEligibleAnswers(ctx context.Context, db *sqlx.DB, sessionID string) (int, error) {
 	q := `SELECT COUNT(*)` + aiGradeFromSQL + `
-WHERE sqs.session_id = $2 AND` + aiGradeEligibleSQL
+WHERE sqs.session_id = $2 AND ex.ai_grading_mode = 'auto' AND` + aiGradeEligibleSQL
 	var n int
 	if err := db.GetContext(ctx, &n, q, aiGradeMaxAttempts, sessionID); err != nil {
 		return 0, fmt.Errorf("count eligible answers: %w", err)
@@ -152,6 +161,9 @@ WHERE sqs.session_id = $2 AND` + aiGradeEligibleSQL
 	return n, nil
 }
 
+// selectAIGradeCandidates returns up to limit pending short-text answers of submitted sessions (last 24 h) whose
+// question is auto-graded, has a model answer, whose answer text is not null, and whose exam is in suggest or auto,
+// with fewer than aiGradeMaxAttempts and no suggestion yet.
 func selectAIGradeCandidates(ctx context.Context, db *sqlx.DB, limit int) ([]aiGradeCandidate, error) {
 	q := `
 SELECT sqs.session_id, sqs.question_id, sqs.ai_grade_attempts, sqs.max_score,
@@ -187,8 +199,8 @@ WHERE session_id = $1 AND question_id = $2
 	return n == 1, nil
 }
 
-// gradeAIAnswer grades one claimed answer. The provider call runs outside any transaction, with a 30 s deadline.
-// On a provider error or an unusable reply the row stays pending_manual (its attempt is already counted).
+// gradeAIAnswer asks the provider about one claimed answer. The provider call runs outside any transaction, with a 30 s
+// deadline. On a provider error or an unusable reply the row stays pending_manual (its attempt is already counted).
 func gradeAIAnswer(ctx context.Context, db *sqlx.DB, logger *slog.Logger, cfg AIGradeConfig, c aiGradeCandidate) error {
 	claimed, err := claimAIGrade(ctx, db, c)
 	if err != nil {
@@ -214,14 +226,19 @@ func gradeAIAnswer(ctx context.Context, db *sqlx.DB, logger *slog.Logger, cfg AI
 	if err != nil {
 		return err
 	}
-	score := float64(result.ScorePct) / 100.0 * c.MaxScore
-	return writeAIGrade(ctx, db, logger, cfg, c, score, result.Reasoning)
+	return writeAIGrade(ctx, db, logger, cfg, c, roundTo2(float64(result.ScorePct)), result.Reasoning)
 }
 
-// writeAIGrade stores the AI score in one short transaction, only while the row is still pending_manual. A human who
-// graded it while the provider call was in flight keeps their score: the AI result is discarded. The same finalise
-// helper as manual grading then decides whether the session is complete.
-func writeAIGrade(ctx context.Context, db *sqlx.DB, logger *slog.Logger, cfg AIGradeConfig, c aiGradeCandidate, score float64, reasoning string) error {
+// roundTo2 rounds a percentage to two decimals, the precision of ai_suggested_score_pct NUMERIC(5,2) (FR-BB73 AC-15).
+// The score is rounded before it is evaluated and before it is stored, so the two cannot differ.
+func roundTo2(v float64) float64 {
+	return math.Round(v*100) / 100
+}
+
+// writeAIGrade stores one AI result in one short transaction, in the order FR-BB73 AC-14 and AC-15 require: the session
+// lock, then the exam's mode, then the row, then the flags, then the branch. A person who graded the row while the
+// provider call was in flight keeps the grade. A mode of off at this point discards the result.
+func writeAIGrade(ctx context.Context, db *sqlx.DB, logger *slog.Logger, cfg AIGradeConfig, c aiGradeCandidate, pct float64, reasoning string) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
@@ -232,36 +249,46 @@ func writeAIGrade(ctx context.Context, db *sqlx.DB, logger *slog.Logger, cfg AIG
 		return fmt.Errorf("lock: %w", err)
 	}
 
-	const scoreQ = `
-UPDATE session_question_scores
-SET score = $3, grading_status = 'ai_graded', ai_reasoning = $4
-WHERE session_id = $1 AND question_id = $2 AND grading_status = 'pending_manual'`
-	res, err := tx.ExecContext(ctx, scoreQ, c.SessionID, c.QuestionID, score, reasoning)
+	mode, err := readExamAIMode(ctx, tx, c.SessionID)
 	if err != nil {
-		return fmt.Errorf("write score: %w", err)
+		return fmt.Errorf("mode: %w", err)
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("write score rows: %w", err)
-	}
-	if n == 0 {
-		logger.Info("ai grading: answer graded by a person meanwhile, AI result discarded",
-			"session_id", c.SessionID, "question_id", c.QuestionID)
+	if mode == "off" {
+		logger.Info("ai grading: exam switched off meanwhile, AI result discarded", "session_id", c.SessionID, "question_id", c.QuestionID)
 		return nil
 	}
 
-	fin, err := finaliseSessionIfAllGraded(ctx, tx, c.SessionID)
+	open, err := rowIsOpenForAI(ctx, tx, c)
 	if err != nil {
-		return fmt.Errorf("finalise: %w", err)
+		return fmt.Errorf("row: %w", err)
+	}
+	if !open {
+		logger.Info("ai grading: answer graded or suggested meanwhile, AI result discarded", "session_id", c.SessionID, "question_id", c.QuestionID)
+		return nil
 	}
 
-	const auditQ = `
-INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
-VALUES ('public', NULL, 'answer.ai_grade', 'session_answer', $1, '', jsonb_build_object('session_id', $2::text))`
-	if _, err := tx.ExecContext(ctx, auditQ, c.QuestionID, c.SessionID); err != nil {
-		return fmt.Errorf("audit: %w", err)
+	flagCtx, err := readFlagContext(ctx, tx, c.SessionID)
+	if err != nil {
+		return fmt.Errorf("flag context: %w", err)
+	}
+	flags := flagAIGrade(c.TextAnswer, pct, c.ModelAnswer, flagCtx)
+
+	if mode == "suggest" || len(flags) > 0 {
+		// AC-13, AC-16: a suggestion changes no score, status, mail or certificate input.
+		if err := applyAISuggestion(ctx, tx, c, pct, reasoning, flags); err != nil {
+			return fmt.Errorf("suggest: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit: %w", err)
+		}
+		return nil
 	}
 
+	// AC-14: the unflagged auto grade, finalised through the one finalise path.
+	fin, err := applyAIGrade(ctx, tx, c, pct, reasoning)
+	if err != nil {
+		return fmt.Errorf("grade: %w", err)
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
@@ -269,6 +296,137 @@ VALUES ('public', NULL, 'answer.ai_grade', 'session_answer', $1, '', jsonb_build
 		cfg.OnFinalised(c.SessionID)
 	}
 	return nil
+}
+
+// readExamAIMode reads the exam's ai_grading_mode inside the write transaction, after the session lock (FR-BB73 AC-14).
+func readExamAIMode(ctx context.Context, tx *sqlx.Tx, sessionID string) (string, error) {
+	const q = `
+SELECT ex.ai_grading_mode
+FROM exam_sessions es
+JOIN exams ex ON ex.id = es.exam_id
+WHERE es.id = $1`
+	var mode string
+	if err := tx.GetContext(ctx, &mode, q, sessionID); err != nil {
+		return "", fmt.Errorf("read mode: %w", err)
+	}
+	return mode, nil
+}
+
+// rowIsOpenForAI reports whether the answer is still pending and has no suggestion, under the session lock.
+func rowIsOpenForAI(ctx context.Context, tx *sqlx.Tx, c aiGradeCandidate) (bool, error) {
+	const q = `
+SELECT EXISTS (
+    SELECT 1 FROM session_question_scores
+    WHERE session_id = $1 AND question_id = $2
+      AND grading_status = 'pending_manual' AND ai_suggested_score_pct IS NULL
+)`
+	var open bool
+	if err := tx.GetContext(ctx, &open, q, c.SessionID, c.QuestionID); err != nil {
+		return false, fmt.Errorf("row open: %w", err)
+	}
+	return open, nil
+}
+
+// readFlagContext reads what the decisive_pass rule needs, under the session lock (FR-BB73 AC-15): S0 (points of the
+// graded rows), Open (maximum points of every row that is not graded, pending or ai_graded), the total points and the
+// pass mark of the exam.
+func readFlagContext(ctx context.Context, tx *sqlx.Tx, sessionID string) (flagContext, error) {
+	const pointsQ = `
+SELECT
+    COALESCE(SUM(score) FILTER (WHERE grading_status = 'graded'), 0)      AS final_points,
+    COALESCE(SUM(max_score) FILTER (WHERE grading_status <> 'graded'), 0) AS open_points,
+    COALESCE(SUM(max_score), 0)                                           AS total_points
+FROM session_question_scores
+WHERE session_id = $1`
+	var points struct {
+		FinalPoints float64 `db:"final_points"`
+		OpenPoints  float64 `db:"open_points"`
+		TotalPoints float64 `db:"total_points"`
+	}
+	if err := tx.GetContext(ctx, &points, pointsQ, sessionID); err != nil {
+		return flagContext{}, fmt.Errorf("points: %w", err)
+	}
+	const passQ = `
+SELECT e.passing_score_pct
+FROM exams e
+JOIN exam_sessions es ON es.exam_id = e.id
+WHERE es.id = $1`
+	var passingPct float64
+	if err := tx.GetContext(ctx, &passingPct, passQ, sessionID); err != nil {
+		return flagContext{}, fmt.Errorf("pass mark: %w", err)
+	}
+	return flagContext{
+		FinalPoints:     points.FinalPoints,
+		OpenPoints:      points.OpenPoints,
+		TotalPoints:     points.TotalPoints,
+		PassingScorePct: passingPct,
+	}, nil
+}
+
+// applyAISuggestion is the suggest branch (FR-BB73 AC-13). It stores the suggestion and its flags and writes the audit
+// row. The row stays pending_manual, and no score, status, pass/fail, mail or certificate input changes. It does not
+// finalise the session and sends no mail; a source guard test pins that.
+func applyAISuggestion(ctx context.Context, tx *sqlx.Tx, c aiGradeCandidate, pct float64, reasoning string, flags []string) error {
+	const q = `
+UPDATE session_question_scores
+SET ai_suggested_score_pct = $3, ai_suggested_at = NOW(), ai_reasoning = $4, ai_flags = $5
+WHERE session_id = $1 AND question_id = $2
+  AND grading_status = 'pending_manual' AND ai_suggested_score_pct IS NULL`
+	res, err := tx.ExecContext(ctx, q, c.SessionID, c.QuestionID, pct, reasoning, pq.Array(flags))
+	if err != nil {
+		return fmt.Errorf("write suggestion: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return fmt.Errorf("suggestion rows: %d, %v", n, err)
+	}
+	meta, err := json.Marshal(map[string]any{
+		"session_id":          c.SessionID,
+		"suggested_score_pct": pct,
+		"flags":               flags,
+	})
+	if err != nil {
+		return fmt.Errorf("suggestion metadata: %w", err)
+	}
+	const auditQ = `
+INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
+VALUES ('public', NULL, 'answer.ai_suggest', 'session_answer', $1, '', $2::jsonb)`
+	if _, err := tx.ExecContext(ctx, auditQ, c.QuestionID, string(meta)); err != nil {
+		return fmt.Errorf("audit: %w", err)
+	}
+	return nil
+}
+
+// applyAIGrade is the auto branch for an unflagged answer (FR-BB73 AC-14). It stores the grade as ai_graded with its
+// suggestion fields and the empty flag list, finalises the session through the one finalise helper, and writes the
+// audit row.
+func applyAIGrade(ctx context.Context, tx *sqlx.Tx, c aiGradeCandidate, pct float64, reasoning string) (gradeAnswerResult, error) {
+	score := pct / 100.0 * c.MaxScore
+	const scoreQ = `
+UPDATE session_question_scores
+SET score = $3, grading_status = 'ai_graded', ai_reasoning = $4,
+    ai_suggested_score_pct = $5, ai_suggested_at = NOW(), ai_flags = '{}'
+WHERE session_id = $1 AND question_id = $2
+  AND grading_status = 'pending_manual' AND ai_suggested_score_pct IS NULL`
+	res, err := tx.ExecContext(ctx, scoreQ, c.SessionID, c.QuestionID, score, reasoning, pct)
+	if err != nil {
+		return gradeAnswerResult{}, fmt.Errorf("write score: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return gradeAnswerResult{}, fmt.Errorf("score rows: %d, %v", n, err)
+	}
+
+	fin, err := finaliseSessionIfAllGraded(ctx, tx, c.SessionID)
+	if err != nil {
+		return gradeAnswerResult{}, fmt.Errorf("finalise: %w", err)
+	}
+
+	const auditQ = `
+INSERT INTO audit_log (tenant_id, actor_id, action, entity_type, entity_id, ip, metadata)
+VALUES ('public', NULL, 'answer.ai_grade', 'session_answer', $1, '', jsonb_build_object('session_id', $2::text))`
+	if _, err := tx.ExecContext(ctx, auditQ, c.QuestionID, c.SessionID); err != nil {
+		return gradeAnswerResult{}, fmt.Errorf("audit: %w", err)
+	}
+	return fin, nil
 }
 
 // recordAIGradeUsage writes the ai_usage_log row that the daily cap counts. Errors are logged, not returned.

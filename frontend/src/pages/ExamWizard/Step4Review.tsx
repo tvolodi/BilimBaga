@@ -188,6 +188,10 @@ export function Step4Review({ examId, onBack, onPublished }: Step4ReviewProps) {
           label={t('exam.field.certificateEnabled')}
           value={exam.certificate_enabled ? '✓' : '—'}
         />
+        <ReviewRow
+          label={t('exam.wizard.aiGradingMode.label')}
+          value={t(`exam.wizard.aiGradingMode.${exam.ai_grading_mode}`)}
+        />
       </div>
 
       <div className="rounded-lg border p-4">

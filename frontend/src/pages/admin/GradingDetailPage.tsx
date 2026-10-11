@@ -31,6 +31,19 @@ function buildInitialGrades(questions: GradingQuestion[]): GradeMap {
   return map
 }
 
+// A final session is one whose result is out (FR-BB47 AC-5): its graded answers are read-only.
+const FINAL_SESSION_STATUSES: readonly string[] = ['submitted', 'auto_submitted']
+
+/**
+ * A grade is posted when the answer still waits, or when the examiner changed it. A graded answer that is unchanged is
+ * not posted again: a final session refuses it with 409 SESSION_FINALISED (FR-BB73 AC-19).
+ */
+function needsPosting(q: GradingQuestion, grade: GradeMap[string] | undefined): boolean {
+  if (!grade || grade.score_pct === null) return false
+  if (q.grading_status === 'pending_manual') return true
+  return grade.score_pct !== q.current_score_pct || grade.feedback !== (q.manual_feedback ?? '')
+}
+
 export function GradingDetailPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const { t } = useTranslation()
@@ -43,6 +56,7 @@ export function GradingDetailPage() {
   const [grades, setGrades] = useState<GradeMap>({})
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [acceptingId, setAcceptingId] = useState<string | null>(null)
 
   // Initialise grades from API response
   useEffect(() => {
@@ -60,10 +74,14 @@ export function GradingDetailPage() {
 
   async function handleSubmitAll() {
     if (!data) return
+    const pending = data.questions.map((q, i) => ({ q, i })).filter(({ q }) => needsPosting(q, grades[q.question_id]))
+    if (pending.length === 0) {
+      toast.show(t('grading.nothing_to_submit'), 'success')
+      return
+    }
     setIsSubmitting(true)
 
-    for (let i = 0; i < data.questions.length; i++) {
-      const q = data.questions[i]
+    for (const { q, i } of pending) {
       const grade = grades[q.question_id]
       if (!grade || grade.score_pct === null) continue
 
@@ -91,6 +109,28 @@ export function GradingDetailPage() {
     setIsSubmitting(false)
   }
 
+  // FR-BB73 AC-17: accepting the suggestion posts the suggested value as the grade.
+  async function handleAccept(question: GradingQuestion) {
+    if (question.ai_suggested_score_pct === null) return
+    const feedback = grades[question.question_id]?.feedback ?? ''
+    setAcceptingId(question.question_id)
+    try {
+      const result = await submitGrade.mutateAsync({
+        questionId: question.question_id,
+        scorePct: question.ai_suggested_score_pct,
+        feedback,
+        accepted: true,
+      })
+      if (result.all_graded) {
+        navigate('/admin/grading', { state: { gradingSuccess: true } })
+      }
+    } catch {
+      toast.show(t('grading.error_toast', { question: currentIndex + 1 }), 'error')
+    } finally {
+      setAcceptingId(null)
+    }
+  }
+
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
   }
@@ -101,6 +141,9 @@ export function GradingDetailPage() {
 
   const questions = data.questions
   const currentQuestion = questions[currentIndex]
+  const isFinal = FINAL_SESSION_STATUSES.includes(data.session_status)
+  // A final session has nothing to submit unless an AI grade can still be overridden (FR-BB73 AC-19).
+  const canSubmit = !isFinal || questions.some((q) => q.grading_status === 'ai_graded')
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -109,6 +152,9 @@ export function GradingDetailPage() {
         <p className="text-sm text-muted-foreground">
           {data.employee_name} &mdash; {data.exam_title}
         </p>
+        {isFinal && (
+          <p className="mt-2 text-sm text-muted-foreground">{t('grading.suggestion.final_read_only')}</p>
+        )}
       </div>
 
       {/* Toast */}
@@ -141,18 +187,23 @@ export function GradingDetailPage() {
           onChange={(score, feedback) =>
             handleGradeChange(currentQuestion.question_id, score, feedback)
           }
+          readOnly={isFinal && currentQuestion.grading_status === 'graded'}
+          onAccept={() => handleAccept(currentQuestion)}
+          isAccepting={acceptingId === currentQuestion.question_id}
         />
       )}
 
       {/* Submit */}
-      <div className="pt-2">
-        <SubmitAllGradesButton
-          grades={grades}
-          questionCount={questions.length}
-          onSubmit={handleSubmitAll}
-          isLoading={isSubmitting}
-        />
-      </div>
+      {canSubmit && (
+        <div className="pt-2">
+          <SubmitAllGradesButton
+            grades={grades}
+            questionCount={questions.length}
+            onSubmit={handleSubmitAll}
+            isLoading={isSubmitting}
+          />
+        </div>
+      )}
     </div>
   )
 }

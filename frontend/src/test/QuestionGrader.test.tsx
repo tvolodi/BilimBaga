@@ -15,7 +15,10 @@ function makeQuestion(overrides: Partial<GradingQuestion> = {}): GradingQuestion
     grading_status: 'pending_manual',
     current_score_pct: null,
     manual_feedback: null,
+    ai_suggested_score_pct: null,
+    ai_suggested_at: null,
     ai_reasoning: null,
+    ai_flags: null,
     ...overrides,
   }
 }
@@ -112,6 +115,82 @@ describe('QuestionGrader — AI grading display (FR-BB73)', () => {
       />
     )
     expect(screen.queryByText('grading.ai_reasoning_show')).not.toBeInTheDocument()
+  })
+})
+
+describe('QuestionGrader — AI suggestion of a waiting answer (FR-BB73 AC-18)', () => {
+  const waiting = {
+    grading_status: 'pending_manual' as const,
+    ai_suggested_score_pct: 60,
+    ai_suggested_at: '2026-10-11T06:00:00Z',
+    ai_reasoning: 'Covers the main point.',
+    ai_flags: ['decisive_pass'],
+  }
+
+  it('shows the suggestion panel with the flag chips and the reasoning', () => {
+    render(<QuestionGrader question={makeQuestion(waiting)} score={null} feedback="" onChange={vi.fn()} onAccept={vi.fn()} />)
+    expect(screen.getByText('grading.suggestion.title')).toBeInTheDocument()
+    expect(screen.getByText('grading.flag.decisive_pass')).toBeInTheDocument()
+    expect(screen.getByText('Covers the main point.')).toBeInTheDocument()
+  })
+
+  it('calls onAccept when Accept is clicked', () => {
+    const onAccept = vi.fn()
+    render(<QuestionGrader question={makeQuestion(waiting)} score={null} feedback="" onChange={vi.fn()} onAccept={onAccept} />)
+    fireEvent.click(screen.getByRole('button', { name: 'grading.suggestion.accept' }))
+    expect(onAccept).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no suggestion panel when the answer has no suggestion', () => {
+    render(<QuestionGrader question={makeQuestion()} score={null} feedback="" onChange={vi.fn()} onAccept={vi.fn()} />)
+    expect(screen.queryByText('grading.suggestion.title')).not.toBeInTheDocument()
+  })
+
+  it('renders the reasoning as plain text: no HTML, no markdown', () => {
+    const hostile = '<img src=x onerror=alert(1)> and **bold**'
+    const { container } = render(
+      <QuestionGrader question={makeQuestion({ ...waiting, ai_reasoning: hostile })} score={null} feedback="" onChange={vi.fn()} onAccept={vi.fn()} />,
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('strong, b')).toBeNull()
+    expect(screen.getByText(hostile)).toBeInTheDocument()
+  })
+
+  it('hides Accept in a read-only view', () => {
+    render(
+      <QuestionGrader question={makeQuestion(waiting)} score={null} feedback="" onChange={vi.fn()} onAccept={vi.fn()} readOnly />,
+    )
+    expect(screen.queryByRole('button', { name: 'grading.suggestion.accept' })).not.toBeInTheDocument()
+  })
+
+  it('shows the AI score and reasoning of an ai_graded answer', () => {
+    render(
+      <QuestionGrader
+        question={makeQuestion({ grading_status: 'ai_graded', current_score_pct: 40, ai_reasoning: 'Partly right.' })}
+        score={40}
+        feedback=""
+        onChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('grading.suggestion.ai_score')).toBeInTheDocument()
+    expect(screen.getByText('grading.ai_reasoning_show')).toBeInTheDocument()
+  })
+})
+
+describe('QuestionGrader — read-only graded answer (FR-BB47 AC-5)', () => {
+  it('disables the score and the feedback', () => {
+    render(
+      <QuestionGrader
+        question={makeQuestion({ grading_status: 'graded', current_score_pct: 75, manual_feedback: 'ok' })}
+        score={75}
+        feedback="ok"
+        onChange={vi.fn()}
+        readOnly
+      />,
+    )
+    expect(screen.getByRole('slider')).toBeDisabled()
+    expect(screen.getByRole('spinbutton')).toBeDisabled()
+    expect(screen.getByDisplayValue('ok')).toHaveAttribute('readonly')
   })
 })
 

@@ -21,6 +21,7 @@ function session(): GradingSessionDetail {
     employee_name: 'Alice Employee',
     exam_title: 'Security Basics',
     submitted_at: '2026-01-01T00:00:00Z',
+    session_status: 'grading_pending',
     questions: [
       {
         question_id: 'q1',
@@ -29,7 +30,10 @@ function session(): GradingSessionDetail {
         grading_status: 'pending_manual',
         current_score_pct: null,
         manual_feedback: null,
+        ai_suggested_score_pct: null,
+        ai_suggested_at: null,
         ai_reasoning: null,
+        ai_flags: null,
       },
       {
         question_id: 'q2',
@@ -38,7 +42,30 @@ function session(): GradingSessionDetail {
         grading_status: 'graded',
         current_score_pct: 75,
         manual_feedback: 'Good enough',
+        ai_suggested_score_pct: null,
+        ai_suggested_at: null,
         ai_reasoning: null,
+        ai_flags: null,
+      },
+    ],
+  }
+}
+
+/** A final session: q1 is graded by a person and unchanged, q2 was graded by AI and can still be overridden. */
+function finalSession(): GradingSessionDetail {
+  const s = session()
+  return {
+    ...s,
+    session_status: 'submitted',
+    questions: [
+      { ...s.questions[1], question_id: 'q1' },
+      {
+        ...s.questions[0],
+        question_id: 'q2',
+        stem: 'Explain MFA again',
+        grading_status: 'ai_graded',
+        current_score_pct: 40,
+        ai_reasoning: 'Partly right.',
       },
     ],
   }
@@ -116,6 +143,8 @@ describe('GradingDetailPage (FR-BB47)', () => {
       .mockResolvedValueOnce({ all_graded: true })
     renderPage()
     setScore('90')
+    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    setScore('80') // q2 is changed, so it is posted too (FR-BB73 AC-19)
     fireEvent.click(screen.getByRole('button', { name: 'Submit All Grades' }))
 
     await waitFor(() => expect(screen.getByTestId('loc')).toHaveTextContent('/admin/grading'))
@@ -128,9 +157,72 @@ describe('GradingDetailPage (FR-BB47)', () => {
     expect(mutateAsync).toHaveBeenNthCalledWith(1, { questionId: 'q1', scorePct: 90, feedback: '' })
     expect(mutateAsync).toHaveBeenNthCalledWith(2, {
       questionId: 'q2',
-      scorePct: 75,
+      scorePct: 80,
       feedback: 'Good enough',
     })
+  })
+
+  it('posts only the answers that changed or still wait, not an unchanged graded answer (FR-BB73 AC-19)', async () => {
+    mutateAsync.mockResolvedValueOnce({ all_graded: true })
+    renderPage()
+    setScore('90') // q1 waits, so it is posted; q2 is pre-filled and unchanged, so it is not
+    fireEvent.click(screen.getByRole('button', { name: 'Submit All Grades' }))
+
+    await waitFor(() => expect(screen.getByTestId('loc')).toHaveTextContent('/admin/grading'))
+    expect(mutateAsync).toHaveBeenCalledTimes(1)
+    expect(mutateAsync).toHaveBeenCalledWith({ questionId: 'q1', scorePct: 90, feedback: '' })
+  })
+
+  it('posts the suggested value when the examiner accepts it (FR-BB73 AC-17)', async () => {
+    useGradingSession.mockReturnValue({
+      data: {
+        ...session(),
+        questions: [
+          {
+            ...session().questions[0],
+            ai_suggested_score_pct: 60,
+            ai_suggested_at: '2026-10-11T06:00:00Z',
+            ai_reasoning: 'Covers the main point.',
+            ai_flags: ['decisive_pass'],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    })
+    mutateAsync.mockResolvedValueOnce({ all_graded: false })
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }))
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
+    expect(mutateAsync).toHaveBeenCalledWith({ questionId: 'q1', scorePct: 60, feedback: '', accepted: true })
+  })
+
+  it('shows a final session read-only and overrides only the AI-graded answer (FR-BB47 AC-5, FR-BB73 AC-19)', async () => {
+    useGradingSession.mockReturnValue({ data: finalSession(), isLoading: false, isError: false })
+    mutateAsync.mockResolvedValueOnce({ all_graded: true })
+    renderPage()
+    expect(screen.getByText(/session is final/i)).toBeInTheDocument()
+    expect(screen.getByRole('slider')).toBeDisabled() // q1 is graded and final
+
+    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    setScore('90') // q2 was graded by AI and can still be overridden
+    fireEvent.click(screen.getByRole('button', { name: 'Submit All Grades' }))
+
+    await waitFor(() => expect(screen.getByTestId('loc')).toHaveTextContent('/admin/grading'))
+    expect(mutateAsync).toHaveBeenCalledTimes(1)
+    expect(mutateAsync).toHaveBeenCalledWith({ questionId: 'q2', scorePct: 90, feedback: '' })
+  })
+
+  it('hides Submit for a final session with no AI grade to override', () => {
+    const s = finalSession()
+    useGradingSession.mockReturnValue({
+      data: { ...s, questions: [s.questions[0]] },
+      isLoading: false,
+      isError: false,
+    })
+    renderPage()
+    expect(screen.queryByRole('button', { name: 'Submit All Grades' })).not.toBeInTheDocument()
   })
 
   it('stops after a failed submission, names the failed question, and re-enables Submit (AC-11)', async () => {

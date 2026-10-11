@@ -26,24 +26,26 @@ var (
 
 // Exam is the core configuration row.
 type Exam struct {
-	ID                 string     `db:"id"                  json:"id"`
-	Title              string     `db:"title"               json:"title"`
-	Description        *string    `db:"description"         json:"description"`
-	Status             string     `db:"status"              json:"status"`
-	TimeLimitMinutes   int        `db:"time_limit_minutes"  json:"time_limit_minutes"`
-	PassingScorePct    float64    `db:"passing_score_pct"   json:"passing_score_pct"`
-	MaxAttempts        int        `db:"max_attempts"        json:"max_attempts"`
-	AvailableFrom      *time.Time `db:"available_from"      json:"available_from"`
-	AvailableUntil     *time.Time `db:"available_until"     json:"available_until"`
-	ShuffleQuestions   bool       `db:"shuffle_questions"   json:"shuffle_questions"`
-	ShuffleOptions     bool       `db:"shuffle_options"     json:"shuffle_options"`
-	ShowAnswers        string     `db:"show_answers"        json:"show_answers"`
-	OnTabSwitch        string     `db:"on_tab_switch"       json:"on_tab_switch"`
-	CertificateEnabled bool       `db:"certificate_enabled" json:"certificate_enabled"`
-	Adaptive           bool       `db:"adaptive"            json:"adaptive"`
-	CreatedBy          string     `db:"created_by"          json:"created_by"`
-	CreatedAt          time.Time  `db:"created_at"          json:"created_at"`
-	UpdatedAt          time.Time  `db:"updated_at"          json:"updated_at"`
+	ID               string     `db:"id"                  json:"id"`
+	Title            string     `db:"title"               json:"title"`
+	Description      *string    `db:"description"         json:"description"`
+	Status           string     `db:"status"              json:"status"`
+	TimeLimitMinutes int        `db:"time_limit_minutes"  json:"time_limit_minutes"`
+	PassingScorePct  float64    `db:"passing_score_pct"   json:"passing_score_pct"`
+	MaxAttempts      int        `db:"max_attempts"        json:"max_attempts"`
+	AvailableFrom    *time.Time `db:"available_from"      json:"available_from"`
+	AvailableUntil   *time.Time `db:"available_until"     json:"available_until"`
+	ShuffleQuestions bool       `db:"shuffle_questions"   json:"shuffle_questions"`
+	ShuffleOptions   bool       `db:"shuffle_options"     json:"shuffle_options"`
+	ShowAnswers      string     `db:"show_answers"        json:"show_answers"`
+	OnTabSwitch      string     `db:"on_tab_switch"       json:"on_tab_switch"`
+	// AIGradingMode is off, suggest or auto (FR-BB73 AC-9, AC-22).
+	AIGradingMode      string    `db:"ai_grading_mode" json:"ai_grading_mode"`
+	CertificateEnabled bool      `db:"certificate_enabled" json:"certificate_enabled"`
+	Adaptive           bool      `db:"adaptive"            json:"adaptive"`
+	CreatedBy          string    `db:"created_by"          json:"created_by"`
+	CreatedAt          time.Time `db:"created_at"          json:"created_at"`
+	UpdatedAt          time.Time `db:"updated_at"          json:"updated_at"`
 }
 
 // ExamSection is an optional grouping of question rules within an exam.
@@ -140,6 +142,7 @@ type ExamDetail struct {
 	ShuffleOptions     bool                 `json:"shuffle_options"`
 	ShowAnswers        string               `json:"show_answers"`
 	OnTabSwitch        string               `json:"on_tab_switch"`
+	AIGradingMode      string               `json:"ai_grading_mode"`
 	CertificateEnabled bool                 `json:"certificate_enabled"`
 	Adaptive           bool                 `json:"adaptive"`
 	CreatedBy          string               `json:"created_by"`
@@ -191,17 +194,19 @@ func (e *PublishValidationError) Unwrap() error { return ErrRulesUnsatisfied }
 
 // CreateExamInput bundles all fields needed to create a new exam.
 type CreateExamInput struct {
-	Title              string
-	Description        *string
-	TimeLimitMinutes   int
-	PassingScorePct    float64
-	MaxAttempts        int
-	AvailableFrom      *time.Time
-	AvailableUntil     *time.Time
-	ShuffleQuestions   bool
-	ShuffleOptions     bool
-	ShowAnswers        string
-	OnTabSwitch        string
+	Title            string
+	Description      *string
+	TimeLimitMinutes int
+	PassingScorePct  float64
+	MaxAttempts      int
+	AvailableFrom    *time.Time
+	AvailableUntil   *time.Time
+	ShuffleQuestions bool
+	ShuffleOptions   bool
+	ShowAnswers      string
+	OnTabSwitch      string
+	// AIGradingMode is set by the create handler (default suggest) and must be valid.
+	AIGradingMode      string
 	CertificateEnabled bool
 	Adaptive           bool
 	CreatedBy          string
@@ -209,19 +214,29 @@ type CreateExamInput struct {
 
 // UpdateExamInput bundles all updatable fields for an exam.
 type UpdateExamInput struct {
-	Title              string
-	Description        *string
-	TimeLimitMinutes   int
-	PassingScorePct    float64
-	MaxAttempts        int
-	AvailableFrom      *time.Time
-	AvailableUntil     *time.Time
-	ShuffleQuestions   bool
-	ShuffleOptions     bool
-	ShowAnswers        string
-	OnTabSwitch        string
+	Title            string
+	Description      *string
+	TimeLimitMinutes int
+	PassingScorePct  float64
+	MaxAttempts      int
+	AvailableFrom    *time.Time
+	AvailableUntil   *time.Time
+	ShuffleQuestions bool
+	ShuffleOptions   bool
+	ShowAnswers      string
+	OnTabSwitch      string
+	// AIGradingMode empty means unchanged (AC-22: omitted on update leaves the value).
+	AIGradingMode      string
 	CertificateEnabled bool
 	Adaptive           bool
+}
+
+// defaultAIGradingMode is the mode of an exam created without one (FR-BB73 AC-9): suggest.
+func defaultAIGradingMode(mode string) string {
+	if mode == "" {
+		return "suggest"
+	}
+	return mode
 }
 
 // AdaptivePublishValidationError is returned when an adaptive exam has insufficient

@@ -15,6 +15,7 @@ import (
 type mailRecorder struct {
 	submitted []string
 	results   []string
+	corrected []string
 }
 
 func (m *mailRecorder) TriggerSessionResult(sessionID string) {
@@ -22,6 +23,9 @@ func (m *mailRecorder) TriggerSessionResult(sessionID string) {
 }
 func (m *mailRecorder) TriggerExamSubmitted(sessionID string) {
 	m.submitted = append(m.submitted, sessionID)
+}
+func (m *mailRecorder) TriggerResultCorrected(sessionID string) {
+	m.corrected = append(m.corrected, sessionID)
 }
 
 // ── FR-BB322 AC-1/AC-3: the start check order ───────────────────────────────
@@ -178,6 +182,38 @@ func TestSubmitSession_Handler_WaitingSessionBodyHasNullScoreAndPass(t *testing.
 	require.True(t, ok)
 	assert.Nil(t, data["score_pct"])
 	assert.Nil(t, data["passed"])
+}
+
+// FR-BB73 AC-19: the mail decision of a grade. A pass or fail that flips on a final session sends one corrected mail;
+// the transition from grading_pending sends the result mail; an override that does not flip sends nothing.
+func TestGradeAnswer_MailDecisionFollowsTheTransition(t *testing.T) {
+	passed := false
+	cases := []struct {
+		name          string
+		result        gradeAnswerResult
+		wantResult    int
+		wantCorrected int
+	}{
+		{"finalising grade on a waiting session sends the result mail", gradeAnswerResult{allGraded: true, sessionStatus: "submitted", passed: &passed, previousStatus: "grading_pending"}, 1, 0},
+		{"a grade that leaves the session waiting sends nothing", gradeAnswerResult{allGraded: false, sessionStatus: "grading_pending", previousStatus: "grading_pending"}, 0, 0},
+		{"an override that flips a final pass sends one corrected mail", gradeAnswerResult{allGraded: true, sessionStatus: "submitted", passed: &passed, previousStatus: "submitted", passedFlipped: true}, 0, 1},
+		{"an override that does not flip sends nothing", gradeAnswerResult{allGraded: true, sessionStatus: "submitted", passed: &passed, previousStatus: "submitted"}, 0, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &mailRecorder{}
+			result := tc.result
+			repo := &mockRepo{
+				gradeAnswerFn: func(_ context.Context, _, _, _, _, _ string, _ float64, _ string) (*gradeAnswerResult, error) {
+					return &result, nil
+				},
+			}
+			_, err := NewService(repo, WithResultMailer(rec)).GradeAnswer(context.Background(), "sess-1", "q1", "grader-1", "t", "ip", GradeAnswerRequest{ScorePct: 40})
+			require.NoError(t, err)
+			assert.Len(t, rec.results, tc.wantResult)
+			assert.Len(t, rec.corrected, tc.wantCorrected)
+		})
+	}
 }
 
 func TestReportEvent_AutoSubmitWaitingSendsExamSubmittedAndHidesScore(t *testing.T) {

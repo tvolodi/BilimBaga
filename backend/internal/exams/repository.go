@@ -83,11 +83,13 @@ func (r *postgresRepository) Create(ctx context.Context, e *Exam) error {
 		INSERT INTO exams (
 			title, description, status, time_limit_minutes, passing_score_pct,
 			max_attempts, available_from, available_until, shuffle_questions,
-			shuffle_options, show_answers, on_tab_switch, certificate_enabled, adaptive, created_by
+			shuffle_options, show_answers, on_tab_switch, certificate_enabled, adaptive, created_by,
+			ai_grading_mode
 		) VALUES (
 			:title, :description, :status, :time_limit_minutes, :passing_score_pct,
 			:max_attempts, :available_from, :available_until, :shuffle_questions,
-			:shuffle_options, :show_answers, :on_tab_switch, :certificate_enabled, :adaptive, :created_by
+			:shuffle_options, :show_answers, :on_tab_switch, :certificate_enabled, :adaptive, :created_by,
+			:ai_grading_mode
 		)
 		RETURNING id, created_at, updated_at`
 	rows, err := r.db.NamedQueryContext(ctx, q, e)
@@ -213,17 +215,19 @@ func (r *postgresRepository) Update(ctx context.Context, id string, input Update
 			title = $1, description = $2, time_limit_minutes = $3, passing_score_pct = $4,
 			max_attempts = $5, available_from = $6, available_until = $7,
 			shuffle_questions = $8, shuffle_options = $9, show_answers = $10,
-			on_tab_switch = $11, certificate_enabled = $12, adaptive = $13
+			on_tab_switch = $11, certificate_enabled = $12, adaptive = $13,
+			ai_grading_mode = CASE WHEN $15 = '' THEN ai_grading_mode ELSE $15 END
 		WHERE id = $14
 		RETURNING id, title, description, status, time_limit_minutes, passing_score_pct,
 		          max_attempts, available_from, available_until, shuffle_questions, shuffle_options,
-		          show_answers, on_tab_switch, certificate_enabled, adaptive, created_by, created_at, updated_at`
+		          show_answers, on_tab_switch, certificate_enabled, adaptive, created_by, created_at, updated_at,
+		          ai_grading_mode`
 	var e Exam
 	if err := r.db.GetContext(ctx, &e, q,
 		input.Title, input.Description, input.TimeLimitMinutes, input.PassingScorePct,
 		input.MaxAttempts, input.AvailableFrom, input.AvailableUntil,
 		input.ShuffleQuestions, input.ShuffleOptions, input.ShowAnswers,
-		input.OnTabSwitch, input.CertificateEnabled, input.Adaptive, id,
+		input.OnTabSwitch, input.CertificateEnabled, input.Adaptive, id, input.AIGradingMode,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -313,6 +317,7 @@ func (r *postgresRepository) GetWithDetails(ctx context.Context, id string) (*Ex
 		ShuffleOptions:     e.ShuffleOptions,
 		ShowAnswers:        e.ShowAnswers,
 		OnTabSwitch:        e.OnTabSwitch,
+		AIGradingMode:      e.AIGradingMode,
 		CertificateEnabled: e.CertificateEnabled,
 		Adaptive:           e.Adaptive,
 		CreatedBy:          e.CreatedBy,

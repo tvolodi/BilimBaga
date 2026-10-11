@@ -498,6 +498,17 @@
   },
   "exam": {
     "wizard": {
+      "aiGradingMode": {
+        "label": "AI grading",
+        "off": "Off",
+        "suggest": "Suggest",
+        "auto": "Automatic",
+        "help": {
+          "off": "The AI does not grade short answers. An examiner grades them.",
+          "suggest": "The AI proposes a score for each short answer. An examiner accepts or changes it; the AI never changes a result.",
+          "auto": "The AI grades short answers that cannot decide pass or fail and carry no warning. Other answers wait for an examiner, with the AI proposal."
+        }
+      },
       "step1": {
         "title": "Basic Settings"
       },
@@ -879,6 +890,23 @@
     "ai_reasoning_label": "AI Reasoning",
     "ai_reasoning_show": "Show AI reasoning",
     "ai_reasoning_hide": "Hide AI reasoning",
+    "col_ai_mode": "AI grading",
+    "nothing_to_submit": "Nothing to submit: no grade has changed.",
+    "suggestion": {
+      "title": "AI suggestion",
+      "score": "AI suggested score: {{score}}%",
+      "accept": "Accept",
+      "accepting": "Accepting...",
+      "waiting_note": "The score is not applied until an examiner confirms it.",
+      "ai_score": "AI score: {{score}}%",
+      "flags_label": "Warnings",
+      "final_read_only": "This session is final. Graded answers are read-only; an AI-graded answer can still be overridden."
+    },
+    "flag": {
+      "instruction_like": "Reads like an instruction to the grader",
+      "short_high": "Very short answer with a high AI score",
+      "decisive_pass": "The AI score would decide pass or fail"
+    },
     "filter_by_exam": "Filter by exam",
     "filter_all_exams": "All exams",
     "showing_range": "Showing {{start}}–{{end}} of {{total}}",

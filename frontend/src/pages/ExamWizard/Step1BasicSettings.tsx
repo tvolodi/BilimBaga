@@ -30,6 +30,7 @@ interface FormState {
   showAnswers: 'never' | 'after_completion' | 'after_all_attempts'
   onTabSwitch: 'log' | 'warn' | 'submit'
   certificateEnabled: boolean
+  aiGradingMode: 'off' | 'suggest' | 'auto'
 }
 
 interface ValidationErrors {
@@ -91,6 +92,7 @@ function formFromExam(exam: ExamDetail | null): FormState {
       showAnswers: 'never',
       onTabSwitch: 'log',
       certificateEnabled: false,
+      aiGradingMode: 'suggest',
     }
   }
   return {
@@ -106,6 +108,7 @@ function formFromExam(exam: ExamDetail | null): FormState {
     showAnswers: exam.show_answers,
     onTabSwitch: exam.on_tab_switch,
     certificateEnabled: exam.certificate_enabled,
+    aiGradingMode: exam.ai_grading_mode,
   }
 }
 
@@ -201,6 +204,7 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
       show_answers: form.showAnswers,
       on_tab_switch: form.onTabSwitch,
       certificate_enabled: form.certificateEnabled,
+      ai_grading_mode: form.aiGradingMode,
     }
 
     try {
@@ -375,6 +379,24 @@ export function Step1BasicSettings({ exam, onDone, resolvedSectionId }: Step1Bas
             <option value="submit">{t('exam.onTabSwitch.submit')}</option>
           </Select>
         </div>
+      </div>
+
+      {/* AI grading of short-text answers (FR-BB73 AC-22). Always shown: the rules pick questions at run time. */}
+      <div className="space-y-1.5">
+        <Label htmlFor="aiGradingMode">{t('exam.wizard.aiGradingMode.label')}</Label>
+        <Select
+          id="aiGradingMode"
+          value={form.aiGradingMode}
+          onChange={(e) => set('aiGradingMode', e.target.value as FormState['aiGradingMode'])}
+          disabled={isReadOnly}
+        >
+          <option value="off">{t('exam.wizard.aiGradingMode.off')}</option>
+          <option value="suggest">{t('exam.wizard.aiGradingMode.suggest')}</option>
+          <option value="auto">{t('exam.wizard.aiGradingMode.auto')}</option>
+        </Select>
+        <p className="text-xs text-muted-foreground" data-testid="ai-grading-mode-help">
+          {t(`exam.wizard.aiGradingMode.help.${form.aiGradingMode}`)}
+        </p>
       </div>
 
       {/* Toggles */}

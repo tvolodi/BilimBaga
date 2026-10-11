@@ -75,6 +75,8 @@ type Service interface {
 type ResultMailer interface {
 	TriggerSessionResult(sessionID string)
 	TriggerExamSubmitted(sessionID string)
+	// TriggerResultCorrected sends exam_result_corrected when a final session's pass or fail changed (FR-BB73 AC-19).
+	TriggerResultCorrected(sessionID string)
 }
 
 // aiGradingSettings tells the result service whether the AI grading job will grade a waiting answer (FR-BB322 AC-4).
@@ -1098,8 +1100,15 @@ func (s *service) GradeAnswer(ctx context.Context, sessionID, questionID, grader
 		FinalScorePct: result.finalScorePct,
 		Passed:        result.passed,
 	}
-	if s.mailer != nil && resp.AllGraded {
-		s.mailer.TriggerSessionResult(sessionID)
+	// FR-BB73 AC-19: the result mail follows the transition from grading_pending, once. A final session whose pass or
+	// fail flipped gets exactly one exam_result_corrected mail, and no other.
+	if s.mailer != nil {
+		switch {
+		case result.previousStatus == "grading_pending" && result.allGraded:
+			s.mailer.TriggerSessionResult(sessionID)
+		case result.passedFlipped:
+			s.mailer.TriggerResultCorrected(sessionID)
+		}
 	}
 	return resp, nil
 }

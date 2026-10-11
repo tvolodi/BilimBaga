@@ -203,10 +203,21 @@ func TestAutoSubmitSession_ErrorsWrapped(t *testing.T) {
 
 // ── GradeAnswer ──────────────────────────────────────────────────────────────
 
+// queueGradeLock queues the session as read under the lock: its owner, status and stored pass.
+func queueGradeLock(f *fakeDB, owner, status string, passed bool) {
+	f.queue([]string{"user_id", "status", "passed"}, [][]driver.Value{{owner, status, passed}})
+}
+
+// queueGradeRow queues the answer being graded: its status, maximum points, points, suggestion and flags.
+func queueGradeRow(f *fakeDB, gradingStatus string, score float64, suggested any, flags any) {
+	f.queue([]string{"grading_status", "max_score", "score", "ai_suggested_score_pct", "ai_flags"},
+		[][]driver.Value{{gradingStatus, float64(10), score, suggested, flags}})
+}
+
 func TestGradeAnswer_LastAnswerFinalisesSession(t *testing.T) {
 	db, f := newFakeDB(t)
-	f.queue([]string{"id"}, [][]driver.Value{{"sess-1"}})
-	f.queue([]string{"max_score"}, [][]driver.Value{{float64(10)}})
+	queueGradeLock(f, "owner-1", "grading_pending", false)
+	queueGradeRow(f, "pending_manual", 0, nil, nil)
 	f.queue([]string{"count"}, [][]driver.Value{{int64(0)}})
 	f.queue([]string{"round"}, [][]driver.Value{{float64(80)}})
 	f.queue([]string{"passing_score_pct"}, [][]driver.Value{{float64(60)}})
@@ -214,19 +225,21 @@ func TestGradeAnswer_LastAnswerFinalisesSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, res.allGraded)
 	assert.Equal(t, "submitted", res.sessionStatus)
+	assert.Equal(t, "grading_pending", res.previousStatus, "the mail decision sees the transition")
+	assert.False(t, res.passedFlipped)
 	require.NotNil(t, res.finalScorePct)
 	assert.Equal(t, 80.0, *res.finalScorePct)
 	require.NotNil(t, res.passed)
 	assert.True(t, *res.passed)
 	assert.Equal(t, 1, countQueries(f, "UPDATE exam_sessions SET score_pct"))
-	assert.Equal(t, 1, countQueries(f, "audit_log"))
+	assert.Equal(t, 1, countQueries(f, "'answer.grade'"))
 	assert.Equal(t, 1, countQueries(f, "FOR UPDATE"), "the session row is locked before the score write (#528)")
 }
 
 func TestGradeAnswer_OtherAnswersPendingLeavesSessionOpen(t *testing.T) {
 	db, f := newFakeDB(t)
-	f.queue([]string{"id"}, [][]driver.Value{{"sess-1"}})
-	f.queue([]string{"max_score"}, [][]driver.Value{{float64(10)}})
+	queueGradeLock(f, "owner-1", "grading_pending", false)
+	queueGradeRow(f, "pending_manual", 0, nil, nil)
 	f.queue([]string{"count"}, [][]driver.Value{{int64(2)}})
 	res, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "grader-1", "tenant-1", "", 50, "")
 	require.NoError(t, err)
@@ -238,15 +251,65 @@ func TestGradeAnswer_OtherAnswersPendingLeavesSessionOpen(t *testing.T) {
 
 func TestGradeAnswer_NotFoundAndUpdateErrorWrapped(t *testing.T) {
 	db, f := newFakeDB(t)
-	f.queue([]string{"id"}, nil)
+	f.queue([]string{"user_id", "status", "passed"}, nil)
 	_, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "g", "t", "", 50, "")
 	assert.ErrorIs(t, err, ErrSessionNotFound)
 
 	db2, f2 := newFakeDB(t)
-	f2.queue([]string{"id"}, [][]driver.Value{{"sess-1"}})
-	f2.queue([]string{"max_score"}, [][]driver.Value{{float64(10)}})
-	f2.xErr = errors.New("boom")
+	queueGradeLock(f2, "owner-1", "grading_pending", false)
+	f2.queue([]string{"grading_status", "max_score", "score", "ai_suggested_score_pct", "ai_flags"}, nil)
 	_, err = NewRepository(db2, nil).GradeAnswer(context.Background(), "sess-1", "q1", "g", "t", "", 50, "")
-	assert.ErrorIs(t, err, f2.xErr)
+	assert.ErrorIs(t, err, ErrSessionNotFound, "an answer that is not in the session is not found")
+
+	db3, f3 := newFakeDB(t)
+	queueGradeLock(f3, "owner-1", "grading_pending", false)
+	queueGradeRow(f3, "pending_manual", 0, nil, nil)
+	f3.xErr = errors.New("boom")
+	_, err = NewRepository(db3, nil).GradeAnswer(context.Background(), "sess-1", "q1", "g", "t", "", 50, "")
+	assert.ErrorIs(t, err, f3.xErr)
 	assert.ErrorContains(t, err, "update score")
+}
+
+// FR-BB73 AC-21: the employee cannot grade their own session, and nothing is written.
+func TestGradeAnswer_CannotGradeOwnSession(t *testing.T) {
+	db, f := newFakeDB(t)
+	queueGradeLock(f, "owner-1", "grading_pending", false)
+	_, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "owner-1", "t", "", 50, "")
+	assert.ErrorIs(t, err, ErrCannotGradeOwnSession)
+	assert.Equal(t, 0, countQueries(f, "UPDATE session_question_scores"))
+}
+
+// FR-BB73 AC-19: a final session's graded answer is not re-graded silently.
+func TestGradeAnswer_FinalSessionRefusesGradedAnswer(t *testing.T) {
+	db, f := newFakeDB(t)
+	queueGradeLock(f, "owner-1", "submitted", true)
+	queueGradeRow(f, "graded", 5, nil, nil)
+	_, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "grader-1", "t", "", 40, "")
+	assert.ErrorIs(t, err, ErrSessionFinalised)
+	assert.Equal(t, 0, countQueries(f, "UPDATE session_question_scores"))
+}
+
+// FR-BB73 AC-20: an override of a final session with an issued certificate is refused, and nothing changes.
+func TestGradeAnswer_OverrideRefusedWhenCertificateIssued(t *testing.T) {
+	db, f := newFakeDB(t)
+	queueGradeLock(f, "owner-1", "submitted", true)
+	queueGradeRow(f, "ai_graded", 2, nil, nil)
+	f.queue([]string{"exists"}, [][]driver.Value{{true}})
+	_, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "grader-1", "t", "", 40, "")
+	assert.ErrorIs(t, err, ErrCertificateIssued)
+	assert.Equal(t, 0, countQueries(f, "UPDATE session_question_scores"))
+}
+
+// FR-BB73 AC-19: an override of an ai_graded answer while the session waits is allowed, audited as an override, and
+// sends no mail (the session is not final).
+func TestGradeAnswer_OverrideWhileWaitingIsAudited(t *testing.T) {
+	db, f := newFakeDB(t)
+	queueGradeLock(f, "owner-1", "grading_pending", false)
+	queueGradeRow(f, "ai_graded", 2, nil, nil)
+	f.queue([]string{"count"}, [][]driver.Value{{int64(1)}})
+	res, err := NewRepository(db, nil).GradeAnswer(context.Background(), "sess-1", "q1", "grader-1", "t", "", 40, "")
+	require.NoError(t, err)
+	assert.False(t, res.allGraded)
+	assert.Equal(t, 1, countQueries(f, "'answer.ai_override'"))
+	assert.Equal(t, 0, countQueries(f, "'answer.grade'"))
 }

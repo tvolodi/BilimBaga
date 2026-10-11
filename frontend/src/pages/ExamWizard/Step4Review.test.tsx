@@ -47,6 +47,7 @@ function makeExam(rules: QuestionRuleDetail[]): ExamDetail {
     show_answers: 'never',
     on_tab_switch: 'log',
     certificate_enabled: false,
+    ai_grading_mode: 'suggest',
     created_by: 'u1',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -174,5 +175,15 @@ describe('Step4Review eligible counts (FR-BB315)', () => {
     useEligibleCounts.mockReturnValue({ data: { counts: [] }, isLoading: false, isError: false })
     renderStep4()
     expect(screen.queryByText(/^Rule \d+:/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Step4Review AI grading mode (FR-BB73 AC-22)', () => {
+  it('shows the exam AI grading mode among the settings', () => {
+    useExam.mockReturnValue({ data: { ...makeExam([]), ai_grading_mode: 'auto' }, isLoading: false })
+    useEligibleCounts.mockReturnValue({ data: { counts: [] }, isLoading: false, isError: false })
+    renderStep4()
+    expect(screen.getByText('AI grading')).toBeInTheDocument()
+    expect(screen.getByText('Automatic')).toBeInTheDocument()
   })
 })

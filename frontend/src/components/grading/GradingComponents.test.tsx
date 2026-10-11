@@ -43,6 +43,7 @@ describe('GradingQueueTable (FR-BB47 AC-2, AC-3)', () => {
       exam_title: 'Security Basics',
       submitted_at: '2026-01-02T10:00:00Z',
       pending_question_count: 2,
+      ai_grading_mode: 'suggest',
     },
     {
       session_id: '99999999-0000-4000-8000-000000000002',
@@ -51,6 +52,7 @@ describe('GradingQueueTable (FR-BB47 AC-2, AC-3)', () => {
       exam_title: 'Safety 101',
       submitted_at: '2026-01-03T10:00:00Z',
       pending_question_count: 5,
+      ai_grading_mode: 'auto',
     },
   ]
 

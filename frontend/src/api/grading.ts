@@ -16,6 +16,8 @@ function apiPost<T>(qc: QueryClient, url: string, payload: unknown): Promise<T> 
 
 // ---- Types ------------------------------------------------------------------
 
+export type AIGradingMode = 'off' | 'suggest' | 'auto'
+
 export interface GradingQueueItem {
   session_id: string
   employee_name: string
@@ -23,6 +25,7 @@ export interface GradingQueueItem {
   exam_title: string
   submitted_at: string
   pending_question_count: number
+  ai_grading_mode: AIGradingMode
 }
 
 export interface GradingQuestion {
@@ -32,7 +35,12 @@ export interface GradingQuestion {
   grading_status: 'pending_manual' | 'graded' | 'ai_graded'
   current_score_pct: number | null
   manual_feedback: string | null
+  // FR-BB73 AC-18: the suggestion of a waiting answer, and the AI reasoning and flags shown with it.
+  // ai_reasoning is also set on an ai_graded answer, which then carries its AI score as current_score_pct.
+  ai_suggested_score_pct: number | null
+  ai_suggested_at: string | null
   ai_reasoning: string | null
+  ai_flags: string[] | null
 }
 
 export interface GradingSessionDetail {
@@ -40,6 +48,8 @@ export interface GradingSessionDetail {
   employee_name: string
   exam_title: string
   submitted_at: string | null
+  // A final session (submitted or auto_submitted) shows its graded answers read-only (FR-BB47 AC-5).
+  session_status: 'in_progress' | 'submitted' | 'auto_submitted' | 'grading_pending'
   questions: GradingQuestion[]
 }
 
@@ -47,6 +57,8 @@ export interface GradeSubmission {
   questionId: string
   scorePct: number
   feedback: string
+  /** Set when the examiner accepted the AI suggestion: the queue's pending counts change then (FR-BB73 AC-18). */
+  accepted?: boolean
 }
 
 export interface GradingQueueResponse {
@@ -98,9 +110,10 @@ export function useSubmitGrade(sessionId: string) {
         feedback,
       })
     },
-    onSuccess: (data: GradeAnswerResponse) => {
+    // The queue is refreshed when the session is complete (FR-BB47 AC-9) and after an accepted suggestion (FR-BB73 AC-18).
+    onSuccess: (data: GradeAnswerResponse, variables: GradeSubmission) => {
       queryClient.invalidateQueries({ queryKey: ['grading-session', sessionId] })
-      if (data.all_graded) {
+      if (data.all_graded || variables.accepted) {
         queryClient.invalidateQueries({ queryKey: ['grading-queue'] })
       }
     },

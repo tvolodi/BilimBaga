@@ -106,3 +106,57 @@ func TestNginxConf_ThemeInitLocationRevalidatesAndKeepsSecurityHeaders(t *testin
 		}
 	}
 }
+
+// #511 / #461 (FR-BB65 AC-3): text compression, a long immutable cache for the content-hashed bundles and a
+// revalidating HTML shell. add_header is not inherited into a location that declares its own, so each of
+// the two locations must repeat the security headers; /api/ must stay uncompressed.
+func TestNginxConf_CompressionAndCachePolicy(t *testing.T) {
+	raw, err := os.ReadFile("../../../deploy/nginx.conf")
+	if err != nil {
+		t.Fatalf("read nginx.conf: %v", err)
+	}
+	conf := string(raw)
+	if !regexp.MustCompile(`(?m)^\s*gzip\s+on;`).MatchString(conf) {
+		t.Error("server does not enable gzip")
+	}
+	types := regexp.MustCompile(`gzip_types\s+([^;]+);`).FindStringSubmatch(conf)
+	if types == nil {
+		t.Fatal("no gzip_types in deploy/nginx.conf")
+	}
+	for _, mt := range []string{"text/css", "application/javascript", "text/javascript", "application/json", "image/svg+xml"} {
+		if !regexp.MustCompile(`(^|\s)` + regexp.QuoteMeta(mt) + `(\s|$)`).MatchString(types[1]) {
+			t.Errorf("gzip_types lacks %s", mt)
+		}
+	}
+	api := regexp.MustCompile(`(?s)location\s+/api/\s*\{(.*?)\n\s*\}`).FindStringSubmatch(conf)
+	if api == nil || !regexp.MustCompile(`gzip\s+off;`).MatchString(api[1]) {
+		t.Error("/api/ must switch gzip off")
+	}
+	security := []string{"Content-Security-Policy", "X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy", "Strict-Transport-Security"}
+	cases := []struct {
+		name, location, cache, always string
+		extra                         *regexp.Regexp
+	}{
+		// no "always" on the long TTL: a 404 for a missing hashed file must not be cached for a year
+		{"hashed assets", `location\s+/assets/`, `public, max-age=31536000, immutable`, ``, regexp.MustCompile(`try_files\s+\$uri\s+=404;`)},
+		{"HTML shell", `location\s+/`, `no-cache`, `\s+always`, regexp.MustCompile(`try_files\s+\$uri\s+\$uri/\s+/index\.html;`)},
+	}
+	for _, c := range cases {
+		block := regexp.MustCompile(`(?s)` + c.location + `\s*\{(.*?)\n\s*\}`).FindStringSubmatch(conf)
+		if block == nil {
+			t.Errorf("%s: no %s block", c.name, c.location)
+			continue
+		}
+		if !regexp.MustCompile(`add_header\s+Cache-Control\s+"` + regexp.QuoteMeta(c.cache) + `"` + c.always + `;`).MatchString(block[1]) {
+			t.Errorf("%s: Cache-Control %q missing:\n%s", c.name, c.cache, block[1])
+		}
+		if !c.extra.MatchString(block[1]) {
+			t.Errorf("%s: wrong try_files (a missing asset must 404, the shell keeps the SPA fallback):\n%s", c.name, block[1])
+		}
+		for _, h := range security {
+			if !regexp.MustCompile(`add_header\s+` + h + `\s+`).MatchString(block[1]) {
+				t.Errorf("%s does not repeat %s", c.name, h)
+			}
+		}
+	}
+}

@@ -240,7 +240,8 @@ export function UsersListPage() {
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
+                  {/* Actions wrap to a second line rather than run past the table edge at 1280 px (#584). */}
+                  <div className="flex flex-wrap gap-1">
                     {canViewRecord && (
                       <Button size="sm" variant="ghost" asChild>
                         <Link to={`/admin/users/${user.id}/record`}>

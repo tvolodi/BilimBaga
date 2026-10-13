@@ -41,6 +41,7 @@ function renderLoginFrom(from: string) {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<div>Admin Home</div>} />
           <Route path="/admin/departments" element={<div>Departments Page</div>} />
+          <Route path="/portal" element={<div>Portal Home</div>} />
           <Route path="/portal/results" element={<div>Results Page</div>} />
           <Route path="/portal/sessions/:sessionId/result" element={<div>Session Result Page</div>} />
         </Routes>
@@ -113,6 +114,15 @@ describe('LoginPage return path after a revoked session (AC-11)', () => {
     renderLoginFrom('/portal/sessions/sess-1/result')
     submitCredentials()
     expect(await screen.findByText('Session Result Page')).toBeInTheDocument()
+  })
+
+  // FR-BB68 AC-5: an assignment or reminder mail opened while signed out returns to the portal.
+  it('restores /portal for an employee (assignment and reminder mail link)', async () => {
+    await i18n.changeLanguage('en')
+    mutateAsync.mockResolvedValueOnce({ user: { role: 'employee', force_password_change: false } })
+    renderLoginFrom('/portal')
+    submitCredentials()
+    expect(await screen.findByText('Portal Home')).toBeInTheDocument()
   })
 
   it('ignores a return target that is not an in-app path', async () => {

@@ -6,7 +6,7 @@
 | ID | FR-BB68 |
 | Phase | 6 — Polish & Hardening (gap closure; completes roadmap 6.1 "new assignment" and "exam passed with certificate link" emails) |
 | Priority | 1 |
-| Status | Validated |
+| Status | Implemented (AC-1 to AC-6, AC-7 unit and Vitest parts; live Mailhog E2E run is a UAT step) |
 | Depends On | FR-BB61, FR-BB33, FR-BB313, FR-BB45, FR-BB110, FR-BB115, FR-BB322, FR-BB510 |
 
 ## Description

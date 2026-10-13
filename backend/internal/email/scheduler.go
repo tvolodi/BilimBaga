@@ -55,10 +55,16 @@ func runDeadlineReminders(ctx context.Context, emailSvc *EmailService) {
 	}
 
 	slog.Info("email: sending deadline reminders", "count", len(rows))
+	portalLink, linkErr := emailSvc.appLink(portalPath)
 	for _, row := range rows {
+		if linkErr != nil {
+			_ = emailSvc.refuseSend(row.Email, "deadline_reminder", linkErr)
+			continue
+		}
 		tmplData := map[string]any{
-			"ExamTitle": row.Title,
-			"Deadline":  row.Deadline.UTC().Format("2006-01-02 15:04 UTC"),
+			"ExamTitle":  row.Title,
+			"Deadline":   row.Deadline.UTC().Format("2006-01-02 15:04 UTC"),
+			"PortalLink": portalLink,
 		}
 		sendErr := emailSvc.send(row.Email, "deadline_reminder", tmplData, row.Locale)
 		emailSvc.logAttempt(row.Email, "deadline_reminder", sendErr)

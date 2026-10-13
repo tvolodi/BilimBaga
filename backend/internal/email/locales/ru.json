@@ -18,8 +18,8 @@
   "email.exam_failed.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Вы не сдали экзамен <strong>{{.ExamTitle}}</strong>. Ваш результат: <strong>{{.ScorePct}}%</strong> (проходной балл: {{.PassingScorePct}}%).</p><p>Оставшихся попыток: <strong>{{.AttemptsRemaining}}</strong></p><p><a href=\"{{.ResultLink}}\">Посмотреть результат</a></p><p>С уважением,<br>BilimBaga</p></body></html>",
 
   "email.deadline_reminder.subject":   "Напоминание: приближается срок сдачи экзамена — {{.ExamTitle}}",
-  "email.deadline_reminder.body_text": "Здравствуйте,\n\nНапоминаем, что приближается срок сдачи экзамена «{{.ExamTitle}}».\n\nСрок: {{.Deadline}}\n\nПожалуйста, пройдите экзамен до истечения срока.\n\nС уважением,\nBilimBaga",
-  "email.deadline_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Напоминаем, что приближается срок сдачи экзамена <strong>{{.ExamTitle}}</strong>.</p><p><strong>Срок:</strong> {{.Deadline}}</p><p>Пожалуйста, пройдите экзамен до истечения срока.</p><p>С уважением,<br>BilimBaga</p></body></html>",
+  "email.deadline_reminder.body_text": "Здравствуйте,\n\nНапоминаем, что приближается срок сдачи экзамена «{{.ExamTitle}}».\n\nСрок: {{.Deadline}}\n\nПожалуйста, пройдите экзамен до истечения срока.\n\nОткрыть экзамены: {{.PortalLink}}\n\nС уважением,\nBilimBaga",
+  "email.deadline_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Здравствуйте,</p><p>Напоминаем, что приближается срок сдачи экзамена <strong>{{.ExamTitle}}</strong>.</p><p><strong>Срок:</strong> {{.Deadline}}</p><p>Пожалуйста, пройдите экзамен до истечения срока.</p><p><a href=\"{{.PortalLink}}\">Открыть экзамены</a></p><p>С уважением,<br>BilimBaga</p></body></html>",
 
   "email.password_reset.subject":   "Ваш временный пароль — BilimBaga",
   "email.password_reset.body_text": "Здравствуйте,\n\nВаш пароль был сброшен. Временный пароль:\n\n{{.TempPassword}}\n\nПожалуйста, войдите в систему и немедленно смените пароль.\n\nС уважением,\nBilimBaga",

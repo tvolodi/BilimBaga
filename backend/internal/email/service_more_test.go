@@ -85,7 +85,7 @@ func (r *stubRepo) waitLogs(t *testing.T, n int) []loggedAttempt {
 }
 
 func svcFor(repo Repository, smtpSrv *fakeSMTP) *EmailService {
-	cfg := Config{From: "BilimBaga <noreply@example.com>", APIBaseURL: "https://app.example"}
+	cfg := Config{From: "BilimBaga <noreply@example.com>", PublicAppURL: "https://app.example"}
 	if smtpSrv != nil {
 		cfg.Host, cfg.Port = smtpSrv.Host, smtpSrv.Port
 	} else {

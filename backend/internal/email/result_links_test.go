@@ -14,7 +14,9 @@ func TestSessionResultMails_LinkToTheResultPage(t *testing.T) {
 	svc := svcFor(newStubRepo(), nil)
 	svc.cfg.PublicAppURL = "https://app.example.com/"
 	link := "https://app.example.com/portal/sessions/s-1/result"
-	require.Equal(t, link, svc.sessionResultLink("s-1"), "trailing slash of PUBLIC_APP_URL is trimmed")
+	got, err := svc.sessionResultLink("s-1")
+	require.NoError(t, err)
+	require.Equal(t, link, got, "trailing slash of PUBLIC_APP_URL is trimmed")
 
 	data := map[string]any{
 		"ExamTitle":         "Safety",

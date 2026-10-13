@@ -174,7 +174,7 @@ func (r *postgresRepository) StreamExport(ctx context.Context, filter ExportFilt
 	} else {
 		clauses := []string{"1=1"}
 		args = []any{}
-		n := 1
+		n := 0
 		if filter.CategoryID != nil {
 			n++
 			clauses = append(clauses, fmt.Sprintf("q.category_id = $%d::uuid", n))

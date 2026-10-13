@@ -32,7 +32,7 @@ func TestOverdueReminderTemplate_AllLocales(t *testing.T) {
 	data := map[string]any{
 		"ExamTitle":  "Fire Safety",
 		"Deadline":   "2026-01-02 08:00 UTC",
-		"PortalLink": "https://app.example/portal/exams/abc",
+		"PortalLink": "https://app.example/portal",
 	}
 	for _, locale := range []string{"en", "ru", "kk"} {
 		r, err := renderTemplate("overdue_reminder", data, locale)
@@ -46,8 +46,8 @@ func TestOverdueReminderTemplate_AllLocales(t *testing.T) {
 		}
 		if !strings.Contains(r.Subject, "Fire Safety") ||
 			!strings.Contains(r.TextBody, "2026-01-02 08:00 UTC") ||
-			!strings.Contains(r.TextBody, "https://app.example/portal/exams/abc") ||
-			!strings.Contains(r.HTMLBody, `href="https://app.example/portal/exams/abc"`) {
+			!strings.Contains(r.TextBody, "https://app.example/portal") ||
+			!strings.Contains(r.HTMLBody, `href="https://app.example/portal"`) {
 			t.Errorf("%s: missing title/deadline/link", locale)
 		}
 	}

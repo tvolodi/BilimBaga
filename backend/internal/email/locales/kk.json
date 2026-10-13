@@ -18,8 +18,8 @@
   "email.exam_failed.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p>Сіз <strong>{{.ExamTitle}}</strong> емтиханынан өтпедіңіз. Нәтижеңіз <strong>{{.ScorePct}}%</strong> (өту балы: {{.PassingScorePct}}%).</p><p>Қалған мүмкіндіктер: <strong>{{.AttemptsRemaining}}</strong></p><p><a href=\"{{.ResultLink}}\">Нәтижені қарау</a></p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
 
   "email.deadline_reminder.subject":   "Еске салу: емтихан мерзімі жақындап қалды — {{.ExamTitle}}",
-  "email.deadline_reminder.body_text": "Сәлем,\n\n«{{.ExamTitle}}» емтиханының мерзімі жақындап қалды.\n\nМерзімі: {{.Deadline}}\n\nМерзімі өткенге дейін емтиханды аяқтаңыз.\n\nЕң жақсы тілектермен,\nBilimBaga",
-  "email.deadline_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p><strong>{{.ExamTitle}}</strong> емтиханының мерзімі жақындап қалды.</p><p><strong>Мерзімі:</strong> {{.Deadline}}</p><p>Мерзімі өткенге дейін емтиханды аяқтаңыз.</p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
+  "email.deadline_reminder.body_text": "Сәлем,\n\n«{{.ExamTitle}}» емтиханының мерзімі жақындап қалды.\n\nМерзімі: {{.Deadline}}\n\nМерзімі өткенге дейін емтиханды аяқтаңыз.\n\nЕмтихандарды ашу: {{.PortalLink}}\n\nЕң жақсы тілектермен,\nBilimBaga",
+  "email.deadline_reminder.body_html": "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6\"><p>Сәлем,</p><p><strong>{{.ExamTitle}}</strong> емтиханының мерзімі жақындап қалды.</p><p><strong>Мерзімі:</strong> {{.Deadline}}</p><p>Мерзімі өткенге дейін емтиханды аяқтаңыз.</p><p><a href=\"{{.PortalLink}}\">Емтихандарды ашу</a></p><p>Ең жақсы тілектермен,<br>BilimBaga</p></body></html>",
 
   "email.password_reset.subject":   "Уақытша құпия сөз — BilimBaga",
   "email.password_reset.body_text": "Сәлем,\n\nСіздің құпия сөзіңіз қалпына келтірілді. Уақытша құпия сөз:\n\n{{.TempPassword}}\n\nЖүйеге кіріп, құпия сөзді дереу өзгертіңіз.\n\nЕң жақсы тілектермен,\nBilimBaga",

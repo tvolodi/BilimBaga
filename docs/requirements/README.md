@@ -77,7 +77,7 @@ The Status column mirrors the `Status` field of each document. A document that s
 | FR-BB65 | Performance | Performance | Validated |
 | FR-BB66 | Observability | Observability | Implemented |
 | FR-BB67 | e2e-coverage-employee-portal-exam-taking-grading | E2E Coverage: Employee Portal, Exam Taking, Result & Grading Flows | Implemented |
-| FR-BB68 | Email-deep-links | Email Deep Links: mail links must open the SPA | Validated |
+| FR-BB68 | Email-deep-links | Email Deep Links: mail links must open the SPA | Implemented |
 | FR-BB69 | Locale-aware-date-number-formatting | Locale-Aware Date and Number Formatting Everywhere | Validated |
 | FR-BB71 | Question-generation-assist | Question Generation Assist | Implemented |
 | FR-BB72 | Adaptive-difficulty | Adaptive Difficulty | Implemented |

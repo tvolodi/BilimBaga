@@ -28,7 +28,8 @@ type Config struct {
 	TLS        bool
 	From       string // may include display name: "BilimBaga <noreply@example.com>"
 	APIBaseURL string
-	// PublicAppURL is the SPA base URL used to build the password reset link (FR-BB115).
+	// PublicAppURL is the SPA base URL every mail link is built from (FR-BB115, FR-BB68). APIBaseURL is not used
+	// for links.
 	PublicAppURL string
 }
 
@@ -72,12 +73,18 @@ func (s *EmailService) TriggerSessionResult(sessionID string) {
 			tmplName = "exam_passed"
 		}
 
+		resultLink, linkErr := s.sessionResultLink(sessionID)
+		if linkErr != nil {
+			_ = s.refuseSend(data.UserEmail, tmplName, linkErr)
+			return
+		}
+
 		var tmplData map[string]any
 		if data.Passed {
 			tmplData = map[string]any{
 				"ExamTitle":  data.ExamTitle,
 				"ScorePct":   fmt.Sprintf("%.1f", data.ScorePct),
-				"ResultLink": s.sessionResultLink(sessionID),
+				"ResultLink": resultLink,
 			}
 		} else {
 			attemptsRemaining := 0
@@ -92,7 +99,7 @@ func (s *EmailService) TriggerSessionResult(sessionID string) {
 				"ScorePct":          fmt.Sprintf("%.1f", data.ScorePct),
 				"PassingScorePct":   fmt.Sprintf("%.1f", data.PassingScorePct),
 				"AttemptsRemaining": attemptsRemaining,
-				"ResultLink":        s.sessionResultLink(sessionID),
+				"ResultLink":        resultLink,
 			}
 		}
 
@@ -102,12 +109,6 @@ func (s *EmailService) TriggerSessionResult(sessionID string) {
 			s.logger.Error("email send failed", "template", tmplName, "to", data.UserEmail, "error", sendErr)
 		}
 	}()
-}
-
-// sessionResultLink is the SPA result page of a session (FR-BB322 AC-10). It is an SPA route, so the employee
-// signs in there, and the certificate is downloaded from that page with a token.
-func (s *EmailService) sessionResultLink(sessionID string) string {
-	return strings.TrimRight(s.cfg.PublicAppURL, "/") + "/portal/sessions/" + sessionID + "/result"
 }
 
 // TriggerExamSubmitted sends exam_submitted to the session owner when a session first moves to grading_pending
@@ -127,10 +128,15 @@ func (s *EmailService) TriggerExamSubmitted(sessionID string) {
 		if data.SubmittedAt != nil {
 			submittedAt = data.SubmittedAt.UTC().Format("2006-01-02 15:04 UTC")
 		}
+		resultLink, linkErr := s.sessionResultLink(sessionID)
+		if linkErr != nil {
+			_ = s.refuseSend(data.UserEmail, "exam_submitted", linkErr)
+			return
+		}
 		tmplData := map[string]any{
 			"ExamTitle":   data.ExamTitle,
 			"SubmittedAt": submittedAt,
-			"ResultLink":  s.sessionResultLink(sessionID),
+			"ResultLink":  resultLink,
 		}
 		sendErr := s.send(data.UserEmail, "exam_submitted", tmplData, data.UserLocale)
 		s.logAttempt(data.UserEmail, "exam_submitted", sendErr)
@@ -153,11 +159,16 @@ func (s *EmailService) TriggerResultCorrected(sessionID string) {
 			s.logger.Error("email: get session data", "session_id", sessionID, "error", err)
 			return
 		}
+		resultLink, linkErr := s.sessionResultLink(sessionID)
+		if linkErr != nil {
+			_ = s.refuseSend(data.UserEmail, "exam_result_corrected", linkErr)
+			return
+		}
 		tmplData := map[string]any{
 			"ExamTitle":  data.ExamTitle,
 			"ScorePct":   fmt.Sprintf("%.1f", data.ScorePct),
 			"Passed":     data.Passed,
-			"ResultLink": s.sessionResultLink(sessionID),
+			"ResultLink": resultLink,
 		}
 		sendErr := s.send(data.UserEmail, "exam_result_corrected", tmplData, data.UserLocale)
 		s.logAttempt(data.UserEmail, "exam_result_corrected", sendErr)
@@ -209,9 +220,13 @@ func (s *EmailService) TriggerAssignment(examID, examTitle string, deadline *tim
 		if deadline != nil {
 			deadlineStr = deadline.UTC().Format("2006-01-02 15:04 UTC")
 		}
-		portalLink := s.cfg.APIBaseURL + "/portal/exams/" + examID
+		portalLink, linkErr := s.appLink(portalPath)
 
 		for _, u := range recipients {
+			if linkErr != nil {
+				_ = s.refuseSend(u.Email, "new_exam_assigned", linkErr)
+				continue
+			}
 			tmplData := map[string]any{
 				"ExamTitle":  examTitle,
 				"Deadline":   deadlineStr,
@@ -262,7 +277,11 @@ func (s *EmailService) TriggerPasswordResetLink(userID, token string) {
 			s.logger.Error("email: get user for password reset link", "user_id", userID, "error", err)
 			return
 		}
-		link := strings.TrimRight(s.cfg.PublicAppURL, "/") + "/reset-password?token=" + url.QueryEscape(token)
+		link, linkErr := s.appLink("/reset-password?token=" + url.QueryEscape(token))
+		if linkErr != nil {
+			_ = s.refuseSend(u.Email, "password_reset_link", linkErr)
+			return
+		}
 		sendErr := s.send(u.Email, "password_reset_link", map[string]any{"ResetLink": link}, u.Locale)
 		s.logAttempt(u.Email, "password_reset_link", sendErr)
 		if sendErr != nil {
@@ -294,14 +313,14 @@ func (s *EmailService) SendOverdueReminder(ctx context.Context, userID, examID s
 	if data.Deadline != nil {
 		deadlineStr = data.Deadline.UTC().Format("2006-01-02 15:04 UTC")
 	}
-	base := s.cfg.PublicAppURL
-	if base == "" {
-		base = s.cfg.APIBaseURL
+	portalLink, linkErr := s.appLink(portalPath)
+	if linkErr != nil {
+		return nil, s.refuseSend(data.Email, "overdue_reminder", linkErr)
 	}
 	tmplData := map[string]any{
 		"ExamTitle":  data.ExamTitle,
 		"Deadline":   deadlineStr,
-		"PortalLink": strings.TrimRight(base, "/") + "/portal/exams/" + examID,
+		"PortalLink": portalLink,
 	}
 	sendErr := s.send(data.Email, "overdue_reminder", tmplData, data.Locale)
 	s.logAttempt(data.Email, "overdue_reminder", sendErr)

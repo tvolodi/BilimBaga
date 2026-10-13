@@ -1,0 +1,280 @@
+{
+    "metrics": {
+        "http_req_duration{ep:portal_exams}": {
+            "p(95)": 68.57689474999997,
+            "avg": 32.32487299918083,
+            "min": 3.078842,
+            "med": 23.646770500000002,
+            "max": 3393.257792,
+            "p(90)": 54.685771,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        },
+        "http_reqs": {
+            "count": 124526,
+            "rate": 926.8664919814179
+        },
+        "http_req_duration{ep:tenant_config}": {
+            "avg": 1.5091423680736222,
+            "min": 0.104881,
+            "med": 0.6128425,
+            "max": 3326.949576,
+            "p(90)": 3.3950445000000014,
+            "p(95)": 4.801111949999995,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        },
+        "vus": {
+            "value": 7,
+            "min": 7,
+            "max": 100
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "http_req_receiving": {
+            "med": 0.05932,
+            "max": 15.67547,
+            "p(90)": 0.14356049999999998,
+            "p(95)": 0.23757675,
+            "avg": 0.10018653102163513,
+            "min": 0.006975
+        },
+        "vus_max": {
+            "value": 100,
+            "min": 100,
+            "max": 100
+        },
+        "iteration_duration": {
+            "min": 508.955042,
+            "med": 574.6577930000001,
+            "max": 925.560052,
+            "p(90)": 632.034852,
+            "p(95)": 656.1115536,
+            "avg": 579.7182430052966
+        },
+        "http_req_blocked": {
+            "max": 51.637038,
+            "p(90)": 0.007122,
+            "p(95)": 0.00884275,
+            "avg": 0.013859018622616922,
+            "min": 0.000635,
+            "med": 0.004003
+        },
+        "http_req_duration{ep:admin_dash}": {
+            "min": 1.754762,
+            "med": 20.822947,
+            "max": 3378.223254,
+            "p(90)": 47.017178900000005,
+            "p(95)": 56.055189949999985,
+            "avg": 25.996410979811234,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        },
+        "http_req_waiting": {
+            "avg": 14.034972055394045,
+            "min": 0.080615,
+            "med": 6.4439115000000005,
+            "max": 3393.184091,
+            "p(90)": 33.8500425,
+            "p(95)": 45.131642
+        },
+        "http_req_duration": {
+            "p(95)": 45.31448975,
+            "avg": 14.157723926537487,
+            "min": 0.104881,
+            "med": 6.569833,
+            "max": 3393.257792,
+            "p(90)": 33.991839999999996
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 124526,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 14.157723926537487,
+            "min": 0.104881,
+            "med": 6.569833,
+            "max": 3393.257792,
+            "p(90)": 33.991839999999996,
+            "p(95)": 45.31448975
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "avg": 0.007034889910540774,
+            "min": 0,
+            "med": 0,
+            "max": 51.600376,
+            "p(90)": 0
+        },
+        "checks": {
+            "passes": 249048,
+            "fails": 0,
+            "thresholds": {
+                "rate>=0.99": false
+            },
+            "value": 1
+        },
+        "http_req_sending": {
+            "max": 49.898801,
+            "p(90)": 0.028969,
+            "p(95)": 0.04303675,
+            "avg": 0.022565340121741426,
+            "min": 0.002273,
+            "med": 0.012193
+        },
+        "iterations": {
+            "rate": 154.47526761144135,
+            "count": 20754
+        },
+        "data_sent": {
+            "count": 46136613,
+            "rate": 343402.0256268914
+        },
+        "data_received": {
+            "count": 223501421,
+            "rate": 1663556.0287420459
+        },
+        "http_req_duration{ep:exams}": {
+            "p(90)": 20.706115500000003,
+            "p(95)": 28.072362699999992,
+            "avg": 9.375009900886578,
+            "min": 0.769601,
+            "med": 5.8949425,
+            "max": 3336.012255,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        },
+        "http_req_duration{ep:users_me}": {
+            "avg": 8.597255923821901,
+            "min": 0.812337,
+            "med": 5.1469095,
+            "max": 3369.106111,
+            "p(90)": 17.270589500000007,
+            "p(95)": 24.27569779999998,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        },
+        "http_req_duration{ep:categories}": {
+            "med": 3.782067,
+            "max": 3346.532826,
+            "p(90)": 15.2046191,
+            "p(95)": 21.28000759999999,
+            "avg": 7.125839598197927,
+            "min": 0.350822,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        }
+    },
+    "setup_data": {
+        "admin": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGJpbGltYmFnYS5sb2NhbCIsInJvbGUiOiJzdXBlcl9hZG1pbiIsInN1YiI6IjJlYzJmNDlhLWY5ODgtNGEzNS1hZWJhLTJjZmYwYjU0NTUzZSIsImV4cCI6MTc5MTY5MjYwNCwiaWF0IjoxNzkxNjkxNzA0fQ.CcBwOjpe6DIxUipBwIjyi09EwIOkUP6XOfK-mblfXmk",
+        "employee": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImVtcGxveWVlQGJpbGltYmFnYS5sb2NhbCIsInJvbGUiOiJlbXBsb3llZSIsInN1YiI6ImQ1ZTdkMTVmLTFiZDktNDI2Yi1iMTgzLTgyZTJiYTU3OGNjNSIsImV4cCI6MTc5MTY5MjYwNCwiaWF0IjoxNzkxNjkxNzA0fQ.m1jQ1gTwsInITPMt6HQltncEJv8j_K1GFuGBSZhyqVg"
+    },
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "exams status 200": {
+                    "name": "exams status 200",
+                    "path": "::exams status 200",
+                    "id": "df14ec89cda4720bc95a18c259b5ff60",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "exams envelope ok": {
+                    "name": "exams envelope ok",
+                    "path": "::exams envelope ok",
+                    "id": "7d94b19f66eca3af26d86cf047d7b600",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "users_me status 200": {
+                    "fails": 0,
+                    "name": "users_me status 200",
+                    "path": "::users_me status 200",
+                    "id": "c85002211a8f4400d7091d143e1f8ca8",
+                    "passes": 20754
+                },
+                "users_me envelope ok": {
+                    "name": "users_me envelope ok",
+                    "path": "::users_me envelope ok",
+                    "id": "75c2c6b7e2c73c25364c904e0ca49e4e",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "tenant_config status 200": {
+                    "name": "tenant_config status 200",
+                    "path": "::tenant_config status 200",
+                    "id": "b79680ed54a376da0a9c2f4ec172fa79",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "tenant_config envelope ok": {
+                    "id": "69b11723eb50d96d755723130c3982b9",
+                    "passes": 20754,
+                    "fails": 0,
+                    "name": "tenant_config envelope ok",
+                    "path": "::tenant_config envelope ok"
+                },
+                "categories status 200": {
+                    "name": "categories status 200",
+                    "path": "::categories status 200",
+                    "id": "db8643591ddf08fd48e91fba4da96ef7",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "categories envelope ok": {
+                    "name": "categories envelope ok",
+                    "path": "::categories envelope ok",
+                    "id": "e1cb01f4ecf96d04d05358d06d12790a",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "portal_exams status 200": {
+                    "name": "portal_exams status 200",
+                    "path": "::portal_exams status 200",
+                    "id": "5bfd4627cc424fda9f87fea8766511b8",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "portal_exams envelope ok": {
+                    "name": "portal_exams envelope ok",
+                    "path": "::portal_exams envelope ok",
+                    "id": "d72c878de22bbd640757233c33f3f2a5",
+                    "passes": 20754,
+                    "fails": 0
+                },
+                "admin_dash status 200": {
+                    "id": "4ca2baba982ee244ebecb91080c3d846",
+                    "passes": 20754,
+                    "fails": 0,
+                    "name": "admin_dash status 200",
+                    "path": "::admin_dash status 200"
+                },
+                "admin_dash envelope ok": {
+                    "name": "admin_dash envelope ok",
+                    "path": "::admin_dash envelope ok",
+                    "id": "7146aac6a1ba7bddb90d302608b4cf6d",
+                    "passes": 20754,
+                    "fails": 0
+                }
+            },
+        "name": "",
+        "path": ""
+    }
+}
